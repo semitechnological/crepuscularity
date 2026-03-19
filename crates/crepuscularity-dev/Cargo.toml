@@ -1,0 +1,12 @@
+[package]
+name = "crepuscularity-dev"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "crepu-dev"
+path = "src/main.rs"
+
+[dependencies]
+crepuscularity-runtime = { path = "../crepuscularity-runtime" }
+gpui = { workspace = true }

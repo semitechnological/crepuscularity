@@ -1,0 +1,11 @@
+[package]
+name = "crepuscularity"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+gpui = { workspace = true }
+crepuscularity_macros = { path = "../crepuscularity_macros" }

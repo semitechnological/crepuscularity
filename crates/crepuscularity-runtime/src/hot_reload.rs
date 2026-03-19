@@ -1,0 +1,119 @@
+/// Hot-reload GPUI view component.
+/// Reads a template file, renders it, and watches for changes.
+
+use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
+
+use gpui::{AsyncApp, Context, Entity, IntoElement, ParentElement, Render, Styled, WeakEntity, Window, div, rgb, rems};
+
+use crate::ast::Node;
+use crate::context::TemplateContext;
+use crate::parser::parse_template;
+use crate::renderer::render_nodes;
+use crate::watcher::watch_file;
+
+/// State model for the hot-reload view.
+pub struct HotReloadState {
+    pub path: PathBuf,
+    pub template: Result<Vec<Node>, String>,
+    pub context: TemplateContext,
+    pub changed: Arc<Mutex<bool>>,
+}
+
+impl HotReloadState {
+    pub fn new(path: PathBuf, context: TemplateContext, cx: &mut Context<Self>) -> Self {
+        let template = load_template(&path);
+        let changed = Arc::new(Mutex::new(false));
+
+        // Start file watcher
+        watch_file(path.clone(), changed.clone());
+
+        // Poll for changes and trigger re-renders
+        let changed_poll = changed.clone();
+        cx.spawn(async move |this: WeakEntity<HotReloadState>, cx: &mut AsyncApp| {
+            loop {
+                let is_changed = {
+                    changed_poll.lock().map(|mut g| {
+                        let v = *g;
+                        *g = false;
+                        v
+                    }).unwrap_or(false)
+                };
+
+                if is_changed {
+                    this.update(cx, |state, cx| {
+                        state.template = load_template(&state.path);
+                        cx.notify();
+                    }).ok();
+                }
+
+                cx.background_executor()
+                    .timer(std::time::Duration::from_millis(100))
+                    .await;
+            }
+        })
+        .detach();
+
+        Self {
+            path,
+            template,
+            context,
+            changed,
+        }
+    }
+
+    pub fn reload(&mut self) {
+        self.template = load_template(&self.path);
+    }
+}
+
+fn load_template(path: &PathBuf) -> Result<Vec<Node>, String> {
+    let content = std::fs::read_to_string(path)
+        .map_err(|e| format!("Could not read {:?}: {}", path, e))?;
+    parse_template(&content)
+}
+
+/// A GPUI view that renders a hot-reloaded template.
+pub struct HotReloadView {
+    pub state: Entity<HotReloadState>,
+}
+
+impl HotReloadView {
+    pub fn new(state: Entity<HotReloadState>) -> Self {
+        Self { state }
+    }
+}
+
+impl Render for HotReloadView {
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let state = self.state.read(cx);
+        match &state.template {
+            Ok(nodes) => render_nodes(nodes, &state.context),
+            Err(err) => {
+                let msg = format!("Parse error:\n\n{}", err);
+                div()
+                    .w_full()
+                    .h_full()
+                    .bg(rgb(0x1a0000))
+                    .p(rems(2.))
+                    .flex()
+                    .flex_col()
+                    .gap(rems(1.))
+                    .child(
+                        div()
+                            .text_color(rgb(0xff4444))
+                            .font_weight(gpui::FontWeight::BOLD)
+                            .text_size(rems(1.125))
+                            .child("Template Error"),
+                    )
+                    .child(
+                        div()
+                            .text_color(rgb(0xff8888))
+                            .text_size(rems(0.875))
+                            .child(msg),
+                    )
+                    .into_any_element()
+            }
+        }
+    }
+}

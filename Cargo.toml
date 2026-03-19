@@ -1,0 +1,15 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/crepuscularity",
+    "crates/crepuscularity_macros",
+    "crates/crepuscularity-runtime",
+    "crates/crepuscularity-dev",
+    "examples/weather",
+]
+
+[workspace.dependencies]
+gpui = { version = "0.2", default-features = false, features = ["font-kit"] }
+proc-macro2 = "1"
+quote = "1"
+syn = { version = "2", features = ["full", "extra-traits"] }
