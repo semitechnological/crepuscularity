@@ -10,7 +10,7 @@ pub fn parse_template(template: &str) -> Result<Vec<Node>, String> {
 }
 
 fn collect_lines(template: &str) -> Vec<(usize, String)> {
-    template
+    let raw: Vec<(usize, String)> = template
         .lines()
         .map(|line| {
             let trimmed = line.trim_start();
@@ -18,7 +18,14 @@ fn collect_lines(template: &str) -> Vec<(usize, String)> {
             (indent, trimmed.to_string())
         })
         .filter(|(_, line)| !line.is_empty() && !line.starts_with('#'))
-        .collect()
+        .collect();
+
+    // Normalize indentation so root elements always start at column 0.
+    let min_indent = raw.iter().map(|(i, _)| *i).min().unwrap_or(0);
+    if min_indent == 0 {
+        return raw;
+    }
+    raw.into_iter().map(|(i, l)| (i - min_indent, l)).collect()
 }
 
 fn parse_nodes(
@@ -48,6 +55,21 @@ fn parse_nodes(
         // Match arm terminators
         if line.ends_with(" =>") || line == "_ =>" {
             break;
+        }
+
+        // include directive
+        if let Some(mut inc) = try_parse_include(line) {
+            i += 1;
+            let (slot, next_i) = if i < lines.len() && lines[i].0 > expected_indent {
+                let child_indent = lines[i].0;
+                parse_nodes(lines, i, child_indent)
+            } else {
+                (vec![], i)
+            };
+            i = next_i;
+            inc.slot = slot;
+            nodes.push(Node::Include(inc));
+            continue;
         }
 
         // $: let declaration
@@ -95,8 +117,8 @@ fn parse_nodes(
             let parts = parse_text_template(line);
             nodes.push(Node::Text(parts));
         } else if is_raw_expr(line) {
-            // Raw expressions can't be evaluated at runtime — render placeholder
-            nodes.push(Node::RawText(format!("{{{}}}", &line[1..line.len() - 1])));
+            // Raw expressions — rendered as evaluated text
+            nodes.push(Node::RawText(line[1..line.len() - 1].trim().to_string()));
         } else {
             let element = parse_element_line(line, children);
             nodes.push(Node::Element(element));
@@ -195,6 +217,93 @@ fn parse_match_arms(
     (arms, i)
 }
 
+// ── Include parsing ───────────────────────────────────────────────────────────
+
+fn try_parse_include(line: &str) -> Option<IncludeNode> {
+    let rest = line.strip_prefix("include ")?;
+    // First token is the path (no spaces in path), rest are props
+    let (path, props_str) = match rest.find(' ') {
+        Some(pos) => (rest[..pos].trim().to_string(), rest[pos + 1..].trim()),
+        None => (rest.trim().to_string(), ""),
+    };
+    if path.is_empty() {
+        return None;
+    }
+    let props = parse_props(props_str);
+    Some(IncludeNode { path, props, slot: vec![] })
+}
+
+fn parse_props(s: &str) -> Vec<(String, String)> {
+    let mut props = Vec::new();
+    let mut remaining = s.trim();
+
+    while !remaining.is_empty() {
+        // Find key= (key is an identifier, no spaces)
+        let eq_pos = match remaining.find('=') {
+            Some(p) => p,
+            None => break,
+        };
+        let key = remaining[..eq_pos].trim().to_string();
+        if key.is_empty() || key.contains(' ') {
+            break;
+        }
+        remaining = remaining[eq_pos + 1..].trim_start();
+
+        // Extract value
+        let (expr_str, rest) = extract_prop_value(remaining);
+        props.push((key, expr_str));
+        remaining = rest.trim_start();
+    }
+
+    props
+}
+
+/// Extract a prop value token from the start of `s`.
+/// Returns `(expr_string, remaining)`.
+/// - `"quoted"` → returns the string content wrapped in quotes for the evaluator
+/// - `{expr}` → returns the inner expr string
+/// - `bare_token` → returns the token as-is (treated as a variable name / literal)
+fn extract_prop_value(s: &str) -> (String, &str) {
+    if s.is_empty() {
+        return (String::new(), s);
+    }
+
+    if s.starts_with('"') || s.starts_with('\'') {
+        let quote = s.as_bytes()[0];
+        let mut i = 1;
+        while i < s.len() && s.as_bytes()[i] != quote { i += 1; }
+        let content = &s[1..i];
+        // Wrap in double-quotes so the evaluator parses it as a string literal
+        let expr = format!("\"{}\"", content);
+        let rest = if i + 1 <= s.len() { &s[i + 1..] } else { "" };
+        return (expr, rest);
+    }
+
+    if s.starts_with('{') {
+        let mut depth = 0usize;
+        for (i, c) in s.char_indices() {
+            match c {
+                '{' => depth += 1,
+                '}' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        let expr = s[1..i].trim().to_string();
+                        return (expr, &s[i + 1..]);
+                    }
+                }
+                _ => {}
+            }
+        }
+        return (s.to_string(), "");
+    }
+
+    // Bare token: ends at next space
+    let end = s.find(' ').unwrap_or(s.len());
+    (s[..end].to_string(), &s[end..])
+}
+
+// ── Other parsers ─────────────────────────────────────────────────────────────
+
 fn try_parse_if(line: &str) -> Option<String> {
     let rest = line.strip_prefix("if ")?;
     Some(extract_braced(rest.trim()).unwrap_or_else(|| rest.trim().to_string()))
@@ -225,12 +334,18 @@ fn try_parse_match_arm(line: &str) -> Option<String> {
 }
 
 fn try_parse_let_decl(line: &str) -> Option<LetDecl> {
-    let rest = line.strip_prefix("$: let ")?;
+    let (rest, is_default) = if let Some(r) = line.strip_prefix("$: default ") {
+        (r, true)
+    } else if let Some(r) = line.strip_prefix("$: let ") {
+        (r, false)
+    } else {
+        return None;
+    };
     let eq_pos = rest.find('=')?;
     let name = rest[..eq_pos].trim().to_string();
     let expr_str = rest[eq_pos + 1..].trim();
     let expr = extract_braced(expr_str).unwrap_or_else(|| expr_str.to_string());
-    Some(LetDecl { name, expr })
+    Some(LetDecl { name, expr, is_default })
 }
 
 fn is_raw_expr(line: &str) -> bool {
@@ -330,9 +445,7 @@ fn tokenize_line(line: &str) -> Vec<String> {
                 current.push(ch);
             }
             ']' if !in_string && brace_depth == 0 => {
-                if bracket_depth > 0 {
-                    bracket_depth -= 1;
-                }
+                if bracket_depth > 0 { bracket_depth -= 1; }
                 current.push(ch);
             }
             '{' if !in_string && bracket_depth == 0 => {
@@ -340,9 +453,7 @@ fn tokenize_line(line: &str) -> Vec<String> {
                 current.push(ch);
             }
             '}' if !in_string && bracket_depth == 0 => {
-                if brace_depth > 0 {
-                    brace_depth -= 1;
-                }
+                if brace_depth > 0 { brace_depth -= 1; }
                 current.push(ch);
             }
             '\'' | '"' if bracket_depth > 0 || brace_depth > 0 => {

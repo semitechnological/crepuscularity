@@ -8,6 +8,7 @@ pub enum Node {
     For(ForBlock),
     Match(MatchBlock),
     LetDecl(LetDecl),
+    Include(IncludeNode),
     RawText(String),
 }
 
@@ -76,4 +77,25 @@ pub struct MatchArm {
 pub struct LetDecl {
     pub name: String,
     pub expr: String,
+    /// If true, only sets the variable when it is not already present in the context.
+    /// Used for component prop defaults: `$: default name = value`
+    pub is_default: bool,
+}
+
+/// An `include` directive — embeds another `.crepus` file as a component.
+///
+/// ```text
+/// include components/button.crepus label="Click me" count={total}
+///     div p-4
+///         "slot content"
+/// ```
+#[derive(Debug, Clone)]
+pub struct IncludeNode {
+    /// Relative path to the included `.crepus` file.
+    pub path: String,
+    /// Props passed to the component: (key, expr_string) pairs.
+    /// The expr_string is evaluated against the parent context.
+    pub props: Vec<(String, String)>,
+    /// Children of the include directive — become the component's slot content.
+    pub slot: Vec<Node>,
 }
