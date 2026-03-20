@@ -1,7 +1,11 @@
 use proc_macro::TokenStream;
 use proc_macro2::{Span, TokenStream as TokenStream2};
 use quote::quote;
+use std::sync::atomic::{AtomicU64, Ordering};
 use syn::{LitStr, parse_macro_input};
+
+/// Global counter for generating unique element IDs within a compilation unit.
+static ELEM_ID_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 // ============================================================
 // Entry point
@@ -168,7 +172,7 @@ struct LetDecl {
 // ============================================================
 
 fn collect_lines(template: &str) -> Vec<(usize, String)> {
-    template
+    let lines: Vec<(usize, String)> = template
         .lines()
         .map(|line| {
             let trimmed = line.trim_start();
@@ -176,7 +180,15 @@ fn collect_lines(template: &str) -> Vec<(usize, String)> {
             (indent, trimmed.to_string())
         })
         .filter(|(_, line)| !line.is_empty() && !line.starts_with('#'))
-        .collect()
+        .collect();
+
+    // Normalize indentation so root elements always start at column 0.
+    // This allows templates embedded in indented code to work correctly.
+    let min_indent = lines.iter().map(|(i, _)| *i).min().unwrap_or(0);
+    if min_indent == 0 {
+        return lines;
+    }
+    lines.into_iter().map(|(i, l)| (i - min_indent, l)).collect()
 }
 
 fn parse_nodes(
@@ -728,8 +740,20 @@ fn generate_element(element: &Element) -> Result<TokenStream2, String> {
         .map(generate_child_call)
         .collect::<Result<_, _>>()?;
 
+    // on_click (and other StatefulInteractiveElement methods) require the element
+    // to have been given an ElementId via .id(). Inject .id() when click handlers
+    // are present so the Div is promoted to Stateful<Div>.
+    let needs_id = element.event_handlers.iter().any(|h| h.event == "click");
+    let id_call = if needs_id {
+        let id = ELEM_ID_COUNTER.fetch_add(1, Ordering::Relaxed) as usize;
+        quote! { .id(#id as usize) }
+    } else {
+        quote! {}
+    };
+
     Ok(quote! {
         #tag_expr
+        #id_call
         #(#class_methods)*
         #(#conditional_class_calls)*
         #(#handler_calls)*
@@ -1224,13 +1248,10 @@ fn map_class_to_style(class: &str) -> Option<TokenStream2> {
         "items-center" => Some(quote! { .items_center() }),
         "items-start" => Some(quote! { .items_start() }),
         "items-end" => Some(quote! { .items_end() }),
-        "items-stretch" => Some(quote! { .items_stretch() }),
+        "items-stretch" => None, // no items_stretch() in GPUI 0.2.x
         "items-baseline" => Some(quote! { .items_baseline() }),
-        "self-stretch" => Some(quote! { .self_stretch() }),
-        "self-center" => Some(quote! { .self_center() }),
-        "self-start" => Some(quote! { .self_start() }),
-        "self-end" => Some(quote! { .self_end() }),
-        "self-auto" => Some(quote! { .self_auto() }),
+        // self-* (align-self) not available as methods in GPUI 0.2.x
+        "self-stretch" | "self-center" | "self-start" | "self-end" | "self-auto" => None,
         "content-center" => Some(quote! { .content_center() }),
         "content-start" => Some(quote! { .content_start() }),
         "content-end" => Some(quote! { .content_end() }),

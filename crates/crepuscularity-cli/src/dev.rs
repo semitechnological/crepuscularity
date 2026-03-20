@@ -128,6 +128,32 @@ fn background_loop(
     }
 }
 
+/// Find the compiled binary, checking the workspace root target dir first.
+///
+/// In a workspace, `cargo build` places binaries in `{workspace_root}/target/`
+/// rather than in the crate's own directory. We use `cargo locate-project
+/// --workspace` to find the workspace root, then fall back to `{cwd}/target/`.
+fn locate_binary(cwd: &std::path::Path, profile: &str, bin_name: &str) -> PathBuf {
+    // Ask cargo where the workspace root is
+    let workspace_root = std::process::Command::new("cargo")
+        .args(["locate-project", "--workspace", "--message-format", "plain"])
+        .current_dir(cwd)
+        .output()
+        .ok()
+        .and_then(|out| {
+            if out.status.success() {
+                let s = String::from_utf8(out.stdout).ok()?;
+                let p = PathBuf::from(s.trim());
+                p.parent().map(|d| d.to_path_buf())
+            } else {
+                None
+            }
+        });
+
+    let target_base = workspace_root.unwrap_or_else(|| cwd.to_path_buf());
+    target_base.join("target").join(profile).join(bin_name)
+}
+
 fn do_build_launch(
     shared: &Arc<Mutex<HudState>>,
     cwd: &PathBuf,
@@ -154,7 +180,7 @@ fn do_build_launch(
             s.status = DevStatus::Running { elapsed_ms };
         }
         let profile = if release { "release" } else { "debug" };
-        let bin_path = cwd.join("target").join(profile).join(bin_name);
+        let bin_path = locate_binary(cwd, profile, bin_name);
 
         eprintln!("[crepu dev] Built in {elapsed_ms} ms — launching {bin_name}");
 
