@@ -5,6 +5,7 @@ members = [
     "crates/crepuscularity_macros",
     "crates/crepuscularity-runtime",
     "crates/crepuscularity-dev",
+    "crates/crepuscularity-cli",
     "examples/weather",
 ]
 

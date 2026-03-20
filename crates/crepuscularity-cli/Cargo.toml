@@ -1,0 +1,15 @@
+[package]
+name = "crepuscularity-cli"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "crepu"
+path = "src/main.rs"
+
+[dependencies]
+gpui                   = { workspace = true }
+crepuscularity-runtime = { path = "../crepuscularity-runtime" }
+notify                 = "6"
+serde                  = { version = "1", features = ["derive"] }
+serde_json             = "1"
