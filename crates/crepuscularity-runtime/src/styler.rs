@@ -6,7 +6,7 @@
 /// - Dynamic context expressions: `bg-{theme.surface}`, `text-{colors.muted}`
 ///   where the expression evaluates to a hex color string like "#1e1e2e" or "1e1e2e"
 
-use gpui::{prelude::*, rgb, rgba, px, rems, relative, Div, Length, AbsoluteLength, DefiniteLength};
+use gpui::{prelude::*, rgb, rgba, hsla, px, rems, relative, Div, Length, AbsoluteLength, DefiniteLength};
 
 use crate::context::TemplateContext;
 
@@ -108,12 +108,42 @@ fn parse_color_str(s: &str) -> Option<u32> {
 /// Returns Ok(div) if class matched, Err(div) to fall through to dynamic.
 fn apply_static(d: Div, class: &str) -> Result<Div, Div> {
     Ok(match class {
-        // Layout
+        // ── Display ──
+        "block" => d.block(),
         "flex" => d.flex(),
-        "flex-col" => d.flex_col(),
+        "grid" => d.grid(),
+        "hidden" => d.hidden(),
+
+        // ── Visibility ──
+        "visible" => d.visible(),
+        "invisible" => d.invisible(),
+
+        // ── Position ──
+        "absolute" => d.absolute(),
+        "relative" => d.relative(),
+
+        // ── Overflow ──
+        "overflow-hidden" => d.overflow_hidden(),
+        "overflow-x-hidden" => d.overflow_x_hidden(),
+        "overflow-y-hidden" => d.overflow_y_hidden(),
+        // visible/scroll/auto — accepted silently (scroll needs .id(), visible is default)
+        "overflow-visible" | "overflow-x-visible" | "overflow-y-visible"
+        | "overflow-scroll" | "overflow-auto"
+        | "overflow-y-scroll" | "overflow-y-auto"
+        | "overflow-x-scroll" | "overflow-x-auto" => d,
+
+        // ── Flex direction ──
         "flex-row" => d.flex_row(),
+        "flex-row-reverse" => d.flex_row_reverse(),
+        "flex-col" => d.flex_col(),
+        "flex-col-reverse" => d.flex_col_reverse(),
+
+        // ── Flex wrap ──
         "flex-wrap" => d.flex_wrap(),
+        "flex-wrap-reverse" => d.flex_wrap_reverse(),
         "flex-nowrap" => d.flex_nowrap(),
+
+        // ── Flex sizing ──
         "flex-1" => d.flex_1(),
         "flex-auto" => d.flex_auto(),
         "flex-initial" => d.flex_initial(),
@@ -122,70 +152,103 @@ fn apply_static(d: Div, class: &str) -> Result<Div, Div> {
         "grow-0" => d.flex_none(),
         "shrink" => d.flex_shrink(),
         "shrink-0" => d.flex_shrink_0(),
-        "block" => d.block(),
-        "hidden" => d.hidden(),
-        "invisible" => d.invisible(),
-        "visible" => d.visible(),
-        "absolute" => d.absolute(),
-        "relative" => d.relative(),
-        "overflow-hidden" => d.overflow_hidden(),
-        "overflow-x-hidden" => d.overflow_x_hidden(),
-        "overflow-y-hidden" => d.overflow_y_hidden(),
-        // overflow-auto/scroll — scroll not available on Div (needs StatefulInteractiveElement)
-        "overflow-scroll" | "overflow-auto"
-        | "overflow-y-scroll" | "overflow-y-auto"
-        | "overflow-x-scroll" | "overflow-x-auto" => d,
 
-        // Sizing
-        "w-full" => d.w_full(),
-        "h-full" => d.h_full(),
-        "w-auto" => d.w_auto(),
-        "h-auto" => d.h_auto(),
-        "w-px" => d.w_px(),
-        "h-px" => d.h_px(),
-        "min-w-0" => d.min_w(px(0.)),
-        "min-h-0" => d.min_h(px(0.)),
-        "w-0" => d.w(px(0.)),
-        "h-0" => d.h(px(0.)),
-
-        // Flexbox alignment
-        "justify-center" => d.justify_center(),
+        // ── Justify content ──
         "justify-start" => d.justify_start(),
         "justify-end" => d.justify_end(),
+        "justify-center" => d.justify_center(),
         "justify-between" => d.justify_between(),
         "justify-around" => d.justify_around(),
-        "items-center" => d.items_center(),
+
+        // ── Align items ──
         "items-start" => d.items_start(),
         "items-end" => d.items_end(),
+        "items-center" => d.items_center(),
         "items-baseline" => d.items_baseline(),
-        // self-* not supported in GPUI 0.2.x
-        "self-stretch" | "self-center" | "self-start" | "self-end" | "self-auto" => d,
 
-        // Colors — background
+        // ── Align content ──
+        "content-normal" => d.content_normal(),
+        "content-center" => d.content_center(),
+        "content-start" => d.content_start(),
+        "content-end" => d.content_end(),
+        "content-between" => d.content_between(),
+        "content-around" => d.content_around(),
+        "content-evenly" => d.content_evenly(),
+        "content-stretch" => d.content_stretch(),
+
+        // ── Sizing (predefined) ──
+        "w-0" => d.w(px(0.)),
+        "w-px" => d.w_px(),
+        "w-full" => d.w_full(),
+        "w-auto" => d.w_auto(),
+        "h-0" => d.h(px(0.)),
+        "h-px" => d.h_px(),
+        "h-full" => d.h_full(),
+        "h-auto" => d.h_auto(),
+        "size-full" => d.size_full(),
+        "size-auto" => d.size_auto(),
+        "min-w-0" => d.min_w(px(0.)),
+        "min-w-full" => d.min_w_full(),
+        "min-h-0" => d.min_h(px(0.)),
+        "min-h-full" => d.min_h_full(),
+        "max-w-full" => d.max_w_full(),
+        "max-h-full" => d.max_h_full(),
+
+        // ── Named colors — background ──
         "bg-black" => d.bg(gpui::black()),
         "bg-white" => d.bg(gpui::white()),
         "bg-transparent" => d.bg(gpui::transparent_black()),
+        "bg-red" => d.bg(gpui::red()),
+        "bg-green" => d.bg(gpui::green()),
+        "bg-blue" => d.bg(gpui::blue()),
+        "bg-yellow" => d.bg(gpui::yellow()),
 
-        // Colors — text
+        // ── Named colors — text ──
         "text-white" => d.text_color(gpui::white()),
         "text-black" => d.text_color(gpui::black()),
+        "text-transparent" => d.text_color(gpui::transparent_black()),
+        "text-red" => d.text_color(gpui::red()),
+        "text-green" => d.text_color(gpui::green()),
+        "text-blue" => d.text_color(gpui::blue()),
+        "text-yellow" => d.text_color(gpui::yellow()),
 
-        // Colors — border
+        // ── Named colors — border ──
         "border-white" => d.border_color(gpui::white()),
         "border-black" => d.border_color(gpui::black()),
+        "border-transparent" => d.border_color(gpui::transparent_black()),
 
-        // Border width
+        // ── Border style ──
+        "border-dashed" => d.border_dashed(),
+
+        // ── Border width ──
         "border" => d.border_1(),
         "border-0" => d.border_0(),
         "border-2" => d.border_2(),
         "border-4" => d.border_4(),
         "border-8" => d.border_8(),
+        // Per-side border width
         "border-t" => d.border_t_1(),
+        "border-t-0" => d.border_t_0(),
+        "border-t-2" => d.border_t_2(),
+        "border-t-4" => d.border_t_4(),
+        "border-t-8" => d.border_t_8(),
         "border-b" => d.border_b_1(),
+        "border-b-0" => d.border_b_0(),
+        "border-b-2" => d.border_b_2(),
+        "border-b-4" => d.border_b_4(),
+        "border-b-8" => d.border_b_8(),
         "border-l" => d.border_l_1(),
+        "border-l-0" => d.border_l_0(),
+        "border-l-2" => d.border_l_2(),
+        "border-l-4" => d.border_l_4(),
+        "border-l-8" => d.border_l_8(),
         "border-r" => d.border_r_1(),
+        "border-r-0" => d.border_r_0(),
+        "border-r-2" => d.border_r_2(),
+        "border-r-4" => d.border_r_4(),
+        "border-r-8" => d.border_r_8(),
 
-        // Border radius
+        // ── Border radius ──
         "rounded-none" => d.rounded_none(),
         "rounded-sm" => d.rounded_sm(),
         "rounded" | "rounded-md" => d.rounded_md(),
@@ -194,8 +257,74 @@ fn apply_static(d: Div, class: &str) -> Result<Div, Div> {
         "rounded-2xl" => d.rounded_2xl(),
         "rounded-3xl" => d.rounded_3xl(),
         "rounded-full" => d.rounded_full(),
+        // Per-side radius
+        "rounded-t-none" => d.rounded_t_none(),
+        "rounded-t-sm" => d.rounded_t_sm(),
+        "rounded-t" | "rounded-t-md" => d.rounded_t_md(),
+        "rounded-t-lg" => d.rounded_t_lg(),
+        "rounded-t-xl" => d.rounded_t_xl(),
+        "rounded-t-2xl" => d.rounded_t_2xl(),
+        "rounded-t-3xl" => d.rounded_t_3xl(),
+        "rounded-t-full" => d.rounded_t_full(),
+        "rounded-b-none" => d.rounded_b_none(),
+        "rounded-b-sm" => d.rounded_b_sm(),
+        "rounded-b" | "rounded-b-md" => d.rounded_b_md(),
+        "rounded-b-lg" => d.rounded_b_lg(),
+        "rounded-b-xl" => d.rounded_b_xl(),
+        "rounded-b-2xl" => d.rounded_b_2xl(),
+        "rounded-b-3xl" => d.rounded_b_3xl(),
+        "rounded-b-full" => d.rounded_b_full(),
+        "rounded-l-none" => d.rounded_l_none(),
+        "rounded-l-sm" => d.rounded_l_sm(),
+        "rounded-l" | "rounded-l-md" => d.rounded_l_md(),
+        "rounded-l-lg" => d.rounded_l_lg(),
+        "rounded-l-xl" => d.rounded_l_xl(),
+        "rounded-l-2xl" => d.rounded_l_2xl(),
+        "rounded-l-3xl" => d.rounded_l_3xl(),
+        "rounded-l-full" => d.rounded_l_full(),
+        "rounded-r-none" => d.rounded_r_none(),
+        "rounded-r-sm" => d.rounded_r_sm(),
+        "rounded-r" | "rounded-r-md" => d.rounded_r_md(),
+        "rounded-r-lg" => d.rounded_r_lg(),
+        "rounded-r-xl" => d.rounded_r_xl(),
+        "rounded-r-2xl" => d.rounded_r_2xl(),
+        "rounded-r-3xl" => d.rounded_r_3xl(),
+        "rounded-r-full" => d.rounded_r_full(),
+        // Per-corner radius
+        "rounded-tl-none" => d.rounded_tl_none(),
+        "rounded-tl-sm" => d.rounded_tl_sm(),
+        "rounded-tl" | "rounded-tl-md" => d.rounded_tl_md(),
+        "rounded-tl-lg" => d.rounded_tl_lg(),
+        "rounded-tl-xl" => d.rounded_tl_xl(),
+        "rounded-tl-2xl" => d.rounded_tl_2xl(),
+        "rounded-tl-3xl" => d.rounded_tl_3xl(),
+        "rounded-tl-full" => d.rounded_tl_full(),
+        "rounded-tr-none" => d.rounded_tr_none(),
+        "rounded-tr-sm" => d.rounded_tr_sm(),
+        "rounded-tr" | "rounded-tr-md" => d.rounded_tr_md(),
+        "rounded-tr-lg" => d.rounded_tr_lg(),
+        "rounded-tr-xl" => d.rounded_tr_xl(),
+        "rounded-tr-2xl" => d.rounded_tr_2xl(),
+        "rounded-tr-3xl" => d.rounded_tr_3xl(),
+        "rounded-tr-full" => d.rounded_tr_full(),
+        "rounded-bl-none" => d.rounded_bl_none(),
+        "rounded-bl-sm" => d.rounded_bl_sm(),
+        "rounded-bl" | "rounded-bl-md" => d.rounded_bl_md(),
+        "rounded-bl-lg" => d.rounded_bl_lg(),
+        "rounded-bl-xl" => d.rounded_bl_xl(),
+        "rounded-bl-2xl" => d.rounded_bl_2xl(),
+        "rounded-bl-3xl" => d.rounded_bl_3xl(),
+        "rounded-bl-full" => d.rounded_bl_full(),
+        "rounded-br-none" => d.rounded_br_none(),
+        "rounded-br-sm" => d.rounded_br_sm(),
+        "rounded-br" | "rounded-br-md" => d.rounded_br_md(),
+        "rounded-br-lg" => d.rounded_br_lg(),
+        "rounded-br-xl" => d.rounded_br_xl(),
+        "rounded-br-2xl" => d.rounded_br_2xl(),
+        "rounded-br-3xl" => d.rounded_br_3xl(),
+        "rounded-br-full" => d.rounded_br_full(),
 
-        // Typography — weight
+        // ── Typography — weight ──
         "font-thin" => d.font_weight(gpui::FontWeight::THIN),
         "font-light" => d.font_weight(gpui::FontWeight::LIGHT),
         "font-normal" => d.font_weight(gpui::FontWeight::NORMAL),
@@ -204,16 +333,20 @@ fn apply_static(d: Div, class: &str) -> Result<Div, Div> {
         "font-bold" => d.font_weight(gpui::FontWeight::BOLD),
         "font-extrabold" => d.font_weight(gpui::FontWeight::EXTRA_BOLD),
         "font-black" => d.font_weight(gpui::FontWeight::BLACK),
-        "italic" | "font-italic" => d.italic(),
 
-        // Typography — scale
-        "text-xs" => d.text_size(rems(0.75)),
-        "text-sm" => d.text_size(rems(0.875)),
-        "text-base" => d.text_size(rems(1.)),
-        "text-lg" => d.text_size(rems(1.125)),
-        "text-xl" => d.text_size(rems(1.25)),
-        "text-2xl" => d.text_size(rems(1.5)),
-        "text-3xl" => d.text_size(rems(1.875)),
+        // ── Typography — style ──
+        "italic" | "font-italic" => d.italic(),
+        "not-italic" => d.not_italic(),
+
+        // ── Typography — size ──
+        "text-xs" => d.text_xs(),
+        "text-sm" => d.text_sm(),
+        "text-base" => d.text_base(),
+        "text-lg" => d.text_lg(),
+        "text-xl" => d.text_xl(),
+        "text-2xl" => d.text_2xl(),
+        "text-3xl" => d.text_3xl(),
+        // 4xl-9xl: GPUI only has up to text_3xl, use text_size for larger
         "text-4xl" => d.text_size(rems(2.25)),
         "text-5xl" => d.text_size(rems(3.)),
         "text-6xl" => d.text_size(rems(3.75)),
@@ -221,12 +354,24 @@ fn apply_static(d: Div, class: &str) -> Result<Div, Div> {
         "text-8xl" => d.text_size(rems(6.)),
         "text-9xl" => d.text_size(rems(8.)),
 
-        // Typography — alignment
+        // ── Typography — alignment ──
         "text-left" => d.text_left(),
         "text-center" => d.text_center(),
         "text-right" => d.text_right(),
 
-        // Typography — line height
+        // ── Typography — decoration ──
+        "underline" => d.underline(),
+        "line-through" => d.line_through(),
+        "no-underline" => d.text_decoration_none(),
+        "decoration-solid" => d.text_decoration_solid(),
+        "decoration-wavy" => d.text_decoration_wavy(),
+        "decoration-0" => d.text_decoration_0(),
+        "decoration-1" => d.text_decoration_1(),
+        "decoration-2" => d.text_decoration_2(),
+        "decoration-4" => d.text_decoration_4(),
+        "decoration-8" => d.text_decoration_8(),
+
+        // ── Typography — line height ──
         "leading-none" => d.line_height(relative(1.)),
         "leading-tight" => d.line_height(relative(1.25)),
         "leading-snug" => d.line_height(relative(1.375)),
@@ -234,33 +379,74 @@ fn apply_static(d: Div, class: &str) -> Result<Div, Div> {
         "leading-relaxed" => d.line_height(relative(1.625)),
         "leading-loose" => d.line_height(relative(2.)),
 
-        // Typography — misc
+        // ── Typography — overflow ──
         "truncate" => d.truncate(),
+        "text-ellipsis" => d.text_ellipsis(),
         "whitespace-nowrap" => d.whitespace_nowrap(),
         "whitespace-normal" => d.whitespace_normal(),
-        "underline" => d.underline(),
-        "line-through" => d.line_through(),
 
-        // Cursor
-        "cursor-pointer" => d.cursor_pointer(),
+        // ── Cursor ──
         "cursor-default" => d.cursor_default(),
+        "cursor-pointer" => d.cursor_pointer(),
         "cursor-text" => d.cursor_text(),
+        "cursor-move" => d.cursor_move(),
         "cursor-not-allowed" => d.cursor_not_allowed(),
+        "cursor-context-menu" => d.cursor_context_menu(),
         "cursor-crosshair" => d.cursor_crosshair(),
+        "cursor-vertical-text" => d.cursor_vertical_text(),
+        "cursor-alias" => d.cursor_alias(),
+        "cursor-copy" => d.cursor_copy(),
+        "cursor-no-drop" => d.cursor_no_drop(),
         "cursor-grab" => d.cursor_grab(),
         "cursor-grabbing" => d.cursor_grabbing(),
+        "cursor-ew-resize" => d.cursor_ew_resize(),
+        "cursor-ns-resize" => d.cursor_ns_resize(),
+        "cursor-nesw-resize" => d.cursor_nesw_resize(),
+        "cursor-nwse-resize" => d.cursor_nwse_resize(),
         "cursor-col-resize" => d.cursor_col_resize(),
         "cursor-row-resize" => d.cursor_row_resize(),
+        "cursor-n-resize" => d.cursor_n_resize(),
+        "cursor-e-resize" => d.cursor_e_resize(),
+        "cursor-s-resize" => d.cursor_s_resize(),
+        "cursor-w-resize" => d.cursor_w_resize(),
 
-        // Shadow
+        // ── Shadow ──
+        "shadow-2xs" => d.shadow_2xs(),
+        "shadow-xs" => d.shadow_xs(),
         "shadow-sm" => d.shadow_sm(),
         "shadow" | "shadow-md" => d.shadow_md(),
         "shadow-lg" => d.shadow_lg(),
         "shadow-xl" => d.shadow_xl(),
         "shadow-2xl" => d.shadow_2xl(),
-        "shadow-none" => d,
+        "shadow-none" => d.shadow_none(),
 
-        // Transitions & animations — parsed but no-op at the class level
+        // ── Grid ──
+        "grid-cols-1" => d.grid_cols(1),
+        "grid-cols-2" => d.grid_cols(2),
+        "grid-cols-3" => d.grid_cols(3),
+        "grid-cols-4" => d.grid_cols(4),
+        "grid-cols-5" => d.grid_cols(5),
+        "grid-cols-6" => d.grid_cols(6),
+        "grid-cols-7" => d.grid_cols(7),
+        "grid-cols-8" => d.grid_cols(8),
+        "grid-cols-9" => d.grid_cols(9),
+        "grid-cols-10" => d.grid_cols(10),
+        "grid-cols-11" => d.grid_cols(11),
+        "grid-cols-12" => d.grid_cols(12),
+        "grid-rows-1" => d.grid_rows(1),
+        "grid-rows-2" => d.grid_rows(2),
+        "grid-rows-3" => d.grid_rows(3),
+        "grid-rows-4" => d.grid_rows(4),
+        "grid-rows-5" => d.grid_rows(5),
+        "grid-rows-6" => d.grid_rows(6),
+        "col-span-full" => d.col_span_full(),
+        "col-start-auto" => d.col_start_auto(),
+        "col-end-auto" => d.col_end_auto(),
+        "row-span-full" => d.row_span_full(),
+        "row-start-auto" => d.row_start_auto(),
+        "row-end-auto" => d.row_end_auto(),
+
+        // ── Transitions & animations — no-op at class level ──
         // Actual animation is handled by animate: attributes in the renderer.
         "transition" | "transition-all" | "transition-colors" | "transition-opacity"
         | "transition-shadow" | "transition-transform"
@@ -271,18 +457,26 @@ fn apply_static(d: Div, class: &str) -> Result<Div, Div> {
         | "delay-300" | "delay-500" | "delay-700" | "delay-1000"
         | "animate-none" | "animate-spin" | "animate-ping" | "animate-pulse" | "animate-bounce" => d,
 
-        // Ignored / unsupported (accepted silently to allow copy-pasting from Tailwind)
-        "inline-flex" | "inline" | "grid" | "select-none" | "pointer-events-none"
-        | "uppercase" | "lowercase" | "capitalize" | "whitespace-pre" | "sticky"
-        | "fixed" | "overflow-scroll-x" | "content-center" | "content-start"
-        | "content-end" | "items-stretch" => d,
+        // ── Accepted silently (CSS-only or unsupported in GPUI) ──
+        "inline-flex" | "inline" | "inline-block" | "select-none" | "pointer-events-none"
+        | "uppercase" | "lowercase" | "capitalize" | "whitespace-pre"
+        | "sticky" | "fixed" | "items-stretch"
+        | "self-stretch" | "self-center" | "self-start" | "self-end" | "self-auto" => d,
+
+        // ── Debug (only in debug builds) ──
+        #[cfg(debug_assertions)]
+        "debug" => d.debug(),
+        #[cfg(debug_assertions)]
+        "debug-below" => d.debug_below(),
+        #[cfg(not(debug_assertions))]
+        "debug" | "debug-below" => d,
 
         _ => return Err(d),
     })
 }
 
 fn apply_dynamic(d: Div, class: &str) -> Div {
-    // Methods that accept Length (auto allowed: w, h, m*, inset, top, etc.)
+    // ── Length properties (support auto) ──
     const LENGTH_PROPS: &[(&str, fn(Div, Length) -> Div)] = &[
         ("w-", |d, v| d.w(v)),
         ("h-", |d, v| d.h(v)),
@@ -303,6 +497,7 @@ fn apply_dynamic(d: Div, class: &str) -> Div {
         ("right-", |d, v| d.right(v)),
         ("inset-", |d, v| d.inset(v)),
         ("size-", |d, v| d.size(v)),
+        ("basis-", |d, v| d.flex_basis(v)),
     ];
 
     for (prefix, apply) in LENGTH_PROPS {
@@ -313,7 +508,7 @@ fn apply_dynamic(d: Div, class: &str) -> Div {
         }
     }
 
-    // Methods that accept DefiniteLength (auto not allowed: p*, gap*)
+    // ── DefiniteLength properties (no auto) ──
     const DEFINITE_PROPS: &[(&str, fn(Div, DefiniteLength) -> Div)] = &[
         ("p-", |d, v| d.p(v)),
         ("px-", |d, v| d.px(v)),
@@ -335,25 +530,20 @@ fn apply_dynamic(d: Div, class: &str) -> Div {
         }
     }
 
-    // Arbitrary border radius: rounded-[Npx]
-    if let Some(rest) = class.strip_prefix("rounded-[") {
-        if let Some(inner) = rest.strip_suffix(']') {
-            if let Some(abs) = parse_absolute_length(inner) {
-                return d.rounded(abs);
-            }
-        }
-    }
-
-    // Arbitrary border widths: border-t-[Npx], border-b-[Npx], etc.
+    // ── Arbitrary border radius: rounded-[Npx], rounded-t-[Npx], etc. ──
     for (prefix, apply_fn) in &[
-        ("border-t-", Div::border_t as fn(Div, AbsoluteLength) -> Div),
-        ("border-b-", Div::border_b as fn(Div, AbsoluteLength) -> Div),
-        ("border-l-", Div::border_l as fn(Div, AbsoluteLength) -> Div),
-        ("border-r-", Div::border_r as fn(Div, AbsoluteLength) -> Div),
+        ("rounded-tl-[", Div::rounded_tl as fn(Div, AbsoluteLength) -> Div),
+        ("rounded-tr-[", Div::rounded_tr as fn(Div, AbsoluteLength) -> Div),
+        ("rounded-bl-[", Div::rounded_bl as fn(Div, AbsoluteLength) -> Div),
+        ("rounded-br-[", Div::rounded_br as fn(Div, AbsoluteLength) -> Div),
+        ("rounded-t-[", Div::rounded_t as fn(Div, AbsoluteLength) -> Div),
+        ("rounded-b-[", Div::rounded_b as fn(Div, AbsoluteLength) -> Div),
+        ("rounded-l-[", Div::rounded_l as fn(Div, AbsoluteLength) -> Div),
+        ("rounded-r-[", Div::rounded_r as fn(Div, AbsoluteLength) -> Div),
+        ("rounded-[", Div::rounded as fn(Div, AbsoluteLength) -> Div),
     ] {
         if let Some(rest) = class.strip_prefix(prefix) {
-            if rest.starts_with('[') && rest.ends_with(']') {
-                let inner = &rest[1..rest.len()-1];
+            if let Some(inner) = rest.strip_suffix(']') {
                 if let Some(abs) = parse_absolute_length(inner) {
                     return apply_fn(d, abs);
                 }
@@ -361,7 +551,56 @@ fn apply_dynamic(d: Div, class: &str) -> Div {
         }
     }
 
-    // font-['Family'] or font-[Family]
+    // ── Arbitrary border widths: border-t-[Npx], border-[Npx] etc. ──
+    for (prefix, apply_fn) in &[
+        ("border-t-[", Div::border_t as fn(Div, AbsoluteLength) -> Div),
+        ("border-b-[", Div::border_b as fn(Div, AbsoluteLength) -> Div),
+        ("border-l-[", Div::border_l as fn(Div, AbsoluteLength) -> Div),
+        ("border-r-[", Div::border_r as fn(Div, AbsoluteLength) -> Div),
+        ("border-[", Div::border as fn(Div, AbsoluteLength) -> Div),
+    ] {
+        if let Some(rest) = class.strip_prefix(prefix) {
+            if let Some(inner) = rest.strip_suffix(']') {
+                if let Some(abs) = parse_absolute_length(inner) {
+                    return apply_fn(d, abs);
+                }
+            }
+        }
+    }
+
+    // ── Grid placement: col-span-N, col-start-N, col-end-N, row-span-N, etc. ──
+    if let Some(rest) = class.strip_prefix("col-span-") {
+        if let Ok(n) = rest.parse::<u16>() { return d.col_span(n); }
+    }
+    if let Some(rest) = class.strip_prefix("col-start-") {
+        if let Ok(n) = rest.parse::<i16>() { return d.col_start(n); }
+    }
+    if let Some(rest) = class.strip_prefix("col-end-") {
+        if let Ok(n) = rest.parse::<i16>() { return d.col_end(n); }
+    }
+    if let Some(rest) = class.strip_prefix("row-span-") {
+        if let Ok(n) = rest.parse::<u16>() { return d.row_span(n); }
+    }
+    if let Some(rest) = class.strip_prefix("row-start-") {
+        if let Ok(n) = rest.parse::<i16>() { return d.row_start(n); }
+    }
+    if let Some(rest) = class.strip_prefix("row-end-") {
+        if let Ok(n) = rest.parse::<i16>() { return d.row_end(n); }
+    }
+    // Dynamic grid-cols-N and grid-rows-N beyond the static 1-12
+    if let Some(rest) = class.strip_prefix("grid-cols-") {
+        if let Ok(n) = rest.parse::<u16>() { return d.grid_cols(n); }
+    }
+    if let Some(rest) = class.strip_prefix("grid-rows-") {
+        if let Ok(n) = rest.parse::<u16>() { return d.grid_rows(n); }
+    }
+
+    // ── line-clamp-N ──
+    if let Some(rest) = class.strip_prefix("line-clamp-") {
+        if let Ok(n) = rest.parse::<usize>() { return d.line_clamp(n); }
+    }
+
+    // ── font-['Family'] or font-[Family] ──
     if let Some(rest) = class.strip_prefix("font-[") {
         if let Some(inner) = rest.strip_suffix(']') {
             let family = inner.trim_matches('\'').trim_matches('"').replace('_', " ");
@@ -369,16 +608,23 @@ fn apply_dynamic(d: Div, class: &str) -> Div {
         }
     }
 
-    // text-[size] — text_size takes AbsoluteLength
+    // ── text-[size] — arbitrary text size ──
     if let Some(rest) = class.strip_prefix("text-[") {
         if let Some(inner) = rest.strip_suffix(']') {
+            // Check if it's a color first: text-[#rrggbb]
+            if let Some(hex_str) = inner.strip_prefix('#') {
+                if let Ok(hex) = u32::from_str_radix(hex_str, 16) {
+                    return d.text_color(rgb(hex));
+                }
+            }
+            // Otherwise it's a size
             if let Some(len) = parse_absolute_length(inner) {
                 return d.text_size(len);
             }
         }
     }
 
-    // line-height-[value] or leading-[value]
+    // ── leading-[value] — arbitrary line height ──
     if let Some(rest) = class.strip_prefix("leading-[") {
         if let Some(inner) = rest.strip_suffix(']') {
             if let Some(abs) = parse_absolute_length(inner) {
@@ -387,14 +633,55 @@ fn apply_dynamic(d: Div, class: &str) -> Div {
         }
     }
 
-    // opacity-N
+    // ── opacity-N ──
     if let Some(rest) = class.strip_prefix("opacity-") {
         if let Ok(n) = rest.parse::<f32>() {
             return d.opacity(n / 100.0);
         }
     }
 
-    // Color families: bg-{family}-{shade}, text-{family}-{shade}, border-{family}-{shade}
+    // ── Decoration color: decoration-[#hex] or decoration-family-shade ──
+    if let Some(rest) = class.strip_prefix("decoration-[") {
+        if let Some(inner) = rest.strip_suffix(']') {
+            if let Some(hex_str) = inner.strip_prefix('#') {
+                if let Ok(hex) = u32::from_str_radix(hex_str, 16) {
+                    return d.text_decoration_color(rgb(hex));
+                }
+            }
+        }
+    }
+    if let Some(rest) = class.strip_prefix("decoration-") {
+        // decoration-family-shade
+        if let Some(dash_pos) = rest.rfind('-') {
+            let family = &rest[..dash_pos];
+            let shade = &rest[dash_pos + 1..];
+            if let Some(hex) = tailwind_color(family, shade) {
+                return d.text_decoration_color(rgb(hex));
+            }
+        }
+    }
+
+    // ── text-bg: text-bg-[#hex] or text-bg-family-shade ──
+    if let Some(rest) = class.strip_prefix("text-bg-[") {
+        if let Some(inner) = rest.strip_suffix(']') {
+            if let Some(hex_str) = inner.strip_prefix('#') {
+                if let Ok(hex) = u32::from_str_radix(hex_str, 16) {
+                    return d.text_bg(rgb(hex));
+                }
+            }
+        }
+    }
+    if let Some(rest) = class.strip_prefix("text-bg-") {
+        if let Some(dash_pos) = rest.rfind('-') {
+            let family = &rest[..dash_pos];
+            let shade = &rest[dash_pos + 1..];
+            if let Some(hex) = tailwind_color(family, shade) {
+                return d.text_bg(rgb(hex));
+            }
+        }
+    }
+
+    // ── Color families: bg-{family}-{shade}, text-{family}-{shade}, border-{family}-{shade} ──
     for (prefix, apply_fn) in &[
         ("bg-", apply_bg as fn(Div, u32) -> Div),
         ("text-", apply_text_color as fn(Div, u32) -> Div),
@@ -413,6 +700,25 @@ fn apply_dynamic(d: Div, class: &str) -> Div {
                     }
                     if let Ok(hex) = u32::from_str_radix(hex_str, 16) {
                         return apply_fn(d, hex);
+                    }
+                }
+                // hsla: bg-[hsla(h,s,l,a)]
+                if let Some(hsla_str) = inner.strip_prefix("hsla(") {
+                    if let Some(vals) = hsla_str.strip_suffix(')') {
+                        let parts: Vec<&str> = vals.split(',').map(|s| s.trim()).collect();
+                        if parts.len() == 4 {
+                            if let (Ok(h), Ok(s), Ok(l), Ok(a)) = (
+                                parts[0].parse::<f32>(),
+                                parts[1].trim_end_matches('%').parse::<f32>(),
+                                parts[2].trim_end_matches('%').parse::<f32>(),
+                                parts[3].parse::<f32>(),
+                            ) {
+                                let color = hsla(h / 360.0, s / 100.0, l / 100.0, a);
+                                if *prefix == "bg-" { return d.bg(color); }
+                                if *prefix == "text-" { return d.text_color(color); }
+                                if *prefix == "border-" { return d.border_color(color); }
+                            }
+                        }
                     }
                 }
             }
@@ -466,11 +772,33 @@ fn parse_length(value: &str) -> Option<Length> {
         "full" | "screen" => return Some(relative(1.).into()),
         "auto" => return Some(Length::Auto),
         "px" => return Some(px(1.).into()),
+        // Fractions — full Tailwind set
         "1/2" => return Some(relative(0.5).into()),
-        "1/3" => return Some(relative(1.0/3.0).into()),
-        "2/3" => return Some(relative(2.0/3.0).into()),
+        "1/3" => return Some(relative(1.0 / 3.0).into()),
+        "2/3" => return Some(relative(2.0 / 3.0).into()),
         "1/4" => return Some(relative(0.25).into()),
+        "2/4" => return Some(relative(0.5).into()),
         "3/4" => return Some(relative(0.75).into()),
+        "1/5" => return Some(relative(0.2).into()),
+        "2/5" => return Some(relative(0.4).into()),
+        "3/5" => return Some(relative(0.6).into()),
+        "4/5" => return Some(relative(0.8).into()),
+        "1/6" => return Some(relative(1.0 / 6.0).into()),
+        "2/6" => return Some(relative(2.0 / 6.0).into()),
+        "3/6" => return Some(relative(0.5).into()),
+        "4/6" => return Some(relative(4.0 / 6.0).into()),
+        "5/6" => return Some(relative(5.0 / 6.0).into()),
+        "1/12" => return Some(relative(1.0 / 12.0).into()),
+        "2/12" => return Some(relative(2.0 / 12.0).into()),
+        "3/12" => return Some(relative(0.25).into()),
+        "4/12" => return Some(relative(4.0 / 12.0).into()),
+        "5/12" => return Some(relative(5.0 / 12.0).into()),
+        "6/12" => return Some(relative(0.5).into()),
+        "7/12" => return Some(relative(7.0 / 12.0).into()),
+        "8/12" => return Some(relative(8.0 / 12.0).into()),
+        "9/12" => return Some(relative(9.0 / 12.0).into()),
+        "10/12" => return Some(relative(10.0 / 12.0).into()),
+        "11/12" => return Some(relative(11.0 / 12.0).into()),
         _ => {}
     }
     if let Ok(n) = value.parse::<f32>() {
