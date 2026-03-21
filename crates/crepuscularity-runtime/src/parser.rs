@@ -384,6 +384,7 @@ fn parse_element_line(line: &str, children: Vec<Node>) -> Element {
             conditional_classes: vec![],
             event_handlers: vec![],
             bindings: vec![],
+            animations: vec![],
             children,
         };
     }
@@ -393,6 +394,7 @@ fn parse_element_line(line: &str, children: Vec<Node>) -> Element {
     let mut conditional_classes = Vec::new();
     let mut event_handlers = Vec::new();
     let mut bindings = Vec::new();
+    let mut animations = Vec::new();
 
     for token in &tokens[1..] {
         if let Some(rest) = token.strip_prefix('@') {
@@ -422,12 +424,26 @@ fn parse_element_line(line: &str, children: Vec<Node>) -> Element {
                     .to_string();
                 bindings.push(Binding { prop, value });
             }
+        } else if let Some(rest) = token.strip_prefix("animate:") {
+            // animate:property={duration easing} or animate:property={duration easing repeat}
+            if let Some(eq_pos) = rest.find('=') {
+                let property = rest[..eq_pos].to_string();
+                let value_str = rest[eq_pos + 1..]
+                    .trim_matches(|c| c == '{' || c == '}')
+                    .trim()
+                    .to_string();
+                let parts: Vec<&str> = value_str.split_whitespace().collect();
+                let duration_expr = parts.first().unwrap_or(&"300ms").to_string();
+                let easing = parts.get(1).unwrap_or(&"linear").to_string();
+                let repeat = parts.get(2).map(|s| *s == "repeat").unwrap_or(false);
+                animations.push(AnimationSpec { property, duration_expr, easing, repeat });
+            }
         } else {
             classes.push(token.clone());
         }
     }
 
-    Element { tag, classes, conditional_classes, event_handlers, bindings, children }
+    Element { tag, classes, conditional_classes, event_handlers, bindings, animations, children }
 }
 
 fn tokenize_line(line: &str) -> Vec<String> {

@@ -1,8 +1,22 @@
 /// Runtime Tailwind class → GPUI style applicator.
+///
+/// Supports:
+/// - Static Tailwind classes: `flex`, `bg-red-500`, `p-4`
+/// - Arbitrary values: `bg-[#ff5733]`, `w-[200px]`, `text-[14px]`
+/// - Dynamic context expressions: `bg-{theme.surface}`, `text-{colors.muted}`
+///   where the expression evaluates to a hex color string like "#1e1e2e" or "1e1e2e"
 
-use gpui::{prelude::*, rgb, px, rems, relative, Div, Length, AbsoluteLength, DefiniteLength};
+use gpui::{prelude::*, rgb, rgba, px, rems, relative, Div, Length, AbsoluteLength, DefiniteLength};
 
+use crate::context::TemplateContext;
+
+/// Apply a class to a div, optionally resolving `{expr}` placeholders against context.
 pub fn apply_class(d: Div, class: &str) -> Div {
+    apply_class_with_ctx(d, class, None)
+}
+
+/// Apply a class with optional template context for dynamic value resolution.
+pub fn apply_class_with_ctx(d: Div, class: &str, ctx: Option<&TemplateContext>) -> Div {
     // State prefixes — skip silently in runtime renderer (no hover/focus state at runtime)
     if class.starts_with("hover:")
         || class.starts_with("focus:")
@@ -10,6 +24,14 @@ pub fn apply_class(d: Div, class: &str) -> Div {
     {
         return d;
     }
+
+    // Check for context-expression classes: bg-{expr}, text-{expr}, border-{expr}
+    if let Some(ctx) = ctx {
+        if class.contains('{') {
+            return apply_context_class(d, class, ctx);
+        }
+    }
+
     apply_base_class(d, class)
 }
 
@@ -18,6 +40,69 @@ pub fn apply_base_class(d: Div, class: &str) -> Div {
         Ok(d) => d,
         Err(d) => apply_dynamic(d, class),
     }
+}
+
+/// Try to resolve a class containing `{expr}` against the template context.
+/// Falls through to `apply_base_class` if no context expression matched.
+fn apply_context_class(d: Div, class: &str, ctx: &TemplateContext) -> Div {
+    // Pattern: prefix-{expr} where prefix is bg, text, border, etc.
+    for (prefix, apply_fn) in &[
+        ("bg-", apply_bg as fn(Div, u32) -> Div),
+        ("text-", apply_text_color as fn(Div, u32) -> Div),
+        ("border-", apply_border_color as fn(Div, u32) -> Div),
+    ] {
+        if let Some(rest) = class.strip_prefix(prefix) {
+            if rest.starts_with('{') && rest.ends_with('}') {
+                let expr = &rest[1..rest.len() - 1];
+                let val = crate::eval::eval_expr(expr, ctx);
+                let color_str = crate::context::value_to_str(&val);
+                if let Some(hex) = parse_color_str(&color_str) {
+                    return apply_fn(d, hex);
+                }
+            }
+        }
+    }
+
+    // bg-{expr}/alpha pattern for RGBA: bg-{expr}/20
+    if let Some(rest) = class.strip_prefix("bg-") {
+        if let Some((expr_part, alpha_str)) = rest.rsplit_once('/') {
+            if expr_part.starts_with('{') && expr_part.ends_with('}') {
+                let expr = &expr_part[1..expr_part.len() - 1];
+                let val = crate::eval::eval_expr(expr, ctx);
+                let color_str = crate::context::value_to_str(&val);
+                if let Some(hex) = parse_color_str(&color_str) {
+                    if let Ok(alpha) = alpha_str.parse::<u32>() {
+                        let alpha_byte = (alpha * 255 / 100) as u32;
+                        let rgba_val = (hex << 8) | alpha_byte;
+                        return d.bg(rgba(rgba_val));
+                    }
+                }
+            }
+        }
+    }
+
+    // opacity-{expr}
+    if let Some(rest) = class.strip_prefix("opacity-") {
+        if rest.starts_with('{') && rest.ends_with('}') {
+            let expr = &rest[1..rest.len() - 1];
+            let val = crate::eval::eval_expr(expr, ctx);
+            let s = crate::context::value_to_str(&val);
+            if let Ok(n) = s.parse::<f32>() {
+                return d.opacity(n / 100.0);
+            }
+        }
+    }
+
+    // No context expression matched — fall through to normal class processing
+    apply_base_class(d, class)
+}
+
+/// Parse a color string like "#1e1e2e", "1e1e2e", or "0x1e1e2e" to a u32 hex value.
+fn parse_color_str(s: &str) -> Option<u32> {
+    let hex_str = s.strip_prefix('#')
+        .or_else(|| s.strip_prefix("0x"))
+        .unwrap_or(s);
+    u32::from_str_radix(hex_str, 16).ok()
 }
 
 /// Returns Ok(div) if class matched, Err(div) to fall through to dynamic.
@@ -47,7 +132,6 @@ fn apply_static(d: Div, class: &str) -> Result<Div, Div> {
         "overflow-x-hidden" => d.overflow_x_hidden(),
         "overflow-y-hidden" => d.overflow_y_hidden(),
         // overflow-auto/scroll — scroll not available on Div (needs StatefulInteractiveElement)
-        // fall through as no-op
         "overflow-scroll" | "overflow-auto"
         | "overflow-y-scroll" | "overflow-y-auto"
         | "overflow-x-scroll" | "overflow-x-auto" => d,
@@ -96,6 +180,10 @@ fn apply_static(d: Div, class: &str) -> Result<Div, Div> {
         "border-2" => d.border_2(),
         "border-4" => d.border_4(),
         "border-8" => d.border_8(),
+        "border-t" => d.border_t_1(),
+        "border-b" => d.border_b_1(),
+        "border-l" => d.border_l_1(),
+        "border-r" => d.border_r_1(),
 
         // Border radius
         "rounded-none" => d.rounded_none(),
@@ -164,9 +252,27 @@ fn apply_static(d: Div, class: &str) -> Result<Div, Div> {
         "cursor-col-resize" => d.cursor_col_resize(),
         "cursor-row-resize" => d.cursor_row_resize(),
 
-        // Ignored / unsupported
-        "transition" | "transition-colors" | "duration-200" | "ease-in-out"
-        | "inline-flex" | "inline" | "grid" | "select-none" | "pointer-events-none"
+        // Shadow
+        "shadow-sm" => d.shadow_sm(),
+        "shadow" | "shadow-md" => d.shadow_md(),
+        "shadow-lg" => d.shadow_lg(),
+        "shadow-xl" => d.shadow_xl(),
+        "shadow-2xl" => d.shadow_2xl(),
+        "shadow-none" => d,
+
+        // Transitions & animations — parsed but no-op at the class level
+        // Actual animation is handled by animate: attributes in the renderer.
+        "transition" | "transition-all" | "transition-colors" | "transition-opacity"
+        | "transition-shadow" | "transition-transform"
+        | "duration-75" | "duration-100" | "duration-150" | "duration-200"
+        | "duration-300" | "duration-500" | "duration-700" | "duration-1000"
+        | "ease-linear" | "ease-in" | "ease-out" | "ease-in-out"
+        | "delay-75" | "delay-100" | "delay-150" | "delay-200"
+        | "delay-300" | "delay-500" | "delay-700" | "delay-1000"
+        | "animate-none" | "animate-spin" | "animate-ping" | "animate-pulse" | "animate-bounce" => d,
+
+        // Ignored / unsupported (accepted silently to allow copy-pasting from Tailwind)
+        "inline-flex" | "inline" | "grid" | "select-none" | "pointer-events-none"
         | "uppercase" | "lowercase" | "capitalize" | "whitespace-pre" | "sticky"
         | "fixed" | "overflow-scroll-x" | "content-center" | "content-start"
         | "content-end" | "items-stretch" => d,
@@ -229,6 +335,32 @@ fn apply_dynamic(d: Div, class: &str) -> Div {
         }
     }
 
+    // Arbitrary border radius: rounded-[Npx]
+    if let Some(rest) = class.strip_prefix("rounded-[") {
+        if let Some(inner) = rest.strip_suffix(']') {
+            if let Some(abs) = parse_absolute_length(inner) {
+                return d.rounded(abs);
+            }
+        }
+    }
+
+    // Arbitrary border widths: border-t-[Npx], border-b-[Npx], etc.
+    for (prefix, apply_fn) in &[
+        ("border-t-", Div::border_t as fn(Div, AbsoluteLength) -> Div),
+        ("border-b-", Div::border_b as fn(Div, AbsoluteLength) -> Div),
+        ("border-l-", Div::border_l as fn(Div, AbsoluteLength) -> Div),
+        ("border-r-", Div::border_r as fn(Div, AbsoluteLength) -> Div),
+    ] {
+        if let Some(rest) = class.strip_prefix(prefix) {
+            if rest.starts_with('[') && rest.ends_with(']') {
+                let inner = &rest[1..rest.len()-1];
+                if let Some(abs) = parse_absolute_length(inner) {
+                    return apply_fn(d, abs);
+                }
+            }
+        }
+    }
+
     // font-['Family'] or font-[Family]
     if let Some(rest) = class.strip_prefix("font-[") {
         if let Some(inner) = rest.strip_suffix(']') {
@@ -242,6 +374,15 @@ fn apply_dynamic(d: Div, class: &str) -> Div {
         if let Some(inner) = rest.strip_suffix(']') {
             if let Some(len) = parse_absolute_length(inner) {
                 return d.text_size(len);
+            }
+        }
+    }
+
+    // line-height-[value] or leading-[value]
+    if let Some(rest) = class.strip_prefix("leading-[") {
+        if let Some(inner) = rest.strip_suffix(']') {
+            if let Some(abs) = parse_absolute_length(inner) {
+                return d.line_height(abs);
             }
         }
     }
@@ -260,12 +401,34 @@ fn apply_dynamic(d: Div, class: &str) -> Div {
         ("border-", apply_border_color as fn(Div, u32) -> Div),
     ] {
         if let Some(rest) = class.strip_prefix(prefix) {
-            // Arbitrary hex: bg-[#rrggbb]
+            // Arbitrary hex: bg-[#rrggbb] or bg-[#rrggbbaa]
             if rest.starts_with('[') && rest.ends_with(']') {
                 let inner = &rest[1..rest.len() - 1];
                 if let Some(hex_str) = inner.strip_prefix('#') {
+                    if hex_str.len() == 8 {
+                        // 8-digit hex: RRGGBBAA
+                        if let Ok(hex) = u32::from_str_radix(hex_str, 16) {
+                            return d.bg(rgba(hex));
+                        }
+                    }
                     if let Ok(hex) = u32::from_str_radix(hex_str, 16) {
                         return apply_fn(d, hex);
+                    }
+                }
+            }
+            // bg-family/alpha: bg-red-500/50
+            if let Some(slash_pos) = rest.rfind('/') {
+                let color_part = &rest[..slash_pos];
+                let alpha_str = &rest[slash_pos + 1..];
+                if let Ok(alpha_pct) = alpha_str.parse::<u32>() {
+                    if let Some(dash_pos) = color_part.rfind('-') {
+                        let family = &color_part[..dash_pos];
+                        let shade = &color_part[dash_pos + 1..];
+                        if let Some(hex) = tailwind_color(family, shade) {
+                            let alpha_byte = (alpha_pct * 255 / 100) as u32;
+                            let rgba_val = (hex << 8) | alpha_byte;
+                            return d.bg(rgba(rgba_val));
+                        }
                     }
                 }
             }
@@ -303,6 +466,11 @@ fn parse_length(value: &str) -> Option<Length> {
         "full" | "screen" => return Some(relative(1.).into()),
         "auto" => return Some(Length::Auto),
         "px" => return Some(px(1.).into()),
+        "1/2" => return Some(relative(0.5).into()),
+        "1/3" => return Some(relative(1.0/3.0).into()),
+        "2/3" => return Some(relative(2.0/3.0).into()),
+        "1/4" => return Some(relative(0.25).into()),
+        "3/4" => return Some(relative(0.75).into()),
         _ => {}
     }
     if let Ok(n) = value.parse::<f32>() {
@@ -327,7 +495,7 @@ fn parse_definite_length(value: &str) -> Option<DefiniteLength> {
 }
 
 /// Parse a CSS size string to `AbsoluteLength` (px or rem only)
-fn parse_absolute_length(inner: &str) -> Option<AbsoluteLength> {
+pub fn parse_absolute_length(inner: &str) -> Option<AbsoluteLength> {
     if let Some(rest) = inner.strip_suffix("px") {
         if let Ok(n) = rest.parse::<f32>() { return Some(px(n).into()); }
     }
@@ -336,6 +504,17 @@ fn parse_absolute_length(inner: &str) -> Option<AbsoluteLength> {
     }
     if let Ok(n) = inner.parse::<f32>() { return Some(px(n).into()); }
     None
+}
+
+/// Parse a duration string like "300ms", "1s", "0.5s" into milliseconds.
+pub fn parse_duration_ms(s: &str) -> Option<u64> {
+    if let Some(rest) = s.strip_suffix("ms") {
+        return rest.parse::<u64>().ok();
+    }
+    if let Some(rest) = s.strip_suffix('s') {
+        return rest.parse::<f64>().ok().map(|v| (v * 1000.0) as u64);
+    }
+    s.parse::<u64>().ok()
 }
 
 // ============================================================

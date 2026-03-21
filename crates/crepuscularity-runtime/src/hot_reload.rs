@@ -21,7 +21,12 @@ pub struct HotReloadState {
 }
 
 impl HotReloadState {
-    pub fn new(path: PathBuf, context: TemplateContext, cx: &mut Context<Self>) -> Self {
+    pub fn new(path: PathBuf, mut context: TemplateContext, cx: &mut Context<Self>) -> Self {
+        // Set base_dir so `include` directives inside the template can resolve relative paths.
+        if context.base_dir.is_none() {
+            context.base_dir = path.parent().map(|p| p.to_path_buf());
+        }
+
         let template = load_template(&path);
         let changed = Arc::new(Mutex::new(false));
 

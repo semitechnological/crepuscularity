@@ -19,6 +19,7 @@ pub struct Element {
     pub conditional_classes: Vec<ConditionalClass>,
     pub event_handlers: Vec<EventHandler>,
     pub bindings: Vec<Binding>,
+    pub animations: Vec<AnimationSpec>,
     pub children: Vec<Node>,
 }
 
@@ -39,6 +40,23 @@ pub struct EventHandler {
 pub struct Binding {
     pub prop: String,
     pub value: String,
+}
+
+/// An animation specification parsed from `animate:property={duration easing}`.
+///
+/// ```text
+/// div animate:opacity={300ms ease-in-out} animate:scale={500ms linear}
+/// ```
+#[derive(Debug, Clone)]
+pub struct AnimationSpec {
+    /// The property to animate: "opacity", "scale", "slide-x", "slide-y", "fade", "pulse"
+    pub property: String,
+    /// Duration expression (e.g. "300ms", "1s", "0.5s")
+    pub duration_expr: String,
+    /// Easing function name: "linear", "ease-in-out", "quadratic", "bounce"
+    pub easing: String,
+    /// Whether the animation loops
+    pub repeat: bool,
 }
 
 #[derive(Debug, Clone)]

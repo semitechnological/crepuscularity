@@ -1,10 +1,22 @@
 use std::collections::HashMap;
+use std::path::PathBuf;
 
 /// A runtime variable context passed to the template renderer.
 /// Variables can be strings, booleans, numbers, or lists of contexts.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct TemplateContext {
     pub vars: HashMap<String, TemplateValue>,
+    /// Directory of the current `.crepus` file — used to resolve `include` paths.
+    pub base_dir: Option<PathBuf>,
+    /// Slot content passed from a parent `include` directive.
+    /// `(nodes, parent_ctx)` — the nodes are rendered with the parent's context.
+    pub slot: Option<(Vec<crate::ast::Node>, Box<TemplateContext>)>,
+}
+
+impl Default for TemplateContext {
+    fn default() -> Self {
+        Self { vars: HashMap::new(), base_dir: None, slot: None }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -33,23 +45,13 @@ impl TemplateContext {
 
     pub fn get_bool(&self, key: &str) -> bool {
         match self.vars.get(key) {
-            Some(TemplateValue::Bool(b)) => *b,
-            Some(TemplateValue::Int(n)) => *n != 0,
-            Some(TemplateValue::Str(s)) => !s.is_empty(),
-            Some(TemplateValue::Null) | None => false,
-            _ => true,
+            Some(v) => crate::eval::is_truthy(v),
+            None => false,
         }
     }
 
     pub fn get_str(&self, key: &str) -> String {
-        match self.vars.get(key) {
-            Some(TemplateValue::Str(s)) => s.clone(),
-            Some(TemplateValue::Int(n)) => n.to_string(),
-            Some(TemplateValue::Float(f)) => format!("{:.2}", f),
-            Some(TemplateValue::Bool(b)) => b.to_string(),
-            Some(TemplateValue::Null) | None => String::new(),
-            Some(TemplateValue::List(items)) => format!("[{} items]", items.len()),
-        }
+        value_to_str(self.vars.get(key).unwrap_or(&TemplateValue::Null))
     }
 
     pub fn get_list(&self, key: &str) -> Vec<TemplateContext> {
@@ -59,99 +61,34 @@ impl TemplateContext {
         }
     }
 
-    /// Evaluate a simple condition expression. Supports:
-    /// - `varname` — truthy check
-    /// - `!varname` — falsy check
-    /// - `varname == "literal"` — equality check
-    /// - `varname != "literal"` — inequality check
+    /// Evaluate a condition expression — delegates to the full expression evaluator.
     pub fn eval_condition(&self, expr: &str) -> bool {
-        let expr = expr.trim();
-
-        // Negation
-        if let Some(rest) = expr.strip_prefix('!') {
-            return !self.eval_condition(rest.trim());
-        }
-
-        // Equality: varname == "value" or varname == value
-        if let Some(pos) = expr.find("==") {
-            let lhs = expr[..pos].trim();
-            let rhs = expr[pos + 2..].trim().trim_matches('"');
-            return self.get_str(lhs) == rhs;
-        }
-
-        // Inequality
-        if let Some(pos) = expr.find("!=") {
-            let lhs = expr[..pos].trim();
-            let rhs = expr[pos + 2..].trim().trim_matches('"');
-            return self.get_str(lhs) != rhs;
-        }
-
-        // Greater than
-        if let Some(pos) = expr.find('>') {
-            let lhs = expr[..pos].trim();
-            let rhs = expr[pos + 1..].trim();
-            let lval = self.vars.get(lhs).and_then(|v| match v {
-                TemplateValue::Int(n) => Some(*n as f64),
-                TemplateValue::Float(f) => Some(*f),
-                _ => None,
-            });
-            if let (Some(l), Ok(r)) = (lval, rhs.parse::<f64>()) {
-                return l > r;
-            }
-        }
-
-        // Less than
-        if let Some(pos) = expr.find('<') {
-            let lhs = expr[..pos].trim();
-            let rhs = expr[pos + 1..].trim();
-            let lval = self.vars.get(lhs).and_then(|v| match v {
-                TemplateValue::Int(n) => Some(*n as f64),
-                TemplateValue::Float(f) => Some(*f),
-                _ => None,
-            });
-            if let (Some(l), Ok(r)) = (lval, rhs.parse::<f64>()) {
-                return l < r;
-            }
-        }
-
-        // Boolean literals
-        if expr == "true" {
-            return true;
-        }
-        if expr == "false" {
-            return false;
-        }
-
-        // Simple variable truthy check
-        self.get_bool(expr)
+        crate::eval::eval_condition(expr, self)
     }
 
-    /// Interpolate a string with `{varname}` placeholders.
+    /// Interpolate a string with `{expr}` placeholders.
+    /// Expressions are fully evaluated (arithmetic, property access, etc.).
     pub fn interpolate(&self, template: &str) -> String {
         let mut result = String::new();
         let mut chars = template.chars().peekable();
 
         while let Some(ch) = chars.next() {
             if ch == '{' {
-                let mut key = String::new();
+                let mut expr = String::new();
                 let mut depth = 1usize;
                 for c in chars.by_ref() {
                     match c {
-                        '{' => {
-                            depth += 1;
-                            key.push(c);
-                        }
+                        '{' => { depth += 1; expr.push(c); }
                         '}' => {
                             depth -= 1;
-                            if depth == 0 {
-                                break;
-                            }
-                            key.push(c);
+                            if depth == 0 { break; }
+                            expr.push(c);
                         }
-                        _ => key.push(c),
+                        _ => expr.push(c),
                     }
                 }
-                result.push_str(&self.get_str(key.trim()));
+                let val = crate::eval::eval_expr(expr.trim(), self);
+                result.push_str(&value_to_str(&val));
             } else {
                 result.push(ch);
             }
@@ -161,44 +98,51 @@ impl TemplateContext {
     }
 }
 
-impl From<String> for TemplateValue {
-    fn from(s: String) -> Self {
-        TemplateValue::Str(s)
+/// Convert a `TemplateValue` to a display string. Pub(crate) for use in renderer/eval.
+pub(crate) fn value_to_str(v: &TemplateValue) -> String {
+    match v {
+        TemplateValue::Str(s) => s.clone(),
+        TemplateValue::Int(n) => n.to_string(),
+        TemplateValue::Float(f) => {
+            // Show as integer if it has no fractional part
+            if f.fract() == 0.0 && f.abs() < 1e15 {
+                format!("{}", *f as i64)
+            } else {
+                format!("{}", f)
+            }
+        }
+        TemplateValue::Bool(b) => b.to_string(),
+        TemplateValue::Null => String::new(),
+        TemplateValue::List(items) => format!("[{} items]", items.len()),
     }
+}
+
+// ── From impls ────────────────────────────────────────────────────────────────
+
+impl From<String> for TemplateValue {
+    fn from(s: String) -> Self { TemplateValue::Str(s) }
 }
 
 impl From<&str> for TemplateValue {
-    fn from(s: &str) -> Self {
-        TemplateValue::Str(s.to_string())
-    }
+    fn from(s: &str) -> Self { TemplateValue::Str(s.to_string()) }
 }
 
 impl From<bool> for TemplateValue {
-    fn from(b: bool) -> Self {
-        TemplateValue::Bool(b)
-    }
+    fn from(b: bool) -> Self { TemplateValue::Bool(b) }
 }
 
 impl From<i64> for TemplateValue {
-    fn from(n: i64) -> Self {
-        TemplateValue::Int(n)
-    }
+    fn from(n: i64) -> Self { TemplateValue::Int(n) }
 }
 
 impl From<i32> for TemplateValue {
-    fn from(n: i32) -> Self {
-        TemplateValue::Int(n as i64)
-    }
+    fn from(n: i32) -> Self { TemplateValue::Int(n as i64) }
 }
 
 impl From<f64> for TemplateValue {
-    fn from(f: f64) -> Self {
-        TemplateValue::Float(f)
-    }
+    fn from(f: f64) -> Self { TemplateValue::Float(f) }
 }
 
 impl From<Vec<TemplateContext>> for TemplateValue {
-    fn from(list: Vec<TemplateContext>) -> Self {
-        TemplateValue::List(list)
-    }
+    fn from(list: Vec<TemplateContext>) -> Self { TemplateValue::List(list) }
 }

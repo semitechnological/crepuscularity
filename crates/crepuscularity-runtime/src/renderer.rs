@@ -1,10 +1,20 @@
 /// Runtime GPUI renderer — walks the AST and builds GPUI elements dynamically.
+///
+/// Supports:
+/// - Dynamic theme colors via context expressions in class values
+/// - GPUI animations via `animate:property={duration easing}` attributes
+/// - All standard Tailwind-like classes mapped to GPUI methods
 
-use gpui::{AnyElement, IntoElement, ParentElement, Styled, div, rgb};
+use std::time::Duration;
+
+use gpui::{
+    AnyElement, Animation, AnimationExt, ElementId, IntoElement, ParentElement, SharedString,
+    Styled, div, rgb, linear, quadratic, ease_in_out, ease_out_quint, bounce,
+};
 
 use crate::ast::*;
 use crate::context::{TemplateContext, TemplateValue, value_to_str};
-use crate::styler::apply_class;
+use crate::styler::{apply_class_with_ctx, parse_duration_ms};
 
 /// Render a list of nodes into a single `AnyElement`, threading `LetDecl`s into
 /// a running context clone so later siblings see the declared variables.
@@ -44,14 +54,17 @@ fn render_nodes_with_ctx(nodes: &[Node], mut ctx: TemplateContext) -> AnyElement
 pub fn render_node(node: &Node, ctx: &TemplateContext) -> AnyElement {
     match node {
         Node::Element(el) => render_element(el, ctx),
-        Node::Text(parts) => render_text(parts, ctx).into_any_element(),
+        Node::Text(parts) => {
+            let text = render_text(parts, ctx);
+            div().child(SharedString::from(text)).into_any_element()
+        }
         Node::If(block) => render_if(block, ctx),
         Node::For(block) => render_for(block, ctx),
         Node::Match(block) => render_match(block, ctx),
         Node::LetDecl(_) => div().into_any_element(), // handled in render_nodes_with_ctx
         Node::RawText(expr) => {
             let val = crate::eval::eval_expr(expr, ctx);
-            div().child(value_to_str(&val)).into_any_element()
+            div().child(SharedString::from(value_to_str(&val))).into_any_element()
         }
         Node::Include(inc) => render_include(inc, ctx),
     }
@@ -69,22 +82,122 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> AnyElement {
 
     let mut d = base_tag_element(&el.tag);
 
+    // Apply static and dynamic classes with context for expression resolution
     for class in &el.classes {
-        d = apply_class(d, class);
+        d = apply_class_with_ctx(d, class, Some(ctx));
     }
 
+    // Apply conditional classes
     for cc in &el.conditional_classes {
         if ctx.eval_condition(&cc.condition) {
-            d = apply_class(d, &cc.class);
+            d = apply_class_with_ctx(d, &cc.class, Some(ctx));
         }
     }
 
+    // Render children
     for child in &el.children {
         let child_el = render_node(child, ctx);
         d = d.child(child_el);
     }
 
+    // If animations are present, wrap with GPUI animation
+    if !el.animations.is_empty() {
+        return render_with_animations(d, &el.animations, &el.tag);
+    }
+
     d.into_any_element()
+}
+
+/// Wrap a div with GPUI animations based on the parsed animation specs.
+fn render_with_animations(d: gpui::Div, animations: &[AnimationSpec], tag: &str) -> AnyElement {
+    // Generate a stable element ID from the tag + animation properties
+    let props: Vec<&str> = animations.iter().map(|a| a.property.as_str()).collect();
+    let id_str = format!("crepus-anim-{}-{}", tag, props.join("-"));
+    let id = ElementId::Name(SharedString::from(id_str).into());
+
+    if animations.len() == 1 {
+        let spec = &animations[0];
+        let duration_ms = parse_duration_ms(&spec.duration_expr).unwrap_or(300);
+        let duration = Duration::from_millis(duration_ms);
+
+        let mut anim = Animation::new(duration);
+        anim = apply_easing(anim, &spec.easing);
+        if spec.repeat {
+            anim = anim.repeat();
+        }
+
+        let property = spec.property.clone();
+        d.with_animation(id, anim, move |el, delta| {
+            apply_animation_property(el, &property, delta)
+        }).into_any_element()
+    } else {
+        let anims: Vec<Animation> = animations.iter().map(|spec| {
+            let duration_ms = parse_duration_ms(&spec.duration_expr).unwrap_or(300);
+            let mut anim = Animation::new(Duration::from_millis(duration_ms));
+            anim = apply_easing(anim, &spec.easing);
+            if spec.repeat {
+                anim = anim.repeat();
+            }
+            anim
+        }).collect();
+
+        let properties: Vec<String> = animations.iter().map(|a| a.property.clone()).collect();
+        d.with_animations(id, anims, move |el, ix, delta| {
+            if ix < properties.len() {
+                apply_animation_property(el, &properties[ix], delta)
+            } else {
+                el
+            }
+        }).into_any_element()
+    }
+}
+
+fn apply_easing(anim: Animation, easing: &str) -> Animation {
+    match easing {
+        "linear" => anim.with_easing(linear),
+        "ease-in-out" => anim.with_easing(ease_in_out),
+        "quadratic" => anim.with_easing(quadratic),
+        "bounce" => anim.with_easing(bounce(quadratic)),
+        "ease-out" => anim.with_easing(ease_out_quint()),
+        _ => anim, // default: linear
+    }
+}
+
+/// Apply an animation delta (0.0 - 1.0) to a specific property on a div.
+fn apply_animation_property(d: gpui::Div, property: &str, delta: f32) -> gpui::Div {
+    match property {
+        "opacity" | "fade" | "fade-in" => d.opacity(delta),
+        "fade-out" => d.opacity(1.0 - delta),
+        "pulse" => d.opacity(0.4 + delta * 0.6),
+        "scale" => {
+            // Scale from 0.8 to 1.0
+            let scale = 0.8 + delta * 0.2;
+            d.opacity(scale) // GPUI doesn't have transform: scale; use opacity as approximation
+        }
+        "slide-down" => {
+            // Slide from -10px to 0px
+            let offset = gpui::px(-10.0 * (1.0 - delta));
+            d.mt(offset)
+        }
+        "slide-up" => {
+            let offset = gpui::px(10.0 * (1.0 - delta));
+            d.mt(offset)
+        }
+        "slide-right" => {
+            let offset = gpui::px(-20.0 * (1.0 - delta));
+            d.ml(offset)
+        }
+        "slide-left" => {
+            let offset = gpui::px(20.0 * (1.0 - delta));
+            d.ml(offset)
+        }
+        "grow" => {
+            // Grow from w-0 to full
+            let pct = gpui::relative(delta);
+            d.w(pct)
+        }
+        _ => d,
+    }
 }
 
 fn base_tag_element(tag: &str) -> gpui::Div {
@@ -176,7 +289,7 @@ fn render_include(inc: &IncludeNode, ctx: &TemplateContext) -> AnyElement {
         Ok(c) => c,
         Err(e) => {
             let msg = format!("include error: {:?}: {}", file_path, e);
-            return div().text_color(rgb(0xff4444)).child(msg).into_any_element();
+            return div().text_color(rgb(0xff4444)).child(SharedString::from(msg)).into_any_element();
         }
     };
 
@@ -184,7 +297,7 @@ fn render_include(inc: &IncludeNode, ctx: &TemplateContext) -> AnyElement {
         Ok(n) => n,
         Err(e) => {
             let msg = format!("include parse error: {}", e);
-            return div().text_color(rgb(0xff4444)).child(msg).into_any_element();
+            return div().text_color(rgb(0xff4444)).child(SharedString::from(msg)).into_any_element();
         }
     };
 

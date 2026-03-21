@@ -10,7 +10,7 @@ members = [
 ]
 
 [workspace.dependencies]
-gpui = { version = "0.2", default-features = false, features = ["font-kit"] }
+gpui = { version = "0.2.2", default-features = false, features = ["font-kit"] }
 proc-macro2 = "1"
 quote = "1"
 syn = { version = "2", features = ["full", "extra-traits"] }
