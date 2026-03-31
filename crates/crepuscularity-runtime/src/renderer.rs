@@ -278,7 +278,12 @@ fn render_match(block: &MatchBlock, ctx: &TemplateContext) -> AnyElement {
 }
 
 fn render_include(inc: &IncludeNode, ctx: &TemplateContext) -> AnyElement {
-    // Resolve the component path relative to the current file's directory.
+    // Multi-component syntax: "path/file.crepus#ComponentName"
+    if let Some((file_part, comp_name)) = inc.path.split_once('#') {
+        return render_named_component(inc, ctx, file_part, comp_name);
+    }
+
+    // Single-component file: resolve path relative to the current file's directory.
     let file_path = if let Some(base) = &ctx.base_dir {
         base.join(&inc.path)
     } else {
@@ -315,4 +320,70 @@ fn render_include(inc: &IncludeNode, ctx: &TemplateContext) -> AnyElement {
     }
 
     render_nodes(&nodes, &child_ctx)
+}
+
+/// Render a named component from a multi-component file (`path#Name` syntax).
+fn render_named_component(
+    inc: &IncludeNode,
+    ctx: &TemplateContext,
+    file_part: &str,
+    comp_name: &str,
+) -> AnyElement {
+    let file_path = if let Some(base) = &ctx.base_dir {
+        base.join(file_part)
+    } else {
+        std::path::PathBuf::from(file_part)
+    };
+
+    let content = match std::fs::read_to_string(&file_path) {
+        Ok(c) => c,
+        Err(e) => {
+            let msg = format!("include error: {:?}: {}", file_path, e);
+            return div().text_color(rgb(0xff4444)).child(SharedString::from(msg)).into_any_element();
+        }
+    };
+
+    let comp_file = match crate::parser::parse_component_file(&content) {
+        Ok(cf) => cf,
+        Err(e) => {
+            let msg = format!("component file parse error: {}", e);
+            return div().text_color(rgb(0xff4444)).child(SharedString::from(msg)).into_any_element();
+        }
+    };
+
+    let comp = match comp_file.components.get(comp_name) {
+        Some(c) => c,
+        None => {
+            let mut keys: Vec<&str> = comp_file.components.keys().map(|s| s.as_str()).collect();
+            keys.sort();
+            let msg = format!(
+                "component '{}' not found in {}; available: [{}]",
+                comp_name,
+                file_part,
+                keys.join(", ")
+            );
+            return div().text_color(rgb(0xff4444)).child(SharedString::from(msg)).into_any_element();
+        }
+    };
+
+    let mut child_ctx = TemplateContext::new();
+    child_ctx.base_dir = file_path.parent().map(|p| p.to_path_buf());
+
+    // Inject TOML defaults first — passed props override them.
+    for (key, expr) in &comp.meta.defaults {
+        let val = crate::eval::eval_expr(expr, &TemplateContext::new());
+        child_ctx.vars.insert(key.clone(), val);
+    }
+
+    // Apply passed props.
+    for (key, expr) in &inc.props {
+        let val = crate::eval::eval_expr(expr, ctx);
+        child_ctx.vars.insert(key.clone(), val);
+    }
+
+    if !inc.slot.is_empty() {
+        child_ctx.slot = Some((inc.slot.clone(), Box::new(ctx.clone())));
+    }
+
+    render_nodes(&comp.nodes, &child_ctx)
 }

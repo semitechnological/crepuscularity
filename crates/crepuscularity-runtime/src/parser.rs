@@ -1,7 +1,165 @@
 /// Runtime parser for the crepuscularity template DSL.
 /// Mirrors the compile-time proc-macro parser but operates on strings at runtime.
 
+use std::collections::HashMap;
+
 use crate::ast::*;
+
+// ── Multi-component files ─────────────────────────────────────────────────────
+
+/// Metadata and default prop values for one component parsed from TOML frontmatter.
+#[derive(Debug, Clone, Default)]
+pub struct ComponentMeta {
+    /// Description string (from `description = "..."` in TOML).
+    pub description: Option<String>,
+    /// Default prop values as evaluable expression strings.
+    /// `[Card.defaults]` section: `title = "Untitled"` → `"title" → "\"Untitled\""`
+    pub defaults: HashMap<String, String>,
+}
+
+/// A named component extracted from a multi-component file.
+#[derive(Debug, Clone)]
+pub struct ComponentDef {
+    pub nodes: Vec<Node>,
+    pub meta: ComponentMeta,
+}
+
+/// Parsed multi-component `.crepus` file.
+///
+/// A multi-component file starts with an optional `+++...+++` TOML frontmatter
+/// block, followed by one or more component sections introduced by `--- Name`.
+///
+/// ```text
+/// +++
+/// [Card]
+/// description = "A simple card"
+///
+/// [Card.defaults]
+/// title = "Untitled"
+/// subtitle = ""
+///
+/// [Button]
+/// description = "A clickable button"
+///
+/// [Button.defaults]
+/// label = "Click me"
+/// variant = "primary"
+/// +++
+///
+/// --- Card
+/// div rounded-lg border p-4 mb-2
+///   div font-bold text-lg
+///     {title}
+///   div text-sm text-gray-400
+///     {subtitle}
+///   slot
+///
+/// --- Button
+/// $: default variant = "primary"
+/// button px-4 py-2 rounded
+///   {label}
+/// ```
+///
+/// Components are then included with `include components.crepus#Card title="Hello"`.
+pub struct ComponentFile {
+    pub components: HashMap<String, ComponentDef>,
+}
+
+/// Parse a multi-component `.crepus` file into a [`ComponentFile`].
+pub fn parse_component_file(content: &str) -> Result<ComponentFile, String> {
+    let (frontmatter_str, body) = split_frontmatter(content);
+
+    // Parse TOML for metadata / defaults.
+    let mut meta_map: HashMap<String, ComponentMeta> = HashMap::new();
+    if let Some(toml_str) = frontmatter_str {
+        let value: toml::Value = toml_str
+            .parse()
+            .map_err(|e| format!("TOML parse error in frontmatter: {e}"))?;
+
+        if let toml::Value::Table(table) = value {
+            for (comp_name, comp_val) in &table {
+                if let toml::Value::Table(comp_table) = comp_val {
+                    let mut meta = ComponentMeta::default();
+
+                    if let Some(toml::Value::String(desc)) = comp_table.get("description") {
+                        meta.description = Some(desc.clone());
+                    }
+
+                    if let Some(toml::Value::Table(defs)) = comp_table.get("defaults") {
+                        for (k, v) in defs {
+                            meta.defaults.insert(k.clone(), toml_value_to_expr(v));
+                        }
+                    }
+
+                    meta_map.insert(comp_name.clone(), meta);
+                }
+            }
+        }
+    }
+
+    let sections = split_sections(body);
+    let mut components = HashMap::new();
+
+    for (name, section_content) in sections {
+        let nodes = parse_template(&section_content)?;
+        let meta = meta_map.remove(&name).unwrap_or_default();
+        components.insert(name, ComponentDef { nodes, meta });
+    }
+
+    Ok(ComponentFile { components })
+}
+
+/// Split `+++...+++` TOML frontmatter from the rest of the file.
+fn split_frontmatter(content: &str) -> (Option<&str>, &str) {
+    let trimmed = content.trim_start();
+    if !trimmed.starts_with("+++") {
+        return (None, content);
+    }
+    let after_open = &trimmed[3..];
+    if let Some(close_pos) = after_open.find("\n+++") {
+        let toml_str = &after_open[..close_pos];
+        let rest = &after_open[close_pos + 4..]; // skip "\n+++"
+        (Some(toml_str.trim()), rest)
+    } else {
+        (None, content)
+    }
+}
+
+/// Split body into named sections on `--- ComponentName` lines.
+fn split_sections(body: &str) -> Vec<(String, String)> {
+    let mut sections: Vec<(String, String)> = Vec::new();
+    let mut current_name: Option<String> = None;
+    let mut current_lines: Vec<&str> = Vec::new();
+
+    for line in body.lines() {
+        if let Some(name) = line.trim().strip_prefix("--- ") {
+            if let Some(prev) = current_name.take() {
+                sections.push((prev, current_lines.join("\n")));
+                current_lines.clear();
+            }
+            current_name = Some(name.trim().to_string());
+        } else if current_name.is_some() {
+            current_lines.push(line);
+        }
+    }
+
+    if let Some(name) = current_name {
+        sections.push((name, current_lines.join("\n")));
+    }
+
+    sections
+}
+
+/// Convert a TOML scalar to an expression string usable by the evaluator.
+fn toml_value_to_expr(v: &toml::Value) -> String {
+    match v {
+        toml::Value::String(s) => format!("\"{}\"", s.replace('"', "\\\"")),
+        toml::Value::Integer(i) => i.to_string(),
+        toml::Value::Float(f) => f.to_string(),
+        toml::Value::Boolean(b) => b.to_string(),
+        _ => "\"\"".to_string(),
+    }
+}
 
 pub fn parse_template(template: &str) -> Result<Vec<Node>, String> {
     let lines = collect_lines(template);

@@ -6,3 +6,4 @@ edition = "2021"
 [dependencies]
 gpui = { workspace = true }
 notify = "6"
+toml = "0.8"
