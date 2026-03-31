@@ -1,5 +1,4 @@
 /// `crepu new <name>` — scaffold a new GPUI application.
-
 use std::fs;
 use std::path::Path;
 

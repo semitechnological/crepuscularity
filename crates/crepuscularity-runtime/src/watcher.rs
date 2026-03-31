@@ -1,11 +1,10 @@
 /// File watcher using the `notify` crate.
 /// Sets a shared flag when the watched file changes.
-
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
-use notify::{Event, RecursiveMode, Watcher, recommended_watcher};
+use notify::{recommended_watcher, Event, RecursiveMode, Watcher};
 
 /// Spawns a background thread that watches `path` for modifications.
 /// When a change is detected, sets `*changed = true`.

@@ -12,7 +12,6 @@
 ///   una  = "!" una | "-" una | post
 ///   post = prim ("." ident)*
 ///   prim = int | float | str | bool | null | "(" expr ")" | ident
-
 use crate::context::{TemplateContext, TemplateValue};
 
 // ── Tokens ──────────────────────────────────────────────────────────────────
@@ -25,12 +24,23 @@ enum Token {
     Bool(bool),
     Null,
     Ident(String),
-    Plus, Minus, Star, Slash, Percent,
-    EqEq, BangEq, Lt, LtEq, Gt, GtEq,
-    AmpAmp, PipePipe,
+    Plus,
+    Minus,
+    Star,
+    Slash,
+    Percent,
+    EqEq,
+    BangEq,
+    Lt,
+    LtEq,
+    Gt,
+    GtEq,
+    AmpAmp,
+    PipePipe,
     Bang,
     Dot,
-    LParen, RParen,
+    LParen,
+    RParen,
     Eof,
 }
 
@@ -59,27 +69,63 @@ fn tokenize(input: &str) -> Vec<Token> {
                         b'n' => s.push('\n'),
                         b't' => s.push('\t'),
                         b'\\' => s.push('\\'),
-                        c => { s.push('\\'); s.push(c as char); }
+                        c => {
+                            s.push('\\');
+                            s.push(c as char);
+                        }
                     }
                 } else {
                     s.push(bytes[i] as char);
                 }
                 i += 1;
             }
-            if i < len { i += 1; } // consume closing quote
+            if i < len {
+                i += 1;
+            } // consume closing quote
             tokens.push(Token::Str(s));
             continue;
         }
 
         // Numbers
-        if bytes[i].is_ascii_digit() || (bytes[i] == b'-' && i + 1 < len && bytes[i+1].is_ascii_digit() && tokens.last().map_or(true, |t| matches!(t, Token::LParen | Token::Plus | Token::Minus | Token::Star | Token::Slash | Token::Percent | Token::EqEq | Token::BangEq | Token::Lt | Token::LtEq | Token::Gt | Token::GtEq | Token::AmpAmp | Token::PipePipe | Token::Bang))) {
+        if bytes[i].is_ascii_digit()
+            || (bytes[i] == b'-'
+                && i + 1 < len
+                && bytes[i + 1].is_ascii_digit()
+                && tokens.last().map_or(true, |t| {
+                    matches!(
+                        t,
+                        Token::LParen
+                            | Token::Plus
+                            | Token::Minus
+                            | Token::Star
+                            | Token::Slash
+                            | Token::Percent
+                            | Token::EqEq
+                            | Token::BangEq
+                            | Token::Lt
+                            | Token::LtEq
+                            | Token::Gt
+                            | Token::GtEq
+                            | Token::AmpAmp
+                            | Token::PipePipe
+                            | Token::Bang
+                    )
+                }))
+        {
             let start = i;
-            if bytes[i] == b'-' { i += 1; }
-            while i < len && bytes[i].is_ascii_digit() { i += 1; }
-            let is_float = i < len && bytes[i] == b'.' && i + 1 < len && bytes[i+1].is_ascii_digit();
+            if bytes[i] == b'-' {
+                i += 1;
+            }
+            while i < len && bytes[i].is_ascii_digit() {
+                i += 1;
+            }
+            let is_float =
+                i < len && bytes[i] == b'.' && i + 1 < len && bytes[i + 1].is_ascii_digit();
             if is_float {
                 i += 1; // consume '.'
-                while i < len && bytes[i].is_ascii_digit() { i += 1; }
+                while i < len && bytes[i].is_ascii_digit() {
+                    i += 1;
+                }
                 if let Ok(f) = input[start..i].parse::<f64>() {
                     tokens.push(Token::Float(f));
                 }
@@ -94,7 +140,9 @@ fn tokenize(input: &str) -> Vec<Token> {
         // Identifiers and keywords
         if bytes[i].is_ascii_alphabetic() || bytes[i] == b'_' {
             let start = i;
-            while i < len && (bytes[i].is_ascii_alphanumeric() || bytes[i] == b'_') { i += 1; }
+            while i < len && (bytes[i].is_ascii_alphanumeric() || bytes[i] == b'_') {
+                i += 1;
+            }
             let word = &input[start..i];
             tokens.push(match word {
                 "true" => Token::Bool(true),
@@ -107,7 +155,7 @@ fn tokenize(input: &str) -> Vec<Token> {
 
         // Two-char operators (check before single-char)
         if i + 1 < len {
-            let two = &input[i..i+2];
+            let two = &input[i..i + 2];
             let tok = match two {
                 "==" => Some(Token::EqEq),
                 "!=" => Some(Token::BangEq),
@@ -159,7 +207,11 @@ struct Parser<'a> {
 
 impl<'a> Parser<'a> {
     fn new(tokens: Vec<Token>, ctx: &'a TemplateContext) -> Self {
-        Self { tokens, pos: 0, ctx }
+        Self {
+            tokens,
+            pos: 0,
+            ctx,
+        }
     }
 
     fn peek(&self) -> &Token {
@@ -179,6 +231,10 @@ impl<'a> Parser<'a> {
         } else {
             false
         }
+    }
+
+    fn is_at_end(&self) -> bool {
+        matches!(self.peek(), Token::Eof)
     }
 
     // expr = or
@@ -302,9 +358,12 @@ impl<'a> Parser<'a> {
                 self.eat(&Token::RParen);
                 v
             }
-            Token::Ident(name) => {
-                self.ctx.vars.get(&name).cloned().unwrap_or(TemplateValue::Null)
-            }
+            Token::Ident(name) => self
+                .ctx
+                .vars
+                .get(&name)
+                .cloned()
+                .unwrap_or(TemplateValue::Null),
             _ => TemplateValue::Null,
         }
     }
@@ -337,9 +396,9 @@ fn compare(lhs: &TemplateValue, rhs: &TemplateValue, op: &str) -> bool {
         return match op {
             "==" => (l - r).abs() < f64::EPSILON,
             "!=" => (l - r).abs() >= f64::EPSILON,
-            "<"  => l < r,
+            "<" => l < r,
             "<=" => l <= r,
-            ">"  => l > r,
+            ">" => l > r,
             ">=" => l >= r,
             _ => false,
         };
@@ -351,9 +410,9 @@ fn compare(lhs: &TemplateValue, rhs: &TemplateValue, op: &str) -> bool {
     match op {
         "==" => lstr == rstr,
         "!=" => lstr != rstr,
-        "<"  => lstr < rstr,
+        "<" => lstr < rstr,
         "<=" => lstr <= rstr,
-        ">"  => lstr > rstr,
+        ">" => lstr > rstr,
         ">=" => lstr >= rstr,
         _ => false,
     }
@@ -399,8 +458,20 @@ fn arith(lhs: &TemplateValue, rhs: &TemplateValue, op: &str) -> TemplateValue {
             "+" => l + r,
             "-" => l - r,
             "*" => l * r,
-            "/" => if r == 0.0 { return TemplateValue::Null; } else { l / r },
-            "%" => if r == 0.0 { return TemplateValue::Null; } else { l % r },
+            "/" => {
+                if r == 0.0 {
+                    return TemplateValue::Null;
+                } else {
+                    l / r
+                }
+            }
+            "%" => {
+                if r == 0.0 {
+                    return TemplateValue::Null;
+                } else {
+                    l % r
+                }
+            }
             _ => return TemplateValue::Null,
         };
         if both_int && op != "/" {
@@ -440,13 +511,19 @@ fn apply_property(val: TemplateValue, prop: &str) -> TemplateValue {
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
-/// Evaluate an expression string against a template context.
 pub fn eval_expr(expr: &str, ctx: &TemplateContext) -> TemplateValue {
     let expr = expr.trim();
-    if expr.is_empty() { return TemplateValue::Null; }
+    if expr.is_empty() {
+        return TemplateValue::Null;
+    }
     let tokens = tokenize(expr);
     let mut parser = Parser::new(tokens, ctx);
-    parser.parse_expr()
+    let value = parser.parse_expr();
+    if parser.is_at_end() {
+        value
+    } else {
+        TemplateValue::Null
+    }
 }
 
 /// Evaluate an expression as a boolean condition.

@@ -1,7 +1,5 @@
 use crepuscularity::prelude::*;
-use gpui::{
-    Application, ClickEvent, KeyBinding, WindowOptions, actions, bounds, point, size,
-};
+use gpui::{actions, bounds, point, size, Application, ClickEvent, KeyBinding, WindowOptions};
 
 actions!(weather, [FetchWeather]);
 
@@ -24,12 +22,7 @@ impl WeatherView {
         }
     }
 
-    fn fetch_weather(
-        &mut self,
-        _: &ClickEvent,
-        _window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
+    fn fetch_weather(&mut self, _: &ClickEvent, _window: &mut Window, cx: &mut Context<Self>) {
         self.is_loading = true;
         cx.notify();
 
@@ -113,9 +106,7 @@ fn main() {
             tabbing_identifier: None,
         };
 
-        cx.open_window(window_options, |_window, cx| {
-            cx.new(WeatherView::new)
-        })
-        .unwrap();
+        cx.open_window(window_options, |_window, cx| cx.new(WeatherView::new))
+            .unwrap();
     });
 }

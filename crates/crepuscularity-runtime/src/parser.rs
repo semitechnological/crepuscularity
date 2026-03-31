@@ -1,6 +1,5 @@
 /// Runtime parser for the crepuscularity template DSL.
 /// Mirrors the compile-time proc-macro parser but operates on strings at runtime.
-
 use std::collections::HashMap;
 
 use crate::ast::*;
@@ -286,11 +285,7 @@ fn parse_nodes(
     (nodes, i)
 }
 
-fn parse_if_node(
-    lines: &[(usize, String)],
-    i: usize,
-    expected_indent: usize,
-) -> (Node, usize) {
+fn parse_if_node(lines: &[(usize, String)], i: usize, expected_indent: usize) -> (Node, usize) {
     let line = &lines[i].1;
     let condition = try_parse_if(line).unwrap_or_default();
     let mut i = i + 1;
@@ -316,7 +311,10 @@ fn parse_if_node(
                 Some(vec![])
             }
         } else if else_line.starts_with("else if ") {
-            let rewritten = else_line.strip_prefix("else ").unwrap_or(else_line).to_string();
+            let rewritten = else_line
+                .strip_prefix("else ")
+                .unwrap_or(else_line)
+                .to_string();
             let mut patched = lines.to_vec();
             patched[i].1 = rewritten;
             let (else_if_node, next_i) = parse_if_node(&patched, i, expected_indent);
@@ -388,7 +386,11 @@ fn try_parse_include(line: &str) -> Option<IncludeNode> {
         return None;
     }
     let props = parse_props(props_str);
-    Some(IncludeNode { path, props, slot: vec![] })
+    Some(IncludeNode {
+        path,
+        props,
+        slot: vec![],
+    })
 }
 
 fn parse_props(s: &str) -> Vec<(String, String)> {
@@ -429,12 +431,31 @@ fn extract_prop_value(s: &str) -> (String, &str) {
     if s.starts_with('"') || s.starts_with('\'') {
         let quote = s.as_bytes()[0];
         let mut i = 1;
-        while i < s.len() && s.as_bytes()[i] != quote { i += 1; }
-        let content = &s[1..i];
-        // Wrap in double-quotes so the evaluator parses it as a string literal
-        let expr = format!("\"{}\"", content);
-        let rest = if i + 1 <= s.len() { &s[i + 1..] } else { "" };
-        return (expr, rest);
+        let mut escaped = false;
+        while i < s.len() {
+            let byte = s.as_bytes()[i];
+            if escaped {
+                escaped = false;
+            } else if byte == b'\\' {
+                escaped = true;
+            } else if byte == quote {
+                let content = &s[1..i];
+                let escaped_content = content
+                    .replace('\\', "\\\\")
+                    .replace('"', "\\\"");
+                let expr = format!("\"{}\"", escaped_content);
+                let rest = if i + 1 <= s.len() { &s[i + 1..] } else { "" };
+                return (expr, rest);
+            }
+            i += 1;
+        }
+
+        let content = &s[1..];
+        let escaped_content = content
+            .replace('\\', "\\\\")
+            .replace('"', "\\\"");
+        let expr = format!("\"{}\"", escaped_content);
+        return (expr, "");
     }
 
     if s.starts_with('{') {
@@ -503,7 +524,11 @@ fn try_parse_let_decl(line: &str) -> Option<LetDecl> {
     let name = rest[..eq_pos].trim().to_string();
     let expr_str = rest[eq_pos + 1..].trim();
     let expr = extract_braced(expr_str).unwrap_or_else(|| expr_str.to_string());
-    Some(LetDecl { name, expr, is_default })
+    Some(LetDecl {
+        name,
+        expr,
+        is_default,
+    })
 }
 
 fn is_raw_expr(line: &str) -> bool {
@@ -560,8 +585,16 @@ fn parse_element_line(line: &str, children: Vec<Node>) -> Element {
                 let event_part = &rest[..eq_pos];
                 let handler = rest[eq_pos + 1..].to_string();
                 let event = event_part.split('|').next().unwrap_or("").to_string();
-                let modifiers: Vec<String> = event_part.split('|').skip(1).map(|s| s.to_string()).collect();
-                event_handlers.push(EventHandler { event, modifiers, handler });
+                let modifiers: Vec<String> = event_part
+                    .split('|')
+                    .skip(1)
+                    .map(|s| s.to_string())
+                    .collect();
+                event_handlers.push(EventHandler {
+                    event,
+                    modifiers,
+                    handler,
+                });
             }
         } else if let Some(rest) = token.strip_prefix("class:") {
             if let Some(eq_pos) = rest.find('=') {
@@ -594,14 +627,27 @@ fn parse_element_line(line: &str, children: Vec<Node>) -> Element {
                 let duration_expr = parts.first().unwrap_or(&"300ms").to_string();
                 let easing = parts.get(1).unwrap_or(&"linear").to_string();
                 let repeat = parts.get(2).map(|s| *s == "repeat").unwrap_or(false);
-                animations.push(AnimationSpec { property, duration_expr, easing, repeat });
+                animations.push(AnimationSpec {
+                    property,
+                    duration_expr,
+                    easing,
+                    repeat,
+                });
             }
         } else {
             classes.push(token.clone());
         }
     }
 
-    Element { tag, classes, conditional_classes, event_handlers, bindings, animations, children }
+    Element {
+        tag,
+        classes,
+        conditional_classes,
+        event_handlers,
+        bindings,
+        animations,
+        children,
+    }
 }
 
 fn tokenize_line(line: &str) -> Vec<String> {
@@ -619,7 +665,9 @@ fn tokenize_line(line: &str) -> Vec<String> {
                 current.push(ch);
             }
             ']' if !in_string && brace_depth == 0 => {
-                if bracket_depth > 0 { bracket_depth -= 1; }
+                if bracket_depth > 0 {
+                    bracket_depth -= 1;
+                }
                 current.push(ch);
             }
             '{' if !in_string && bracket_depth == 0 => {
@@ -627,7 +675,9 @@ fn tokenize_line(line: &str) -> Vec<String> {
                 current.push(ch);
             }
             '}' if !in_string && bracket_depth == 0 => {
-                if brace_depth > 0 { brace_depth -= 1; }
+                if brace_depth > 0 {
+                    brace_depth -= 1;
+                }
                 current.push(ch);
             }
             '\'' | '"' if bracket_depth > 0 || brace_depth > 0 => {
@@ -676,10 +726,15 @@ fn parse_text_template(line: &str) -> Vec<TextPart> {
             let mut depth = 1usize;
             for ec in chars.by_ref() {
                 match ec {
-                    '{' => { depth += 1; expr.push(ec); }
+                    '{' => {
+                        depth += 1;
+                        expr.push(ec);
+                    }
                     '}' => {
                         depth -= 1;
-                        if depth == 0 { break; }
+                        if depth == 0 {
+                            break;
+                        }
                         expr.push(ec);
                     }
                     _ => expr.push(ec),

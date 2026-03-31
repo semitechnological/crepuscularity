@@ -3,13 +3,12 @@
 /// `HudState` lives in an `Arc<Mutex<_>>` shared between the background build
 /// thread and the GPUI entity. The entity polls every 100 ms and calls
 /// `cx.notify()` whenever the state has changed.
-
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use gpui::{
-    prelude::*, AsyncApp, Context, IntoElement, ParentElement, Render, Styled,
-    WeakEntity, Window, div, px, rgb, rems, size,
+    div, prelude::*, px, rems, rgb, size, AsyncApp, Context, IntoElement, ParentElement, Render,
+    Styled, WeakEntity, Window,
 };
 
 // ── Shared data types ──────────────────────────────────────────────────────
@@ -28,9 +27,16 @@ pub enum DevStatus {
     #[default]
     Starting,
     Building,
-    Running { elapsed_ms: u64 },
-    Failed { errors: Vec<BuildError>, count: usize },
-    Exited { code: Option<i32> },
+    Running {
+        elapsed_ms: u64,
+    },
+    Failed {
+        errors: Vec<BuildError>,
+        count: usize,
+    },
+    Exited {
+        code: Option<i32>,
+    },
 }
 
 #[derive(Clone, Debug)]
@@ -41,7 +47,10 @@ pub struct HudState {
 
 impl HudState {
     pub fn new(project_name: String) -> Self {
-        Self { project_name, status: DevStatus::Starting }
+        Self {
+            project_name,
+            status: DevStatus::Starting,
+        }
     }
 }
 
@@ -93,7 +102,13 @@ impl DevHud {
         })
         .detach();
 
-        Self { shared, project_name, status_text, status_color, frame: 0 }
+        Self {
+            shared,
+            project_name,
+            status_text,
+            status_color,
+            frame: 0,
+        }
     }
 }
 
@@ -103,21 +118,31 @@ fn snapshot(shared: &Arc<Mutex<HudState>>, frame: usize) -> (String, String, u32
     let (text, color) = match &state.status {
         DevStatus::Starting => (format!("{spinner} starting…"), 0x888888u32),
         DevStatus::Building => (format!("{spinner} building…"), 0xfbbf24u32),
-        DevStatus::Running { elapsed_ms } => {
-            (format!("✓ running  ({elapsed_ms} ms)"), 0x4ade80u32)
-        }
+        DevStatus::Running { elapsed_ms } => (format!("✓ running  ({elapsed_ms} ms)"), 0x4ade80u32),
         DevStatus::Failed { count, errors } => {
-            let loc = errors.first().and_then(|e| {
-                if !e.file.is_empty() {
-                    Some(format!("  {}", e.file.trim_start_matches("src/")))
-                } else {
-                    None
-                }
-            }).unwrap_or_default();
-            (format!("✗ {count} error{}  {loc}", if *count == 1 { "" } else { "s" }), 0xf87171u32)
+            let loc = errors
+                .first()
+                .and_then(|e| {
+                    if !e.file.is_empty() {
+                        Some(format!("  {}", e.file.trim_start_matches("src/")))
+                    } else {
+                        None
+                    }
+                })
+                .unwrap_or_default();
+            (
+                format!(
+                    "✗ {count} error{}  {loc}",
+                    if *count == 1 { "" } else { "s" }
+                ),
+                0xf87171u32,
+            )
         }
         DevStatus::Exited { code } => (
-            format!("⚑ exited ({})", code.map(|c| c.to_string()).unwrap_or_else(|| "?".into())),
+            format!(
+                "⚑ exited ({})",
+                code.map(|c| c.to_string()).unwrap_or_else(|| "?".into())
+            ),
             0xa78bfa,
         ),
     };
@@ -152,7 +177,12 @@ impl Render for DevHud {
                             .font_weight(gpui::FontWeight::BOLD)
                             .child("crepu"),
                     )
-                    .child(div().text_color(rgb(0x1e293b)).text_size(rems(0.7)).child("·"))
+                    .child(
+                        div()
+                            .text_color(rgb(0x1e293b))
+                            .text_size(rems(0.7))
+                            .child("·"),
+                    )
                     .child(
                         div()
                             .text_color(rgb(0xcbd5e1))
@@ -178,7 +208,7 @@ pub fn open_hud_window(
     shutdown: Arc<AtomicBool>,
     cx: &mut gpui::App,
 ) {
-    use gpui::{WindowBackgroundAppearance, WindowKind, WindowOptions, bounds, point};
+    use gpui::{bounds, point, WindowBackgroundAppearance, WindowKind, WindowOptions};
 
     let window_options = WindowOptions {
         window_bounds: Some(gpui::WindowBounds::Windowed(bounds(

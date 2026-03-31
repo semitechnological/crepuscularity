@@ -9,7 +9,7 @@
 use std::path::PathBuf;
 
 use crepuscularity_runtime::{HotReloadState, HotReloadView, TemplateContext, TemplateValue};
-use gpui::{prelude::*, Application, WindowOptions, bounds, point, size};
+use gpui::{bounds, point, prelude::*, size, Application, WindowOptions};
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
@@ -145,7 +145,9 @@ fn main() {
 /// Load simple TOML key=value pairs into the context.
 /// Supports: strings, booleans, integers.
 fn load_context_toml(path: &std::path::Path, ctx: &mut TemplateContext) {
-    let Ok(content) = std::fs::read_to_string(path) else { return };
+    let Ok(content) = std::fs::read_to_string(path) else {
+        return;
+    };
 
     for line in content.lines() {
         let line = line.trim();
@@ -169,10 +171,7 @@ fn load_context_toml(path: &std::path::Path, ctx: &mut TemplateContext) {
                 ctx.set(key, TemplateValue::Float(f));
             } else {
                 // String — strip surrounding quotes if present
-                let s = raw_val
-                    .trim_matches('"')
-                    .trim_matches('\'')
-                    .to_string();
+                let s = raw_val.trim_matches('"').trim_matches('\'').to_string();
                 ctx.set(key, s);
             }
         }

@@ -1,10 +1,12 @@
 /// Hot-reload GPUI view component.
 /// Reads a template file, renders it, and watches for changes.
-
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-use gpui::{AsyncApp, Context, Entity, IntoElement, ParentElement, Render, Styled, WeakEntity, Window, div, rgb, rems};
+use gpui::{
+    div, rems, rgb, AsyncApp, Context, Entity, IntoElement, ParentElement, Render, Styled,
+    WeakEntity, Window,
+};
 
 use crate::ast::Node;
 use crate::context::TemplateContext;
@@ -35,28 +37,32 @@ impl HotReloadState {
 
         // Poll for changes and trigger re-renders
         let changed_poll = changed.clone();
-        cx.spawn(async move |this: WeakEntity<HotReloadState>, cx: &mut AsyncApp| {
-            loop {
+        cx.spawn(
+            async move |this: WeakEntity<HotReloadState>, cx: &mut AsyncApp| loop {
                 let is_changed = {
-                    changed_poll.lock().map(|mut g| {
-                        let v = *g;
-                        *g = false;
-                        v
-                    }).unwrap_or(false)
+                    changed_poll
+                        .lock()
+                        .map(|mut g| {
+                            let v = *g;
+                            *g = false;
+                            v
+                        })
+                        .unwrap_or(false)
                 };
 
                 if is_changed {
                     this.update(cx, |state, cx| {
                         state.template = load_template(&state.path);
                         cx.notify();
-                    }).ok();
+                    })
+                    .ok();
                 }
 
                 cx.background_executor()
                     .timer(std::time::Duration::from_millis(100))
                     .await;
-            }
-        })
+            },
+        )
         .detach();
 
         Self {
@@ -73,8 +79,8 @@ impl HotReloadState {
 }
 
 fn load_template(path: &PathBuf) -> Result<Vec<Node>, String> {
-    let content = std::fs::read_to_string(path)
-        .map_err(|e| format!("Could not read {:?}: {}", path, e))?;
+    let content =
+        std::fs::read_to_string(path).map_err(|e| format!("Could not read {:?}: {}", path, e))?;
     parse_template(&content)
 }
 

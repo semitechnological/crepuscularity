@@ -4,16 +4,15 @@
 /// - Dynamic theme colors via context expressions in class values
 /// - GPUI animations via `animate:property={duration easing}` attributes
 /// - All standard Tailwind-like classes mapped to GPUI methods
-
 use std::time::Duration;
 
 use gpui::{
-    AnyElement, Animation, AnimationExt, ElementId, IntoElement, ParentElement, SharedString,
-    Styled, div, rgb, linear, quadratic, ease_in_out, ease_out_quint, bounce,
+    bounce, div, ease_in_out, ease_out_quint, linear, quadratic, rgb, Animation, AnimationExt,
+    AnyElement, ElementId, IntoElement, ParentElement, SharedString, Styled,
 };
 
 use crate::ast::*;
-use crate::context::{TemplateContext, TemplateValue, value_to_str};
+use crate::context::{value_to_str, TemplateContext, TemplateValue};
 use crate::styler::{apply_class_with_ctx, parse_duration_ms};
 
 /// Render a list of nodes into a single `AnyElement`, threading `LetDecl`s into
@@ -64,7 +63,9 @@ pub fn render_node(node: &Node, ctx: &TemplateContext) -> AnyElement {
         Node::LetDecl(_) => div().into_any_element(), // handled in render_nodes_with_ctx
         Node::RawText(expr) => {
             let val = crate::eval::eval_expr(expr, ctx);
-            div().child(SharedString::from(value_to_str(&val))).into_any_element()
+            div()
+                .child(SharedString::from(value_to_str(&val)))
+                .into_any_element()
         }
         Node::Include(inc) => render_include(inc, ctx),
     }
@@ -129,17 +130,21 @@ fn render_with_animations(d: gpui::Div, animations: &[AnimationSpec], tag: &str)
         let property = spec.property.clone();
         d.with_animation(id, anim, move |el, delta| {
             apply_animation_property(el, &property, delta)
-        }).into_any_element()
+        })
+        .into_any_element()
     } else {
-        let anims: Vec<Animation> = animations.iter().map(|spec| {
-            let duration_ms = parse_duration_ms(&spec.duration_expr).unwrap_or(300);
-            let mut anim = Animation::new(Duration::from_millis(duration_ms));
-            anim = apply_easing(anim, &spec.easing);
-            if spec.repeat {
-                anim = anim.repeat();
-            }
-            anim
-        }).collect();
+        let anims: Vec<Animation> = animations
+            .iter()
+            .map(|spec| {
+                let duration_ms = parse_duration_ms(&spec.duration_expr).unwrap_or(300);
+                let mut anim = Animation::new(Duration::from_millis(duration_ms));
+                anim = apply_easing(anim, &spec.easing);
+                if spec.repeat {
+                    anim = anim.repeat();
+                }
+                anim
+            })
+            .collect();
 
         let properties: Vec<String> = animations.iter().map(|a| a.property.clone()).collect();
         d.with_animations(id, anims, move |el, ix, delta| {
@@ -148,7 +153,8 @@ fn render_with_animations(d: gpui::Div, animations: &[AnimationSpec], tag: &str)
             } else {
                 el
             }
-        }).into_any_element()
+        })
+        .into_any_element()
     }
 }
 
@@ -244,7 +250,9 @@ fn render_for(block: &ForBlock, ctx: &TemplateContext) -> AnyElement {
         if !pattern.is_empty() {
             let item_str = item_ctx.get_str("value");
             if !item_str.is_empty() {
-                child_ctx.vars.insert(pattern.to_string(), TemplateValue::Str(item_str));
+                child_ctx
+                    .vars
+                    .insert(pattern.to_string(), TemplateValue::Str(item_str));
             }
         }
 
@@ -284,17 +292,16 @@ fn render_include(inc: &IncludeNode, ctx: &TemplateContext) -> AnyElement {
     }
 
     // Single-component file: resolve path relative to the current file's directory.
-    let file_path = if let Some(base) = &ctx.base_dir {
-        base.join(&inc.path)
-    } else {
-        std::path::PathBuf::from(&inc.path)
-    };
+    let file_path = resolve_include_path(ctx.base_dir.as_deref(), &inc.path);
 
     let content = match std::fs::read_to_string(&file_path) {
         Ok(c) => c,
         Err(e) => {
             let msg = format!("include error: {:?}: {}", file_path, e);
-            return div().text_color(rgb(0xff4444)).child(SharedString::from(msg)).into_any_element();
+            return div()
+                .text_color(rgb(0xff4444))
+                .child(SharedString::from(msg))
+                .into_any_element();
         }
     };
 
@@ -302,7 +309,10 @@ fn render_include(inc: &IncludeNode, ctx: &TemplateContext) -> AnyElement {
         Ok(n) => n,
         Err(e) => {
             let msg = format!("include parse error: {}", e);
-            return div().text_color(rgb(0xff4444)).child(SharedString::from(msg)).into_any_element();
+            return div()
+                .text_color(rgb(0xff4444))
+                .child(SharedString::from(msg))
+                .into_any_element();
         }
     };
 
@@ -322,6 +332,17 @@ fn render_include(inc: &IncludeNode, ctx: &TemplateContext) -> AnyElement {
     render_nodes(&nodes, &child_ctx)
 }
 
+
+fn resolve_include_path(base_dir: Option<&std::path::Path>, path: &str) -> std::path::PathBuf {
+    let candidate = if let Some(base) = base_dir {
+        base.join(path)
+    } else {
+        std::path::PathBuf::from(path)
+    };
+
+    std::fs::canonicalize(&candidate).unwrap_or(candidate)
+}
+
 /// Render a named component from a multi-component file (`path#Name` syntax).
 fn render_named_component(
     inc: &IncludeNode,
@@ -329,17 +350,16 @@ fn render_named_component(
     file_part: &str,
     comp_name: &str,
 ) -> AnyElement {
-    let file_path = if let Some(base) = &ctx.base_dir {
-        base.join(file_part)
-    } else {
-        std::path::PathBuf::from(file_part)
-    };
+    let file_path = resolve_include_path(ctx.base_dir.as_deref(), file_part);
 
     let content = match std::fs::read_to_string(&file_path) {
         Ok(c) => c,
         Err(e) => {
             let msg = format!("include error: {:?}: {}", file_path, e);
-            return div().text_color(rgb(0xff4444)).child(SharedString::from(msg)).into_any_element();
+            return div()
+                .text_color(rgb(0xff4444))
+                .child(SharedString::from(msg))
+                .into_any_element();
         }
     };
 
@@ -347,7 +367,10 @@ fn render_named_component(
         Ok(cf) => cf,
         Err(e) => {
             let msg = format!("component file parse error: {}", e);
-            return div().text_color(rgb(0xff4444)).child(SharedString::from(msg)).into_any_element();
+            return div()
+                .text_color(rgb(0xff4444))
+                .child(SharedString::from(msg))
+                .into_any_element();
         }
     };
 
@@ -362,7 +385,10 @@ fn render_named_component(
                 file_part,
                 keys.join(", ")
             );
-            return div().text_color(rgb(0xff4444)).child(SharedString::from(msg)).into_any_element();
+            return div()
+                .text_color(rgb(0xff4444))
+                .child(SharedString::from(msg))
+                .into_any_element();
         }
     };
 

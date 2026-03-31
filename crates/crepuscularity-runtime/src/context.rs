@@ -15,7 +15,11 @@ pub struct TemplateContext {
 
 impl Default for TemplateContext {
     fn default() -> Self {
-        Self { vars: HashMap::new(), base_dir: None, slot: None }
+        Self {
+            vars: HashMap::new(),
+            base_dir: None,
+            slot: None,
+        }
     }
 }
 
@@ -78,10 +82,15 @@ impl TemplateContext {
                 let mut depth = 1usize;
                 for c in chars.by_ref() {
                     match c {
-                        '{' => { depth += 1; expr.push(c); }
+                        '{' => {
+                            depth += 1;
+                            expr.push(c);
+                        }
                         '}' => {
                             depth -= 1;
-                            if depth == 0 { break; }
+                            if depth == 0 {
+                                break;
+                            }
                             expr.push(c);
                         }
                         _ => expr.push(c),
@@ -120,29 +129,43 @@ pub(crate) fn value_to_str(v: &TemplateValue) -> String {
 // ── From impls ────────────────────────────────────────────────────────────────
 
 impl From<String> for TemplateValue {
-    fn from(s: String) -> Self { TemplateValue::Str(s) }
+    fn from(s: String) -> Self {
+        TemplateValue::Str(s)
+    }
 }
 
 impl From<&str> for TemplateValue {
-    fn from(s: &str) -> Self { TemplateValue::Str(s.to_string()) }
+    fn from(s: &str) -> Self {
+        TemplateValue::Str(s.to_string())
+    }
 }
 
 impl From<bool> for TemplateValue {
-    fn from(b: bool) -> Self { TemplateValue::Bool(b) }
+    fn from(b: bool) -> Self {
+        TemplateValue::Bool(b)
+    }
 }
 
 impl From<i64> for TemplateValue {
-    fn from(n: i64) -> Self { TemplateValue::Int(n) }
+    fn from(n: i64) -> Self {
+        TemplateValue::Int(n)
+    }
 }
 
 impl From<i32> for TemplateValue {
-    fn from(n: i32) -> Self { TemplateValue::Int(n as i64) }
+    fn from(n: i32) -> Self {
+        TemplateValue::Int(n as i64)
+    }
 }
 
 impl From<f64> for TemplateValue {
-    fn from(f: f64) -> Self { TemplateValue::Float(f) }
+    fn from(f: f64) -> Self {
+        TemplateValue::Float(f)
+    }
 }
 
 impl From<Vec<TemplateContext>> for TemplateValue {
-    fn from(list: Vec<TemplateContext>) -> Self { TemplateValue::List(list) }
+    fn from(list: Vec<TemplateContext>) -> Self {
+        TemplateValue::List(list)
+    }
 }

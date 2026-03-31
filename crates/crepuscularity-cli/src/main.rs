@@ -29,7 +29,10 @@ fn main() {
             let mut i = 2;
             while i < args.len() {
                 match args[i].as_str() {
-                    "--bin" => { i += 1; bin = args.get(i).cloned(); }
+                    "--bin" => {
+                        i += 1;
+                        bin = args.get(i).cloned();
+                    }
                     "--release" => release = true,
                     _ => {}
                 }
@@ -51,10 +54,13 @@ fn main() {
         }
 
         Some("preview") => {
-            let path = args.get(2).map(|s| std::path::PathBuf::from(s)).unwrap_or_else(|| {
-                eprintln!("Usage: crepu preview <file.crepus>");
-                std::process::exit(1);
-            });
+            let path = args
+                .get(2)
+                .map(|s| std::path::PathBuf::from(s))
+                .unwrap_or_else(|| {
+                    eprintln!("Usage: crepu preview <file.crepus>");
+                    std::process::exit(1);
+                });
             if !path.exists() {
                 eprintln!("File not found: {:?}", path);
                 std::process::exit(1);
@@ -78,9 +84,16 @@ fn print_usage() {
 
 fn run_preview(path: std::path::PathBuf) {
     use crepuscularity_runtime::{HotReloadState, HotReloadView, TemplateContext};
-    use gpui::{prelude::*, Application, WindowBackgroundAppearance, WindowKind, WindowOptions, bounds, point, px, size};
+    use gpui::{
+        bounds, point, prelude::*, px, size, Application, WindowBackgroundAppearance, WindowKind,
+        WindowOptions,
+    };
 
-    let display_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("preview").to_string();
+    let display_name = path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("preview")
+        .to_string();
 
     // Also load context.toml from the same directory if present
     let mut ctx = TemplateContext::new();
@@ -126,11 +139,15 @@ fn run_preview(path: std::path::PathBuf) {
 
 fn load_context_toml(path: &std::path::Path, ctx: &mut crepuscularity_runtime::TemplateContext) {
     use crepuscularity_runtime::TemplateValue;
-    let Ok(content) = std::fs::read_to_string(path) else { return };
+    let Ok(content) = std::fs::read_to_string(path) else {
+        return;
+    };
 
     for line in content.lines() {
         let line = line.trim();
-        if line.is_empty() || line.starts_with('#') { continue; }
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
         if let Some(eq) = line.find('=') {
             let key = line[..eq].trim();
             let val = line[eq + 1..].trim();

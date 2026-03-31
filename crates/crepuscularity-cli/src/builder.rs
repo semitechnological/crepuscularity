@@ -2,7 +2,6 @@
 ///
 /// Runs `cargo build --message-format=json-diagnostic-rendered-ansi`,
 /// streams the JSON output, and returns a `BuildOutcome`.
-
 use std::io::{BufRead, BufReader};
 use std::path::Path;
 use std::process::{Child, Command, Stdio};
@@ -47,11 +46,7 @@ pub struct BuildOutcome {
 /// Diagnostics are streamed to stderr immediately (ANSI rendered).
 /// Errors are also collected in the returned `BuildOutcome` for the HUD.
 /// `hud` is optional — pass `None` when running outside the dev loop.
-pub fn cargo_build(
-    cwd: &Path,
-    release: bool,
-    hud: Option<Arc<Mutex<HudState>>>,
-) -> BuildOutcome {
+pub fn cargo_build(cwd: &Path, release: bool, hud: Option<Arc<Mutex<HudState>>>) -> BuildOutcome {
     let mut cmd = Command::new("cargo");
     cmd.arg("build")
         .arg("--message-format=json-diagnostic-rendered-ansi")
@@ -67,7 +62,10 @@ pub fn cargo_build(
         Ok(c) => c,
         Err(e) => {
             eprintln!("[crepu] Failed to spawn cargo: {e}");
-            return BuildOutcome { success: false, errors: vec![] };
+            return BuildOutcome {
+                success: false,
+                errors: vec![],
+            };
         }
     };
 
@@ -76,7 +74,10 @@ pub fn cargo_build(
     let mut success = false;
 
     for line in BufReader::new(stdout).lines() {
-        let line = match line { Ok(l) => l, Err(_) => continue };
+        let line = match line {
+            Ok(l) => l,
+            Err(_) => continue,
+        };
         let msg: CargoLine = match serde_json::from_str(&line) {
             Ok(m) => m,
             Err(_) => continue,
@@ -158,7 +159,11 @@ pub fn find_bin_name(cwd: &Path, override_name: Option<&str>) -> Option<String> 
         }
         if (in_bin || in_package) && t.starts_with("name") {
             if let Some(eq) = t.find('=') {
-                let name = t[eq + 1..].trim().trim_matches('"').trim_matches('\'').to_string();
+                let name = t[eq + 1..]
+                    .trim()
+                    .trim_matches('"')
+                    .trim_matches('\'')
+                    .to_string();
                 if !name.is_empty() {
                     if in_bin {
                         return Some(name); // [[bin]] wins immediately

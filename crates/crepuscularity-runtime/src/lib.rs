@@ -9,5 +9,7 @@ pub mod watcher;
 
 pub use context::{TemplateContext, TemplateValue};
 pub use hot_reload::{HotReloadState, HotReloadView};
-pub use parser::{parse_template, parse_component_file, ComponentFile, ComponentDef, ComponentMeta};
+pub use parser::{
+    parse_component_file, parse_template, ComponentDef, ComponentFile, ComponentMeta,
+};
 pub use renderer::render_nodes;

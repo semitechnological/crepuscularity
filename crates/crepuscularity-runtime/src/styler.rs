@@ -5,8 +5,9 @@
 /// - Arbitrary values: `bg-[#ff5733]`, `w-[200px]`, `text-[14px]`
 /// - Dynamic context expressions: `bg-{theme.surface}`, `text-{colors.muted}`
 ///   where the expression evaluates to a hex color string like "#1e1e2e" or "1e1e2e"
-
-use gpui::{prelude::*, rgb, rgba, hsla, px, rems, relative, Div, Length, AbsoluteLength, DefiniteLength};
+use gpui::{
+    hsla, prelude::*, px, relative, rems, rgb, rgba, AbsoluteLength, DefiniteLength, Div, Length,
+};
 
 use crate::context::TemplateContext;
 
@@ -18,10 +19,7 @@ pub fn apply_class(d: Div, class: &str) -> Div {
 /// Apply a class with optional template context for dynamic value resolution.
 pub fn apply_class_with_ctx(d: Div, class: &str, ctx: Option<&TemplateContext>) -> Div {
     // State prefixes — skip silently in runtime renderer (no hover/focus state at runtime)
-    if class.starts_with("hover:")
-        || class.starts_with("focus:")
-        || class.starts_with("active:")
-    {
+    if class.starts_with("hover:") || class.starts_with("focus:") || class.starts_with("active:") {
         return d;
     }
 
@@ -99,7 +97,8 @@ fn apply_context_class(d: Div, class: &str, ctx: &TemplateContext) -> Div {
 
 /// Parse a color string like "#1e1e2e", "1e1e2e", or "0x1e1e2e" to a u32 hex value.
 fn parse_color_str(s: &str) -> Option<u32> {
-    let hex_str = s.strip_prefix('#')
+    let hex_str = s
+        .strip_prefix('#')
         .or_else(|| s.strip_prefix("0x"))
         .unwrap_or(s);
     u32::from_str_radix(hex_str, 16).ok()
@@ -127,10 +126,9 @@ fn apply_static(d: Div, class: &str) -> Result<Div, Div> {
         "overflow-x-hidden" => d.overflow_x_hidden(),
         "overflow-y-hidden" => d.overflow_y_hidden(),
         // visible/scroll/auto — accepted silently (scroll needs .id(), visible is default)
-        "overflow-visible" | "overflow-x-visible" | "overflow-y-visible"
-        | "overflow-scroll" | "overflow-auto"
-        | "overflow-y-scroll" | "overflow-y-auto"
-        | "overflow-x-scroll" | "overflow-x-auto" => d,
+        "overflow-visible" | "overflow-x-visible" | "overflow-y-visible" | "overflow-scroll"
+        | "overflow-auto" | "overflow-y-scroll" | "overflow-y-auto" | "overflow-x-scroll"
+        | "overflow-x-auto" => d,
 
         // ── Flex direction ──
         "flex-row" => d.flex_row(),
@@ -448,20 +446,56 @@ fn apply_static(d: Div, class: &str) -> Result<Div, Div> {
 
         // ── Transitions & animations — no-op at class level ──
         // Actual animation is handled by animate: attributes in the renderer.
-        "transition" | "transition-all" | "transition-colors" | "transition-opacity"
-        | "transition-shadow" | "transition-transform"
-        | "duration-75" | "duration-100" | "duration-150" | "duration-200"
-        | "duration-300" | "duration-500" | "duration-700" | "duration-1000"
-        | "ease-linear" | "ease-in" | "ease-out" | "ease-in-out"
-        | "delay-75" | "delay-100" | "delay-150" | "delay-200"
-        | "delay-300" | "delay-500" | "delay-700" | "delay-1000"
-        | "animate-none" | "animate-spin" | "animate-ping" | "animate-pulse" | "animate-bounce" => d,
+        "transition"
+        | "transition-all"
+        | "transition-colors"
+        | "transition-opacity"
+        | "transition-shadow"
+        | "transition-transform"
+        | "duration-75"
+        | "duration-100"
+        | "duration-150"
+        | "duration-200"
+        | "duration-300"
+        | "duration-500"
+        | "duration-700"
+        | "duration-1000"
+        | "ease-linear"
+        | "ease-in"
+        | "ease-out"
+        | "ease-in-out"
+        | "delay-75"
+        | "delay-100"
+        | "delay-150"
+        | "delay-200"
+        | "delay-300"
+        | "delay-500"
+        | "delay-700"
+        | "delay-1000"
+        | "animate-none"
+        | "animate-spin"
+        | "animate-ping"
+        | "animate-pulse"
+        | "animate-bounce" => d,
 
         // ── Accepted silently (CSS-only or unsupported in GPUI) ──
-        "inline-flex" | "inline" | "inline-block" | "select-none" | "pointer-events-none"
-        | "uppercase" | "lowercase" | "capitalize" | "whitespace-pre"
-        | "sticky" | "fixed" | "items-stretch"
-        | "self-stretch" | "self-center" | "self-start" | "self-end" | "self-auto" => d,
+        "inline-flex"
+        | "inline"
+        | "inline-block"
+        | "select-none"
+        | "pointer-events-none"
+        | "uppercase"
+        | "lowercase"
+        | "capitalize"
+        | "whitespace-pre"
+        | "sticky"
+        | "fixed"
+        | "items-stretch"
+        | "self-stretch"
+        | "self-center"
+        | "self-start"
+        | "self-end"
+        | "self-auto" => d,
 
         // ── Debug (only in debug builds) ──
         #[cfg(debug_assertions)]
@@ -532,14 +566,38 @@ fn apply_dynamic(d: Div, class: &str) -> Div {
 
     // ── Arbitrary border radius: rounded-[Npx], rounded-t-[Npx], etc. ──
     for (prefix, apply_fn) in &[
-        ("rounded-tl-[", Div::rounded_tl as fn(Div, AbsoluteLength) -> Div),
-        ("rounded-tr-[", Div::rounded_tr as fn(Div, AbsoluteLength) -> Div),
-        ("rounded-bl-[", Div::rounded_bl as fn(Div, AbsoluteLength) -> Div),
-        ("rounded-br-[", Div::rounded_br as fn(Div, AbsoluteLength) -> Div),
-        ("rounded-t-[", Div::rounded_t as fn(Div, AbsoluteLength) -> Div),
-        ("rounded-b-[", Div::rounded_b as fn(Div, AbsoluteLength) -> Div),
-        ("rounded-l-[", Div::rounded_l as fn(Div, AbsoluteLength) -> Div),
-        ("rounded-r-[", Div::rounded_r as fn(Div, AbsoluteLength) -> Div),
+        (
+            "rounded-tl-[",
+            Div::rounded_tl as fn(Div, AbsoluteLength) -> Div,
+        ),
+        (
+            "rounded-tr-[",
+            Div::rounded_tr as fn(Div, AbsoluteLength) -> Div,
+        ),
+        (
+            "rounded-bl-[",
+            Div::rounded_bl as fn(Div, AbsoluteLength) -> Div,
+        ),
+        (
+            "rounded-br-[",
+            Div::rounded_br as fn(Div, AbsoluteLength) -> Div,
+        ),
+        (
+            "rounded-t-[",
+            Div::rounded_t as fn(Div, AbsoluteLength) -> Div,
+        ),
+        (
+            "rounded-b-[",
+            Div::rounded_b as fn(Div, AbsoluteLength) -> Div,
+        ),
+        (
+            "rounded-l-[",
+            Div::rounded_l as fn(Div, AbsoluteLength) -> Div,
+        ),
+        (
+            "rounded-r-[",
+            Div::rounded_r as fn(Div, AbsoluteLength) -> Div,
+        ),
         ("rounded-[", Div::rounded as fn(Div, AbsoluteLength) -> Div),
     ] {
         if let Some(rest) = class.strip_prefix(prefix) {
@@ -553,10 +611,22 @@ fn apply_dynamic(d: Div, class: &str) -> Div {
 
     // ── Arbitrary border widths: border-t-[Npx], border-[Npx] etc. ──
     for (prefix, apply_fn) in &[
-        ("border-t-[", Div::border_t as fn(Div, AbsoluteLength) -> Div),
-        ("border-b-[", Div::border_b as fn(Div, AbsoluteLength) -> Div),
-        ("border-l-[", Div::border_l as fn(Div, AbsoluteLength) -> Div),
-        ("border-r-[", Div::border_r as fn(Div, AbsoluteLength) -> Div),
+        (
+            "border-t-[",
+            Div::border_t as fn(Div, AbsoluteLength) -> Div,
+        ),
+        (
+            "border-b-[",
+            Div::border_b as fn(Div, AbsoluteLength) -> Div,
+        ),
+        (
+            "border-l-[",
+            Div::border_l as fn(Div, AbsoluteLength) -> Div,
+        ),
+        (
+            "border-r-[",
+            Div::border_r as fn(Div, AbsoluteLength) -> Div,
+        ),
         ("border-[", Div::border as fn(Div, AbsoluteLength) -> Div),
     ] {
         if let Some(rest) = class.strip_prefix(prefix) {
@@ -570,34 +640,52 @@ fn apply_dynamic(d: Div, class: &str) -> Div {
 
     // ── Grid placement: col-span-N, col-start-N, col-end-N, row-span-N, etc. ──
     if let Some(rest) = class.strip_prefix("col-span-") {
-        if let Ok(n) = rest.parse::<u16>() { return d.col_span(n); }
+        if let Ok(n) = rest.parse::<u16>() {
+            return d.col_span(n);
+        }
     }
     if let Some(rest) = class.strip_prefix("col-start-") {
-        if let Ok(n) = rest.parse::<i16>() { return d.col_start(n); }
+        if let Ok(n) = rest.parse::<i16>() {
+            return d.col_start(n);
+        }
     }
     if let Some(rest) = class.strip_prefix("col-end-") {
-        if let Ok(n) = rest.parse::<i16>() { return d.col_end(n); }
+        if let Ok(n) = rest.parse::<i16>() {
+            return d.col_end(n);
+        }
     }
     if let Some(rest) = class.strip_prefix("row-span-") {
-        if let Ok(n) = rest.parse::<u16>() { return d.row_span(n); }
+        if let Ok(n) = rest.parse::<u16>() {
+            return d.row_span(n);
+        }
     }
     if let Some(rest) = class.strip_prefix("row-start-") {
-        if let Ok(n) = rest.parse::<i16>() { return d.row_start(n); }
+        if let Ok(n) = rest.parse::<i16>() {
+            return d.row_start(n);
+        }
     }
     if let Some(rest) = class.strip_prefix("row-end-") {
-        if let Ok(n) = rest.parse::<i16>() { return d.row_end(n); }
+        if let Ok(n) = rest.parse::<i16>() {
+            return d.row_end(n);
+        }
     }
     // Dynamic grid-cols-N and grid-rows-N beyond the static 1-12
     if let Some(rest) = class.strip_prefix("grid-cols-") {
-        if let Ok(n) = rest.parse::<u16>() { return d.grid_cols(n); }
+        if let Ok(n) = rest.parse::<u16>() {
+            return d.grid_cols(n);
+        }
     }
     if let Some(rest) = class.strip_prefix("grid-rows-") {
-        if let Ok(n) = rest.parse::<u16>() { return d.grid_rows(n); }
+        if let Ok(n) = rest.parse::<u16>() {
+            return d.grid_rows(n);
+        }
     }
 
     // ── line-clamp-N ──
     if let Some(rest) = class.strip_prefix("line-clamp-") {
-        if let Ok(n) = rest.parse::<usize>() { return d.line_clamp(n); }
+        if let Ok(n) = rest.parse::<usize>() {
+            return d.line_clamp(n);
+        }
     }
 
     // ── font-['Family'] or font-[Family] ──
@@ -714,9 +802,15 @@ fn apply_dynamic(d: Div, class: &str) -> Div {
                                 parts[3].parse::<f32>(),
                             ) {
                                 let color = hsla(h / 360.0, s / 100.0, l / 100.0, a);
-                                if *prefix == "bg-" { return d.bg(color); }
-                                if *prefix == "text-" { return d.text_color(color); }
-                                if *prefix == "border-" { return d.border_color(color); }
+                                if *prefix == "bg-" {
+                                    return d.bg(color);
+                                }
+                                if *prefix == "text-" {
+                                    return d.text_color(color);
+                                }
+                                if *prefix == "border-" {
+                                    return d.border_color(color);
+                                }
                             }
                         }
                     }
@@ -752,9 +846,15 @@ fn apply_dynamic(d: Div, class: &str) -> Div {
     d
 }
 
-fn apply_bg(d: Div, hex: u32) -> Div { d.bg(rgb(hex)) }
-fn apply_text_color(d: Div, hex: u32) -> Div { d.text_color(rgb(hex)) }
-fn apply_border_color(d: Div, hex: u32) -> Div { d.border_color(rgb(hex)) }
+fn apply_bg(d: Div, hex: u32) -> Div {
+    d.bg(rgb(hex))
+}
+fn apply_text_color(d: Div, hex: u32) -> Div {
+    d.text_color(rgb(hex))
+}
+fn apply_border_color(d: Div, hex: u32) -> Div {
+    d.border_color(rgb(hex))
+}
 
 /// Parse a Tailwind length token into a `Length` (supports auto, full, %, px, rem, number)
 fn parse_length(value: &str) -> Option<Length> {
@@ -764,7 +864,9 @@ fn parse_length(value: &str) -> Option<Length> {
             return Some(abs.into());
         }
         if let Some(rest) = inner.strip_suffix('%') {
-            if let Ok(n) = rest.parse::<f32>() { return Some(relative(n / 100.0).into()); }
+            if let Ok(n) = rest.parse::<f32>() {
+                return Some(relative(n / 100.0).into());
+            }
         }
         return None;
     }
@@ -825,12 +927,18 @@ fn parse_definite_length(value: &str) -> Option<DefiniteLength> {
 /// Parse a CSS size string to `AbsoluteLength` (px or rem only)
 pub fn parse_absolute_length(inner: &str) -> Option<AbsoluteLength> {
     if let Some(rest) = inner.strip_suffix("px") {
-        if let Ok(n) = rest.parse::<f32>() { return Some(px(n).into()); }
+        if let Ok(n) = rest.parse::<f32>() {
+            return Some(px(n).into());
+        }
     }
     if let Some(rest) = inner.strip_suffix("rem") {
-        if let Ok(n) = rest.parse::<f32>() { return Some(rems(n).into()); }
+        if let Ok(n) = rest.parse::<f32>() {
+            return Some(rems(n).into());
+        }
     }
-    if let Ok(n) = inner.parse::<f32>() { return Some(px(n).into()); }
+    if let Ok(n) = inner.parse::<f32>() {
+        return Some(px(n).into());
+    }
     None
 }
 
@@ -851,138 +959,248 @@ pub fn parse_duration_ms(s: &str) -> Option<u64> {
 
 pub fn tailwind_color(family: &str, shade: &str) -> Option<u32> {
     match (family, shade) {
-        ("slate","50")=>Some(0xf8fafc),("slate","100")=>Some(0xf1f5f9),
-        ("slate","200")=>Some(0xe2e8f0),("slate","300")=>Some(0xcbd5e1),
-        ("slate","400")=>Some(0x94a3b8),("slate","500")=>Some(0x64748b),
-        ("slate","600")=>Some(0x475569),("slate","700")=>Some(0x334155),
-        ("slate","800")=>Some(0x1e293b),("slate","900")=>Some(0x0f172a),
-        ("slate","950")=>Some(0x020617),
-        ("gray","50")=>Some(0xf9fafb),("gray","100")=>Some(0xf3f4f6),
-        ("gray","200")=>Some(0xe5e7eb),("gray","300")=>Some(0xd1d5db),
-        ("gray","400")=>Some(0x9ca3af),("gray","500")=>Some(0x6b7280),
-        ("gray","600")=>Some(0x4b5563),("gray","700")=>Some(0x374151),
-        ("gray","800")=>Some(0x1f2937),("gray","900")=>Some(0x111827),
-        ("gray","950")=>Some(0x030712),
-        ("zinc","50")=>Some(0xfafafa),("zinc","100")=>Some(0xf4f4f5),
-        ("zinc","200")=>Some(0xe4e4e7),("zinc","300")=>Some(0xd4d4d8),
-        ("zinc","400")=>Some(0xa1a1aa),("zinc","500")=>Some(0x71717a),
-        ("zinc","600")=>Some(0x52525b),("zinc","700")=>Some(0x3f3f46),
-        ("zinc","800")=>Some(0x27272a),("zinc","900")=>Some(0x18181b),
-        ("zinc","950")=>Some(0x09090b),
-        ("neutral","50")=>Some(0xfafafa),("neutral","100")=>Some(0xf5f5f5),
-        ("neutral","200")=>Some(0xe5e5e5),("neutral","300")=>Some(0xd4d4d4),
-        ("neutral","400")=>Some(0xa3a3a3),("neutral","500")=>Some(0x737373),
-        ("neutral","600")=>Some(0x525252),("neutral","700")=>Some(0x404040),
-        ("neutral","800")=>Some(0x262626),("neutral","900")=>Some(0x171717),
-        ("neutral","950")=>Some(0x0a0a0a),
-        ("stone","50")=>Some(0xfafaf9),("stone","100")=>Some(0xf5f5f4),
-        ("stone","200")=>Some(0xe7e5e4),("stone","300")=>Some(0xd6d3d1),
-        ("stone","400")=>Some(0xa8a29e),("stone","500")=>Some(0x78716c),
-        ("stone","600")=>Some(0x57534e),("stone","700")=>Some(0x44403c),
-        ("stone","800")=>Some(0x292524),("stone","900")=>Some(0x1c1917),
-        ("stone","950")=>Some(0x0c0a09),
-        ("red","50")=>Some(0xfef2f2),("red","100")=>Some(0xfee2e2),
-        ("red","200")=>Some(0xfecaca),("red","300")=>Some(0xfca5a5),
-        ("red","400")=>Some(0xf87171),("red","500")=>Some(0xef4444),
-        ("red","600")=>Some(0xdc2626),("red","700")=>Some(0xb91c1c),
-        ("red","800")=>Some(0x991b1b),("red","900")=>Some(0x7f1d1d),
-        ("red","950")=>Some(0x450a0a),
-        ("orange","50")=>Some(0xfff7ed),("orange","100")=>Some(0xffedd5),
-        ("orange","200")=>Some(0xfed7aa),("orange","300")=>Some(0xfdba74),
-        ("orange","400")=>Some(0xfb923c),("orange","500")=>Some(0xf97316),
-        ("orange","600")=>Some(0xea580c),("orange","700")=>Some(0xc2410c),
-        ("orange","800")=>Some(0x9a3412),("orange","900")=>Some(0x7c2d12),
-        ("orange","950")=>Some(0x431407),
-        ("amber","50")=>Some(0xfffbeb),("amber","100")=>Some(0xfef3c7),
-        ("amber","200")=>Some(0xfde68a),("amber","300")=>Some(0xfcd34d),
-        ("amber","400")=>Some(0xfbbf24),("amber","500")=>Some(0xf59e0b),
-        ("amber","600")=>Some(0xd97706),("amber","700")=>Some(0xb45309),
-        ("amber","800")=>Some(0x92400e),("amber","900")=>Some(0x78350f),
-        ("amber","950")=>Some(0x451a03),
-        ("yellow","50")=>Some(0xfefce8),("yellow","100")=>Some(0xfef9c3),
-        ("yellow","200")=>Some(0xfef08a),("yellow","300")=>Some(0xfde047),
-        ("yellow","400")=>Some(0xfacc15),("yellow","500")=>Some(0xeab308),
-        ("yellow","600")=>Some(0xca8a04),("yellow","700")=>Some(0xa16207),
-        ("yellow","800")=>Some(0x854d0e),("yellow","900")=>Some(0x713f12),
-        ("yellow","950")=>Some(0x422006),
-        ("lime","50")=>Some(0xf7fee7),("lime","100")=>Some(0xecfccb),
-        ("lime","200")=>Some(0xd9f99d),("lime","300")=>Some(0xbef264),
-        ("lime","400")=>Some(0xa3e635),("lime","500")=>Some(0x84cc16),
-        ("lime","600")=>Some(0x65a30d),("lime","700")=>Some(0x4d7c0f),
-        ("lime","800")=>Some(0x3f6212),("lime","900")=>Some(0x365314),
-        ("lime","950")=>Some(0x1a2e05),
-        ("green","50")=>Some(0xf0fdf4),("green","100")=>Some(0xdcfce7),
-        ("green","200")=>Some(0xbbf7d0),("green","300")=>Some(0x86efac),
-        ("green","400")=>Some(0x4ade80),("green","500")=>Some(0x22c55e),
-        ("green","600")=>Some(0x16a34a),("green","700")=>Some(0x15803d),
-        ("green","800")=>Some(0x166534),("green","900")=>Some(0x14532d),
-        ("green","950")=>Some(0x052e16),
-        ("emerald","50")=>Some(0xecfdf5),("emerald","100")=>Some(0xd1fae5),
-        ("emerald","200")=>Some(0xa7f3d0),("emerald","300")=>Some(0x6ee7b7),
-        ("emerald","400")=>Some(0x34d399),("emerald","500")=>Some(0x10b981),
-        ("emerald","600")=>Some(0x059669),("emerald","700")=>Some(0x047857),
-        ("emerald","800")=>Some(0x065f46),("emerald","900")=>Some(0x064e3b),
-        ("emerald","950")=>Some(0x022c22),
-        ("teal","50")=>Some(0xf0fdfa),("teal","100")=>Some(0xccfbf1),
-        ("teal","200")=>Some(0x99f6e4),("teal","300")=>Some(0x5eead4),
-        ("teal","400")=>Some(0x2dd4bf),("teal","500")=>Some(0x14b8a6),
-        ("teal","600")=>Some(0x0d9488),("teal","700")=>Some(0x0f766e),
-        ("teal","800")=>Some(0x115e59),("teal","900")=>Some(0x134e4a),
-        ("teal","950")=>Some(0x042f2e),
-        ("cyan","50")=>Some(0xecfeff),("cyan","100")=>Some(0xcffafe),
-        ("cyan","200")=>Some(0xa5f3fc),("cyan","300")=>Some(0x67e8f9),
-        ("cyan","400")=>Some(0x22d3ee),("cyan","500")=>Some(0x06b6d4),
-        ("cyan","600")=>Some(0x0891b2),("cyan","700")=>Some(0x0e7490),
-        ("cyan","800")=>Some(0x155e75),("cyan","900")=>Some(0x164e63),
-        ("cyan","950")=>Some(0x083344),
-        ("sky","50")=>Some(0xf0f9ff),("sky","100")=>Some(0xe0f2fe),
-        ("sky","200")=>Some(0xbae6fd),("sky","300")=>Some(0x7dd3fc),
-        ("sky","400")=>Some(0x38bdf8),("sky","500")=>Some(0x0ea5e9),
-        ("sky","600")=>Some(0x0284c7),("sky","700")=>Some(0x0369a1),
-        ("sky","800")=>Some(0x075985),("sky","900")=>Some(0x0c4a6e),
-        ("sky","950")=>Some(0x082f49),
-        ("blue","50")=>Some(0xeff6ff),("blue","100")=>Some(0xdbeafe),
-        ("blue","200")=>Some(0xbfdbfe),("blue","300")=>Some(0x93c5fd),
-        ("blue","400")=>Some(0x60a5fa),("blue","500")=>Some(0x3b82f6),
-        ("blue","600")=>Some(0x2563eb),("blue","700")=>Some(0x1d4ed8),
-        ("blue","800")=>Some(0x1e40af),("blue","900")=>Some(0x1e3a8a),
-        ("blue","950")=>Some(0x172554),
-        ("indigo","50")=>Some(0xeef2ff),("indigo","100")=>Some(0xe0e7ff),
-        ("indigo","200")=>Some(0xc7d2fe),("indigo","300")=>Some(0xa5b4fc),
-        ("indigo","400")=>Some(0x818cf8),("indigo","500")=>Some(0x6366f1),
-        ("indigo","600")=>Some(0x4f46e5),("indigo","700")=>Some(0x4338ca),
-        ("indigo","800")=>Some(0x3730a3),("indigo","900")=>Some(0x312e81),
-        ("indigo","950")=>Some(0x1e1b4b),
-        ("violet","50")=>Some(0xf5f3ff),("violet","100")=>Some(0xede9fe),
-        ("violet","200")=>Some(0xddd6fe),("violet","300")=>Some(0xc4b5fd),
-        ("violet","400")=>Some(0xa78bfa),("violet","500")=>Some(0x8b5cf6),
-        ("violet","600")=>Some(0x7c3aed),("violet","700")=>Some(0x6d28d9),
-        ("violet","800")=>Some(0x5b21b6),("violet","900")=>Some(0x4c1d95),
-        ("violet","950")=>Some(0x2e1065),
-        ("purple","50")=>Some(0xfaf5ff),("purple","100")=>Some(0xf3e8ff),
-        ("purple","200")=>Some(0xe9d5ff),("purple","300")=>Some(0xd8b4fe),
-        ("purple","400")=>Some(0xc084fc),("purple","500")=>Some(0xa855f7),
-        ("purple","600")=>Some(0x9333ea),("purple","700")=>Some(0x7e22ce),
-        ("purple","800")=>Some(0x6b21a8),("purple","900")=>Some(0x581c87),
-        ("purple","950")=>Some(0x3b0764),
-        ("fuchsia","50")=>Some(0xfdf4ff),("fuchsia","100")=>Some(0xfae8ff),
-        ("fuchsia","200")=>Some(0xf5d0fe),("fuchsia","300")=>Some(0xf0abfc),
-        ("fuchsia","400")=>Some(0xe879f9),("fuchsia","500")=>Some(0xd946ef),
-        ("fuchsia","600")=>Some(0xc026d3),("fuchsia","700")=>Some(0xa21caf),
-        ("fuchsia","800")=>Some(0x86198f),("fuchsia","900")=>Some(0x701a75),
-        ("fuchsia","950")=>Some(0x4a044e),
-        ("pink","50")=>Some(0xfdf2f8),("pink","100")=>Some(0xfce7f3),
-        ("pink","200")=>Some(0xfbcfe8),("pink","300")=>Some(0xf9a8d4),
-        ("pink","400")=>Some(0xf472b6),("pink","500")=>Some(0xec4899),
-        ("pink","600")=>Some(0xdb2777),("pink","700")=>Some(0xbe185d),
-        ("pink","800")=>Some(0x9d174d),("pink","900")=>Some(0x831843),
-        ("pink","950")=>Some(0x500724),
-        ("rose","50")=>Some(0xfff1f2),("rose","100")=>Some(0xffe4e6),
-        ("rose","200")=>Some(0xfecdd3),("rose","300")=>Some(0xfda4af),
-        ("rose","400")=>Some(0xfb7185),("rose","500")=>Some(0xf43f5e),
-        ("rose","600")=>Some(0xe11d48),("rose","700")=>Some(0xbe123c),
-        ("rose","800")=>Some(0x9f1239),("rose","900")=>Some(0x881337),
-        ("rose","950")=>Some(0x4c0519),
+        ("slate", "50") => Some(0xf8fafc),
+        ("slate", "100") => Some(0xf1f5f9),
+        ("slate", "200") => Some(0xe2e8f0),
+        ("slate", "300") => Some(0xcbd5e1),
+        ("slate", "400") => Some(0x94a3b8),
+        ("slate", "500") => Some(0x64748b),
+        ("slate", "600") => Some(0x475569),
+        ("slate", "700") => Some(0x334155),
+        ("slate", "800") => Some(0x1e293b),
+        ("slate", "900") => Some(0x0f172a),
+        ("slate", "950") => Some(0x020617),
+        ("gray", "50") => Some(0xf9fafb),
+        ("gray", "100") => Some(0xf3f4f6),
+        ("gray", "200") => Some(0xe5e7eb),
+        ("gray", "300") => Some(0xd1d5db),
+        ("gray", "400") => Some(0x9ca3af),
+        ("gray", "500") => Some(0x6b7280),
+        ("gray", "600") => Some(0x4b5563),
+        ("gray", "700") => Some(0x374151),
+        ("gray", "800") => Some(0x1f2937),
+        ("gray", "900") => Some(0x111827),
+        ("gray", "950") => Some(0x030712),
+        ("zinc", "50") => Some(0xfafafa),
+        ("zinc", "100") => Some(0xf4f4f5),
+        ("zinc", "200") => Some(0xe4e4e7),
+        ("zinc", "300") => Some(0xd4d4d8),
+        ("zinc", "400") => Some(0xa1a1aa),
+        ("zinc", "500") => Some(0x71717a),
+        ("zinc", "600") => Some(0x52525b),
+        ("zinc", "700") => Some(0x3f3f46),
+        ("zinc", "800") => Some(0x27272a),
+        ("zinc", "900") => Some(0x18181b),
+        ("zinc", "950") => Some(0x09090b),
+        ("neutral", "50") => Some(0xfafafa),
+        ("neutral", "100") => Some(0xf5f5f5),
+        ("neutral", "200") => Some(0xe5e5e5),
+        ("neutral", "300") => Some(0xd4d4d4),
+        ("neutral", "400") => Some(0xa3a3a3),
+        ("neutral", "500") => Some(0x737373),
+        ("neutral", "600") => Some(0x525252),
+        ("neutral", "700") => Some(0x404040),
+        ("neutral", "800") => Some(0x262626),
+        ("neutral", "900") => Some(0x171717),
+        ("neutral", "950") => Some(0x0a0a0a),
+        ("stone", "50") => Some(0xfafaf9),
+        ("stone", "100") => Some(0xf5f5f4),
+        ("stone", "200") => Some(0xe7e5e4),
+        ("stone", "300") => Some(0xd6d3d1),
+        ("stone", "400") => Some(0xa8a29e),
+        ("stone", "500") => Some(0x78716c),
+        ("stone", "600") => Some(0x57534e),
+        ("stone", "700") => Some(0x44403c),
+        ("stone", "800") => Some(0x292524),
+        ("stone", "900") => Some(0x1c1917),
+        ("stone", "950") => Some(0x0c0a09),
+        ("red", "50") => Some(0xfef2f2),
+        ("red", "100") => Some(0xfee2e2),
+        ("red", "200") => Some(0xfecaca),
+        ("red", "300") => Some(0xfca5a5),
+        ("red", "400") => Some(0xf87171),
+        ("red", "500") => Some(0xef4444),
+        ("red", "600") => Some(0xdc2626),
+        ("red", "700") => Some(0xb91c1c),
+        ("red", "800") => Some(0x991b1b),
+        ("red", "900") => Some(0x7f1d1d),
+        ("red", "950") => Some(0x450a0a),
+        ("orange", "50") => Some(0xfff7ed),
+        ("orange", "100") => Some(0xffedd5),
+        ("orange", "200") => Some(0xfed7aa),
+        ("orange", "300") => Some(0xfdba74),
+        ("orange", "400") => Some(0xfb923c),
+        ("orange", "500") => Some(0xf97316),
+        ("orange", "600") => Some(0xea580c),
+        ("orange", "700") => Some(0xc2410c),
+        ("orange", "800") => Some(0x9a3412),
+        ("orange", "900") => Some(0x7c2d12),
+        ("orange", "950") => Some(0x431407),
+        ("amber", "50") => Some(0xfffbeb),
+        ("amber", "100") => Some(0xfef3c7),
+        ("amber", "200") => Some(0xfde68a),
+        ("amber", "300") => Some(0xfcd34d),
+        ("amber", "400") => Some(0xfbbf24),
+        ("amber", "500") => Some(0xf59e0b),
+        ("amber", "600") => Some(0xd97706),
+        ("amber", "700") => Some(0xb45309),
+        ("amber", "800") => Some(0x92400e),
+        ("amber", "900") => Some(0x78350f),
+        ("amber", "950") => Some(0x451a03),
+        ("yellow", "50") => Some(0xfefce8),
+        ("yellow", "100") => Some(0xfef9c3),
+        ("yellow", "200") => Some(0xfef08a),
+        ("yellow", "300") => Some(0xfde047),
+        ("yellow", "400") => Some(0xfacc15),
+        ("yellow", "500") => Some(0xeab308),
+        ("yellow", "600") => Some(0xca8a04),
+        ("yellow", "700") => Some(0xa16207),
+        ("yellow", "800") => Some(0x854d0e),
+        ("yellow", "900") => Some(0x713f12),
+        ("yellow", "950") => Some(0x422006),
+        ("lime", "50") => Some(0xf7fee7),
+        ("lime", "100") => Some(0xecfccb),
+        ("lime", "200") => Some(0xd9f99d),
+        ("lime", "300") => Some(0xbef264),
+        ("lime", "400") => Some(0xa3e635),
+        ("lime", "500") => Some(0x84cc16),
+        ("lime", "600") => Some(0x65a30d),
+        ("lime", "700") => Some(0x4d7c0f),
+        ("lime", "800") => Some(0x3f6212),
+        ("lime", "900") => Some(0x365314),
+        ("lime", "950") => Some(0x1a2e05),
+        ("green", "50") => Some(0xf0fdf4),
+        ("green", "100") => Some(0xdcfce7),
+        ("green", "200") => Some(0xbbf7d0),
+        ("green", "300") => Some(0x86efac),
+        ("green", "400") => Some(0x4ade80),
+        ("green", "500") => Some(0x22c55e),
+        ("green", "600") => Some(0x16a34a),
+        ("green", "700") => Some(0x15803d),
+        ("green", "800") => Some(0x166534),
+        ("green", "900") => Some(0x14532d),
+        ("green", "950") => Some(0x052e16),
+        ("emerald", "50") => Some(0xecfdf5),
+        ("emerald", "100") => Some(0xd1fae5),
+        ("emerald", "200") => Some(0xa7f3d0),
+        ("emerald", "300") => Some(0x6ee7b7),
+        ("emerald", "400") => Some(0x34d399),
+        ("emerald", "500") => Some(0x10b981),
+        ("emerald", "600") => Some(0x059669),
+        ("emerald", "700") => Some(0x047857),
+        ("emerald", "800") => Some(0x065f46),
+        ("emerald", "900") => Some(0x064e3b),
+        ("emerald", "950") => Some(0x022c22),
+        ("teal", "50") => Some(0xf0fdfa),
+        ("teal", "100") => Some(0xccfbf1),
+        ("teal", "200") => Some(0x99f6e4),
+        ("teal", "300") => Some(0x5eead4),
+        ("teal", "400") => Some(0x2dd4bf),
+        ("teal", "500") => Some(0x14b8a6),
+        ("teal", "600") => Some(0x0d9488),
+        ("teal", "700") => Some(0x0f766e),
+        ("teal", "800") => Some(0x115e59),
+        ("teal", "900") => Some(0x134e4a),
+        ("teal", "950") => Some(0x042f2e),
+        ("cyan", "50") => Some(0xecfeff),
+        ("cyan", "100") => Some(0xcffafe),
+        ("cyan", "200") => Some(0xa5f3fc),
+        ("cyan", "300") => Some(0x67e8f9),
+        ("cyan", "400") => Some(0x22d3ee),
+        ("cyan", "500") => Some(0x06b6d4),
+        ("cyan", "600") => Some(0x0891b2),
+        ("cyan", "700") => Some(0x0e7490),
+        ("cyan", "800") => Some(0x155e75),
+        ("cyan", "900") => Some(0x164e63),
+        ("cyan", "950") => Some(0x083344),
+        ("sky", "50") => Some(0xf0f9ff),
+        ("sky", "100") => Some(0xe0f2fe),
+        ("sky", "200") => Some(0xbae6fd),
+        ("sky", "300") => Some(0x7dd3fc),
+        ("sky", "400") => Some(0x38bdf8),
+        ("sky", "500") => Some(0x0ea5e9),
+        ("sky", "600") => Some(0x0284c7),
+        ("sky", "700") => Some(0x0369a1),
+        ("sky", "800") => Some(0x075985),
+        ("sky", "900") => Some(0x0c4a6e),
+        ("sky", "950") => Some(0x082f49),
+        ("blue", "50") => Some(0xeff6ff),
+        ("blue", "100") => Some(0xdbeafe),
+        ("blue", "200") => Some(0xbfdbfe),
+        ("blue", "300") => Some(0x93c5fd),
+        ("blue", "400") => Some(0x60a5fa),
+        ("blue", "500") => Some(0x3b82f6),
+        ("blue", "600") => Some(0x2563eb),
+        ("blue", "700") => Some(0x1d4ed8),
+        ("blue", "800") => Some(0x1e40af),
+        ("blue", "900") => Some(0x1e3a8a),
+        ("blue", "950") => Some(0x172554),
+        ("indigo", "50") => Some(0xeef2ff),
+        ("indigo", "100") => Some(0xe0e7ff),
+        ("indigo", "200") => Some(0xc7d2fe),
+        ("indigo", "300") => Some(0xa5b4fc),
+        ("indigo", "400") => Some(0x818cf8),
+        ("indigo", "500") => Some(0x6366f1),
+        ("indigo", "600") => Some(0x4f46e5),
+        ("indigo", "700") => Some(0x4338ca),
+        ("indigo", "800") => Some(0x3730a3),
+        ("indigo", "900") => Some(0x312e81),
+        ("indigo", "950") => Some(0x1e1b4b),
+        ("violet", "50") => Some(0xf5f3ff),
+        ("violet", "100") => Some(0xede9fe),
+        ("violet", "200") => Some(0xddd6fe),
+        ("violet", "300") => Some(0xc4b5fd),
+        ("violet", "400") => Some(0xa78bfa),
+        ("violet", "500") => Some(0x8b5cf6),
+        ("violet", "600") => Some(0x7c3aed),
+        ("violet", "700") => Some(0x6d28d9),
+        ("violet", "800") => Some(0x5b21b6),
+        ("violet", "900") => Some(0x4c1d95),
+        ("violet", "950") => Some(0x2e1065),
+        ("purple", "50") => Some(0xfaf5ff),
+        ("purple", "100") => Some(0xf3e8ff),
+        ("purple", "200") => Some(0xe9d5ff),
+        ("purple", "300") => Some(0xd8b4fe),
+        ("purple", "400") => Some(0xc084fc),
+        ("purple", "500") => Some(0xa855f7),
+        ("purple", "600") => Some(0x9333ea),
+        ("purple", "700") => Some(0x7e22ce),
+        ("purple", "800") => Some(0x6b21a8),
+        ("purple", "900") => Some(0x581c87),
+        ("purple", "950") => Some(0x3b0764),
+        ("fuchsia", "50") => Some(0xfdf4ff),
+        ("fuchsia", "100") => Some(0xfae8ff),
+        ("fuchsia", "200") => Some(0xf5d0fe),
+        ("fuchsia", "300") => Some(0xf0abfc),
+        ("fuchsia", "400") => Some(0xe879f9),
+        ("fuchsia", "500") => Some(0xd946ef),
+        ("fuchsia", "600") => Some(0xc026d3),
+        ("fuchsia", "700") => Some(0xa21caf),
+        ("fuchsia", "800") => Some(0x86198f),
+        ("fuchsia", "900") => Some(0x701a75),
+        ("fuchsia", "950") => Some(0x4a044e),
+        ("pink", "50") => Some(0xfdf2f8),
+        ("pink", "100") => Some(0xfce7f3),
+        ("pink", "200") => Some(0xfbcfe8),
+        ("pink", "300") => Some(0xf9a8d4),
+        ("pink", "400") => Some(0xf472b6),
+        ("pink", "500") => Some(0xec4899),
+        ("pink", "600") => Some(0xdb2777),
+        ("pink", "700") => Some(0xbe185d),
+        ("pink", "800") => Some(0x9d174d),
+        ("pink", "900") => Some(0x831843),
+        ("pink", "950") => Some(0x500724),
+        ("rose", "50") => Some(0xfff1f2),
+        ("rose", "100") => Some(0xffe4e6),
+        ("rose", "200") => Some(0xfecdd3),
+        ("rose", "300") => Some(0xfda4af),
+        ("rose", "400") => Some(0xfb7185),
+        ("rose", "500") => Some(0xf43f5e),
+        ("rose", "600") => Some(0xe11d48),
+        ("rose", "700") => Some(0xbe123c),
+        ("rose", "800") => Some(0x9f1239),
+        ("rose", "900") => Some(0x881337),
+        ("rose", "950") => Some(0x4c0519),
         _ => None,
     }
 }

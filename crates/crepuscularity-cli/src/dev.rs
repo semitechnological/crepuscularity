@@ -6,17 +6,16 @@
 ///
 /// Communication: `Arc<Mutex<HudState>>` (polled by GPUI entity every 100ms)
 /// Shutdown:      `Arc<AtomicBool>` set when GPUI window closes
-
 use std::path::PathBuf;
 use std::process::{Child, Command};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use notify::{Event, EventKind, RecursiveMode, Watcher, recommended_watcher};
+use notify::{recommended_watcher, Event, EventKind, RecursiveMode, Watcher};
 
 use crate::builder::{cargo_build, find_bin_name, kill_child};
-use crate::hud::{DevStatus, HudState, open_hud_window};
+use crate::hud::{open_hud_window, DevStatus, HudState};
 
 pub fn run(bin_override: Option<String>, release: bool) {
     let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
@@ -84,14 +83,18 @@ fn background_loop(
     if src.exists() {
         watcher.watch(&src, RecursiveMode::Recursive).ok();
     }
-    watcher.watch(&cwd.join("Cargo.toml"), RecursiveMode::NonRecursive).ok();
+    watcher
+        .watch(&cwd.join("Cargo.toml"), RecursiveMode::NonRecursive)
+        .ok();
 
     // Initial build + launch
     let mut child = do_build_launch(&shared, &cwd, &bin_name, release, None);
 
     loop {
         if shutdown.load(Ordering::Relaxed) {
-            if let Some(mut c) = child { kill_child(&mut c); }
+            if let Some(mut c) = child {
+                kill_child(&mut c);
+            }
             break;
         }
 
@@ -205,7 +208,10 @@ fn do_build_launch(
         let count = outcome.errors.len();
         eprintln!("[crepu dev] Build failed with {count} error(s)");
         if let Ok(mut s) = shared.lock() {
-            s.status = DevStatus::Failed { errors: outcome.errors, count };
+            s.status = DevStatus::Failed {
+                errors: outcome.errors,
+                count,
+            };
         }
         None
     }

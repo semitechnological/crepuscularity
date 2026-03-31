@@ -22,7 +22,7 @@ pub mod prelude {
     pub use crepuscularity_macros::view;
     pub use gpui::prelude::*;
     pub use gpui::{
-        App, AppContext, Context, Entity, FontWeight, IntoElement, Render, SharedString, Window,
-        div, px, rems, rgb, black, white, relative,
+        black, div, px, relative, rems, rgb, white, App, AppContext, Context, Entity, FontWeight,
+        IntoElement, Render, SharedString, Window,
     };
 }

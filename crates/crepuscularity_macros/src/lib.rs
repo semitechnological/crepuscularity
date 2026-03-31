@@ -2,7 +2,7 @@ use proc_macro::TokenStream;
 use proc_macro2::{Span, TokenStream as TokenStream2};
 use quote::quote;
 use std::sync::atomic::{AtomicU64, Ordering};
-use syn::{LitStr, parse_macro_input};
+use syn::{parse_macro_input, LitStr};
 
 /// Global counter for generating unique element IDs within a compilation unit.
 static ELEM_ID_COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -188,7 +188,10 @@ fn collect_lines(template: &str) -> Vec<(usize, String)> {
     if min_indent == 0 {
         return lines;
     }
-    lines.into_iter().map(|(i, l)| (i - min_indent, l)).collect()
+    lines
+        .into_iter()
+        .map(|(i, l)| (i - min_indent, l))
+        .collect()
 }
 
 fn parse_nodes(
@@ -278,11 +281,7 @@ fn parse_nodes(
 }
 
 /// Parse a single `if` node, handling `else if` chains recursively.
-fn parse_if_node(
-    lines: &[(usize, String)],
-    i: usize,
-    expected_indent: usize,
-) -> (Node, usize) {
+fn parse_if_node(lines: &[(usize, String)], i: usize, expected_indent: usize) -> (Node, usize) {
     let line = &lines[i].1;
     let condition = try_parse_if(line).unwrap_or_default();
     let mut i = i + 1;
@@ -311,7 +310,10 @@ fn parse_if_node(
             }
         } else if else_line.starts_with("else if ") {
             // Rewrite `else if {cond}` as `if {cond}` and recurse
-            let rewritten = else_line.strip_prefix("else ").unwrap_or(else_line).to_string();
+            let rewritten = else_line
+                .strip_prefix("else ")
+                .unwrap_or(else_line)
+                .to_string();
             let mut patched_lines = lines.to_vec();
             patched_lines[i].1 = rewritten;
             let (else_if_node, next_i) = parse_if_node(&patched_lines, i, expected_indent);
@@ -384,17 +386,13 @@ fn try_parse_for(line: &str) -> Option<(String, String)> {
     let in_pos = rest.find(" in ")?;
     let pattern = rest[..in_pos].trim().to_string();
     let after_in = rest[in_pos + 4..].trim();
-    let iterator =
-        extract_braced_expr_str(after_in).unwrap_or_else(|| after_in.to_string());
+    let iterator = extract_braced_expr_str(after_in).unwrap_or_else(|| after_in.to_string());
     Some((pattern, iterator))
 }
 
 fn try_parse_match(line: &str) -> Option<String> {
     let rest = line.strip_prefix("match ")?;
-    Some(
-        extract_braced_expr_str(rest.trim())
-            .unwrap_or_else(|| rest.trim().to_string()),
-    )
+    Some(extract_braced_expr_str(rest.trim()).unwrap_or_else(|| rest.trim().to_string()))
 }
 
 fn try_parse_match_arm(line: &str) -> Option<String> {
@@ -476,7 +474,11 @@ fn parse_element_line(line: &str, children: Vec<Node>) -> Element {
                     .skip(1)
                     .map(|s| s.to_string())
                     .collect();
-                event_handlers.push(EventHandler { event, modifiers, handler });
+                event_handlers.push(EventHandler {
+                    event,
+                    modifiers,
+                    handler,
+                });
             }
         } else if let Some(rest) = token.strip_prefix("class:") {
             // Conditional class: class:hidden={condition}
@@ -658,10 +660,10 @@ fn generate_root(nodes: &[Node]) -> Result<TokenStream2, String> {
 }
 
 fn generate_let_decl(decl: &LetDecl) -> Result<TokenStream2, String> {
-    let name: syn::Ident = syn::parse_str(&decl.name)
-        .map_err(|e| format!("Invalid let name `{}`: {e}", decl.name))?;
-    let expr: syn::Expr = syn::parse_str(&decl.expr)
-        .map_err(|e| format!("Invalid let expr `{}`: {e}", decl.expr))?;
+    let name: syn::Ident =
+        syn::parse_str(&decl.name).map_err(|e| format!("Invalid let name `{}`: {e}", decl.name))?;
+    let expr: syn::Expr =
+        syn::parse_str(&decl.expr).map_err(|e| format!("Invalid let expr `{}`: {e}", decl.expr))?;
     Ok(quote! { let #name = #expr; })
 }
 
@@ -872,7 +874,9 @@ fn generate_if_expr(if_block: &IfBlock) -> Result<TokenStream2, String> {
 }
 
 fn generate_for_child_call(for_block: &ForBlock) -> Result<TokenStream2, String> {
-    let pattern: TokenStream2 = for_block.pattern.parse()
+    let pattern: TokenStream2 = for_block
+        .pattern
+        .parse()
         .map_err(|error| format!("Invalid for pattern `{}`: {error}", for_block.pattern))?;
     let iterator: syn::Expr = syn::parse_str(&for_block.iterator)
         .map_err(|error| format!("Invalid for iterator `{}`: {error}", for_block.iterator))?;
@@ -933,7 +937,9 @@ fn generate_match_expr(match_block: &MatchBlock) -> Result<TokenStream2, String>
 }
 
 fn generate_match_arm(arm: &MatchArm) -> Result<TokenStream2, String> {
-    let pattern: TokenStream2 = arm.pattern.parse()
+    let pattern: TokenStream2 = arm
+        .pattern
+        .parse()
         .map_err(|e| format!("Invalid match pattern `{}`: {e}", arm.pattern))?;
 
     let body = match arm.body.len() {
@@ -958,9 +964,8 @@ fn generate_event_handler(handler: &EventHandler) -> Result<TokenStream2, String
     // Helper: parse closure or method reference
     let make_listener = |event_type: &str| -> Result<TokenStream2, String> {
         if is_closure {
-            let closure: syn::Expr =
-                syn::parse_str(&handler_expr[1..handler_expr.len() - 1])
-                    .map_err(|e| format!("Invalid {event_type} closure: {e}"))?;
+            let closure: syn::Expr = syn::parse_str(&handler_expr[1..handler_expr.len() - 1])
+                .map_err(|e| format!("Invalid {event_type} closure: {e}"))?;
             Ok(closure.into_token_stream())
         } else {
             let method: syn::Ident = syn::parse_str(handler_expr)
@@ -1024,45 +1029,48 @@ fn generate_keydown_with_modifiers(handler: &EventHandler) -> Result<TokenStream
 
     // Build key filter from modifiers
     // Modifiers can be: "Enter", "Escape", "ctrl+s", "shift+Tab", etc.
-    let key_conditions: Vec<TokenStream2> = handler.modifiers.iter().map(|modifier| {
-        let lower = modifier.to_lowercase();
-        if lower.contains('+') {
-            // ctrl+s, shift+tab, etc.
-            let parts: Vec<&str> = lower.split('+').collect();
-            let key = parts.last().unwrap_or(&"");
-            let mut conds = vec![quote! { __ev.keystroke.key == #key }];
-            for part in &parts[..parts.len() - 1] {
-                match *part {
-                    "ctrl" | "cmd" => conds.push(quote! { __ev.keystroke.modifiers.command }),
-                    "shift" => conds.push(quote! { __ev.keystroke.modifiers.shift }),
-                    "alt" | "opt" => conds.push(quote! { __ev.keystroke.modifiers.alt }),
-                    _ => {}
+    let key_conditions: Vec<TokenStream2> = handler
+        .modifiers
+        .iter()
+        .map(|modifier| {
+            let lower = modifier.to_lowercase();
+            if lower.contains('+') {
+                // ctrl+s, shift+tab, etc.
+                let parts: Vec<&str> = lower.split('+').collect();
+                let key = parts.last().unwrap_or(&"");
+                let mut conds = vec![quote! { __ev.keystroke.key == #key }];
+                for part in &parts[..parts.len() - 1] {
+                    match *part {
+                        "ctrl" | "cmd" => conds.push(quote! { __ev.keystroke.modifiers.command }),
+                        "shift" => conds.push(quote! { __ev.keystroke.modifiers.shift }),
+                        "alt" | "opt" => conds.push(quote! { __ev.keystroke.modifiers.alt }),
+                        _ => {}
+                    }
                 }
+                quote! { (#(#conds)&&*) }
+            } else {
+                // Simple key: Enter, Escape, Tab, etc.
+                let key = match lower.as_str() {
+                    "enter" => "enter",
+                    "escape" | "esc" => "escape",
+                    "tab" => "tab",
+                    "backspace" => "backspace",
+                    "delete" => "delete",
+                    "space" => "space",
+                    "arrowup" | "up" => "up",
+                    "arrowdown" | "down" => "down",
+                    "arrowleft" | "left" => "left",
+                    "arrowright" | "right" => "right",
+                    other => other,
+                };
+                quote! { __ev.keystroke.key == #key }
             }
-            quote! { (#(#conds)&&*) }
-        } else {
-            // Simple key: Enter, Escape, Tab, etc.
-            let key = match lower.as_str() {
-                "enter" => "enter",
-                "escape" | "esc" => "escape",
-                "tab" => "tab",
-                "backspace" => "backspace",
-                "delete" => "delete",
-                "space" => "space",
-                "arrowup" | "up" => "up",
-                "arrowdown" | "down" => "down",
-                "arrowleft" | "left" => "left",
-                "arrowright" | "right" => "right",
-                other => other,
-            };
-            quote! { __ev.keystroke.key == #key }
-        }
-    }).collect();
+        })
+        .collect();
 
     let call_body = if is_closure {
-        let closure: syn::Expr =
-            syn::parse_str(&handler_expr[1..handler_expr.len() - 1])
-                .map_err(|e| format!("Invalid keydown closure: {e}"))?;
+        let closure: syn::Expr = syn::parse_str(&handler_expr[1..handler_expr.len() - 1])
+            .map_err(|e| format!("Invalid keydown closure: {e}"))?;
         quote! { (#closure)(__ev, __window, __cx) }
     } else {
         let method: syn::Ident = syn::parse_str(handler_expr)
@@ -1089,21 +1097,24 @@ fn generate_keyup_with_modifiers(handler: &EventHandler) -> Result<TokenStream2,
     let handler_expr = &handler.handler;
     let is_closure = handler_expr.starts_with('{') && handler_expr.ends_with('}');
 
-    let key_conditions: Vec<TokenStream2> = handler.modifiers.iter().map(|modifier| {
-        let lower = modifier.to_lowercase();
-        let key = match lower.as_str() {
-            "enter" => "enter",
-            "escape" | "esc" => "escape",
-            "tab" => "tab",
-            other => other,
-        };
-        quote! { __ev.keystroke.key == #key }
-    }).collect();
+    let key_conditions: Vec<TokenStream2> = handler
+        .modifiers
+        .iter()
+        .map(|modifier| {
+            let lower = modifier.to_lowercase();
+            let key = match lower.as_str() {
+                "enter" => "enter",
+                "escape" | "esc" => "escape",
+                "tab" => "tab",
+                other => other,
+            };
+            quote! { __ev.keystroke.key == #key }
+        })
+        .collect();
 
     let call_body = if is_closure {
-        let closure: syn::Expr =
-            syn::parse_str(&handler_expr[1..handler_expr.len() - 1])
-                .map_err(|e| format!("Invalid keyup closure: {e}"))?;
+        let closure: syn::Expr = syn::parse_str(&handler_expr[1..handler_expr.len() - 1])
+            .map_err(|e| format!("Invalid keyup closure: {e}"))?;
         quote! { (#closure)(__ev, __window, __cx) }
     } else {
         let method: syn::Ident = syn::parse_str(handler_expr)
@@ -1142,13 +1153,18 @@ fn element_tag_to_tokens(tag: &str) -> TokenStream2 {
     match tag {
         "div" | "section" | "article" | "main" | "header" | "footer" | "nav" | "aside"
         | "figure" | "ul" | "ol" | "li" => quote! { ::gpui::div() },
-        "span" | "p" | "label" | "h1" | "h2" | "h3" | "h4" | "h5" | "h6" | "strong"
-        | "em" | "small" => quote! { ::gpui::div() },
+        "span" | "p" | "label" | "h1" | "h2" | "h3" | "h4" | "h5" | "h6" | "strong" | "em"
+        | "small" => quote! { ::gpui::div() },
         "button" => quote! { ::gpui::div().cursor_pointer() },
         "input" => quote! { ::gpui::div() },
         "img" | "image" => quote! { ::gpui::div() },
         _ => {
-            if tag.chars().next().map(|c| c.is_uppercase()).unwrap_or(false) {
+            if tag
+                .chars()
+                .next()
+                .map(|c| c.is_uppercase())
+                .unwrap_or(false)
+            {
                 if let Ok(path) = syn::parse_str::<syn::Path>(tag) {
                     quote! { #path::new() }
                 } else {
@@ -1359,8 +1375,13 @@ fn map_class_to_style(class: &str) -> Option<TokenStream2> {
         "pointer-events-none" => Some(quote! { .pointer_events_none() }),
 
         // Explicit ignore list (not supported in GPUI)
-        "transition-colors" | "transition" | "duration-200" | "ease-in-out" | "appearance-none"
-        | "focus-visible:outline-none" | "focus-visible:ring-0" => None,
+        "transition-colors"
+        | "transition"
+        | "duration-200"
+        | "ease-in-out"
+        | "appearance-none"
+        | "focus-visible:outline-none"
+        | "focus-visible:ring-0" => None,
 
         _ => None,
     };
@@ -1427,10 +1448,7 @@ fn parse_dynamic_class(class: &str) -> Option<TokenStream2> {
     // font-['Family_Name'] or font-[Family_Name] — font family
     if let Some(rest) = class.strip_prefix("font-[") {
         if let Some(inner) = rest.strip_suffix(']') {
-            let family = inner
-                .trim_matches('\'')
-                .trim_matches('"')
-                .replace('_', " ");
+            let family = inner.trim_matches('\'').trim_matches('"').replace('_', " ");
             return Some(quote! { .font_family(#family) });
         }
     }
