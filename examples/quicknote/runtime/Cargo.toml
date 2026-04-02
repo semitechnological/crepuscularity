@@ -1,0 +1,17 @@
+[package]
+name = "quicknote_runtime"
+version = "0.2.0"
+edition = "2021"
+description = "Quicknote browser extension example for crepuscularity"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+anywhere-core = { git = "https://github.com/semitechnological/anywhere" }
+anywhere-crepuscularity = { git = "https://github.com/semitechnological/anywhere" }
+crepuscularity-anywhere-webext = { git = "https://github.com/semitechnological/anywhere" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde-wasm-bindgen = "0.6"
+wasm-bindgen = "0.2"
