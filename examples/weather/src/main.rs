@@ -1,4 +1,4 @@
-use crepuscularity::prelude::*;
+use crepuscularity_gpui::prelude::*;
 use gpui::{actions, bounds, point, size, Application, ClickEvent, KeyBinding, WindowOptions};
 
 actions!(weather, [FetchWeather]);

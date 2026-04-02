@@ -2,12 +2,13 @@
 //!
 //! COMMANDS
 //!   crepu new <name>                   scaffold a new GPUI app
-//!   crepu dev [--bin NAME] [--release] watch → rebuild → relaunch
+//!   crepu dev [--bin NAME] [--release] [--emit-events] watch → rebuild → relaunch
 //!   crepu build [--release]            cargo build wrapper
 //!   crepu preview <file.crepus>        live-preview a .crepus template
 
 mod builder;
 mod dev;
+pub mod events;
 mod hud;
 mod new;
 
@@ -26,6 +27,7 @@ fn main() {
         Some("dev") => {
             let mut bin: Option<String> = None;
             let mut release = false;
+            let mut emit_events = false;
             let mut i = 2;
             while i < args.len() {
                 match args[i].as_str() {
@@ -34,11 +36,12 @@ fn main() {
                         bin = args.get(i).cloned();
                     }
                     "--release" => release = true,
+                    "--emit-events" => emit_events = true,
                     _ => {}
                 }
                 i += 1;
             }
-            dev::run(bin, release);
+            dev::run(bin, release, emit_events);
         }
 
         Some("build") => {
@@ -76,10 +79,13 @@ fn print_usage() {
     eprintln!("crepu — Vite/Tauri for GPUI");
     eprintln!();
     eprintln!("COMMANDS:");
-    eprintln!("  new <name>                     scaffold a new GPUI app");
-    eprintln!("  dev [--bin NAME] [--release]   hot-reload dev loop");
-    eprintln!("  build [--release]              cargo build wrapper");
-    eprintln!("  preview <file.crepus>          live-preview a template");
+    eprintln!("  new <name>                                    scaffold a new GPUI app");
+    eprintln!("  dev [--bin NAME] [--release] [--emit-events]  hot-reload dev loop");
+    eprintln!("  build [--release]                             cargo build wrapper");
+    eprintln!("  preview <file.crepus>                         live-preview a template");
+    eprintln!();
+    eprintln!("OPTIONS:");
+    eprintln!("  --emit-events    emit structured JSON events to stdout (IDE integration)");
 }
 
 fn run_preview(path: std::path::PathBuf) {

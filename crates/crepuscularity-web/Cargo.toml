@@ -1,10 +1,7 @@
 [package]
-name = "crepuscularity-runtime"
+name = "crepuscularity-web"
 version = "0.3.0"
 edition = "2021"
 
 [dependencies]
 crepuscularity-core = { path = "../crepuscularity-core" }
-gpui = { workspace = true }
-notify = "6"
-toml = "0.8"

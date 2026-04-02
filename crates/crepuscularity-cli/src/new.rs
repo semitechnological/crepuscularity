@@ -38,7 +38,7 @@ path = "src/main.rs"
 
 [dependencies]
 gpui = {{ version = "0.2", default-features = false, features = ["font-kit"] }}
-crepuscularity = {{ git = "https://github.com/semitechnological/crepuscularity", branch = "runtime-dev" }}
+crepuscularity-gpui = {{ version = "0.2.0" }}
 "#
     )
 }
@@ -48,7 +48,7 @@ fn main_rs(name: &str) -> String {
     // Use r##"..."## so the inner r#"..."# delimiters don't close the outer string.
     // Inside format!(), {{ → { and }} → } in the output.
     format!(
-        r##"use crepuscularity::prelude::*;
+        r##"use crepuscularity_gpui::prelude::*;
 use gpui::{{App, Application, WindowOptions}};
 
 struct {pascal}View {{

@@ -1,8 +1,14 @@
 # Crepuscularity
 
-A UI framework for writing [GPUI](https://github.com/zed-industries/zed/tree/main/crates/gpui) interfaces in a concise, indentation-based template language.
+A general syntax and runtime system for writing UI in a concise, indentation-based template language.
 
-```
+`crepuscularity` now has separate backend crates for:
+
+- HTML rendering for websites and WASM-oriented flows
+- React/JSX rendering for TSX-style integration
+- GPUI rendering for native desktop apps
+
+```text
 div w-full h-full bg-zinc-950 text-white flex flex-col p-8
   div text-2xl font-bold mb-4
     "Hello {name}"
@@ -16,60 +22,62 @@ div w-full h-full bg-zinc-950 text-white flex flex-col p-8
 
 ## Features
 
-- **Tailwind-style classes** mapped to GPUI styled methods
+- **General `.crepus` syntax** shared across backends
+- **Tailwind-style classes** and utility-oriented element declarations
 - **Control flow** — `if / else if / else`, `match`, `for`
 - **String interpolation** — `"Hello {name}"`
 - **Expressions** — arithmetic, comparison, logical operators, property access
 - **Animations** — `animate:opacity={300ms ease-in-out}`
 - **Components** — single-file and multi-component files with slot support
-- **Hot reload** — live template updates without recompiling Rust
-- **Compile-time macro** — `view!` for zero-runtime-cost layouts
+- **HTML backend** — render templates to normal HTML strings
+- **React backend** — render templates to JSX/TSX-style output
+- **GPUI backend** — separate crate with `view!` macro and GPUI prelude
+- **Hot reload** — live template updates in the GPUI runtime path
 
 ## Getting started
 
-Add to your `Cargo.toml`:
+Add the backend crates you want to your `Cargo.toml`:
 
 ```toml
 [dependencies]
 crepuscularity = { path = "crates/crepuscularity" }
-crepuscularity-runtime = { path = "crates/crepuscularity-runtime" }
+crepuscularity-web = { path = "crates/crepuscularity-web" }
+crepuscularity-react = { path = "crates/crepuscularity-react" }
+crepuscularity-gpui = { path = "crates/crepuscularity-gpui" }
 ```
 
-> **macOS note**: GPUI requires the Xcode SDK. Set `SDKROOT=$(xcrun --show-sdk-path)` before building.
-
-## Compile-time templates
-
-Use the `view!` macro to embed templates directly in Rust. The template is parsed and compiled to GPUI builder calls at build time.
+## HTML backend
 
 ```rust
 use crepuscularity::prelude::*;
 
-impl Render for MyView {
-    fn render(&mut self, _cx: &mut Context<Self>) -> impl IntoElement {
-        view! {
-            div w-full h-full bg-zinc-950 text-white p-8
-              div text-2xl font-bold
-                "Hello world"
-        }
-    }
-}
+let content = std::fs::read_to_string("views/dashboard.crepus")?;
+let mut ctx = TemplateContext::new();
+ctx.set("username", "alice");
+ctx.set("score", 1200);
+
+let html = render_template_to_html(&content, &ctx)?;
 ```
 
-## Runtime templates
-
-Use the runtime crate for hot-reloadable templates read from `.crepus` files at runtime.
+## React backend
 
 ```rust
-use crepuscularity_runtime::{TemplateContext, parse_template, render_nodes};
+use crepuscularity::prelude::*;
 
 let content = std::fs::read_to_string("views/dashboard.crepus")?;
-let nodes = parse_template(&content)?;
-
 let mut ctx = TemplateContext::new();
-ctx.set_str("username", "alice");
-ctx.set_int("score", 1200);
+ctx.set("username", "alice");
+ctx.set("score", 1200);
 
-let element = render_nodes(&nodes, &ctx);
+let jsx = render_template_to_jsx(&content, &ctx)?;
+```
+
+## GPUI backend
+
+The GPUI-specific API lives in `crepuscularity-gpui`.
+
+```rust
+use crepuscularity_gpui::prelude::*;
 ```
 
 ## Components
@@ -78,7 +86,7 @@ let element = render_nodes(&nodes, &ctx);
 
 One `.crepus` file = one component. Declare optional props with `$: default`:
 
-```
+```text
 # components/card.crepus
 $: default subtitle = ""
 div rounded-lg border border-zinc-700 p-4
@@ -94,7 +102,7 @@ div rounded-lg border border-zinc-700 p-4
 
 Include it from another template:
 
-```
+```text
 include components/card.crepus title="Hello" subtitle="World"
   div p-2
     "Slot content"
@@ -102,9 +110,9 @@ include components/card.crepus title="Hello" subtitle="World"
 
 ### Multi-component files
 
-Collect related components into one file with a `+++` TOML frontmatter header and `--- Name` section separators. Good for small apps where one file per component is overkill.
+Collect related components into one file with a `+++` TOML frontmatter header and `--- Name` section separators.
 
-```
+```text
 +++
 [Card]
 description = "A bordered card"
@@ -134,15 +142,13 @@ button cursor-pointer px-4 py-2 rounded
 
 Include a named component with the `#Name` fragment:
 
-```
+```text
 include ui.crepus#Card title="Dashboard"
   div text-sm
     "Card body here"
 
 include ui.crepus#Button label="Save" variant="primary"
 ```
-
-The TOML `[ComponentName.defaults]` values are injected before passed props, so passed props always win. Components can also use `$: default` inside the template body for the same effect.
 
 ## DSL reference
 
@@ -155,38 +161,25 @@ The TOML `[ComponentName.defaults]` values are injected before passed props, so 
 | `match {expr}` / `"value" =>` / `_ =>` | Pattern match |
 | `for item in {list}` | Loop |
 | `$: let x = {expr}` | Local variable |
-| `$: default x = value` | Prop default (skipped if already set) |
+| `$: default x = value` | Prop default |
 | `class:hidden={cond}` | Conditional class |
-| `@click=handler` | Event handler (compile-time only) |
+| `@click=handler` | Event handler |
 | `animate:opacity={300ms ease-in-out}` | Animation |
 | `include path/file.crepus prop=val` | Single-file component |
-| `include file.crepus#Name prop=val` | Named component from multi-component file |
-| `slot` | Render parent slot, or fallback children |
-
-## Examples
-
-```bash
-# Run the full demo
-SDKROOT=$(xcrun --show-sdk-path) cargo run -p crepuscularity-dev -- examples/demo.crepus
-
-# Run the multi-component demo
-SDKROOT=$(xcrun --show-sdk-path) cargo run -p crepuscularity-dev -- examples/ui-demo.crepus
-
-# Hot reload: edit examples/ui.crepus or examples/ui-demo.crepus while it runs
-```
+| `include file.crepus#Name prop=val` | Named component |
+| `slot` | Render parent slot or fallback children |
 
 ## Project structure
 
-```
+```text
 crates/
-  crepuscularity/           Main library (re-exports view! macro + prelude)
-  crepuscularity_macros/    Proc-macro for compile-time view! templates
-  crepuscularity-runtime/   Runtime parser, renderer, hot-reload
+  crepuscularity/           General syntax/runtime facade
+  crepuscularity-core/      Shared AST, parser, context, evaluator
+  crepuscularity-web/       HTML backend
+  crepuscularity-react/     React/JSX backend
+  crepuscularity-gpui/      GPUI backend crate
+  crepuscularity_macros/    Proc-macro for compile-time GPUI `view!`
+  crepuscularity-runtime/   GPUI runtime renderer and hot reload
   crepuscularity-dev/       crepu-dev binary
   crepuscularity-cli/       crepu CLI
-examples/
-  demo.crepus               Full DSL feature tour
-  ui.crepus                 Multi-component file (Card, Badge, Button, Alert)
-  ui-demo.crepus            Demo using ui.crepus
-  components/card.crepus    Classic single-file component
 ```

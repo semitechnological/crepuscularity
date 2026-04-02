@@ -1,6 +1,6 @@
 [package]
 name = "weather"
-version = "0.1.0"
+version = "0.3.0"
 edition = "2021"
 
 [[bin]]
@@ -9,4 +9,4 @@ path = "src/main.rs"
 
 [dependencies]
 gpui = { workspace = true }
-crepuscularity = { path = "../../crates/crepuscularity" }
+crepuscularity-gpui = { path = "../../crates/crepuscularity-gpui" }
