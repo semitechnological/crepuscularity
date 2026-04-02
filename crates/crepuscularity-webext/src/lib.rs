@@ -19,11 +19,13 @@
 //! host-permissions = ["https://example.com/*"]
 //! ```
 
+mod api;
 mod capabilities;
 mod manifest;
 mod scanner;
 mod watcher;
 
+pub use api::{BrowserProgram, BrowserSource, BrowserStatement, JsExpr, MessagePayload, StorageArea};
 pub use capabilities::{Capability, CapabilitySet};
 pub use manifest::{ExtensionManifest, ManifestError};
 pub use scanner::{scan_crepus_for_capabilities, CapabilityUsage};
