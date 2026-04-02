@@ -6,6 +6,7 @@ members = [
     "crates/crepuscularity-gpui",
     "crates/crepuscularity-web",
     "crates/crepuscularity-react",
+    "crates/crepuscularity-webext",
     "crates/crepuscularity_macros",
     "crates/crepuscularity-runtime",
     "crates/crepuscularity-dev",
