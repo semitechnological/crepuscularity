@@ -1,29 +1,5 @@
 # TODO
 
-## Unthinkclaw GPUI menubar app
-
-Goal: Create a GPUI+Crepuscularity menubar app for the unthinkclaw AI agent runtime.
-
-### Requirements
-
-1. Add gpui dependency to unthinkclaw
-2. Create menubar tray icon with status indicator
-3. Create .crepus templates for:
-   - Agent status display (running/stopped/error)
-   - Quick configuration panel
-   - Recent conversations list
-   - Settings access
-4. Wire up to unthinkclaw agent runtime via IPC/channels
-
-### Considerations
-
-- Unthinkclaw is already a Rust project with tokio async runtime
-- Need to integrate GPUI's event loop with tokio
-- Menu bar apps on macOS require different window handling
-- Should work on both macOS and Linux (with different tray implementations)
-
----
-
 ## Mobile native support
 
 Goal: let `.crepus` stay the shared syntax while mobile becomes another backend family, not a fork of the language.
