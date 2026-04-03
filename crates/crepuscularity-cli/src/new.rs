@@ -1,28 +1,33 @@
 /// `crepus new NAME` — scaffold a new GPUI application.
 use std::fs;
 use std::path::Path;
+use std::time::Instant;
+
+use crate::ui;
 
 pub fn run(name: &str) {
+    let t0 = Instant::now();
     let dir = Path::new(name);
 
     if dir.exists() {
-        eprintln!("Error: '{}' already exists", name);
-        std::process::exit(1);
+        ui::error(&format!("'{}' already exists", name));
     }
 
     fs::create_dir_all(dir.join("src")).unwrap_or_else(|e| {
-        eprintln!("Error creating directories: {e}");
-        std::process::exit(1);
+        ui::error(&format!("could not create directories: {e}"));
     });
 
     fs::write(dir.join("Cargo.toml"), cargo_toml(name)).unwrap();
     fs::write(dir.join("src").join("main.rs"), main_rs(name)).unwrap();
     fs::write(dir.join(".gitignore"), "/target\n").unwrap();
 
-    eprintln!("\x1b[32m✓\x1b[0m Created \x1b[1m{name}\x1b[0m");
+    use console::style;
+    eprintln!("\n{} created {}", ui::ok(), style(name).cyan().bold());
     eprintln!();
+    eprintln!("{}", style("Next steps:").dim());
     eprintln!("  cd {name}");
     eprintln!("  crepus dev");
+    ui::done_in(t0.elapsed());
 }
 
 fn cargo_toml(name: &str) -> String {
@@ -45,8 +50,6 @@ crepuscularity-gpui = {{ version = "0.3" }}
 
 fn main_rs(name: &str) -> String {
     let pascal = to_pascal_case(name);
-    // Use r##"..."## so the inner r#"..."# delimiters don't close the outer string.
-    // Inside format!(), {{ → { and }} → } in the output.
     format!(
         r##"use crepuscularity_gpui::prelude::*;
 use gpui::{{App, Application, WindowOptions}};

@@ -1,8 +1,5 @@
 /// `crepus render <file.crepus>` — render a template to HTML on stdout.
 ///
-/// Useful for server-side rendering pipelines, CI snapshot tests, and
-/// inspecting template output without a GPUI window.
-///
 /// OPTIONS:
 ///   --ctx <file.toml>    load context variables from a TOML file
 ///   --var key=value      set a single context variable (repeatable)
@@ -11,6 +8,8 @@ use std::path::{Path, PathBuf};
 
 use crepuscularity_core::context::{TemplateContext, TemplateValue};
 use crepuscularity_web::{render_component_file_to_html, render_template_to_html};
+
+use crate::ui;
 
 pub fn run(args: &[String]) {
     let mut path: Option<PathBuf> = None;
@@ -31,8 +30,7 @@ pub fn run(args: &[String]) {
                     if let Some(eq) = kv.find('=') {
                         vars.push((kv[..eq].to_string(), kv[eq + 1..].to_string()));
                     } else {
-                        eprintln!("--var expects key=value, got: {kv}");
-                        std::process::exit(1);
+                        ui::error(&format!("--var expects key=value, got: {kv}"));
                     }
                 }
             }
@@ -42,15 +40,11 @@ pub fn run(args: &[String]) {
             }
             other => {
                 if other.starts_with('-') {
-                    eprintln!("Unknown option: {other}");
-                    print_usage();
-                    std::process::exit(1);
+                    ui::error(&format!("unknown option: {other}"));
                 } else if path.is_none() {
                     path = Some(PathBuf::from(other));
                 } else {
-                    eprintln!("Unexpected argument: {other}");
-                    print_usage();
-                    std::process::exit(1);
+                    ui::error(&format!("unexpected argument: {other}"));
                 }
             }
         }
@@ -58,39 +52,32 @@ pub fn run(args: &[String]) {
     }
 
     let path = path.unwrap_or_else(|| {
-        print_usage();
+        eprintln!("Usage: crepus render <file.crepus> [--ctx FILE] [--var k=v] [--component Name]");
         std::process::exit(1);
     });
 
     if !path.exists() {
-        eprintln!("File not found: {}", path.display());
-        std::process::exit(1);
+        ui::error(&format!("file not found: {}", path.display()));
     }
 
     let mut ctx = TemplateContext::new();
     ctx.base_dir = path.parent().map(|p| p.to_path_buf());
 
-    // Load --ctx file
     if let Some(ctx_path) = ctx_file {
         load_toml_ctx(&ctx_path, &mut ctx);
-    } else {
-        // Auto-load context.toml from same directory
-        if let Some(dir) = path.parent() {
-            let auto = dir.join("context.toml");
-            if auto.exists() {
-                load_toml_ctx(&auto, &mut ctx);
-            }
+    } else if let Some(dir) = path.parent() {
+        let auto = dir.join("context.toml");
+        if auto.exists() {
+            load_toml_ctx(&auto, &mut ctx);
         }
     }
 
-    // Apply --var overrides
     for (k, v) in vars {
         ctx.set(k, v);
     }
 
     let content = std::fs::read_to_string(&path).unwrap_or_else(|e| {
-        eprintln!("Failed to read {}: {e}", path.display());
-        std::process::exit(1);
+        ui::error(&format!("failed to read {}: {e}", path.display()));
     });
 
     let html = match component {
@@ -100,16 +87,13 @@ pub fn run(args: &[String]) {
 
     match html {
         Ok(out) => print!("{out}"),
-        Err(e) => {
-            eprintln!("Render error: {e}");
-            std::process::exit(1);
-        }
+        Err(e) => ui::error(&format!("Render error: {e}")),
     }
 }
 
 fn load_toml_ctx(path: &Path, ctx: &mut TemplateContext) {
     let Ok(content) = std::fs::read_to_string(path) else {
-        eprintln!("Could not read context file: {}", path.display());
+        ui::warning(&format!("could not read context file: {}", path.display()));
         return;
     };
     for line in content.lines() {
@@ -134,13 +118,4 @@ fn load_toml_ctx(path: &Path, ctx: &mut TemplateContext) {
             ctx.set(key, value);
         }
     }
-}
-
-fn print_usage() {
-    eprintln!("Usage: crepus render <file.crepus> [OPTIONS]");
-    eprintln!();
-    eprintln!("OPTIONS:");
-    eprintln!("  --ctx <file.toml>    load context variables from a TOML file");
-    eprintln!("  --var key=value      set a context variable (repeatable)");
-    eprintln!("  --component Name     render a specific named component");
 }

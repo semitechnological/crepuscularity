@@ -20,13 +20,13 @@ use notify::{recommended_watcher, Event, EventKind, RecursiveMode, Watcher};
 use crate::builder::{cargo_build, find_bin_name, kill_child};
 use crate::events::CompilerEvent;
 use crate::hud::{open_hud_window, DevStatus, HudState};
+use crate::ui;
 
 pub fn run(bin_override: Option<String>, release: bool, emit_events: bool) {
     let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
 
     let bin_name = find_bin_name(&cwd, bin_override.as_deref()).unwrap_or_else(|| {
-        eprintln!("[crepus dev] Could not determine binary name. Add a [[bin]] entry to Cargo.toml or use --bin.");
-        std::process::exit(1);
+        ui::error("could not determine binary name — add [[bin]] to Cargo.toml or use --bin");
     });
 
     let shared = Arc::new(Mutex::new(HudState::new(bin_name.clone())));
@@ -93,7 +93,7 @@ fn background_loop(
     }) {
         Ok(w) => w,
         Err(e) => {
-            eprintln!("[crepus dev] Could not create file watcher: {e}");
+            eprintln!("  {} could not create file watcher: {e}", crate::ui::err());
             return;
         }
     };
@@ -133,7 +133,7 @@ fn background_loop(
                     while rx.try_recv().is_ok() {}
                     std::thread::sleep(Duration::from_millis(30));
                 }
-                eprintln!("[crepus dev] Change detected — rebuilding…");
+                eprintln!("  {} change detected — rebuilding…", crate::ui::arrow());
                 child = do_build_launch(&shared, &cwd, &bin_name, release, child, emit_events);
             }
             Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
@@ -142,7 +142,7 @@ fn background_loop(
                     match c.try_wait() {
                         Ok(Some(status)) => {
                             let code = status.code();
-                            eprintln!("[crepus dev] App exited with code {code:?}");
+                            eprintln!("  {} app exited ({code:?})", crate::ui::warn());
                             if emit_events {
                                 CompilerEvent::process_exited(c.id(), code).emit();
                             }
@@ -233,7 +233,7 @@ fn do_build_launch(
         let profile = if release { "release" } else { "debug" };
         let bin_path = locate_binary(cwd, profile, bin_name);
 
-        eprintln!("[crepus dev] Built in {elapsed_ms} ms — launching {bin_name}");
+        eprintln!("  {} built in {elapsed_ms} ms — launching {bin_name}", crate::ui::ok());
 
         match Command::new(&bin_path).current_dir(cwd).spawn() {
             Ok(c) => {
@@ -243,7 +243,7 @@ fn do_build_launch(
                 Some(c)
             }
             Err(e) => {
-                eprintln!("[crepus dev] Failed to launch {bin_name}: {e}");
+                eprintln!("  {} failed to launch {bin_name}: {e}", crate::ui::err());
                 if let Ok(mut s) = shared.lock() {
                     s.status = DevStatus::Failed {
                         errors: vec![crate::hud::BuildError {
@@ -264,7 +264,7 @@ fn do_build_launch(
         }
 
         let count = outcome.errors.len();
-        eprintln!("[crepus dev] Build failed with {count} error(s)");
+        eprintln!("  {} build failed — {count} error(s)", crate::ui::err());
         if let Ok(mut s) = shared.lock() {
             s.status = DevStatus::Failed {
                 errors: outcome.errors,

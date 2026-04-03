@@ -27,7 +27,7 @@ fn main() {
 
     match args.get(1).map(|s| s.as_str()) {
         Some("--version") | Some("-V") => {
-            println!("crepus {}", env!("CARGO_PKG_VERSION"));
+            println!("crepus cli {}", env!("CARGO_PKG_VERSION"));
         }
 
         Some("--help") | Some("-h") => {
@@ -108,13 +108,9 @@ fn main() {
 
 fn print_usage() {
     eprintln!(
-        "{} {}",
+        "{} cli {}",
         style("crepus").cyan().bold(),
         style(env!("CARGO_PKG_VERSION")).dim()
-    );
-    eprintln!(
-        "{}",
-        style("Crepuscularity CLI — scaffold, develop, preview, and render .crepus templates").dim()
     );
     eprintln!();
     eprintln!("{}", style("COMMANDS").dim());
