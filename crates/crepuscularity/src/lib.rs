@@ -13,7 +13,6 @@ pub mod prelude {
         TemplateContext, TemplateValue,
     };
     pub use crepuscularity_web::{
-        render_component_file_to_html, render_component_file_to_jsx, render_nodes_to_html,
-        render_nodes_to_jsx, render_template_to_html, render_template_to_jsx,
+        render_component_file_to_html, render_nodes_to_html, render_template_to_html,
     };
 }
