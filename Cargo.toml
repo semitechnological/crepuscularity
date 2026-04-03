@@ -7,7 +7,6 @@ members = [
     "crates/crepuscularity-web",
     "crates/crepuscularity-react",
     "crates/crepuscularity-webext",
-    "crates/crepuscularity-equilibrium",
     "crates/crepuscularity_macros",
     "crates/crepuscularity-runtime",
     "crates/crepuscularity-dev",
