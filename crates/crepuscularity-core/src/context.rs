@@ -16,7 +16,6 @@ pub struct TemplateContext {
     pub virtual_files: HashMap<String, String>,
 }
 
-
 #[derive(Debug, Clone)]
 pub enum TemplateValue {
     Str(String),

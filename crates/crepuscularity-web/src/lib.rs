@@ -321,8 +321,7 @@ fn read_file(ctx: &TemplateContext, path: &Path) -> Result<String, String> {
             return Ok(content.clone());
         }
     }
-    std::fs::read_to_string(path)
-        .map_err(|e| format!("include error: {:?}: {}", path, e))
+    std::fs::read_to_string(path).map_err(|e| format!("include error: {:?}: {}", path, e))
 }
 
 fn render_include(inc: &IncludeNode, ctx: &TemplateContext) -> Result<String, String> {

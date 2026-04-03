@@ -161,9 +161,26 @@ fn toml_value_to_expr(v: &toml::Value) -> String {
 }
 
 pub fn parse_template(template: &str) -> Result<Vec<Node>, String> {
-    let lines = collect_lines(template);
-    let (nodes, _) = parse_nodes(&lines, 0, 0);
-    Ok(nodes)
+    if is_jsx_mode(template) {
+        parse_jsx_template(template)
+    } else {
+        let lines = collect_lines(template);
+        let (nodes, _) = parse_nodes(&lines, 0, 0);
+        Ok(nodes)
+    }
+}
+
+/// Returns true when the first non-blank, non-comment, non-`$:` line starts with `<`.
+/// This activates the JSX/HTML tag-based input syntax.
+fn is_jsx_mode(template: &str) -> bool {
+    for line in template.lines() {
+        let t = line.trim();
+        if t.is_empty() || t.starts_with('#') || t.starts_with("$:") {
+            continue;
+        }
+        return t.starts_with('<');
+    }
+    false
 }
 
 fn collect_lines(template: &str) -> Vec<(usize, String)> {
@@ -743,4 +760,569 @@ fn parse_text_template(line: &str) -> Vec<TextPart> {
     }
 
     parts
+}
+
+// ── JSX / HTML tag syntax parser ──────────────────────────────────────────────
+//
+// Activated automatically when parse_template() detects JSX mode (first content
+// line starts with `<`). Produces the same Node/Element AST as the indentation
+// parser, so every backend — GPUI, web, webext — works unchanged.
+//
+// Supported syntax:
+//   <div class="text-white w-full">children</div>   — HTML element
+//   <div className="text-white">children</div>       — JSX className alias
+//   <img src={url} />                               — self-closing
+//   <if condition={score > 50}>...
+//     <else>...</else>
+//   </if>                                            — conditional
+//   <else-if condition={...}>...<else-if>            — else-if chain
+//   <for let="item" in={list}>...</for>              — loop
+//   <match on={status}>
+//     <case pattern="ok"><div>Good</div></case>
+//   </match>                                         — match / switch
+//   <include src="file.crepus#Card" title={t} />    — include (self-closing = no slot)
+//   <include src="file.crepus">...</include>         — include with slot
+//   <let name="x" value={42} />                     — let declaration
+//   <let-default name="x" value={42} />             — default let
+//   $: let x = 42                                   — also works in JSX files
+
+// ── Internal attribute types (private to this module) ─────────────────────────
+
+struct JsxAttr {
+    key: String,
+    value: JsxAttrValue,
+}
+
+enum JsxAttrValue {
+    Bool(bool),
+    Str(String),
+    Expr(String),
+}
+
+impl JsxAttr {
+    fn as_str(&self) -> Option<&str> {
+        if let JsxAttrValue::Str(s) = &self.value {
+            Some(s)
+        } else {
+            None
+        }
+    }
+
+    /// Returns an evaluable expression string for the attribute value.
+    fn as_expr(&self) -> Option<String> {
+        match &self.value {
+            JsxAttrValue::Expr(e) => Some(e.clone()),
+            JsxAttrValue::Str(s) => Some(format!("\"{}\"", s.replace('"', "\\\""))),
+            JsxAttrValue::Bool(b) => Some(b.to_string()),
+        }
+    }
+}
+
+// ── Entry point ───────────────────────────────────────────────────────────────
+
+fn parse_jsx_template(src: &str) -> Result<Vec<Node>, String> {
+    let (nodes, _) = parse_jsx_nodes(src)?;
+    Ok(nodes)
+}
+
+/// Parse a sequence of JSX nodes, stopping before a closing tag or EOF.
+/// Returns `(nodes, remaining_source)`.
+fn parse_jsx_nodes(src: &str) -> Result<(Vec<Node>, &str), String> {
+    let mut nodes = Vec::new();
+    let mut rest = src;
+
+    loop {
+        let t = rest.trim_start();
+
+        if t.is_empty() {
+            rest = t;
+            break;
+        }
+        // Stop before any closing tag or <else / <else-if (handled by caller)
+        if t.starts_with("</") || t.starts_with("<else") {
+            rest = t;
+            break;
+        }
+        // $: let / $: default — identical syntax to indentation mode
+        if t.starts_with("$:") {
+            let end = t.find('\n').unwrap_or(t.len());
+            let line = t[..end].trim();
+            rest = &t[end..];
+            if let Some(decl) = try_parse_let_decl(line) {
+                nodes.push(Node::LetDecl(decl));
+            }
+            continue;
+        }
+        // Opening tag
+        if t.starts_with('<') {
+            rest = t;
+            let (node, next) = parse_jsx_tag(rest)?;
+            nodes.push(node);
+            rest = next;
+            continue;
+        }
+        // Standalone {expr} — becomes RawText
+        if t.starts_with('{') {
+            rest = t;
+            let (expr, next) = jsx_brace_expr(rest)?;
+            nodes.push(Node::RawText(expr));
+            rest = next;
+            continue;
+        }
+        // Text content (may contain {expr} interpolations)
+        let prev_len = rest.len();
+        let (node_opt, next) = jsx_text_node(rest);
+        if let Some(node) = node_opt {
+            nodes.push(node);
+        }
+        rest = next;
+        if rest.len() == prev_len {
+            // Safety: no progress, skip one character
+            let skip = rest
+                .char_indices()
+                .nth(1)
+                .map(|(i, _)| i)
+                .unwrap_or(rest.len());
+            rest = &rest[skip..];
+        }
+    }
+
+    Ok((nodes, rest))
+}
+
+// ── Tag dispatcher ─────────────────────────────────────────────────────────────
+
+fn parse_jsx_tag(src: &str) -> Result<(Node, &str), String> {
+    let src = src.trim_start();
+    // Strip `<`
+    let after_lt = &src[1..];
+    let name_end = after_lt
+        .find(|c: char| c.is_whitespace() || c == '>' || c == '/')
+        .unwrap_or(after_lt.len());
+    let tag = &after_lt[..name_end];
+    let rest = after_lt[name_end..].trim_start();
+
+    let (attrs, after_gt, self_closing) = jsx_parse_attrs(rest)?;
+
+    match tag {
+        "if" => parse_jsx_if(attrs, after_gt),
+        "else" | "else-if" => Err(format!("<{tag}> encountered outside <if>")),
+        "for" => parse_jsx_for(attrs, after_gt),
+        "match" => parse_jsx_match(attrs, after_gt),
+        "include" if self_closing => Ok((jsx_build_include(attrs, vec![])?, after_gt)),
+        "include" => {
+            let (slot, rest) = parse_jsx_nodes(after_gt)?;
+            let rest = jsx_close(rest, "include")?;
+            Ok((jsx_build_include(attrs, slot)?, rest))
+        }
+        "let" => Ok((Node::LetDecl(jsx_build_let(attrs, false)?), after_gt)),
+        "let-default" => Ok((Node::LetDecl(jsx_build_let(attrs, true)?), after_gt)),
+        _ if self_closing => Ok((
+            Node::Element(jsx_build_element(tag, attrs, vec![])),
+            after_gt,
+        )),
+        _ => {
+            let (children, rest) = parse_jsx_nodes(after_gt)?;
+            let rest = jsx_close(rest, tag)?;
+            Ok((Node::Element(jsx_build_element(tag, attrs, children)), rest))
+        }
+    }
+}
+
+// ── Control-flow tag parsers ───────────────────────────────────────────────────
+
+fn parse_jsx_if(attrs: Vec<JsxAttr>, children_src: &str) -> Result<(Node, &str), String> {
+    let condition = attrs
+        .iter()
+        .find(|a| matches!(a.key.as_str(), "condition" | "test" | "cond"))
+        .and_then(|a| a.as_expr())
+        .unwrap_or_default();
+
+    let (then_children, rest) = parse_jsx_nodes(children_src)?;
+    let rest = rest.trim_start();
+
+    let (else_children, rest) = if rest.starts_with("<else-if") {
+        let after_name = rest.strip_prefix("<else-if").unwrap_or("").trim_start();
+        let (ei_attrs, ei_body, _) = jsx_parse_attrs(after_name)?;
+        let (nested, next) = parse_jsx_if(ei_attrs, ei_body)?;
+        (Some(vec![nested]), next)
+    } else if rest.starts_with("<else") {
+        let after_name = rest.strip_prefix("<else").unwrap_or("").trim_start();
+        let (_, else_body, self_closing) = jsx_parse_attrs(after_name)?;
+        if self_closing {
+            (Some(vec![]), else_body)
+        } else {
+            let (else_nodes, after_nodes) = parse_jsx_nodes(else_body)?;
+            let after_close = jsx_close(after_nodes, "else")?;
+            (Some(else_nodes), after_close)
+        }
+    } else {
+        (None, rest)
+    };
+
+    let rest = jsx_close(rest, "if")?;
+    Ok((
+        Node::If(IfBlock {
+            condition,
+            then_children,
+            else_children,
+        }),
+        rest,
+    ))
+}
+
+fn parse_jsx_for(attrs: Vec<JsxAttr>, children_src: &str) -> Result<(Node, &str), String> {
+    let pattern = attrs
+        .iter()
+        .find(|a| matches!(a.key.as_str(), "let" | "var"))
+        .and_then(|a| a.as_str())
+        .unwrap_or("")
+        .to_string();
+    let iterator = attrs
+        .iter()
+        .find(|a| a.key == "in")
+        .and_then(|a| a.as_expr())
+        .unwrap_or_default();
+
+    let (body, rest) = parse_jsx_nodes(children_src)?;
+    let rest = jsx_close(rest, "for")?;
+    Ok((
+        Node::For(ForBlock {
+            pattern,
+            iterator,
+            body,
+        }),
+        rest,
+    ))
+}
+
+fn parse_jsx_match(attrs: Vec<JsxAttr>, children_src: &str) -> Result<(Node, &str), String> {
+    let expr = attrs
+        .iter()
+        .find(|a| matches!(a.key.as_str(), "on" | "value"))
+        .and_then(|a| a.as_expr())
+        .unwrap_or_default();
+
+    let mut arms = Vec::new();
+    let mut rest = children_src.trim_start();
+
+    while rest.starts_with("<case") {
+        let after_name = &rest["<case".len()..].trim_start();
+        let (case_attrs, case_body, self_closing) = jsx_parse_attrs(after_name)?;
+        let pattern = case_attrs
+            .iter()
+            .find(|a| matches!(a.key.as_str(), "pattern" | "match" | "when"))
+            .and_then(|a| match &a.value {
+                JsxAttrValue::Str(s) => Some(s.clone()),
+                JsxAttrValue::Expr(e) => Some(e.clone()),
+                JsxAttrValue::Bool(_) => None,
+            })
+            .unwrap_or_else(|| "_".to_string());
+        let (body, after_body): (Vec<Node>, &str) = if self_closing {
+            (vec![], case_body)
+        } else {
+            let (b, r) = parse_jsx_nodes(case_body)?;
+            let r = jsx_close(r, "case")?;
+            (b, r)
+        };
+        arms.push(MatchArm { pattern, body });
+        rest = after_body.trim_start();
+    }
+
+    let rest = jsx_close(rest, "match")?;
+    Ok((Node::Match(MatchBlock { expr, arms }), rest))
+}
+
+// ── Node builders ──────────────────────────────────────────────────────────────
+
+fn jsx_build_element(tag: &str, attrs: Vec<JsxAttr>, children: Vec<Node>) -> Element {
+    let mut classes = Vec::new();
+    let mut conditional_classes = Vec::new();
+    let mut event_handlers = Vec::new();
+    let mut bindings = Vec::new();
+    let mut animations = Vec::new();
+
+    for attr in attrs {
+        let key = &attr.key;
+
+        // class / className → split into individual class tokens
+        if key == "class" || key == "className" {
+            match &attr.value {
+                JsxAttrValue::Str(s) => {
+                    classes.extend(s.split_whitespace().map(|c| c.to_string()));
+                }
+                JsxAttrValue::Expr(e) => {
+                    // Dynamic expression — keep as a single {expr} class token
+                    classes.push(format!("{{{}}}", e));
+                }
+                JsxAttrValue::Bool(_) => {}
+            }
+            continue;
+        }
+
+        // class:name={condition}
+        if let Some(class_name) = key.strip_prefix("class:") {
+            conditional_classes.push(ConditionalClass {
+                class: class_name.to_string(),
+                condition: attr.as_expr().unwrap_or_default(),
+            });
+            continue;
+        }
+
+        // @event={handler}
+        if let Some(event_part) = key.strip_prefix('@') {
+            let event = event_part.split('|').next().unwrap_or("").to_string();
+            let modifiers = event_part
+                .split('|')
+                .skip(1)
+                .map(|s| s.to_string())
+                .collect();
+            event_handlers.push(EventHandler {
+                event,
+                modifiers,
+                handler: attr.as_expr().unwrap_or_default(),
+            });
+            continue;
+        }
+
+        // onEvent={handler} — React-style camelCase
+        if key.starts_with("on") && key.len() > 2 {
+            let rest = &key[2..];
+            if rest.starts_with(|c: char| c.is_ascii_uppercase()) {
+                let first = rest.chars().next().unwrap();
+                let event = format!(
+                    "{}{}",
+                    first.to_ascii_lowercase(),
+                    &rest[first.len_utf8()..]
+                );
+                event_handlers.push(EventHandler {
+                    event,
+                    modifiers: vec![],
+                    handler: attr.as_expr().unwrap_or_default(),
+                });
+                continue;
+            }
+        }
+
+        // animate:property={duration easing}
+        if let Some(prop) = key.strip_prefix("animate:") {
+            let val = attr.as_expr().unwrap_or_default();
+            let parts: Vec<&str> = val.split_whitespace().collect();
+            animations.push(AnimationSpec {
+                property: prop.to_string(),
+                duration_expr: parts.first().unwrap_or(&"300ms").to_string(),
+                easing: parts.get(1).unwrap_or(&"linear").to_string(),
+                repeat: parts.get(2).map(|s| *s == "repeat").unwrap_or(false),
+            });
+            continue;
+        }
+
+        // bind:prop={expr}
+        if let Some(prop) = key.strip_prefix("bind:") {
+            bindings.push(Binding {
+                prop: prop.to_string(),
+                value: attr.as_expr().unwrap_or_default(),
+            });
+            continue;
+        }
+
+        // All other attributes with values → binding
+        if let Some(value) = attr.as_expr() {
+            bindings.push(Binding {
+                prop: key.clone(),
+                value,
+            });
+        }
+    }
+
+    Element {
+        tag: tag.to_string(),
+        classes,
+        conditional_classes,
+        event_handlers,
+        bindings,
+        animations,
+        children,
+    }
+}
+
+fn jsx_build_include(attrs: Vec<JsxAttr>, slot: Vec<Node>) -> Result<Node, String> {
+    let path = attrs
+        .iter()
+        .find(|a| matches!(a.key.as_str(), "src" | "path"))
+        .and_then(|a| a.as_str())
+        .unwrap_or("")
+        .to_string();
+    let props = attrs
+        .iter()
+        .filter(|a| !matches!(a.key.as_str(), "src" | "path"))
+        .filter_map(|a| a.as_expr().map(|v| (a.key.clone(), v)))
+        .collect();
+    Ok(Node::Include(IncludeNode { path, props, slot }))
+}
+
+fn jsx_build_let(attrs: Vec<JsxAttr>, is_default: bool) -> Result<LetDecl, String> {
+    let name = attrs
+        .iter()
+        .find(|a| a.key == "name")
+        .and_then(|a| a.as_str())
+        .unwrap_or("")
+        .to_string();
+    let expr = attrs
+        .iter()
+        .find(|a| a.key == "value")
+        .and_then(|a| a.as_expr())
+        .unwrap_or_default();
+    Ok(LetDecl {
+        name,
+        expr,
+        is_default,
+    })
+}
+
+// ── Low-level helpers ──────────────────────────────────────────────────────────
+
+/// Parse JSX attributes until `>` or `/>`.
+/// Returns `(attrs, source_after_gt, self_closing)`.
+fn jsx_parse_attrs(src: &str) -> Result<(Vec<JsxAttr>, &str, bool), String> {
+    let mut attrs = Vec::new();
+    let mut rest = src.trim_start();
+    let mut self_closing = false;
+
+    loop {
+        rest = rest.trim_start();
+        if rest.is_empty() {
+            return Err("unclosed JSX tag".to_string());
+        }
+        if rest.starts_with("/>") {
+            self_closing = true;
+            rest = &rest[2..];
+            break;
+        }
+        if rest.starts_with('>') {
+            rest = &rest[1..];
+            break;
+        }
+
+        // Read attribute key (ends at whitespace, `=`, `>`, or `/`)
+        let key_end = rest
+            .find(|c: char| c.is_whitespace() || c == '=' || c == '>' || c == '/')
+            .unwrap_or(rest.len());
+        if key_end == 0 {
+            rest = &rest[1..];
+            continue;
+        }
+        let key = rest[..key_end].to_string();
+        rest = rest[key_end..].trim_start();
+
+        if rest.starts_with('=') {
+            rest = rest[1..].trim_start();
+            let (value, next) = jsx_attr_value(rest)?;
+            attrs.push(JsxAttr { key, value });
+            rest = next;
+        } else {
+            attrs.push(JsxAttr {
+                key,
+                value: JsxAttrValue::Bool(true),
+            });
+        }
+    }
+
+    Ok((attrs, rest, self_closing))
+}
+
+/// Parse a single JSX attribute value (after the `=`).
+fn jsx_attr_value(src: &str) -> Result<(JsxAttrValue, &str), String> {
+    if src.starts_with('"') {
+        let mut i = 1;
+        let bytes = src.as_bytes();
+        while i < bytes.len() {
+            match bytes[i] {
+                b'\\' => i += 2,
+                b'"' => {
+                    let content = src[1..i].replace("\\\"", "\"");
+                    return Ok((JsxAttrValue::Str(content), &src[i + 1..]));
+                }
+                _ => i += 1,
+            }
+        }
+        let inner = src.strip_prefix('"').unwrap_or("");
+        Ok((JsxAttrValue::Str(inner.replace("\\\"", "\"")), ""))
+    } else if src.starts_with('\'') {
+        let inner = src.strip_prefix('\'').unwrap_or(src);
+        let end = inner.find('\'').unwrap_or(inner.len());
+        Ok((
+            JsxAttrValue::Str(inner[..end].to_string()),
+            &inner[end + 1..],
+        ))
+    } else if src.starts_with('{') {
+        let (expr, rest) = jsx_brace_expr(src)?;
+        Ok((JsxAttrValue::Expr(expr), rest))
+    } else {
+        let end = src
+            .find(|c: char| c.is_whitespace() || c == '>' || c == '/')
+            .unwrap_or(src.len());
+        let val = &src[..end];
+        let value = match val {
+            "true" => JsxAttrValue::Bool(true),
+            "false" => JsxAttrValue::Bool(false),
+            other => JsxAttrValue::Str(other.to_string()),
+        };
+        Ok((value, &src[end..]))
+    }
+}
+
+/// Consume a `{...}` brace expression, returning `(inner_expr, remaining)`.
+fn jsx_brace_expr(src: &str) -> Result<(String, &str), String> {
+    let src = src.trim_start();
+    if !src.starts_with('{') {
+        return Err(format!("expected '{{', got: {}", &src[..src.len().min(10)]));
+    }
+    let mut depth = 0usize;
+    for (i, c) in src.char_indices() {
+        match c {
+            '{' => depth += 1,
+            '}' => {
+                depth -= 1;
+                if depth == 0 {
+                    let expr = src[1..i].trim().to_string();
+                    return Ok((expr, &src[i + 1..]));
+                }
+            }
+            _ => {}
+        }
+    }
+    Err("unclosed '{' in JSX expression".to_string())
+}
+
+/// Consume text content up to the next `<` tag, parsing `{expr}` interpolations.
+fn jsx_text_node(src: &str) -> (Option<Node>, &str) {
+    let end = src.find('<').unwrap_or(src.len());
+    if end == 0 {
+        return (None, src);
+    }
+    let text = &src[..end];
+    let trimmed = text.trim();
+    if trimmed.is_empty() {
+        return (None, &src[end..]);
+    }
+    let parts = parse_text_template(trimmed);
+    (Some(Node::Text(parts)), &src[end..])
+}
+
+/// Consume a closing tag `</tag>`, returning the source after it.
+fn jsx_close<'a>(src: &'a str, tag: &str) -> Result<&'a str, String> {
+    let src = src.trim_start();
+    let prefix = format!("</{}", tag);
+    if let Some(rest) = src.strip_prefix(&prefix) {
+        let rest = rest.trim_start();
+        if let Some(rest) = rest.strip_prefix('>') {
+            return Ok(rest);
+        }
+    }
+    Err(format!(
+        "expected </{}>, got: {}",
+        tag,
+        &src[..src.len().min(40)]
+    ))
 }

@@ -12,6 +12,18 @@ SDKROOT=$(xcrun --show-sdk-path) cargo build
 
 `dispatch.h` lives inside the Xcode SDK, not `/usr/include`, so the explicit `SDKROOT` is always required on macOS without the extra command-line tools package. You can also add `SDKROOT=$(xcrun --show-sdk-path)` to your shell profile to avoid repeating it.
 
+## Before pushing / CI requirements
+
+All three checks must pass before pushing:
+
+```bash
+cargo fmt --all -- --check          # formatting
+cargo clippy --all-features --workspace -- -D warnings  # lints
+cargo test --workspace              # tests
+```
+
+To auto-fix formatting: `cargo fmt --all`
+
 ## Workspace layout
 
 | Crate | Purpose |
@@ -25,7 +37,11 @@ SDKROOT=$(xcrun --show-sdk-path) cargo build
 
 ## DSL quick reference
 
-Elements are `tag classes…` with indented children. See `examples/demo.crepus` for an exhaustive feature tour.
+`.crepus` files support **two equivalent input syntaxes** that compile to the same AST and work with every backend (GPUI, web, webext). Auto-detected by whether the first content line starts with `<`.
+
+### Indentation syntax (native)
+
+Elements are `tag classes…` with indented children.
 
 ```
 div w-full h-full bg-zinc-950 text-white flex flex-col gap-4
@@ -41,6 +57,27 @@ div w-full h-full bg-zinc-950 text-white flex flex-col gap-4
     div p-2 border rounded
       {item}
 ```
+
+### JSX / HTML tag syntax
+
+For developers familiar with React/TSX. Same semantics, angle-bracket style.
+
+```jsx
+<div class="w-full h-full bg-zinc-950 text-white flex flex-col gap-4">
+  <div class="text-2xl font-bold">Hello {name}</div>
+  <if condition={score > 50}>
+    <div class="text-green-400">High score!</div>
+    <else><div class="text-red-400">Low score</div></else>
+  </if>
+  <for let="item" in={list}>
+    <div class="p-2 border rounded">{item}</div>
+  </for>
+</div>
+```
+
+Control-flow tags: `<if condition={...}>`, `<else>`, `<else-if condition={...}>`, `<for let="var" in={list}>`, `<match on={expr}><case pattern="...">`.
+Include: `<include src="file.crepus#Card" title={t} />` or with slot children.
+Declarations: `<let name="x" value={42} />`, `<let-default name="x" value={42} />`, or `$: let x = 42` lines still work.
 
 ## Component system
 
