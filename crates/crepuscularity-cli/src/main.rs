@@ -5,12 +5,16 @@
 //!   crepu dev [--bin NAME] [--release] [--emit-events] watch → rebuild → relaunch
 //!   crepu build [--release]            cargo build wrapper
 //!   crepu preview <file.crepus>        live-preview a .crepus template
+//!   crepu webext new <name>            scaffold a browser extension
+//!   crepu webext build [--app PATH]    build browser extension
+//!   crepu webext manifest [--app PATH] print manifest.json
 
 mod builder;
 mod dev;
 pub mod events;
 mod hud;
 mod new;
+mod webext;
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
@@ -71,6 +75,10 @@ fn main() {
             run_preview(path);
         }
 
+        Some("webext") => {
+            webext::run(&args[2..]);
+        }
+
         _ => print_usage(),
     }
 }
@@ -83,6 +91,10 @@ fn print_usage() {
     eprintln!("  dev [--bin NAME] [--release] [--emit-events]  hot-reload dev loop");
     eprintln!("  build [--release]                             cargo build wrapper");
     eprintln!("  preview <file.crepus>                         live-preview a template");
+    eprintln!();
+    eprintln!("  webext new <name>                             scaffold browser extension");
+    eprintln!("  webext build [--app PATH]                     build extension to dist/");
+    eprintln!("  webext manifest [--app PATH]                  print manifest.json");
     eprintln!();
     eprintln!("OPTIONS:");
     eprintln!("  --emit-events    emit structured JSON events to stdout (IDE integration)");
