@@ -9,4 +9,3 @@ path = "src/lib.rs"
 [dependencies]
 crepuscularity-core = { path = "../crepuscularity-core" }
 crepuscularity-web = { path = "../crepuscularity-web" }
-crepuscularity-react = { path = "../crepuscularity-react" }
