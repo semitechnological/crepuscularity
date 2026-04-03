@@ -233,7 +233,10 @@ fn do_build_launch(
         let profile = if release { "release" } else { "debug" };
         let bin_path = locate_binary(cwd, profile, bin_name);
 
-        eprintln!("  {} built in {elapsed_ms} ms — launching {bin_name}", crate::ui::ok());
+        eprintln!(
+            "  {} built in {elapsed_ms} ms — launching {bin_name}",
+            crate::ui::ok()
+        );
 
         match Command::new(&bin_path).current_dir(cwd).spawn() {
             Ok(c) => {

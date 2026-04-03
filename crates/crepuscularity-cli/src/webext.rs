@@ -1,6 +1,7 @@
 //! Browser extension commands for crepus CLI.
 
 use console::style;
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
@@ -8,20 +9,13 @@ use crate::ui;
 
 // ── Embedded runtime assets ──────────────────────────────────────────────────
 
-const ASSET_POPUP_HTML: &str =
-    include_str!("../../crepuscularity-webext/assets/popup.html");
-const ASSET_POPUP_JS: &str =
-    include_str!("../../crepuscularity-webext/assets/popup.js");
-const ASSET_POPUP_CSS: &str =
-    include_str!("../../crepuscularity-webext/assets/popup.css");
-const ASSET_BACKGROUND_JS: &str =
-    include_str!("../../crepuscularity-webext/assets/background.js");
-const ASSET_CONTENT_JS: &str =
-    include_str!("../../crepuscularity-webext/assets/content.js");
-const ASSET_CONTENT_CSS: &str =
-    include_str!("../../crepuscularity-webext/assets/content.css");
-const ASSET_BROWSER_SHIM: &str =
-    include_str!("../../crepuscularity-webext/assets/browser-shim.js");
+const ASSET_POPUP_HTML: &str = include_str!("../../crepuscularity-webext/assets/popup.html");
+const ASSET_POPUP_JS: &str = include_str!("../../crepuscularity-webext/assets/popup.js");
+const ASSET_POPUP_CSS: &str = include_str!("../../crepuscularity-webext/assets/popup.css");
+const ASSET_BACKGROUND_JS: &str = include_str!("../../crepuscularity-webext/assets/background.js");
+const ASSET_CONTENT_JS: &str = include_str!("../../crepuscularity-webext/assets/content.js");
+const ASSET_CONTENT_CSS: &str = include_str!("../../crepuscularity-webext/assets/content.css");
+const ASSET_BROWSER_SHIM: &str = include_str!("../../crepuscularity-webext/assets/browser-shim.js");
 const ASSET_RUNTIME_ADAPTER: &str =
     include_str!("../../crepuscularity-webext/assets/runtime-as-adapter.js");
 const ASSET_UNOCSS_JS: &[u8] =
@@ -181,7 +175,10 @@ div flex flex-col gap-4 p-4
     eprintln!("{}", style("Next steps:").dim());
     eprintln!("  cd {slug}");
     eprintln!("  crepus webext build");
-    eprintln!("  {}", style("# Load dist/unpacked/ in chrome://extensions").dim());
+    eprintln!(
+        "  {}",
+        style("# Load dist/unpacked/ in chrome://extensions").dim()
+    );
     ui::done_in(t0.elapsed());
 }
 
@@ -192,10 +189,7 @@ fn build_extension(app_path: &Path) {
 
     let webext_toml = app_path.join("webext.toml");
     if !webext_toml.exists() {
-        ui::error(&format!(
-            "no webext.toml found in {}",
-            app_path.display()
-        ));
+        ui::error(&format!("no webext.toml found in {}", app_path.display()));
     }
 
     let manifest = match crepuscularity_webext::ExtensionManifest::load(&webext_toml) {
@@ -221,19 +215,11 @@ fn build_extension(app_path: &Path) {
         ui::spinner_ok(&sp, "manifest.json");
     }
 
-    // ── Step 2: copy views ───────────────────────────────────────────────────
-    let views_src = app_path.join("views");
-    if views_src.exists() {
-        let sp = ui::spinner("copying views");
-        copy_dir_recursive(&views_src, &dist.join("views"));
-        ui::spinner_ok(&sp, "views/");
-    }
-
-    // ── Step 3: runtime assets ───────────────────────────────────────────────
+    // ── Step 2: runtime assets ───────────────────────────────────────────────
     {
         let sp = ui::spinner("writing runtime assets");
-        std::fs::write(dist.join("popup.html"), ASSET_POPUP_HTML).unwrap();
-        std::fs::write(dist.join("popup.css"), ASSET_POPUP_CSS).unwrap();
+        std::fs::write(src_dir.join("popup.html"), ASSET_POPUP_HTML).unwrap();
+        std::fs::write(src_dir.join("popup.css"), ASSET_POPUP_CSS).unwrap();
         std::fs::write(src_dir.join("popup.js"), ASSET_POPUP_JS).unwrap();
         std::fs::write(src_dir.join("background.js"), ASSET_BACKGROUND_JS).unwrap();
         std::fs::write(src_dir.join("content.js"), ASSET_CONTENT_JS).unwrap();
@@ -244,13 +230,31 @@ fn build_extension(app_path: &Path) {
         ui::spinner_ok(&sp, "runtime assets");
     }
 
-    // ── Step 4: WASM runtime ─────────────────────────────────────────────────
+    // ── Step 3: WASM runtime ─────────────────────────────────────────────────
     let runtime_dir = app_path.join("runtime");
     if runtime_dir.exists() {
-        build_wasm_runtime(&runtime_dir, &vendor_dir);
+        build_wasm_runtime(app_path, &runtime_dir, &vendor_dir);
     } else {
         ui::warning("no runtime/ directory — skipping WASM compile");
         ui::warning("run `crepus webext new` to scaffold a full project");
+    }
+
+    // ── Step 4: pre-render popup HTML ────────────────────────────────────────
+    // If views/popup.crepus exists, render it natively and write popup.html so
+    // the popup opens instantly without loading WASM at runtime.
+    let popup_template = app_path.join("views/popup.crepus");
+    if popup_template.exists() {
+        let sp = ui::spinner("pre-rendering popup.html");
+        match prerender_popup_html(&popup_template, &manifest) {
+            Ok(html) => {
+                std::fs::write(src_dir.join("popup.html"), &html).unwrap();
+                ui::spinner_ok(&sp, "popup.html (pre-rendered from popup.crepus)");
+            }
+            Err(e) => {
+                sp.finish_and_clear();
+                ui::warning(&format!("popup pre-render failed: {e}"));
+            }
+        }
     }
 
     eprintln!(
@@ -267,7 +271,7 @@ fn build_extension(app_path: &Path) {
     ui::done_in(t0.elapsed());
 }
 
-fn build_wasm_runtime(runtime_dir: &Path, vendor_dir: &Path) {
+fn build_wasm_runtime(app_path: &Path, runtime_dir: &Path, vendor_dir: &Path) {
     // Check wasm32 target is available
     {
         let sp = ui::spinner("compiling WASM runtime");
@@ -294,7 +298,10 @@ fn build_wasm_runtime(runtime_dir: &Path, vendor_dir: &Path) {
                     eprintln!("    {}", style(line).dim());
                 }
                 if stderr.lines().count() > 15 {
-                    eprintln!("    {}", style("... (run cargo build manually for full output)").dim());
+                    eprintln!(
+                        "    {}",
+                        style("... (run cargo build manually for full output)").dim()
+                    );
                 }
                 // Non-fatal — extension is still partially built
                 return;
@@ -307,9 +314,12 @@ fn build_wasm_runtime(runtime_dir: &Path, vendor_dir: &Path) {
         }
     }
 
-    // Find the built .wasm file
-    let wasm_glob_dir = runtime_dir.join("target/wasm32-unknown-unknown/release");
-    let wasm_file = find_wasm_file(&wasm_glob_dir);
+    // Find the built .wasm file. Cargo puts the target at the workspace root,
+    // which may be app_path (when runtime/ is a workspace member) rather than
+    // runtime_dir itself. Check both.
+    let workspace_target = app_path.join("target/wasm32-unknown-unknown/release");
+    let local_target = runtime_dir.join("target/wasm32-unknown-unknown/release");
+    let wasm_file = find_wasm_file(&workspace_target).or_else(|| find_wasm_file(&local_target));
 
     let Some(wasm_path) = wasm_file else {
         ui::warning("built .wasm not found in target/wasm32-unknown-unknown/release/");
@@ -354,6 +364,58 @@ fn build_wasm_runtime(runtime_dir: &Path, vendor_dir: &Path) {
             }
         }
     }
+}
+
+/// Render `views/popup.crepus` with two states (main + help) and embed both
+/// as sibling `<div>` elements in the returned HTML string. The popup opens
+/// instantly from the pre-rendered HTML; popup.js only reads storage to patch
+/// checkbox states and handles click events — no WASM needed in popup context.
+fn prerender_popup_html(
+    template_path: &Path,
+    manifest: &crepuscularity_webext::ExtensionManifest,
+) -> Result<String, String> {
+    use crepuscularity_core::context::TemplateContext;
+    use crepuscularity_web::render_from_files;
+
+    let source = std::fs::read_to_string(template_path).map_err(|e| e.to_string())?;
+    let mut files = HashMap::new();
+    files.insert("popup.crepus".to_string(), source);
+
+    let render = |extra: &[(&str, bool)]| -> Result<String, String> {
+        let mut ctx = TemplateContext::new();
+        ctx.set("enabled", true);
+        ctx.set("auto_render", false);
+        ctx.set("show_help", false);
+        for (k, v) in extra {
+            ctx.set(*k, *v);
+        }
+        render_from_files(&files, "popup.crepus", &ctx)
+    };
+
+    let main_html = render(&[])?;
+    let help_html = render(&[("show_help", true)])?;
+
+    let title = &manifest.extension.name;
+    // Inline the CSS so the popup is a single self-contained file with zero
+    // external fetches before it renders. UnoCSS is not needed here — the popup
+    // uses BEM class names from popup.css, not utility classes.
+    let css = ASSET_POPUP_CSS;
+    Ok(format!(
+        r#"<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{title}</title>
+  <style>{css}</style>
+</head>
+<body>
+  <div id="view-main">{main_html}</div>
+  <div id="view-help" hidden>{help_html}</div>
+  <script type="module" src="./popup.js"></script>
+</body>
+</html>"#
+    ))
 }
 
 fn find_wasm_file(dir: &Path) -> Option<PathBuf> {
@@ -402,19 +464,3 @@ fn print_manifest(app_path: &Path) {
 }
 
 // ── helpers ───────────────────────────────────────────────────────────────────
-
-fn copy_dir_recursive(src: &Path, dst: &Path) {
-    std::fs::create_dir_all(dst).unwrap();
-    if let Ok(entries) = std::fs::read_dir(src) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            let name = path.file_name().unwrap();
-            let dst_path = dst.join(name);
-            if path.is_dir() {
-                copy_dir_recursive(&path, &dst_path);
-            } else {
-                std::fs::copy(&path, &dst_path).unwrap();
-            }
-        }
-    }
-}

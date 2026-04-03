@@ -99,13 +99,7 @@ impl Render for TodoView {
                         .items_center()
                         .justify_center()
                         .flex_shrink_0()
-                        .child(
-                            div()
-                                .w_2()
-                                .h_2()
-                                .rounded_full()
-                                .bg(white()),
-                        )
+                        .child(div().w_2().h_2().rounded_full().bg(white()))
                 } else {
                     div()
                         .w_4()

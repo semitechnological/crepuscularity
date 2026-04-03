@@ -65,7 +65,11 @@ fn main() {
             let t0 = Instant::now();
             let release = args.iter().any(|a| a == "--release");
             let cwd = std::env::current_dir().unwrap();
-            let sp = ui::spinner(if release { "cargo build --release" } else { "cargo build" });
+            let sp = ui::spinner(if release {
+                "cargo build --release"
+            } else {
+                "cargo build"
+            });
             let outcome = builder::cargo_build(&cwd, release, None);
             if outcome.success {
                 ui::spinner_ok(&sp, "build succeeded");

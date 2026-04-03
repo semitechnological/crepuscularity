@@ -184,15 +184,37 @@ fn is_jsx_mode(template: &str) -> bool {
 }
 
 fn collect_lines(template: &str) -> Vec<(usize, String)> {
-    let raw: Vec<(usize, String)> = template
-        .lines()
-        .map(|line| {
-            let trimmed = line.trim_start();
-            let indent = line.len() - trimmed.len();
-            (indent, trimmed.to_string())
-        })
-        .filter(|(_, line)| !line.is_empty() && !line.starts_with('#'))
-        .collect();
+    let source_lines: Vec<&str> = template.lines().collect();
+    let mut raw: Vec<(usize, String)> = Vec::new();
+    let mut i = 0;
+
+    while i < source_lines.len() {
+        let line = source_lines[i];
+        let trimmed = line.trim_start();
+        let indent = line.len() - trimmed.len();
+        i += 1;
+
+        if trimmed.is_empty() || trimmed.starts_with('#') {
+            continue;
+        }
+
+        // Multi-line strings: a `"` that opens but doesn't close on the same line
+        // is merged with subsequent lines until the closing `"` is found.
+        if trimmed.starts_with('"') && !string_is_closed(trimmed) {
+            let mut combined = trimmed.to_string();
+            while i < source_lines.len() {
+                combined.push('\n');
+                combined.push_str(source_lines[i].trim_start());
+                i += 1;
+                if string_is_closed(&combined) {
+                    break;
+                }
+            }
+            raw.push((indent, combined));
+        } else {
+            raw.push((indent, trimmed.to_string()));
+        }
+    }
 
     // Normalize indentation so root elements always start at column 0.
     let min_indent = raw.iter().map(|(i, _)| *i).min().unwrap_or(0);
@@ -200,6 +222,30 @@ fn collect_lines(template: &str) -> Vec<(usize, String)> {
         return raw;
     }
     raw.into_iter().map(|(i, l)| (i - min_indent, l)).collect()
+}
+
+/// Returns true when `s` is a properly closed double-quoted string
+/// (starts with `"` and has a matching unescaped closing `"`).
+fn string_is_closed(s: &str) -> bool {
+    if !s.starts_with('"') {
+        return false;
+    }
+    let mut escaped = false;
+    let mut closes = 0usize;
+    for ch in s.chars().skip(1) {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+        if ch == '\\' {
+            escaped = true;
+            continue;
+        }
+        if ch == '"' {
+            closes += 1;
+        }
+    }
+    closes > 0
 }
 
 fn parse_nodes(
@@ -647,6 +693,60 @@ fn parse_element_line(line: &str, children: Vec<Node>) -> Element {
                     repeat,
                 });
             }
+        } else if token.contains('=') {
+            // HTML attribute: class="foo bar", type="button", data-action="x", key={expr}
+            let eq_pos = token.find('=').unwrap();
+            let key = &token[..eq_pos];
+            let valid_key = !key.is_empty()
+                && key
+                    .chars()
+                    .all(|c| c.is_alphanumeric() || c == '-' || c == '_');
+            if valid_key {
+                let raw = token[eq_pos + 1..].trim();
+                let unquoted = if raw.len() >= 2
+                    && ((raw.starts_with('"') && raw.ends_with('"'))
+                        || (raw.starts_with('\'') && raw.ends_with('\'')))
+                {
+                    &raw[1..raw.len() - 1]
+                } else {
+                    raw
+                };
+                if key == "class" {
+                    // class="foo bar" → individual class tokens
+                    for cls in unquoted.split_whitespace() {
+                        classes.push(cls.to_string());
+                    }
+                } else {
+                    let expr = if raw.starts_with('{') && raw.ends_with('}') {
+                        raw[1..raw.len() - 1].trim().to_string()
+                    } else {
+                        format!("\"{}\"", unquoted)
+                    };
+                    bindings.push(Binding {
+                        prop: key.to_string(),
+                        value: expr,
+                    });
+                }
+            } else {
+                classes.push(token.clone());
+            }
+        } else if matches!(
+            token.as_str(),
+            "checked"
+                | "disabled"
+                | "hidden"
+                | "required"
+                | "readonly"
+                | "multiple"
+                | "selected"
+                | "autofocus"
+                | "open"
+        ) {
+            // Boolean HTML attributes
+            bindings.push(Binding {
+                prop: token.clone(),
+                value: "\"\"".to_string(),
+            });
         } else {
             classes.push(token.clone());
         }
@@ -689,7 +789,7 @@ fn tokenize_line(line: &str) -> Vec<String> {
                 brace_depth = brace_depth.saturating_sub(1);
                 current.push(ch);
             }
-            '\'' | '"' if bracket_depth > 0 || brace_depth > 0 => {
+            '\'' | '"' => {
                 if in_string && ch == string_char {
                     in_string = false;
                 } else if !in_string {

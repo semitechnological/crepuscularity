@@ -246,28 +246,50 @@ impl ManifestV3 {
             manifest.capabilities.host_permissions.clone()
         };
 
-        // Content scripts
-        let content_scripts: Vec<ContentScriptSpec> = manifest
-            .content_scripts
-            .iter()
-            .map(|cs| {
-                let mut css = cs.css.clone();
-                for extra in &opts.content_css {
-                    if !css.contains(extra) {
-                        css.push(extra.clone());
+        // Content scripts — use explicit [[content_scripts]] entries when present;
+        // fall back to a default entry when content-script = true is declared but
+        // no explicit entries exist.
+        let content_scripts: Vec<ContentScriptSpec> = if !manifest.content_scripts.is_empty() {
+            manifest
+                .content_scripts
+                .iter()
+                .map(|cs| {
+                    let mut css = cs.css.clone();
+                    for extra in &opts.content_css {
+                        if !css.contains(extra) {
+                            css.push(extra.clone());
+                        }
                     }
-                }
-                ContentScriptSpec {
-                    matches: cs.matches.clone(),
-                    js: cs.js.clone(),
-                    css,
-                    run_at: cs
-                        .run_at
-                        .clone()
-                        .unwrap_or_else(|| "document_idle".to_string()),
-                }
-            })
-            .collect();
+                    ContentScriptSpec {
+                        matches: cs.matches.clone(),
+                        js: cs.js.clone(),
+                        css,
+                        run_at: cs
+                            .run_at
+                            .clone()
+                            .unwrap_or_else(|| "document_idle".to_string()),
+                    }
+                })
+                .collect()
+        } else if manifest.capabilities.content_script {
+            // Default: inject src/content.js (+ content.css if no custom css list).
+            let mut css = opts.content_css.clone();
+            if css.is_empty() {
+                css.push("src/content.css".to_string());
+            }
+            vec![ContentScriptSpec {
+                matches: if manifest.capabilities.host_permissions.is_empty() {
+                    vec!["<all_urls>".to_string()]
+                } else {
+                    manifest.capabilities.host_permissions.clone()
+                },
+                js: vec!["src/content.js".to_string()],
+                css,
+                run_at: "document_idle".to_string(),
+            }]
+        } else {
+            vec![]
+        };
 
         // Web accessible resources
         let mut resources = vec![
@@ -526,6 +548,44 @@ host-permissions = ["https://example.com/*"]
         let browser = manifest.to_browser_manifest();
         assert_eq!(browser["manifest_version"], 3);
         assert_eq!(browser["name"], "Test");
+    }
+
+    #[test]
+    fn content_script_and_background_not_in_permissions() {
+        let manifest = ExtensionManifest {
+            extension: ExtensionInfo {
+                name: "Test".to_string(),
+                version: "1.0.0".to_string(),
+                description: None,
+                author: None,
+                homepage: None,
+            },
+            capabilities: CapabilitiesSection {
+                content_script: true,
+                background_script: true,
+                storage: true,
+                ..Default::default()
+            },
+            content_scripts: vec![],
+            plugins: HashMap::new(),
+            options: ManifestOptions::default(),
+        };
+
+        let mv3 = manifest.to_manifest_v3();
+        assert!(
+            !mv3.permissions.contains(&"content_scripts".to_string()),
+            "content_scripts must not appear in permissions"
+        );
+        assert!(
+            !mv3.permissions.contains(&"background".to_string()),
+            "background must not appear in permissions"
+        );
+        assert!(mv3.permissions.contains(&"storage".to_string()));
+        assert!(mv3.background.is_some());
+        // content-script=true with no explicit entries → default entry generated
+        assert_eq!(mv3.content_scripts.len(), 1);
+        assert_eq!(mv3.content_scripts[0].js, vec!["src/content.js"]);
+        assert_eq!(mv3.content_scripts[0].css, vec!["src/content.css"]);
     }
 
     #[test]

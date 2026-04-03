@@ -80,6 +80,15 @@ impl Capability {
     pub fn is_host_permission(&self) -> bool {
         matches!(self, Capability::HostPermission(_))
     }
+
+    /// Returns false for capabilities that are expressed as top-level manifest
+    /// fields (background, content_scripts) rather than entries in "permissions".
+    pub fn is_permission(&self) -> bool {
+        !matches!(
+            self,
+            Capability::ContentScript | Capability::BackgroundScript
+        )
+    }
 }
 
 /// A set of capabilities for an extension.
@@ -113,7 +122,7 @@ impl CapabilitySet {
     pub fn to_permissions(&self) -> Vec<String> {
         self.capabilities
             .iter()
-            .filter(|c| !c.is_host_permission())
+            .filter(|c| !c.is_host_permission() && c.is_permission())
             .map(|c| c.to_permission_string())
             .collect()
     }

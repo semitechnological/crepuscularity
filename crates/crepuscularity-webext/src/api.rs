@@ -149,6 +149,59 @@ impl BrowserProgram {
         self
     }
 
+    /// Emit the program as a JSON data structure for CSP-safe interpretation.
+    ///
+    /// Returns a JSON string describing bindings and statements that the
+    /// framework's `content.js` interprets without any dynamic `import()`.
+    /// Use this instead of `emit_module()` to avoid blob URL CSP violations
+    /// on host pages with strict `script-src` policies.
+    pub fn emit_data(&self) -> String {
+        let bindings: Vec<Value> = self
+            .bindings
+            .iter()
+            .map(|b| match &b.source {
+                BrowserSource::StorageGet { area, key } => serde_json::json!({
+                    "name": b.name,
+                    "type": "storage_get",
+                    "area": area.as_js_name(),
+                    "key": key,
+                }),
+                BrowserSource::RuntimeMessage(payload) => serde_json::json!({
+                    "name": b.name,
+                    "type": "runtime_message",
+                    "payload": payload.fields.iter()
+                        .map(|(k, v)| (k.clone(), json_expr_to_value(v)))
+                        .collect::<serde_json::Map<_, _>>(),
+                }),
+            })
+            .collect();
+
+        let statements: Vec<Value> = self
+            .statements
+            .iter()
+            .map(|s| match s {
+                BrowserStatement::StorageSet { area, key, value } => serde_json::json!({
+                    "type": "storage_set",
+                    "area": area.as_js_name(),
+                    "key": key,
+                    "value": json_expr_to_value(value),
+                }),
+                BrowserStatement::RuntimeSend(payload) => serde_json::json!({
+                    "type": "runtime_send",
+                    "payload": payload.fields.iter()
+                        .map(|(k, v)| (k.clone(), json_expr_to_value(v)))
+                        .collect::<serde_json::Map<_, _>>(),
+                }),
+                BrowserStatement::ConsoleLog(values) => serde_json::json!({
+                    "type": "console_log",
+                    "args": values.iter().map(json_expr_to_value).collect::<Vec<_>>(),
+                }),
+            })
+            .collect();
+
+        serde_json::json!({ "bindings": bindings, "statements": statements }).to_string()
+    }
+
     /// Emit the program as a JavaScript ES module.
     pub fn emit_module(&self) -> String {
         let mut js = String::from("export async function runBrowserProgram(browserApi) {\n");
@@ -326,6 +379,20 @@ impl From<bool> for JsExpr {
 impl From<i64> for JsExpr {
     fn from(value: i64) -> Self {
         Self::Raw(value.to_string())
+    }
+}
+
+/// Serialize a JsExpr to a JSON value for the data-driven program format.
+/// Variable references are encoded as `{ "$var": "name" }` so the JS
+/// interpreter can resolve them against the bound variables map.
+fn json_expr_to_value(expr: &JsExpr) -> Value {
+    match expr {
+        JsExpr::Literal(v) => v.clone(),
+        JsExpr::Var(name) => serde_json::json!({ "$var": name }),
+        JsExpr::Member { object, property } => {
+            serde_json::json!({ "$var": format!("{object}.{property}") })
+        }
+        JsExpr::Raw(code) => serde_json::json!({ "$raw": code }),
     }
 }
 

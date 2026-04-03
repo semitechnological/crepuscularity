@@ -14,12 +14,11 @@
 
   const unocssSource = await fetch(chrome.runtime.getURL('vendor/unocss.js')).then(r => r.text()).catch(() => '');
 
-  const templateFiles = await loadTemplateFiles();
-  const browserProgramSource = wasmModule.browser_program();
-  const browserProgramUrl = URL.createObjectURL(new Blob([browserProgramSource], { type: "text/javascript" }));
-  const { runBrowserProgram } = await import(browserProgramUrl);
-  URL.revokeObjectURL(browserProgramUrl);
-  runBrowserProgram(browserApi).catch((error) => console.error("crepuscularity browser program failed", error));
+  // Run the app's browser program using the data-driven API (CSP-safe — no blob URL import).
+  if (typeof wasmModule.browser_program_data === "function") {
+    runBrowserProgramData(browserApi, JSON.parse(wasmModule.browser_program_data()))
+      .catch((error) => console.error("crepuscularity browser program failed", error));
+  }
 
   const messageSelectors = [
     "[data-message-author-role='assistant']",
@@ -50,37 +49,43 @@
     return [...nodes];
   }
 
-  async function loadTemplateFiles() {
-    const paths = ["views/ui.crepus"];
-    const entries = await Promise.all(
-      paths.map(async (path) => {
-        const response = await fetch(chrome.runtime.getURL(path));
-        return [path, await response.text()];
-      })
-    );
-    return Object.fromEntries(entries);
-  }
+  // Interprets a browser program data structure produced by BrowserProgram::emit_data().
+  // Resolves { "$var": "name" } references against the `vars` map built from bindings.
+  async function runBrowserProgramData(api, program) {
+    const vars = {};
 
-  function buildFrameDoc(spec) {
-    return `<!doctype html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <style>html,body{margin:0;padding:0;background:#fffdf8;color:#111;font-family:"IBM Plex Sans",sans-serif;}body{padding:16px;}${spec.css || ""}</style>
-  <script>${unocssSource}<\/script>
-</head>
-<body>
-  ${spec.html || "<p>Widget had no HTML payload.</p>"}
-  <script type="module">${spec.js || ""}<\/script>
-</body>
-</html>`;
+    function resolveExpr(expr) {
+      if (expr !== null && typeof expr === "object" && "$var" in expr) return vars[expr.$var];
+      return expr;
+    }
+    function resolveObj(obj) {
+      if (typeof obj !== "object" || obj === null) return obj;
+      return Object.fromEntries(Object.entries(obj).map(([k, v]) => [k, resolveExpr(v)]));
+    }
+
+    for (const b of (program.bindings ?? [])) {
+      if (b.type === "storage_get") {
+        const res = await api.storage[b.area].get({ [b.key]: undefined }).catch(() => ({}));
+        vars[b.name] = res[b.key];
+      } else if (b.type === "runtime_message") {
+        vars[b.name] = await api.runtime.sendMessage(resolveObj(b.payload)).catch(() => null);
+      }
+    }
+
+    for (const s of (program.statements ?? [])) {
+      if (s.type === "storage_set") {
+        await api.storage[s.area].set({ [s.key]: resolveExpr(s.value) }).catch(() => {});
+      } else if (s.type === "runtime_send") {
+        await api.runtime.sendMessage(resolveObj(s.payload)).catch(() => {});
+      } else if (s.type === "console_log") {
+        console.log(...(s.args ?? []).map(resolveExpr));
+      }
+    }
   }
 
   function createShell(spec) {
-    const request = {
+    const rendered = wasmModule.render_frontend({
       entry: "views/ui.crepus#Panel",
-      files: templateFiles,
       props: {
         title: spec.title,
         format: spec.format,
@@ -97,9 +102,8 @@
           { label: "Show source", action: "toggle-source", kind: "secondary" }
         ]
       }
-    };
+    });
 
-    const rendered = wasmModule.render_frontend(request);
     const mount = document.createElement("section");
     mount.className = "aa-shell";
     mount.innerHTML = rendered.html;
@@ -122,7 +126,7 @@
       const frame = document.createElement("iframe");
       frame.className = "aa-widget-frame";
       frame.sandbox = "allow-scripts";
-      frame.srcdoc = buildFrameDoc(spec);
+      frame.srcdoc = wasmModule.render_frame_doc({ ...spec, unocss: unocssSource }).srcdoc;
       frameHost.append(frame);
       runButton.setAttribute("disabled", "disabled");
       runButton.textContent = "Rendered";
@@ -135,68 +139,15 @@
     return mount;
   }
 
-  function buildAnywhereFrameDoc(widget) {
-    const data = widget.data ? (() => { try { return JSON.parse(widget.data); } catch { return {}; } })() : {};
-    let html = "";
-    let css = "";
-    let js = "";
-
-    if (widget.ui) {
-      if (widget.ui.lang === "html") {
-        html = widget.ui.source;
-      } else if (widget.ui.lang === "crepus") {
-        try {
-          const rendered = wasmModule.render_frontend({
-            entry: "__ai_widget__#Widget",
-            files: { "__ai_widget__": widget.ui.source },
-            props: data
-          });
-          html = rendered.html || "";
-          css = rendered.css || "";
-        } catch (err) {
-          html = `<pre style="color:red">Crepus render error: ${String(err)}</pre>`;
-        }
-      }
-    }
-
-    if (widget.script) {
-      if (widget.script.lang === "mermaid") {
-        html = `<div class="mermaid">${widget.script.source}</div>`;
-        js = `import('https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.esm.min.mjs').then(m=>m.default.initialize({startOnLoad:true}));`;
-      } else if (widget.script.lang === "latex") {
-        html = `<div class="latex">${widget.script.source}</div>`;
-        js = `import('https://cdn.jsdelivr.net/npm/katex/dist/katex.mjs').then(m=>{document.querySelectorAll('.latex').forEach(el=>m.default.render(el.textContent,el,{throwOnError:false}));});`;
-      } else {
-        js = widget.script.source;
-      }
-    }
-
-    return `<!doctype html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <style>html,body{margin:0;padding:0;background:#fffdf8;color:#111;font-family:"IBM Plex Sans",sans-serif;}body{padding:16px;}${css}</style>
-  <script>${unocssSource}<\/script>
-</head>
-<body>
-  ${html || "<p>Widget had no content.</p>"}
-  <script type="module">${js}<\/script>
-</body>
-</html>`;
-  }
-
   function createAnywhereShell(widget) {
     const title = widget.title || widget.widget_type || "Widget";
     const widgetType = widget.widget_type || "widget";
 
-    const request = {
+    const rendered = wasmModule.render_frontend({
       entry: "views/ui.crepus#AnywhereShell",
-      files: templateFiles,
       props: { title, widget_type: widgetType }
-    };
+    });
 
-    const rendered = wasmModule.render_frontend(request);
     const mount = document.createElement("section");
     mount.className = "aa-shell";
     mount.innerHTML = rendered.html;
@@ -211,7 +162,7 @@
       const frame = document.createElement("iframe");
       frame.className = "aa-widget-frame";
       frame.sandbox = "allow-scripts";
-      frame.srcdoc = buildAnywhereFrameDoc(widget);
+      frame.srcdoc = wasmModule.render_anywhere_frame_doc({ ...widget, unocss: unocssSource }).srcdoc;
       frameHost.append(frame);
       runButton.setAttribute("disabled", "disabled");
       runButton.textContent = "Rendered";

@@ -4,4 +4,4 @@ version = "0.3.0"
 edition = "2021"
 
 [dependencies]
-toml = "0.8"
+toml = "1"

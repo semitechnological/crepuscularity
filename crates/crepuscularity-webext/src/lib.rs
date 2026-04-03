@@ -24,6 +24,7 @@ mod capabilities;
 mod manifest;
 mod scanner;
 mod watcher;
+pub mod widgets;
 
 pub use api::{
     BrowserProgram, BrowserSource, BrowserStatement, JsExpr, MessagePayload, StorageArea,
@@ -36,3 +37,4 @@ pub use manifest::{
 };
 pub use scanner::{scan_crepus_for_capabilities, CapabilityUsage};
 pub use watcher::{check_project_capabilities, CapabilityWatcher, WatchEvent};
+pub use widgets::{build_frame_doc, json_to_template};
