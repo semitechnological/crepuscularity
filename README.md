@@ -62,10 +62,9 @@ The `.crepus` DSL is the primary language. Each output target is a renderer that
 |---|---|
 | `crepuscularity-gpui` | Native desktop (GPUI elements) — primary target |
 | `crepuscularity-web` | HTML strings — server rendering, WASM, browser extensions |
-| `crepuscularity-react` | JSX/TSX — familiar syntax output for teams already on React |
 | `crepuscularity-webext` | MV3 browser extensions — manifest, assets, capability scanning |
 
-`crepuscularity-react` is not a React framework — it outputs `.crepus` templates as JSX so teams comfortable with React syntax can read the output. The DSL and component model are the same regardless of which renderer you use.
+JSX/HTML tag syntax is supported as an **input format** in the core parser — the same `.crepus` templates can be written in either indentation style or `<tag>` style, and both compile to the same AST.
 
 ## CLI Commands
 
@@ -89,6 +88,55 @@ See [docs/](docs/) for detailed documentation:
 - [CLI Guide](docs/cli.md)
 - [Browser Extensions](docs/webext.md)
 
+## GPUI — Tailwind Class Support
+
+The GPUI renderer maps Tailwind-style class strings to native GPUI style calls. This is a native desktop renderer, not a browser, so the mapping is intentionally selective.
+
+### Supported
+
+| Category | Classes |
+|---|---|
+| **Layout** | `flex`, `grid`, `block`, `hidden`, `flex-col/row`, `flex-wrap`, `flex-1/auto/none`, `grow`, `shrink` |
+| **Justify / Align** | `justify-start/end/center/between/around`, `items-start/end/center/baseline`, `content-*` |
+| **Align self** | `self-start`, `self-end`, `self-center`, `self-stretch`, `self-baseline`, `self-auto` |
+| **Sizing** | `w-*`, `h-*`, `size-*`, `min-w/h-*`, `max-w/h-*` — numbers, fractions, `full`, `auto`, `[Npx]` |
+| **Aspect ratio** | `aspect-square`, `aspect-video`, `aspect-auto`, `aspect-[N/M]` |
+| **Spacing** | `p-*`, `px-*`, `py-*`, `pt/pb/pl/pr-*`, `m-*`, `mx/my-*`, `mt/mb/ml/mr-*`, `gap-*`, `gap-x/y-*` |
+| **Position** | `absolute`, `relative`, `top/bottom/left/right/inset-*` |
+| **Overflow** | `overflow-hidden`, `overflow-x/y-hidden` |
+| **Colors** | Full Tailwind palette (`bg/text/border-{family}-{shade}`), hex (`bg-[#rrggbb]`), hsla, rgba with `/alpha` |
+| **Border** | `border`, `border-0/2/4/8`, per-side `border-t/b/l/r-*`, `border-dashed` |
+| **Border radius** | `rounded-*` — all sizes, all sides, all corners |
+| **Typography** | Font weight (`font-thin` → `font-black`), style (`italic`), size (`text-xs` → `text-9xl`, `text-[Npx]`) |
+| **Typography** | Alignment (`text-left/center/right`), decoration (`underline`, `line-through`, `decoration-*`) |
+| **Typography** | Line height (`leading-*`, `leading-[N]`), truncation (`truncate`, `text-ellipsis`, `whitespace-nowrap`) |
+| **Font** | `font-['Family']`, `line-clamp-N`, `font-features` via `FontFeatures` API |
+| **Shadow** | `shadow-2xs` → `shadow-2xl`, `shadow-none` |
+| **Ring** | `ring`, `ring-0/1/2/4/8`, `ring-[Npx]` — rendered as box-shadow spread |
+| **Opacity** | `opacity-N` (0–100), `opacity-{expr}` |
+| **Cursor** | `cursor-default/pointer/text/move/not-allowed` and all resize variants |
+| **Grid** | `grid-cols-N`, `grid-rows-N`, `col-span-N`, `col-start/end-N`, `row-span/start/end-N` |
+| **Arbitrary values** | `w-[Npx]`, `bg-[#hex]`, `text-[size]`, `rounded-[Npx]`, `border-[Npx]`, `aspect-[N/M]`, etc. |
+| **Dynamic context** | `bg-{expr}`, `text-{expr}`, `border-{expr}`, `opacity-{expr}` — evaluated against template context |
+| **State prefixes** | `hover:`, `focus:`, `active:` — accepted silently (state styling requires `.hover()`/`.on_click()` handlers in code) |
+
+### Not Supported (GPUI hard limits)
+
+These cannot be added without forking GPUI itself:
+
+| Gap | Reason |
+|---|---|
+| `tracking-*` (letter-spacing) | Not in GPUI's `TextStyle` — no letter-spacing in the text layout engine |
+| `uppercase` / `lowercase` / `capitalize` | No text-transform in GPUI — text is rendered as-is |
+| `ring-{color}` | Ring color customisation requires architectural change; default ring is blue-500/50 |
+| `md:` / `lg:` / `xl:` breakpoints | No CSS cascade or viewport queries — GPUI uses Taffy layout |
+| `dark:` variant | No built-in dark mode detection — use `bg-{theme.surface}` context expressions instead |
+| `group-hover:` / `peer:` | No selector/relationship system |
+| `before:` / `after:` pseudo-elements | No pseudo-elements — add child `div` nodes in the template instead |
+| `z-*` (z-index) | GPUI uses painter's algorithm / GPU layers, not z-index |
+| `float` | Not supported by Taffy layout engine |
+| `ring-inset` | GPUI has no inset box-shadow — accepted silently |
+
 ## Project Structure
 
 ```text
@@ -96,10 +144,9 @@ crates/
   crepuscularity/           Facade re-exporting prelude
   crepuscularity-core/      AST, parser, evaluator
   crepuscularity-web/       HTML backend
-  crepuscularity-react/     React/JSX backend
   crepuscularity-gpui/      GPUI prelude + view! macro
   crepuscularity_macros/    Compile-time view! proc-macro
-  crepuscularity-runtime/   Hot-reload renderer
+  crepuscularity-runtime/   Hot-reload renderer (Tailwind → GPUI styler)
   crepuscularity-cli/       crepus CLI
   crepuscularity-webext/    Browser extension support
 examples/

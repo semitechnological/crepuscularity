@@ -6,7 +6,8 @@
 /// - Dynamic context expressions: `bg-{theme.surface}`, `text-{colors.muted}`
 ///   where the expression evaluates to a hex color string like "#1e1e2e" or "1e1e2e"
 use gpui::{
-    hsla, prelude::*, px, relative, rems, rgb, rgba, AbsoluteLength, DefiniteLength, Div, Length,
+    hsla, point, prelude::*, px, relative, rems, rgb, rgba, AbsoluteLength, AlignItems, BoxShadow,
+    DefiniteLength, Div, Length,
 };
 
 use crate::context::TemplateContext;
@@ -479,6 +480,89 @@ fn apply_static(d: Div, class: &str) -> Result<Div, Div> {
         | "animate-pulse"
         | "animate-bounce" => d,
 
+        // ── Align self ──
+        "self-start" => {
+            let mut d = d;
+            d.style().align_self = Some(AlignItems::Start);
+            d
+        }
+        "self-end" => {
+            let mut d = d;
+            d.style().align_self = Some(AlignItems::End);
+            d
+        }
+        "self-center" => {
+            let mut d = d;
+            d.style().align_self = Some(AlignItems::Center);
+            d
+        }
+        "self-stretch" => {
+            let mut d = d;
+            d.style().align_self = Some(AlignItems::Stretch);
+            d
+        }
+        "self-baseline" => {
+            let mut d = d;
+            d.style().align_self = Some(AlignItems::Baseline);
+            d
+        }
+        "self-auto" => {
+            let mut d = d;
+            d.style().align_self = None;
+            d
+        }
+
+        // ── Aspect ratio ──
+        "aspect-square" => {
+            let mut d = d;
+            d.style().aspect_ratio = Some(1.0);
+            d
+        }
+        "aspect-video" => {
+            let mut d = d;
+            d.style().aspect_ratio = Some(16.0 / 9.0);
+            d
+        }
+        "aspect-auto" => {
+            let mut d = d;
+            d.style().aspect_ratio = None;
+            d
+        }
+
+        // ── Ring (focus ring via box-shadow spread) ──
+        "ring" => d.shadow(vec![BoxShadow {
+            color: hsla(0.603, 0.912, 0.602, 0.5),
+            offset: point(px(0.), px(0.)),
+            blur_radius: px(0.),
+            spread_radius: px(3.),
+        }]),
+        "ring-0" => d.shadow_none(),
+        "ring-1" => d.shadow(vec![BoxShadow {
+            color: hsla(0.603, 0.912, 0.602, 0.5),
+            offset: point(px(0.), px(0.)),
+            blur_radius: px(0.),
+            spread_radius: px(1.),
+        }]),
+        "ring-2" => d.shadow(vec![BoxShadow {
+            color: hsla(0.603, 0.912, 0.602, 0.5),
+            offset: point(px(0.), px(0.)),
+            blur_radius: px(0.),
+            spread_radius: px(2.),
+        }]),
+        "ring-4" => d.shadow(vec![BoxShadow {
+            color: hsla(0.603, 0.912, 0.602, 0.5),
+            offset: point(px(0.), px(0.)),
+            blur_radius: px(0.),
+            spread_radius: px(4.),
+        }]),
+        "ring-8" => d.shadow(vec![BoxShadow {
+            color: hsla(0.603, 0.912, 0.602, 0.5),
+            offset: point(px(0.), px(0.)),
+            blur_radius: px(0.),
+            spread_radius: px(8.),
+        }]),
+        "ring-inset" => d, // GPUI has no inset shadow; accepted silently
+
         // ── Accepted silently (CSS-only or unsupported in GPUI) ──
         "inline-flex"
         | "inline"
@@ -491,12 +575,7 @@ fn apply_static(d: Div, class: &str) -> Result<Div, Div> {
         | "whitespace-pre"
         | "sticky"
         | "fixed"
-        | "items-stretch"
-        | "self-stretch"
-        | "self-center"
-        | "self-start"
-        | "self-end"
-        | "self-auto" => d,
+        | "items-stretch" => d,
 
         // ── Debug (only in debug builds) ──
         #[cfg(debug_assertions)]
@@ -682,6 +761,43 @@ fn apply_dynamic(d: Div, class: &str) -> Div {
     if let Some(rest) = class.strip_prefix("grid-rows-") {
         if let Ok(n) = rest.parse::<u16>() {
             return d.grid_rows(n);
+        }
+    }
+
+    // ── aspect-[N/M] or aspect-[N] — arbitrary aspect ratio ──
+    if let Some(rest) = class.strip_prefix("aspect-[") {
+        if let Some(inner) = rest.strip_suffix(']') {
+            let ratio = if let Some(slash) = inner.find('/') {
+                let w = inner[..slash].parse::<f32>().ok();
+                let h = inner[slash + 1..].parse::<f32>().ok();
+                w.zip(h)
+                    .and_then(|(w, h)| if h != 0.0 { Some(w / h) } else { None })
+            } else {
+                inner.parse::<f32>().ok()
+            };
+            if let Some(r) = ratio {
+                let mut d = d;
+                d.style().aspect_ratio = Some(r);
+                return d;
+            }
+        }
+    }
+
+    // ── ring-[Npx] — arbitrary ring width ──
+    if let Some(rest) = class.strip_prefix("ring-[") {
+        if let Some(inner) = rest.strip_suffix(']') {
+            if let Some(abs) = parse_absolute_length(inner) {
+                let spread = match abs {
+                    gpui::AbsoluteLength::Pixels(p) => p,
+                    gpui::AbsoluteLength::Rems(r) => px(r.0 * 16.0),
+                };
+                return d.shadow(vec![BoxShadow {
+                    color: hsla(0.603, 0.912, 0.602, 0.5),
+                    offset: point(px(0.), px(0.)),
+                    blur_radius: px(0.),
+                    spread_radius: spread,
+                }]);
+            }
         }
     }
 
