@@ -11,6 +11,9 @@ pub struct TemplateContext {
     /// Slot content passed from a parent `include` directive.
     /// `(nodes, parent_ctx)` — the nodes are rendered with the parent's context.
     pub slot: Option<(Vec<crate::ast::Node>, Box<TemplateContext>)>,
+    /// In-memory virtual file system for WASM / no-filesystem environments.
+    /// Keys are paths (e.g. `"views/ui.crepus"`). Checked before real filesystem.
+    pub virtual_files: HashMap<String, String>,
 }
 
 impl Default for TemplateContext {
@@ -18,6 +21,7 @@ impl Default for TemplateContext {
         Self {
             vars: HashMap::new(),
             base_dir: None,
+            virtual_files: HashMap::new(),
             slot: None,
         }
     }

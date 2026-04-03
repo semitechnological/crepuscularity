@@ -5,6 +5,32 @@ use crepuscularity_core::context::{value_to_str, TemplateContext, TemplateValue}
 use crepuscularity_core::eval::eval_expr;
 use crepuscularity_core::parser::{parse_component_file, parse_template};
 
+/// Render an entry point from an in-memory file map — no filesystem access.
+///
+/// `entry` is `"path/to/file.crepus"` or `"path/to/file.crepus#ComponentName"`.
+/// `files` maps paths to `.crepus` source strings.
+/// All `include` directives within the templates are resolved from `files`.
+pub fn render_from_files(
+    files: &std::collections::HashMap<String, String>,
+    entry: &str,
+    ctx: &TemplateContext,
+) -> Result<String, String> {
+    let mut ctx = ctx.clone();
+    ctx.virtual_files = files.clone();
+
+    if let Some((file_part, comp_name)) = entry.split_once('#') {
+        let content = files
+            .get(file_part)
+            .ok_or_else(|| format!("file not found in virtual fs: {file_part}"))?;
+        return render_component_file_to_html(content, comp_name, &ctx);
+    }
+
+    let content = files
+        .get(entry)
+        .ok_or_else(|| format!("file not found in virtual fs: {entry}"))?;
+    render_template_to_html(content, &ctx)
+}
+
 pub fn render_template_to_html(template: &str, ctx: &TemplateContext) -> Result<String, String> {
     let nodes = parse_template(template)?;
     render_nodes_to_html(&nodes, ctx)
@@ -205,18 +231,34 @@ fn render_match(block: &MatchBlock, ctx: &TemplateContext) -> Result<String, Str
     Ok(String::new())
 }
 
+fn read_file(ctx: &TemplateContext, path: &Path) -> Result<String, String> {
+    // Check virtual files first (enables WASM / no-filesystem rendering).
+    let key = path.to_string_lossy();
+    if let Some(content) = ctx.virtual_files.get(key.as_ref()) {
+        return Ok(content.clone());
+    }
+    // Also check with just the filename portion for relative paths.
+    for (vkey, content) in &ctx.virtual_files {
+        if vkey.ends_with(key.as_ref()) || key.ends_with(vkey.as_str()) {
+            return Ok(content.clone());
+        }
+    }
+    std::fs::read_to_string(path)
+        .map_err(|e| format!("include error: {:?}: {}", path, e))
+}
+
 fn render_include(inc: &IncludeNode, ctx: &TemplateContext) -> Result<String, String> {
     if let Some((file_part, comp_name)) = inc.path.split_once('#') {
         return render_named_component(inc, ctx, file_part, comp_name);
     }
 
     let file_path = resolve_include_path(ctx.base_dir.as_deref(), &inc.path);
-    let content = std::fs::read_to_string(&file_path)
-        .map_err(|e| format!("include error: {:?}: {}", file_path, e))?;
+    let content = read_file(ctx, &file_path)?;
     let nodes = parse_template(&content).map_err(|e| format!("include parse error: {}", e))?;
 
     let mut child_ctx = TemplateContext::new();
     child_ctx.base_dir = file_path.parent().map(|p| p.to_path_buf());
+    child_ctx.virtual_files = ctx.virtual_files.clone();
     for (key, expr) in &inc.props {
         child_ctx.vars.insert(key.clone(), eval_expr(expr, ctx));
     }
@@ -234,8 +276,7 @@ fn render_named_component(
     comp_name: &str,
 ) -> Result<String, String> {
     let file_path = resolve_include_path(ctx.base_dir.as_deref(), file_part);
-    let content = std::fs::read_to_string(&file_path)
-        .map_err(|e| format!("include error: {:?}: {}", file_path, e))?;
+    let content = read_file(ctx, &file_path)?;
     let comp_file =
         parse_component_file(&content).map_err(|e| format!("component file parse error: {}", e))?;
     let comp = comp_file
@@ -245,6 +286,7 @@ fn render_named_component(
 
     let mut child_ctx = TemplateContext::new();
     child_ctx.base_dir = file_path.parent().map(|p| p.to_path_buf());
+    child_ctx.virtual_files = ctx.virtual_files.clone();
     for (key, expr) in &comp.meta.defaults {
         child_ctx
             .vars
