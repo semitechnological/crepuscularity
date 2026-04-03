@@ -1,11 +1,11 @@
 # CLI Guide
 
-The `crepus` CLI provides commands for scaffolding, building, and developing crepusscularity applications.
+The `crepus` CLI provides commands for scaffolding, building, and developing crepuscularity applications.
 
 ## Installation
 
 ```bash
-cargo install --path crates/crepusscularity-cli
+cargo install --path crates/crepuscularity-cli
 ```
 
 ## Commands
@@ -21,9 +21,9 @@ SDKROOT=$(xcrun --show-sdk-path) cargo run
 ```
 
 Creates:
-- `Cargo.toml` with crepusscularity dependencies
+- `Cargo.toml` with crepuscularity dependencies
 - `src/main.rs` with GPUI boilerplate
-- `views/` directory for `.crepuss` templates
+- `views/` directory for `.crepus` templates
 
 ### `crepus dev`
 
@@ -50,12 +50,12 @@ crepus build
 crepus build --release
 ```
 
-### `crepus preview <file.crepuss>`
+### `crepus preview <file.crepus>`
 
 Live preview a single template file:
 
 ```bash
-crepus preview views/dashboard.crepuss
+crepus preview views/dashboard.crepus
 ```
 
 Opens a window showing the rendered template with hot-reload.
@@ -84,7 +84,7 @@ crepus webext build
 Creates:
 - `webext.toml` — extension configuration
 - `runtime/` — Rust WASM runtime crate
-- `views/` — `.crepuss` templates
+- `views/` — `.crepus` templates
 
 ### `crepus webext build`
 
