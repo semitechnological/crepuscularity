@@ -129,10 +129,7 @@ impl CapabilitySet {
 
     /// Find capabilities in this set that are not in another set.
     pub fn missing_from(&self, other: &CapabilitySet) -> Vec<&Capability> {
-        self.capabilities
-            .iter()
-            .filter(|c| !other.has(c))
-            .collect()
+        self.capabilities.iter().filter(|c| !other.has(c)).collect()
     }
 
     /// Merge another capability set into this one.

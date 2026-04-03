@@ -213,11 +213,8 @@ fn do_build_launch(
 
     // Emit compilation started
     if emit_events {
-        CompilerEvent::compilation_started(
-            vec![cwd.join("src")],
-            Some("file_change".to_string()),
-        )
-        .emit();
+        CompilerEvent::compilation_started(vec![cwd.join("src")], Some("file_change".to_string()))
+            .emit();
     }
 
     let t0 = Instant::now();

@@ -261,7 +261,10 @@ impl ManifestV3 {
                     matches: cs.matches.clone(),
                     js: cs.js.clone(),
                     css,
-                    run_at: cs.run_at.clone().unwrap_or_else(|| "document_idle".to_string()),
+                    run_at: cs
+                        .run_at
+                        .clone()
+                        .unwrap_or_else(|| "document_idle".to_string()),
                 }
             })
             .collect();

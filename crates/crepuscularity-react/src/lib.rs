@@ -113,7 +113,10 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<String, String>
         out.push_str("data-animate-");
         out.push_str(&animation.property);
         out.push('=');
-        out.push_str(&quote_jsx_string(&format!("{} {}", animation.duration_expr, animation.easing)));
+        out.push_str(&quote_jsx_string(&format!(
+            "{} {}",
+            animation.duration_expr, animation.easing
+        )));
     }
 
     out.push('>');
@@ -229,8 +232,8 @@ fn render_named_component(
     let file_path = resolve_include_path(ctx.base_dir.as_deref(), file_part);
     let content = std::fs::read_to_string(&file_path)
         .map_err(|e| format!("include error: {:?}: {}", file_path, e))?;
-    let comp_file = parse_component_file(&content)
-        .map_err(|e| format!("component file parse error: {}", e))?;
+    let comp_file =
+        parse_component_file(&content).map_err(|e| format!("component file parse error: {}", e))?;
     let comp = comp_file
         .components
         .get(comp_name)

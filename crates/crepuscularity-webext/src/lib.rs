@@ -25,7 +25,9 @@ mod manifest;
 mod scanner;
 mod watcher;
 
-pub use api::{BrowserProgram, BrowserSource, BrowserStatement, JsExpr, MessagePayload, StorageArea};
+pub use api::{
+    BrowserProgram, BrowserSource, BrowserStatement, JsExpr, MessagePayload, StorageArea,
+};
 pub use capabilities::{Capability, CapabilitySet};
 pub use manifest::{
     ActionSpec, BackgroundSpec, CapabilitiesSection, ContentScriptEntry, ContentScriptSpec,

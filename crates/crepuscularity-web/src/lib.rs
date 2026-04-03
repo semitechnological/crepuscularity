@@ -23,7 +23,10 @@ pub fn render_component_file_to_html(
 
     let mut child_ctx = ctx.clone();
     for (key, expr) in &component.meta.defaults {
-        child_ctx.vars.entry(key.clone()).or_insert_with(|| eval_expr(expr, &TemplateContext::new()));
+        child_ctx
+            .vars
+            .entry(key.clone())
+            .or_insert_with(|| eval_expr(expr, &TemplateContext::new()));
     }
 
     render_nodes_to_html(&component.nodes, &child_ctx)
@@ -113,7 +116,10 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<String, String>
         out.push_str("data-animate-");
         out.push_str(&animation.property);
         out.push_str("=\"");
-        out.push_str(&escape_html(&format!("{} {}", animation.duration_expr, animation.easing)));
+        out.push_str(&escape_html(&format!(
+            "{} {}",
+            animation.duration_expr, animation.easing
+        )));
         out.push('"');
     }
 
@@ -164,7 +170,9 @@ fn render_for(block: &ForBlock, ctx: &TemplateContext) -> Result<String, String>
         if !pattern.is_empty() {
             let item_str = item_ctx.get_str("value");
             if !item_str.is_empty() {
-                child_ctx.vars.insert(pattern.to_string(), TemplateValue::Str(item_str));
+                child_ctx
+                    .vars
+                    .insert(pattern.to_string(), TemplateValue::Str(item_str));
             }
         }
 
@@ -228,8 +236,8 @@ fn render_named_component(
     let file_path = resolve_include_path(ctx.base_dir.as_deref(), file_part);
     let content = std::fs::read_to_string(&file_path)
         .map_err(|e| format!("include error: {:?}: {}", file_path, e))?;
-    let comp_file = parse_component_file(&content)
-        .map_err(|e| format!("component file parse error: {}", e))?;
+    let comp_file =
+        parse_component_file(&content).map_err(|e| format!("component file parse error: {}", e))?;
     let comp = comp_file
         .components
         .get(comp_name)
@@ -238,7 +246,9 @@ fn render_named_component(
     let mut child_ctx = TemplateContext::new();
     child_ctx.base_dir = file_path.parent().map(|p| p.to_path_buf());
     for (key, expr) in &comp.meta.defaults {
-        child_ctx.vars.insert(key.clone(), eval_expr(expr, &TemplateContext::new()));
+        child_ctx
+            .vars
+            .insert(key.clone(), eval_expr(expr, &TemplateContext::new()));
     }
     for (key, expr) in &inc.props {
         child_ctx.vars.insert(key.clone(), eval_expr(expr, ctx));

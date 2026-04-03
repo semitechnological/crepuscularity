@@ -332,7 +332,6 @@ fn render_include(inc: &IncludeNode, ctx: &TemplateContext) -> AnyElement {
     render_nodes(&nodes, &child_ctx)
 }
 
-
 fn resolve_include_path(base_dir: Option<&std::path::Path>, path: &str) -> std::path::PathBuf {
     let candidate = if let Some(base) = base_dir {
         base.join(path)

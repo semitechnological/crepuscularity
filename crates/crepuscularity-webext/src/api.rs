@@ -104,7 +104,11 @@ impl BrowserProgram {
     }
 
     /// Bind a value from a runtime message to a variable.
-    pub fn bind_runtime_message(mut self, name: impl Into<String>, payload: MessagePayload) -> Self {
+    pub fn bind_runtime_message(
+        mut self,
+        name: impl Into<String>,
+        payload: MessagePayload,
+    ) -> Self {
         self.bindings.push(BrowserBinding {
             name: name.into(),
             source: BrowserSource::RuntimeMessage(payload),
@@ -175,7 +179,8 @@ impl BrowserProgram {
                     js.push_str(&format!(
                         "  await browserApi.storage.{area}.set({{{quoted_key}: {value}}});\n",
                         area = area.as_js_name(),
-                        quoted_key = serde_json::to_string(key).unwrap_or_else(|_| "\"\"".to_string()),
+                        quoted_key =
+                            serde_json::to_string(key).unwrap_or_else(|_| "\"\"".to_string()),
                         value = value.to_js(),
                     ));
                 }
@@ -186,7 +191,11 @@ impl BrowserProgram {
                     ));
                 }
                 BrowserStatement::ConsoleLog(values) => {
-                    let joined = values.iter().map(JsExpr::to_js).collect::<Vec<_>>().join(", ");
+                    let joined = values
+                        .iter()
+                        .map(JsExpr::to_js)
+                        .collect::<Vec<_>>()
+                        .join(", ");
                     js.push_str(&format!("  console.log({joined});\n"));
                 }
             }
@@ -323,7 +332,13 @@ impl From<i64> for JsExpr {
 fn sanitize_ident(input: &str) -> String {
     input
         .chars()
-        .map(|ch| if ch.is_ascii_alphanumeric() || ch == '_' { ch } else { '_' })
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() || ch == '_' {
+                ch
+            } else {
+                '_'
+            }
+        })
         .collect()
 }
 

@@ -440,9 +440,7 @@ fn extract_prop_value(s: &str) -> (String, &str) {
                 escaped = true;
             } else if byte == quote {
                 let content = &s[1..i];
-                let escaped_content = content
-                    .replace('\\', "\\\\")
-                    .replace('"', "\\\"");
+                let escaped_content = content.replace('\\', "\\\\").replace('"', "\\\"");
                 let expr = format!("\"{}\"", escaped_content);
                 let rest = if i + 1 <= s.len() { &s[i + 1..] } else { "" };
                 return (expr, rest);
@@ -451,9 +449,7 @@ fn extract_prop_value(s: &str) -> (String, &str) {
         }
 
         let content = &s[1..];
-        let escaped_content = content
-            .replace('\\', "\\\\")
-            .replace('"', "\\\"");
+        let escaped_content = content.replace('\\', "\\\\").replace('"', "\\\"");
         let expr = format!("\"{}\"", escaped_content);
         return (expr, "");
     }

@@ -37,10 +37,7 @@ pub enum CompilerEvent {
     },
 
     /// Emitted when a file change is detected.
-    FileChanged {
-        timestamp_ms: u64,
-        path: PathBuf,
-    },
+    FileChanged { timestamp_ms: u64, path: PathBuf },
 
     /// Emitted when the dev server starts.
     DevServerStarted {
