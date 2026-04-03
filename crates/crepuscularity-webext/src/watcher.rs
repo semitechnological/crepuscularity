@@ -1,6 +1,6 @@
 //! File watcher for auto-detecting capability changes.
 //!
-//! Watches .crepus files and manifest.crex, emitting events when
+//! Watches .crepus and .js/.ts files and webext.toml, emitting events when
 //! capabilities change or new ones are detected.
 
 use std::path::{Path, PathBuf};
@@ -42,8 +42,8 @@ impl CapabilityWatcher {
     /// Create a new watcher for the given project directory.
     ///
     /// Watches:
-    /// - `**/*.crepus` files for API usage
-    /// - `manifest.crex` for declared capabilities
+    /// - `**/*.crepus`, `**/*.js`, `**/*.ts` files for API usage
+    /// - `webext.toml` for declared capabilities
     pub fn new(project_dir: &Path) -> Result<Self, notify::Error> {
         let (tx, rx) = channel();
         let project_dir = project_dir.to_path_buf();
@@ -90,17 +90,17 @@ fn handle_event(event: Event, project_dir: &Path, tx: &Sender<WatchEvent>) {
                 let ext = path.extension().and_then(|e| e.to_str());
                 let file_name = path.file_name().and_then(|n| n.to_str());
 
-                if ext == Some("crepus") {
-                    // A .crepus file changed - check for new capabilities
+                let is_source = matches!(ext, Some("crepus") | Some("js") | Some("ts"));
+                if is_source {
+                    // A source file changed — check for new capabilities
                     let _ = tx.send(WatchEvent::FileChanged { path: path.clone() });
 
-                    // Scan for capabilities and compare with manifest
                     if let Err(e) = check_capabilities(project_dir, tx) {
                         let _ = tx.send(WatchEvent::Error {
                             message: format!("Failed to check capabilities: {e}"),
                         });
                     }
-                } else if file_name == Some("manifest.crex") {
+                } else if file_name == Some("webext.toml") {
                     let _ = tx.send(WatchEvent::ManifestUpdated { path });
                 }
             }
@@ -110,7 +110,7 @@ fn handle_event(event: Event, project_dir: &Path, tx: &Sender<WatchEvent>) {
 }
 
 fn check_capabilities(project_dir: &Path, tx: &Sender<WatchEvent>) -> Result<(), String> {
-    let manifest_path = project_dir.join("manifest.crex");
+    let manifest_path = project_dir.join("webext.toml");
 
     // Load manifest if it exists
     let declared_caps = if manifest_path.exists() {
@@ -144,7 +144,7 @@ fn check_capabilities(project_dir: &Path, tx: &Sender<WatchEvent>) -> Result<(),
 
 /// Check a project for missing capabilities (one-shot, no watching).
 pub fn check_project_capabilities(project_dir: &Path) -> Result<Vec<Capability>, String> {
-    let manifest_path = project_dir.join("manifest.crex");
+    let manifest_path = project_dir.join("webext.toml");
 
     let declared_caps = if manifest_path.exists() {
         ExtensionManifest::load(&manifest_path)

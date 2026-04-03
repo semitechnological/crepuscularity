@@ -257,6 +257,25 @@ fn build_extension(app_path: &Path) {
         }
     }
 
+    // ── Capability check ────────────────────────────────────────────────────
+    match crepuscularity_webext::check_project_capabilities(app_path) {
+        Ok(missing) if !missing.is_empty() => {
+            eprintln!();
+            ui::warning("missing capabilities detected — add these to webext.toml:");
+            for cap in &missing {
+                eprintln!(
+                    "  {} {}",
+                    ui::dim("→"),
+                    style(cap.to_permission_string()).yellow()
+                );
+            }
+        }
+        Err(e) => {
+            ui::warning(&format!("capability scan failed: {e}"));
+        }
+        _ => {}
+    }
+
     eprintln!(
         "\n{} built to {}",
         ui::ok(),
