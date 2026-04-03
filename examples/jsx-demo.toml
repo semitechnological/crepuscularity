@@ -1,0 +1,4 @@
+name = "World"
+show_header = true
+score = 65
+status = "active"
