@@ -16,7 +16,11 @@ pub mod events;
 mod hud;
 mod new;
 mod render;
+pub mod ui;
 mod webext;
+
+use console::style;
+use std::time::Instant;
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
@@ -32,8 +36,7 @@ fn main() {
 
         Some("new") => {
             let name = args.get(2).map(|s| s.as_str()).unwrap_or_else(|| {
-                eprintln!("Usage: crepus new <name>");
-                std::process::exit(1);
+                ui::error("Usage: crepus new <name>");
             });
             new::run(name);
         }
@@ -59,14 +62,17 @@ fn main() {
         }
 
         Some("build") => {
+            let t0 = Instant::now();
             let release = args.iter().any(|a| a == "--release");
             let cwd = std::env::current_dir().unwrap();
+            let sp = ui::spinner(if release { "cargo build --release" } else { "cargo build" });
             let outcome = builder::cargo_build(&cwd, release, None);
             if outcome.success {
-                eprintln!("\x1b[32m✓\x1b[0m Build succeeded");
-                std::process::exit(0);
+                ui::spinner_ok(&sp, "build succeeded");
+                ui::done_in(t0.elapsed());
             } else {
-                std::process::exit(1);
+                sp.finish_and_clear();
+                ui::error("build failed");
             }
         }
 
@@ -75,13 +81,16 @@ fn main() {
                 .get(2)
                 .map(std::path::PathBuf::from)
                 .unwrap_or_else(|| {
-                    eprintln!("Usage: crepus preview <file.crepus>");
-                    std::process::exit(1);
+                    ui::error("Usage: crepus preview <file.crepus>");
                 });
             if !path.exists() {
-                eprintln!("File not found: {:?}", path);
-                std::process::exit(1);
+                ui::error(&format!("file not found: {}", path.display()));
             }
+            eprintln!(
+                "{} previewing {}",
+                style("crepus").dim(),
+                style(path.display().to_string()).cyan().bold()
+            );
             run_preview(path);
         }
 
@@ -98,27 +107,75 @@ fn main() {
 }
 
 fn print_usage() {
-    eprintln!("crepus {}", env!("CARGO_PKG_VERSION"));
-    eprintln!("Crepuscularity CLI — scaffold, develop, preview, and render .crepus templates");
-    eprintln!();
-    eprintln!("COMMANDS:");
-    eprintln!("  new <name>                                    scaffold a new GPUI app");
-    eprintln!("  dev [--bin NAME] [--release] [--emit-events]  hot-reload dev loop");
-    eprintln!("  build [--release]                             cargo build wrapper");
     eprintln!(
-        "  preview <file.crepus>                         live-preview a template (GPUI window)"
+        "{} {}",
+        style("crepus").cyan().bold(),
+        style(env!("CARGO_PKG_VERSION")).dim()
     );
-    eprintln!("  render <file.crepus> [--ctx FILE] [--var k=v] [--component Name]");
-    eprintln!("                                                render template to HTML on stdout");
+    eprintln!(
+        "{}",
+        style("Crepuscularity CLI — scaffold, develop, preview, and render .crepus templates").dim()
+    );
     eprintln!();
-    eprintln!("  webext new <name>                             scaffold browser extension");
-    eprintln!("  webext build [--app PATH]                     build extension to dist/");
-    eprintln!("  webext manifest [--app PATH]                  print manifest.json");
+    eprintln!("{}", style("COMMANDS").dim());
+    eprintln!(
+        "  {}  {}",
+        style("new <name>                           ").green(),
+        style("scaffold a new GPUI app").dim()
+    );
+    eprintln!(
+        "  {}  {}",
+        style("dev [--bin NAME] [--release]         ").green(),
+        style("hot-reload dev loop").dim()
+    );
+    eprintln!(
+        "  {}  {}",
+        style("build [--release]                    ").green(),
+        style("cargo build wrapper").dim()
+    );
+    eprintln!(
+        "  {}  {}",
+        style("preview <file.crepus>                ").green(),
+        style("live-preview a template (GPUI window)").dim()
+    );
+    eprintln!(
+        "  {}  {}",
+        style("render <file.crepus> [--ctx] [--var] ").green(),
+        style("render template to HTML on stdout").dim()
+    );
     eprintln!();
-    eprintln!("OPTIONS:");
-    eprintln!("  -h, --help       show this help");
-    eprintln!("  -V, --version    show version");
-    eprintln!("  --emit-events    emit structured JSON events to stdout (IDE integration)");
+    eprintln!(
+        "  {}  {}",
+        style("webext new <name>                    ").green(),
+        style("scaffold a browser extension").dim()
+    );
+    eprintln!(
+        "  {}  {}",
+        style("webext build [--app PATH]            ").green(),
+        style("build extension to dist/unpacked/").dim()
+    );
+    eprintln!(
+        "  {}  {}",
+        style("webext manifest [--app PATH]         ").green(),
+        style("print manifest.json").dim()
+    );
+    eprintln!();
+    eprintln!("{}", style("OPTIONS").dim());
+    eprintln!(
+        "  {}  {}",
+        style("-h, --help                           ").green(),
+        style("show this help").dim()
+    );
+    eprintln!(
+        "  {}  {}",
+        style("-V, --version                        ").green(),
+        style("show version").dim()
+    );
+    eprintln!(
+        "  {}  {}",
+        style("--emit-events                        ").green(),
+        style("emit JSON events to stdout (IDE integration)").dim()
+    );
 }
 
 fn run_preview(path: std::path::PathBuf) {
@@ -134,7 +191,6 @@ fn run_preview(path: std::path::PathBuf) {
         .unwrap_or("preview")
         .to_string();
 
-    // Also load context.toml from the same directory if present
     let mut ctx = TemplateContext::new();
     if let Some(dir) = path.parent() {
         let ctx_path = dir.join("context.toml");
@@ -142,8 +198,6 @@ fn run_preview(path: std::path::PathBuf) {
             load_context_toml(&ctx_path, &mut ctx);
         }
     }
-
-    eprintln!("crepus preview: watching {path:?}");
 
     Application::new().run(move |cx: &mut gpui::App| {
         let opts = WindowOptions {
