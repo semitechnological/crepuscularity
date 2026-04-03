@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 /// A runtime variable context passed to the template renderer.
 /// Variables can be strings, booleans, numbers, or lists of contexts.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct TemplateContext {
     pub vars: HashMap<String, TemplateValue>,
     /// Directory of the current `.crepus` file — used to resolve `include` paths.
@@ -16,16 +16,6 @@ pub struct TemplateContext {
     pub virtual_files: HashMap<String, String>,
 }
 
-impl Default for TemplateContext {
-    fn default() -> Self {
-        Self {
-            vars: HashMap::new(),
-            base_dir: None,
-            virtual_files: HashMap::new(),
-            slot: None,
-        }
-    }
-}
 
 #[derive(Debug, Clone)]
 pub enum TemplateValue {

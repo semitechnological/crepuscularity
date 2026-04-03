@@ -70,7 +70,7 @@ fn apply_context_class(d: Div, class: &str, ctx: &TemplateContext) -> Div {
                 let color_str = crate::context::value_to_str(&val);
                 if let Some(hex) = parse_color_str(&color_str) {
                     if let Ok(alpha) = alpha_str.parse::<u32>() {
-                        let alpha_byte = (alpha * 255 / 100) as u32;
+                        let alpha_byte = alpha * 255 / 100;
                         let rgba_val = (hex << 8) | alpha_byte;
                         return d.bg(rgba(rgba_val));
                     }
@@ -105,6 +105,7 @@ fn parse_color_str(s: &str) -> Option<u32> {
 }
 
 /// Returns Ok(div) if class matched, Err(div) to fall through to dynamic.
+#[allow(clippy::result_large_err)]
 fn apply_static(d: Div, class: &str) -> Result<Div, Div> {
     Ok(match class {
         // ── Display ──
@@ -509,9 +510,12 @@ fn apply_static(d: Div, class: &str) -> Result<Div, Div> {
     })
 }
 
+type LengthPropEntry = (&'static str, fn(Div, Length) -> Div);
+type DefiniteLengthPropEntry = (&'static str, fn(Div, DefiniteLength) -> Div);
+
 fn apply_dynamic(d: Div, class: &str) -> Div {
     // ── Length properties (support auto) ──
-    const LENGTH_PROPS: &[(&str, fn(Div, Length) -> Div)] = &[
+    const LENGTH_PROPS: &[LengthPropEntry] = &[
         ("w-", |d, v| d.w(v)),
         ("h-", |d, v| d.h(v)),
         ("min-w-", |d, v| d.min_w(v)),
@@ -543,7 +547,7 @@ fn apply_dynamic(d: Div, class: &str) -> Div {
     }
 
     // ── DefiniteLength properties (no auto) ──
-    const DEFINITE_PROPS: &[(&str, fn(Div, DefiniteLength) -> Div)] = &[
+    const DEFINITE_PROPS: &[DefiniteLengthPropEntry] = &[
         ("p-", |d, v| d.p(v)),
         ("px-", |d, v| d.px(v)),
         ("py-", |d, v| d.py(v)),
@@ -825,7 +829,7 @@ fn apply_dynamic(d: Div, class: &str) -> Div {
                         let family = &color_part[..dash_pos];
                         let shade = &color_part[dash_pos + 1..];
                         if let Some(hex) = tailwind_color(family, shade) {
-                            let alpha_byte = (alpha_pct * 255 / 100) as u32;
+                            let alpha_byte = alpha_pct * 255 / 100;
                             let rgba_val = (hex << 8) | alpha_byte;
                             return d.bg(rgba(rgba_val));
                         }
@@ -914,9 +918,8 @@ fn parse_definite_length(value: &str) -> Option<DefiniteLength> {
     if value.starts_with('[') && value.ends_with(']') {
         return parse_absolute_length(&value[1..value.len() - 1]).map(Into::into);
     }
-    match value {
-        "px" => return Some(px(1.).into()),
-        _ => {}
+    if value == "px" {
+        return Some(px(1.).into());
     }
     if let Ok(n) = value.parse::<f32>() {
         return Some(rems(n * 0.25).into());

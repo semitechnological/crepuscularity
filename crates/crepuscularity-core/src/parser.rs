@@ -442,7 +442,7 @@ fn extract_prop_value(s: &str) -> (String, &str) {
                 let content = &s[1..i];
                 let escaped_content = content.replace('\\', "\\\\").replace('"', "\\\"");
                 let expr = format!("\"{}\"", escaped_content);
-                let rest = if i + 1 <= s.len() { &s[i + 1..] } else { "" };
+                let rest = if i < s.len() { &s[i + 1..] } else { "" };
                 return (expr, rest);
             }
             i += 1;
@@ -661,9 +661,7 @@ fn tokenize_line(line: &str) -> Vec<String> {
                 current.push(ch);
             }
             ']' if !in_string && brace_depth == 0 => {
-                if bracket_depth > 0 {
-                    bracket_depth -= 1;
-                }
+                bracket_depth = bracket_depth.saturating_sub(1);
                 current.push(ch);
             }
             '{' if !in_string && bracket_depth == 0 => {
@@ -671,9 +669,7 @@ fn tokenize_line(line: &str) -> Vec<String> {
                 current.push(ch);
             }
             '}' if !in_string && bracket_depth == 0 => {
-                if brace_depth > 0 {
-                    brace_depth -= 1;
-                }
+                brace_depth = brace_depth.saturating_sub(1);
                 current.push(ch);
             }
             '\'' | '"' if bracket_depth > 0 || brace_depth > 0 => {

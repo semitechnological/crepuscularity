@@ -1,5 +1,5 @@
 use crepuscularity_gpui::prelude::*;
-use gpui::{actions, bounds, point, size, Application, ClickEvent, KeyBinding, WindowOptions};
+use gpui::{actions, bounds, point, size, Application, ClickEvent, WindowOptions};
 
 actions!(weather, [FetchWeather]);
 
@@ -7,7 +7,7 @@ struct WeatherView {
     temp_c: i32,
     condition: String,
     suggestion: String,
-    city: String,
+    _city: String,
     is_loading: bool,
 }
 
@@ -17,7 +17,7 @@ impl WeatherView {
             temp_c: 22,
             condition: "Sunny".to_string(),
             suggestion: "Grab some sunscreen".to_string(),
-            city: String::new(),
+            _city: String::new(),
             is_loading: false,
         }
     }

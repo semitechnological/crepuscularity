@@ -114,9 +114,7 @@ fn background_loop(
             if let Some(mut c) = child {
                 kill_child(&mut c);
                 if emit_events {
-                    if let Some(pid) = c.id().try_into().ok() {
-                        CompilerEvent::process_exited(pid, None).emit();
-                    }
+                    CompilerEvent::process_exited(c.id(), None).emit();
                 }
             }
             break;

@@ -59,7 +59,6 @@ impl HudState {
 const SPINNER: [&str; 8] = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠏"];
 
 pub struct DevHud {
-    shared: Arc<Mutex<HudState>>,
     /// Local rendering snapshot, updated each poll.
     project_name: String,
     status_text: String,
@@ -103,7 +102,6 @@ impl DevHud {
         .detach();
 
         Self {
-            shared,
             project_name,
             status_text,
             status_color,

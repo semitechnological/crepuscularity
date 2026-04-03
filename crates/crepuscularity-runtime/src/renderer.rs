@@ -114,7 +114,7 @@ fn render_with_animations(d: gpui::Div, animations: &[AnimationSpec], tag: &str)
     // Generate a stable element ID from the tag + animation properties
     let props: Vec<&str> = animations.iter().map(|a| a.property.as_str()).collect();
     let id_str = format!("crepus-anim-{}-{}", tag, props.join("-"));
-    let id = ElementId::Name(SharedString::from(id_str).into());
+    let id = ElementId::Name(SharedString::from(id_str));
 
     if animations.len() == 1 {
         let spec = &animations[0];

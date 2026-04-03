@@ -63,7 +63,7 @@ fn main() {
         Some("preview") => {
             let path = args
                 .get(2)
-                .map(|s| std::path::PathBuf::from(s))
+                .map(std::path::PathBuf::from)
                 .unwrap_or_else(|| {
                     eprintln!("Usage: crepus preview <file.crepus>");
                     std::process::exit(1);

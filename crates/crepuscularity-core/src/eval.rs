@@ -91,7 +91,7 @@ fn tokenize(input: &str) -> Vec<Token> {
             || (bytes[i] == b'-'
                 && i + 1 < len
                 && bytes[i + 1].is_ascii_digit()
-                && tokens.last().map_or(true, |t| {
+                && tokens.last().is_none_or(|t| {
                     matches!(
                         t,
                         Token::LParen
@@ -129,10 +129,8 @@ fn tokenize(input: &str) -> Vec<Token> {
                 if let Ok(f) = input[start..i].parse::<f64>() {
                     tokens.push(Token::Float(f));
                 }
-            } else {
-                if let Ok(n) = input[start..i].parse::<i64>() {
-                    tokens.push(Token::Int(n));
-                }
+            } else if let Ok(n) = input[start..i].parse::<i64>() {
+                tokens.push(Token::Int(n));
             }
             continue;
         }

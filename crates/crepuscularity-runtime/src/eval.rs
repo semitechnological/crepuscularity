@@ -91,7 +91,7 @@ fn tokenize(input: &str) -> Vec<Token> {
             || (bytes[i] == b'-'
                 && i + 1 < len
                 && bytes[i + 1].is_ascii_digit()
-                && tokens.last().map_or(true, |t| {
+                && tokens.last().is_none_or(|t| {
                     matches!(
                         t,
                         Token::LParen

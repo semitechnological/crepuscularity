@@ -531,9 +531,7 @@ fn tokenize_line(line: &str) -> Vec<String> {
                 current.push(ch);
             }
             ']' if !in_string && brace_depth == 0 => {
-                if bracket_depth > 0 {
-                    bracket_depth -= 1;
-                }
+                bracket_depth = bracket_depth.saturating_sub(1);
                 current.push(ch);
             }
             '{' if !in_string && bracket_depth == 0 => {
@@ -541,9 +539,7 @@ fn tokenize_line(line: &str) -> Vec<String> {
                 current.push(ch);
             }
             '}' if !in_string && bracket_depth == 0 => {
-                if brace_depth > 0 {
-                    brace_depth -= 1;
-                }
+                brace_depth = brace_depth.saturating_sub(1);
                 current.push(ch);
             }
             '\'' | '"' if bracket_depth > 0 || brace_depth > 0 => {
@@ -909,7 +905,7 @@ fn generate_match_child_call(match_block: &MatchBlock) -> Result<TokenStream2, S
     let arms: Vec<TokenStream2> = match_block
         .arms
         .iter()
-        .map(|arm| generate_match_arm(arm))
+        .map(generate_match_arm)
         .collect::<Result<_, _>>()?;
 
     Ok(quote! {
@@ -926,7 +922,7 @@ fn generate_match_expr(match_block: &MatchBlock) -> Result<TokenStream2, String>
     let arms: Vec<TokenStream2> = match_block
         .arms
         .iter()
-        .map(|arm| generate_match_arm(arm))
+        .map(generate_match_arm)
         .collect::<Result<_, _>>()?;
 
     Ok(quote! {
