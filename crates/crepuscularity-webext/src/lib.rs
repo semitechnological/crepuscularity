@@ -27,6 +27,10 @@ mod watcher;
 
 pub use api::{BrowserProgram, BrowserSource, BrowserStatement, JsExpr, MessagePayload, StorageArea};
 pub use capabilities::{Capability, CapabilitySet};
-pub use manifest::{ExtensionManifest, ManifestError};
+pub use manifest::{
+    ActionSpec, BackgroundSpec, CapabilitiesSection, ContentScriptEntry, ContentScriptSpec,
+    ExtensionInfo, ExtensionManifest, ManifestError, ManifestOptions, ManifestV3,
+    WebAccessibleResources,
+};
 pub use scanner::{scan_crepus_for_capabilities, CapabilityUsage};
 pub use watcher::{CapabilityWatcher, WatchEvent};

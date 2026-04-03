@@ -1,6 +1,6 @@
 //! Extension manifest parsing and generation (.crex format).
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};
@@ -55,6 +55,8 @@ pub struct ExtensionManifest {
     pub content_scripts: Vec<ContentScriptEntry>,
     #[serde(default)]
     pub plugins: HashMap<String, PluginEntry>,
+    #[serde(default)]
+    pub options: ManifestOptions,
 }
 
 /// Basic extension information.
@@ -131,6 +133,201 @@ pub struct PluginEntry {
     pub path: String,
     #[serde(rename = "type")]
     pub plugin_type: String,
+}
+
+/// Browser-ready MV3 manifest options that app authors can configure.
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct ManifestOptions {
+    /// Map of icon size → resource path (e.g., "48" → "icons/48.png")
+    #[serde(default)]
+    pub icons: BTreeMap<String, String>,
+    /// Content script CSS resource paths
+    #[serde(default)]
+    pub content_css: Vec<String>,
+    /// Additional web_accessible_resources patterns
+    #[serde(default)]
+    pub extra_resources: Vec<String>,
+    /// Custom popup HTML path (default: "src/popup.html")
+    #[serde(default)]
+    pub popup_html: Option<String>,
+    /// Custom background script path (default: "src/background.js")
+    #[serde(default)]
+    pub background_script: Option<String>,
+}
+
+// ---------------------------------------------------------------------------
+// Browser MV3 manifest generation
+// ---------------------------------------------------------------------------
+
+/// Full browser Manifest V3 document.
+#[derive(Clone, Debug, Serialize)]
+pub struct ManifestV3 {
+    pub manifest_version: u8,
+    pub name: String,
+    pub version: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub icons: BTreeMap<String, String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub permissions: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub host_permissions: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content_security_policy: Option<ContentSecurityPolicy>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub background: Option<BackgroundSpec>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub action: Option<ActionSpec>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub content_scripts: Vec<ContentScriptSpec>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub web_accessible_resources: Vec<WebAccessibleResources>,
+}
+
+/// Content Security Policy for extension pages.
+#[derive(Clone, Debug, Serialize)]
+pub struct ContentSecurityPolicy {
+    /// CSP for extension pages (popup, options). Must include 'wasm-unsafe-eval' to run WASM.
+    pub extension_pages: String,
+}
+
+/// Background service worker specification.
+#[derive(Clone, Debug, Serialize)]
+pub struct BackgroundSpec {
+    pub service_worker: String,
+    #[serde(rename = "type")]
+    pub kind: String,
+}
+
+/// Browser action (toolbar button) specification.
+#[derive(Clone, Debug, Serialize)]
+pub struct ActionSpec {
+    pub default_popup: String,
+    pub default_title: String,
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub default_icon: BTreeMap<String, String>,
+}
+
+/// Content script specification for MV3.
+#[derive(Clone, Debug, Serialize)]
+pub struct ContentScriptSpec {
+    pub matches: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub js: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub css: Vec<String>,
+    pub run_at: String,
+}
+
+/// Web accessible resources specification.
+#[derive(Clone, Debug, Serialize)]
+pub struct WebAccessibleResources {
+    pub resources: Vec<String>,
+    pub matches: Vec<String>,
+}
+
+impl ManifestV3 {
+    /// Create a ManifestV3 from an ExtensionManifest.
+    pub fn from_manifest(manifest: &ExtensionManifest) -> Self {
+        let caps = manifest.to_capability_set();
+        let opts = &manifest.options;
+
+        // Build permissions list
+        let mut permissions: Vec<String> = caps.to_permissions();
+        // Deduplicate
+        permissions.sort();
+        permissions.dedup();
+
+        // Build host permissions
+        let host_permissions = if manifest.capabilities.host_permissions.is_empty() {
+            vec!["<all_urls>".to_string()]
+        } else {
+            manifest.capabilities.host_permissions.clone()
+        };
+
+        // Content scripts
+        let content_scripts: Vec<ContentScriptSpec> = manifest
+            .content_scripts
+            .iter()
+            .map(|cs| {
+                let mut css = cs.css.clone();
+                for extra in &opts.content_css {
+                    if !css.contains(extra) {
+                        css.push(extra.clone());
+                    }
+                }
+                ContentScriptSpec {
+                    matches: cs.matches.clone(),
+                    js: cs.js.clone(),
+                    css,
+                    run_at: cs.run_at.clone().unwrap_or_else(|| "document_idle".to_string()),
+                }
+            })
+            .collect();
+
+        // Web accessible resources
+        let mut resources = vec![
+            "vendor/*".to_string(),
+            "src/*".to_string(),
+            "views/*".to_string(),
+        ];
+        resources.extend(opts.extra_resources.iter().cloned());
+
+        let web_accessible_resources = if !resources.is_empty() {
+            vec![WebAccessibleResources {
+                resources,
+                matches: host_permissions.clone(),
+            }]
+        } else {
+            vec![]
+        };
+
+        // Background
+        let background = if manifest.capabilities.background_script {
+            Some(BackgroundSpec {
+                service_worker: opts
+                    .background_script
+                    .clone()
+                    .unwrap_or_else(|| "src/background.js".to_string()),
+                kind: "module".to_string(),
+            })
+        } else {
+            None
+        };
+
+        // Action (popup)
+        let action = Some(ActionSpec {
+            default_popup: opts
+                .popup_html
+                .clone()
+                .unwrap_or_else(|| "src/popup.html".to_string()),
+            default_title: manifest.extension.name.clone(),
+            default_icon: opts.icons.clone(),
+        });
+
+        ManifestV3 {
+            manifest_version: 3,
+            name: manifest.extension.name.clone(),
+            version: manifest.extension.version.clone(),
+            description: manifest.extension.description.clone(),
+            icons: opts.icons.clone(),
+            permissions,
+            host_permissions,
+            content_security_policy: Some(ContentSecurityPolicy {
+                extension_pages: "script-src 'self' 'wasm-unsafe-eval';".to_string(),
+            }),
+            background,
+            action,
+            content_scripts,
+            web_accessible_resources,
+        }
+    }
+
+    /// Serialize to pretty-printed JSON.
+    pub fn to_json(&self) -> String {
+        serde_json::to_string_pretty(self).expect("ManifestV3 serialization failed")
+    }
 }
 
 impl ExtensionManifest {
@@ -214,7 +411,7 @@ impl ExtensionManifest {
         set
     }
 
-    /// Generate a Chrome/Firefox manifest.json from this manifest.
+    /// Generate a Chrome/Firefox manifest.json from this manifest (simple format).
     pub fn to_browser_manifest(&self) -> serde_json::Value {
         let caps = self.to_capability_set();
 
@@ -266,6 +463,16 @@ impl ExtensionManifest {
 
         manifest
     }
+
+    /// Generate a full MV3 manifest.
+    pub fn to_manifest_v3(&self) -> ManifestV3 {
+        ManifestV3::from_manifest(self)
+    }
+
+    /// Generate a full MV3 manifest as JSON string.
+    pub fn to_manifest_v3_json(&self) -> String {
+        self.to_manifest_v3().to_json()
+    }
 }
 
 #[cfg(test)]
@@ -310,10 +517,56 @@ host-permissions = ["https://example.com/*"]
             },
             content_scripts: vec![],
             plugins: HashMap::new(),
+            options: ManifestOptions::default(),
         };
 
         let browser = manifest.to_browser_manifest();
         assert_eq!(browser["manifest_version"], 3);
         assert_eq!(browser["name"], "Test");
+    }
+
+    #[test]
+    fn test_manifest_v3_generation() {
+        let manifest = ExtensionManifest {
+            extension: ExtensionInfo {
+                name: "Full Test".to_string(),
+                version: "2.0.0".to_string(),
+                description: Some("A full test extension".to_string()),
+                author: None,
+                homepage: None,
+            },
+            capabilities: CapabilitiesSection {
+                storage: true,
+                background_script: true,
+                content_script: true,
+                host_permissions: vec!["https://*.example.com/*".to_string()],
+                ..Default::default()
+            },
+            content_scripts: vec![ContentScriptEntry {
+                matches: vec!["https://*.example.com/*".to_string()],
+                js: vec!["src/content.js".to_string()],
+                css: vec!["src/content.css".to_string()],
+                run_at: Some("document_idle".to_string()),
+            }],
+            plugins: HashMap::new(),
+            options: ManifestOptions {
+                icons: BTreeMap::from([
+                    ("48".to_string(), "icons/48.png".to_string()),
+                    ("128".to_string(), "icons/128.png".to_string()),
+                ]),
+                ..Default::default()
+            },
+        };
+
+        let mv3 = manifest.to_manifest_v3();
+        assert_eq!(mv3.manifest_version, 3);
+        assert_eq!(mv3.name, "Full Test");
+        assert!(mv3.background.is_some());
+        assert!(!mv3.content_scripts.is_empty());
+        assert!(!mv3.icons.is_empty());
+
+        let json = mv3.to_json();
+        assert!(json.contains("\"manifest_version\": 3"));
+        assert!(json.contains("wasm-unsafe-eval"));
     }
 }
