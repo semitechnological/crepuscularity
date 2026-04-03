@@ -175,7 +175,7 @@ impl Render for DevHud {
                             .text_color(rgb(0x818cf8))
                             .text_size(rems(0.7))
                             .font_weight(gpui::FontWeight::BOLD)
-                            .child("crepu"),
+                            .child("crepus"),
                     )
                     .child(
                         div()
@@ -224,7 +224,7 @@ pub fn open_hud_window(
         is_minimizable: false,
         display_id: None,
         window_background: WindowBackgroundAppearance::Opaque,
-        app_id: Some("crepuscularity.crepu.hud".to_string()),
+        app_id: Some("crepuscularity.crepus.hud".to_string()),
         window_min_size: Some(size(px(400.), px(72.))),
         window_decorations: None,
         tabbing_identifier: None,

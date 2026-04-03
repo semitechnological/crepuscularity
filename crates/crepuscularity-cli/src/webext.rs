@@ -1,4 +1,4 @@
-//! Browser extension commands for crepu CLI.
+//! Browser extension commands for crepus CLI.
 
 use std::path::{Path, PathBuf};
 
@@ -6,7 +6,7 @@ pub fn run(args: &[String]) {
     match args.first().map(|s| s.as_str()) {
         Some("new") => {
             let name = args.get(1).map(|s| s.as_str()).unwrap_or_else(|| {
-                eprintln!("Usage: crepu webext new <name>");
+                eprintln!("Usage: crepus webext new <name>");
                 std::process::exit(1);
             });
             scaffold_extension(name);
@@ -40,7 +40,7 @@ fn parse_app_path(args: &[String]) -> PathBuf {
 }
 
 fn print_webext_usage() {
-    eprintln!("crepu webext — Browser extension commands");
+    eprintln!("crepus webext — Browser extension commands");
     eprintln!();
     eprintln!("COMMANDS:");
     eprintln!("  new <name>             scaffold a new browser extension");
@@ -92,7 +92,7 @@ edition = "2021"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-crepuscularity-webext = {{ git = "https://github.com/semitechnological/crepuscularity" }}
+crepuscularity-webext = {{ git = "https://github.com/yourusername/crepuscularity" }}
 serde = {{ version = "1.0", features = ["derive"] }}
 serde_json = "1.0"
 wasm-bindgen = "0.2"
@@ -132,7 +132,7 @@ div popup flex flex-col gap-4 p-4
     eprintln!();
     eprintln!("Next steps:");
     eprintln!("  cd {}", slug);
-    eprintln!("  crepu webext build");
+    eprintln!("  crepus webext build");
     eprintln!("  # Load dist/unpacked/ in chrome://extensions");
 }
 

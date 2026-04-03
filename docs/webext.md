@@ -5,9 +5,9 @@ The `crepuscularity-webext` crate provides support for building Chrome/Firefox e
 ## Quick Start
 
 ```bash
-crepu webext new my-extension
+crepus webext new my-extension
 cd my-extension
-crepu webext build
+crepus webext build
 # Load dist/unpacked/ in chrome://extensions
 ```
 
@@ -64,7 +64,7 @@ my-extension/
 The CLI generates a Chrome Manifest V3 from `webext.toml`:
 
 ```bash
-crepu webext manifest
+crepus webext manifest
 ```
 
 Output:

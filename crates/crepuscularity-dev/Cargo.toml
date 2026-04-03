@@ -4,7 +4,7 @@ version = "0.3.0"
 edition = "2021"
 
 [[bin]]
-name = "crepu-dev"
+name = "crepus-dev"
 path = "src/main.rs"
 
 [dependencies]

@@ -1,4 +1,4 @@
-/// `crepu new <name>` — scaffold a new GPUI application.
+/// `crepus new NAME` — scaffold a new GPUI application.
 use std::fs;
 use std::path::Path;
 
@@ -22,7 +22,7 @@ pub fn run(name: &str) {
     eprintln!("\x1b[32m✓\x1b[0m Created \x1b[1m{name}\x1b[0m");
     eprintln!();
     eprintln!("  cd {name}");
-    eprintln!("  crepu dev");
+    eprintln!("  crepus dev");
 }
 
 fn cargo_toml(name: &str) -> String {

@@ -1,5 +1,8 @@
-[app]
-id = "quicknote"
+[extension]
 name = "quicknote"
-frontend_plugin = "crepuscularity"
-entry = "views/ui.crepus#NoteList"
+version = "0.2.0"
+description = "Take quick notes on any page, stored locally in your browser."
+
+[capabilities]
+storage = true
+background-script = true

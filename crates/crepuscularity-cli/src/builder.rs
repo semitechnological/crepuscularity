@@ -61,7 +61,7 @@ pub fn cargo_build(cwd: &Path, release: bool, hud: Option<Arc<Mutex<HudState>>>)
     let mut child = match cmd.spawn() {
         Ok(c) => c,
         Err(e) => {
-            eprintln!("[crepu] Failed to spawn cargo: {e}");
+            eprintln!("[crepus] Failed to spawn cargo: {e}");
             return BuildOutcome {
                 success: false,
                 errors: vec![],

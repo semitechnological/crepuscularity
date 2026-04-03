@@ -19,8 +19,8 @@ SDKROOT=$(xcrun --show-sdk-path) cargo build
 | `crates/crepuscularity` | Main library re-exporting `view!` macro + prelude |
 | `crates/crepuscularity_macros` | Proc-macro: compiles `.crepus` DSL strings at build time |
 | `crates/crepuscularity-runtime` | Runtime parser, renderer, and hot-reload engine |
-| `crates/crepuscularity-dev` | `crepu-dev` binary — hot-reload dev server |
-| `crates/crepuscularity-cli` | `crepu` CLI for scaffolding and builds |
+| `crates/crepuscularity-dev` | `crepus-dev` binary — hot-reload dev server |
+| `crates/crepuscularity-cli` | `crepus` CLI for scaffolding and builds |
 | `examples/weather` | Full weather-app example using the runtime |
 
 ## DSL quick reference

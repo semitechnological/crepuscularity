@@ -1,7 +1,7 @@
 //! crepuscularity-dev — Vite-like hot-reload dev server for crepuscularity templates.
 //!
 //! Usage:
-//!   crepu-dev <template.crepus> [--width N] [--height N]
+//!   crepus-dev <template.crepus> [--width N] [--height N]
 //!
 //! Opens a GPUI window that live-reloads whenever the template file is saved.
 //! Optionally load context variables from a `context.toml` in the same directory.
@@ -14,9 +14,9 @@ use gpui::{bounds, point, prelude::*, size, Application, WindowOptions};
 fn main() {
     let args: Vec<String> = std::env::args().collect();
 
-    // Parse args: crepu-dev <file> [--width N] [--height N] [--var key=value ...]
+    // Parse args: crepus-dev <file> [--width N] [--height N] [--var key=value ...]
     if args.len() < 2 || args[1] == "--help" || args[1] == "-h" {
-        eprintln!("Usage: crepu-dev <template.crepus> [--width N] [--height N] [--var key=value]");
+        eprintln!("Usage: crepus-dev <template.crepus> [--width N] [--height N] [--var key=value]");
         eprintln!();
         eprintln!("Options:");
         eprintln!("  --width N      Window width in pixels (default: 1200)");
@@ -26,7 +26,7 @@ fn main() {
         eprintln!("  --int k=42     Set an integer template variable");
         eprintln!();
         eprintln!("Example:");
-        eprintln!("  crepu-dev my-view.crepus --width 800 --height 600 --var title=Hello --bool show_button=true");
+        eprintln!("  crepus-dev my-view.crepus --width 800 --height 600 --var title=Hello --bool show_button=true");
         std::process::exit(0);
     }
 
@@ -106,9 +106,9 @@ fn main() {
         .unwrap_or("template")
         .to_string();
 
-    eprintln!("crepu-dev: watching {:?}", template_path);
-    eprintln!("crepu-dev: window {}x{}", width as u32, height as u32);
-    eprintln!("crepu-dev: edit and save to hot-reload");
+    eprintln!("crepus-dev: watching {:?}", template_path);
+    eprintln!("crepus-dev: window {}x{}", width as u32, height as u32);
+    eprintln!("crepus-dev: edit and save to hot-reload");
 
     Application::new().run(move |cx: &mut gpui::App| {
         let window_options = WindowOptions {

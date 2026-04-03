@@ -1,4 +1,4 @@
-// anywhere — AssemblyScript runtime adapter
+// crepuscularity — AssemblyScript runtime adapter
 //
 // Drop this file as vendor/runtime.js when building an AssemblyScript app.
 // Wraps the AS WASM binary in the same interface that popup.js and content.js
@@ -48,7 +48,7 @@ function jsonIn(value) {
 }
 
 // ------------------------------------------------------------------
-// Exports matching the anywhere WASM contract.
+// Exports matching the crepuscularity WASM contract.
 // Implement any subset in your assembly/index.ts.
 // ------------------------------------------------------------------
 

@@ -1,13 +1,13 @@
-//! crepu — Vite/Tauri for GPUI
+//! crepuss — the Crepuscularity CLI
 //!
 //! COMMANDS
-//!   crepu new <name>                   scaffold a new GPUI app
-//!   crepu dev [--bin NAME] [--release] [--emit-events] watch → rebuild → relaunch
-//!   crepu build [--release]            cargo build wrapper
-//!   crepu preview <file.crepus>        live-preview a .crepus template
-//!   crepu webext new <name>            scaffold a browser extension
-//!   crepu webext build [--app PATH]    build browser extension
-//!   crepu webext manifest [--app PATH] print manifest.json
+//!   crepuss new NAME                              scaffold a new GPUI app
+//!   crepuss dev [--bin NAME] [--release] [--emit-events]  watch → rebuild → relaunch
+//!   crepuss build [--release]                     cargo build wrapper
+//!   crepuss preview FILE                          live-preview a .crepuss template
+//!   crepuss webext new NAME                       scaffold a browser extension
+//!   crepuss webext build [--app PATH]             build browser extension
+//!   crepuss webext manifest [--app PATH]          print manifest.json
 
 mod builder;
 mod dev;
@@ -22,7 +22,7 @@ fn main() {
     match args.get(1).map(|s| s.as_str()) {
         Some("new") => {
             let name = args.get(2).map(|s| s.as_str()).unwrap_or_else(|| {
-                eprintln!("Usage: crepu new <name>");
+                eprintln!("Usage: crepus new <name>");
                 std::process::exit(1);
             });
             new::run(name);
@@ -65,7 +65,7 @@ fn main() {
                 .get(2)
                 .map(|s| std::path::PathBuf::from(s))
                 .unwrap_or_else(|| {
-                    eprintln!("Usage: crepu preview <file.crepus>");
+                    eprintln!("Usage: crepus preview <file.crepuss>");
                     std::process::exit(1);
                 });
             if !path.exists() {
@@ -84,13 +84,13 @@ fn main() {
 }
 
 fn print_usage() {
-    eprintln!("crepu — Vite/Tauri for GPUI");
+    eprintln!("crepus — Vite/Tauri for GPUI");
     eprintln!();
     eprintln!("COMMANDS:");
     eprintln!("  new <name>                                    scaffold a new GPUI app");
     eprintln!("  dev [--bin NAME] [--release] [--emit-events]  hot-reload dev loop");
     eprintln!("  build [--release]                             cargo build wrapper");
-    eprintln!("  preview <file.crepus>                         live-preview a template");
+    eprintln!("  preview <file.crepuss>                         live-preview a template");
     eprintln!();
     eprintln!("  webext new <name>                             scaffold browser extension");
     eprintln!("  webext build [--app PATH]                     build extension to dist/");
@@ -101,7 +101,7 @@ fn print_usage() {
 }
 
 fn run_preview(path: std::path::PathBuf) {
-    use crepuscularity_runtime::{HotReloadState, HotReloadView, TemplateContext};
+    use crepusscularity_runtime::{HotReloadState, HotReloadView, TemplateContext};
     use gpui::{
         bounds, point, prelude::*, px, size, Application, WindowBackgroundAppearance, WindowKind,
         WindowOptions,
@@ -122,7 +122,7 @@ fn run_preview(path: std::path::PathBuf) {
         }
     }
 
-    eprintln!("crepu preview: watching {path:?}");
+    eprintln!("crepus preview: watching {path:?}");
 
     Application::new().run(move |cx: &mut gpui::App| {
         let opts = WindowOptions {
@@ -155,8 +155,8 @@ fn run_preview(path: std::path::PathBuf) {
     });
 }
 
-fn load_context_toml(path: &std::path::Path, ctx: &mut crepuscularity_runtime::TemplateContext) {
-    use crepuscularity_runtime::TemplateValue;
+fn load_context_toml(path: &std::path::Path, ctx: &mut crepusscularity_runtime::TemplateContext) {
+    use crepusscularity_runtime::TemplateValue;
     let Ok(content) = std::fs::read_to_string(path) else {
         return;
     };

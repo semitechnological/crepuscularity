@@ -1,91 +1,67 @@
 use std::collections::BTreeMap;
 
-use anywhere_core::plugin::{FrontendRenderRequest, PluginHost, PluginId};
-use anywhere_crepuscularity::{plugin as crepuscularity_plugin, PLUGIN_ID as CREPUSCULARITY_PLUGIN_ID};
-use crepuscularity_anywhere_webext::api::{BrowserProgram, JsExpr, StorageArea};
-use crepuscularity_anywhere_webext::manifest::{ExtensionApp, ManifestSpec};
+use crepuscularity_core::context::{TemplateContext, TemplateValue};
+use crepuscularity_web::render_component_file_to_html;
+use crepuscularity_webext::api::{BrowserProgram, JsExpr, StorageArea};
 use serde_json::{json, Value};
 use wasm_bindgen::prelude::*;
 
-fn app_definition() -> ExtensionApp {
-    ExtensionApp::new(
-        "quicknote",
-        ManifestSpec {
-            name: "quicknote".to_string(),
-            version: env!("CARGO_PKG_VERSION").to_string(),
-            description: "Take quick notes on any page, stored locally in your browser.".to_string(),
-        },
-        CREPUSCULARITY_PLUGIN_ID,
-    )
-    .with_frontend(CREPUSCULARITY_PLUGIN_ID, "views/ui.crepus#NoteList")
-}
-
-fn plugin_host() -> Result<PluginHost, JsValue> {
-    let mut host = PluginHost::new();
-    host.register_frontend(crepuscularity_plugin())
-        .map_err(|err| JsValue::from_str(&err))?;
-    Ok(host)
-}
-
-fn render_entry(
-    entry: &str,
-    files: BTreeMap<String, String>,
-    props: BTreeMap<String, Value>,
-) -> Result<JsValue, JsValue> {
-    let request = FrontendRenderRequest { entry: entry.to_string(), files, props };
-    let host = plugin_host()?;
-    let plugin_id = PluginId::new(CREPUSCULARITY_PLUGIN_ID);
-    let rendered = host
-        .render_frontend(&plugin_id, &request)
-        .map_err(|err| JsValue::from_str(&err))?;
-    serde_wasm_bindgen::to_value(&rendered).map_err(|err| JsValue::from_str(&err.to_string()))
-}
-
-// The note list template is compiled into the binary so the popup needs no
-// network fetch. Editing the template requires a WASM rebuild.
 const UI_CREPUS: &str = include_str!("../../views/ui.crepus");
 
-fn template_files() -> BTreeMap<String, String> {
-    let mut files = BTreeMap::new();
-    files.insert("views/ui.crepus".to_string(), UI_CREPUS.to_string());
-    files
+/// Convert a serde_json Value into a TemplateValue.
+/// Object arrays become List(Vec<TemplateContext>), each entry keyed by the object fields.
+fn json_to_template(v: Value) -> TemplateValue {
+    match v {
+        Value::Bool(b) => TemplateValue::Bool(b),
+        Value::Number(n) => {
+            if let Some(i) = n.as_i64() {
+                TemplateValue::Int(i)
+            } else {
+                TemplateValue::Float(n.as_f64().unwrap_or(0.0))
+            }
+        }
+        Value::String(s) => TemplateValue::Str(s),
+        Value::Array(arr) => {
+            let list = arr
+                .into_iter()
+                .map(|item| {
+                    let mut ctx = TemplateContext::new();
+                    if let Value::Object(obj) = item {
+                        for (k, v) in obj {
+                            ctx.set(k, json_to_template(v));
+                        }
+                    }
+                    ctx
+                })
+                .collect();
+            TemplateValue::List(list)
+        }
+        _ => TemplateValue::Null,
+    }
 }
+
+/// Render a named component from ui.crepus with the given props.
+fn render_component(
+    component_name: &str,
+    props: &[(&str, TemplateValue)],
+) -> Result<String, String> {
+    let mut ctx = TemplateContext::new();
+    for (k, v) in props {
+        ctx.set(*k, v.clone());
+    }
+    render_component_file_to_html(UI_CREPUS, component_name, &ctx)
+}
+
+// ── WASM exports ─────────────────────────────────────────────────────────────
 
 #[wasm_bindgen]
 pub fn runtime_version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
 }
 
-#[wasm_bindgen]
-pub fn app_manifest() -> Result<JsValue, JsValue> {
-    serde_wasm_bindgen::to_value(&app_definition()).map_err(|err| JsValue::from_str(&err.to_string()))
-}
-
-const POPUP_CSS: &str = r#"
-body{margin:0;min-width:280px;font-family:system-ui,"Segoe UI",sans-serif;background:#1a1a2e;color:#e8e8f0}
-.qn-popup{display:flex;flex-direction:column}
-.qn-header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#16213e;border-bottom:1px solid rgba(255,255,255,.08)}
-.qn-brand{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#7b8cde}
-.qn-count{font-size:11px;color:#666688}
-.qn-body{padding:6px;overflow-y:auto;max-height:260px}
-.qn-empty{padding:18px;text-align:center;color:#555577;font-size:13px}
-.qn-note{display:flex;align-items:flex-start;gap:6px;padding:7px 9px;margin-bottom:5px;background:rgba(255,255,255,.05);border-radius:8px;border:1px solid rgba(255,255,255,.07)}
-.qn-note-text{flex:1;font-size:13px;line-height:1.4;word-break:break-word}
-.qn-delete{flex-shrink:0;background:none;border:none;color:#555577;cursor:pointer;font-size:15px;padding:0 2px;line-height:1}
-.qn-delete:hover{color:#cc4444}
-.qn-footer{border-top:1px solid rgba(255,255,255,.08);background:#16213e}
-.qn-form{display:flex;gap:5px;padding:8px 10px}
-.qn-input{flex:1;padding:7px 9px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:7px;color:#e8e8f0;font-size:13px;outline:none}
-.qn-input:focus{border-color:#7b8cde}
-.qn-add{padding:7px 12px;background:#7b8cde;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer}
-.qn-add:hover{background:#6a7bcf}
-.qn-clear{display:block;width:100%;padding:6px 10px;background:none;border:none;border-top:1px solid rgba(255,255,255,.06);color:#555577;font-size:12px;cursor:pointer;text-align:center}
-.qn-clear:hover{color:#cc4444}
-"#;
-
-/// Called by the framework `popup.js` on startup and after every action.
-/// `state` is the raw `browser.storage.local` contents as a JS object.
-/// Returns `{ html, css }` — `css` is injected into `<head>` by popup.js.
+/// Called by popup.js on startup and after every action.
+/// `state` is `browser.storage.local` contents as a JS object.
+/// Returns `{ html, css }`.
 #[wasm_bindgen]
 pub fn render_popup(state: JsValue) -> Result<JsValue, JsValue> {
     let state_map: BTreeMap<String, Value> =
@@ -95,32 +71,25 @@ pub fn render_popup(state: JsValue) -> Result<JsValue, JsValue> {
         .get("quicknotes")
         .and_then(|v| v.as_array().cloned())
         .unwrap_or_default();
-    let note_count = notes.len();
+    let note_count = notes.len() as i64;
     let empty = notes.is_empty();
 
-    let mut props: BTreeMap<String, Value> = BTreeMap::new();
-    props.insert("notes".to_string(), json!(notes));
-    props.insert("note_count".to_string(), json!(note_count));
-    props.insert("empty".to_string(), json!(empty));
+    let html = render_component(
+        "NoteList",
+        &[
+            ("notes", json_to_template(json!(notes))),
+            ("note_count", TemplateValue::Int(note_count)),
+            ("empty", TemplateValue::Bool(empty)),
+        ],
+    )
+    .map_err(|e| JsValue::from_str(&e))?;
 
-    let rendered = render_entry("views/ui.crepus#NoteList", template_files(), props)?;
-    // Deserialise into a plain Value so we can add the css field.
-    let mut out: BTreeMap<String, Value> =
-        serde_wasm_bindgen::from_value(rendered).map_err(|e| JsValue::from_str(&e.to_string()))?;
-    out.insert("css".to_string(), json!(POPUP_CSS));
+    let out = json!({ "html": html, "css": POPUP_CSS });
     serde_wasm_bindgen::to_value(&out).map_err(|e| JsValue::from_str(&e.to_string()))
 }
 
-/// Called by `popup.js` event delegation on `[data-action]` clicks.
-/// Returns `{ storage_op? }` — an optional storage mutation for `popup.js` to apply.
-///
-/// Supported actions:
-/// - `add-note`    data: { text: String }
-///   → `{ storage_op: { type: "push", key: "quicknotes", item: { text } } }`
-/// - `delete-note` data: { id: String }
-///   → `{ storage_op: { type: "remove", key: "quicknotes", id } }`
-/// - `clear-notes`
-///   → `{ storage_op: { type: "set", key: "quicknotes", value: [] } }`
+/// Called by popup.js event delegation on `[data-action]` clicks.
+/// Returns `{ storage_op? }` for popup.js to apply.
 #[wasm_bindgen]
 pub fn handle_popup_action(action: &str, data: JsValue) -> Result<JsValue, JsValue> {
     let data_map: BTreeMap<String, Value> =
@@ -160,9 +129,10 @@ pub fn handle_popup_action(action: &str, data: JsValue) -> Result<JsValue, JsVal
         _ => json!({ "noop": true }),
     };
 
-    serde_wasm_bindgen::to_value(&response).map_err(|err| JsValue::from_str(&err.to_string()))
+    serde_wasm_bindgen::to_value(&response).map_err(|e| JsValue::from_str(&e.to_string()))
 }
 
+/// Returns the browser API interaction program as a self-contained ES module string.
 #[wasm_bindgen]
 pub fn browser_program() -> String {
     BrowserProgram::new()
@@ -171,7 +141,29 @@ pub fn browser_program() -> String {
         .console_log([
             JsExpr::string("quicknote booted"),
             JsExpr::var("notes"),
-            JsExpr::Literal(json!({ "framework": "anywhere", "app": "quicknote" })),
+            JsExpr::Literal(json!({ "framework": "crepuscularity", "app": "quicknote" })),
         ])
         .emit_module()
 }
+
+const POPUP_CSS: &str = r#"
+body{margin:0;min-width:280px;font-family:system-ui,"Segoe UI",sans-serif;background:#1a1a2e;color:#e8e8f0}
+.qn-popup{display:flex;flex-direction:column}
+.qn-header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#16213e;border-bottom:1px solid rgba(255,255,255,.08)}
+.qn-brand{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#7b8cde}
+.qn-count{font-size:11px;color:#666688}
+.qn-body{padding:6px;overflow-y:auto;max-height:260px}
+.qn-empty{padding:18px;text-align:center;color:#555577;font-size:13px}
+.qn-note{display:flex;align-items:flex-start;gap:6px;padding:7px 9px;margin-bottom:5px;background:rgba(255,255,255,.05);border-radius:8px;border:1px solid rgba(255,255,255,.07)}
+.qn-note-text{flex:1;font-size:13px;line-height:1.4;word-break:break-word}
+.qn-delete{flex-shrink:0;background:none;border:none;color:#555577;cursor:pointer;font-size:15px;padding:0 2px;line-height:1}
+.qn-delete:hover{color:#cc4444}
+.qn-footer{border-top:1px solid rgba(255,255,255,.08);background:#16213e}
+.qn-form{display:flex;gap:5px;padding:8px 10px}
+.qn-input{flex:1;padding:7px 9px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:7px;color:#e8e8f0;font-size:13px;outline:none}
+.qn-input:focus{border-color:#7b8cde}
+.qn-add{padding:7px 12px;background:#7b8cde;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer}
+.qn-add:hover{background:#6a7bcf}
+.qn-clear{display:block;width:100%;padding:6px 10px;background:none;border:none;border-top:1px solid rgba(255,255,255,.06);color:#555577;font-size:12px;cursor:pointer;text-align:center}
+.qn-clear:hover{color:#cc4444}
+"#;

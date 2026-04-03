@@ -1,39 +1,39 @@
 # CLI Guide
 
-The `crepu` CLI provides commands for scaffolding, building, and developing crepuscularity applications.
+The `crepus` CLI provides commands for scaffolding, building, and developing crepusscularity applications.
 
 ## Installation
 
 ```bash
-cargo install --path crates/crepuscularity-cli
+cargo install --path crates/crepusscularity-cli
 ```
 
 ## Commands
 
-### `crepu new <name>`
+### `crepus new <name>`
 
 Scaffold a new GPUI application:
 
 ```bash
-crepu new my-app
+crepus new my-app
 cd my-app
 SDKROOT=$(xcrun --show-sdk-path) cargo run
 ```
 
 Creates:
-- `Cargo.toml` with crepuscularity dependencies
+- `Cargo.toml` with crepusscularity dependencies
 - `src/main.rs` with GPUI boilerplate
-- `views/` directory for `.crepus` templates
+- `views/` directory for `.crepuss` templates
 
-### `crepu dev`
+### `crepus dev`
 
 Start the hot-reload development loop:
 
 ```bash
-crepu dev
-crepu dev --bin my-binary
-crepu dev --release
-crepu dev --emit-events  # IDE integration
+crepus dev
+crepus dev --bin my-binary
+crepus dev --release
+crepus dev --emit-events  # IDE integration
 ```
 
 Options:
@@ -41,21 +41,21 @@ Options:
 - `--release` — build in release mode
 - `--emit-events` — emit structured JSON events to stdout
 
-### `crepu build`
+### `crepus build`
 
 Build the project:
 
 ```bash
-crepu build
-crepu build --release
+crepus build
+crepus build --release
 ```
 
-### `crepu preview <file.crepus>`
+### `crepus preview <file.crepuss>`
 
 Live preview a single template file:
 
 ```bash
-crepu preview views/dashboard.crepus
+crepus preview views/dashboard.crepuss
 ```
 
 Opens a window showing the rendered template with hot-reload.
@@ -71,37 +71,37 @@ logged_in = true
 
 ## Browser Extension Commands
 
-### `crepu webext new <name>`
+### `crepus webext new <name>`
 
 Scaffold a new browser extension:
 
 ```bash
-crepu webext new my-extension
+crepus webext new my-extension
 cd my-extension
-crepu webext build
+crepus webext build
 ```
 
 Creates:
 - `webext.toml` — extension configuration
 - `runtime/` — Rust WASM runtime crate
-- `views/` — `.crepus` templates
+- `views/` — `.crepuss` templates
 
-### `crepu webext build`
+### `crepus webext build`
 
 Build the extension to `dist/unpacked/`:
 
 ```bash
-crepu webext build
-crepu webext build --app ./path/to/extension
+crepus webext build
+crepus webext build --app ./path/to/extension
 ```
 
-### `crepu webext manifest`
+### `crepus webext manifest`
 
 Print the generated `manifest.json`:
 
 ```bash
-crepu webext manifest
-crepu webext manifest --app ./path/to/extension
+crepus webext manifest
+crepus webext manifest --app ./path/to/extension
 ```
 
 ## IDE Integration
@@ -109,7 +109,7 @@ crepu webext manifest --app ./path/to/extension
 The `--emit-events` flag outputs structured JSON events for IDE integration:
 
 ```bash
-crepu dev --emit-events
+crepus dev --emit-events
 ```
 
 Events:

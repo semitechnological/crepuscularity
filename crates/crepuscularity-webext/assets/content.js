@@ -19,7 +19,7 @@
   const browserProgramUrl = URL.createObjectURL(new Blob([browserProgramSource], { type: "text/javascript" }));
   const { runBrowserProgram } = await import(browserProgramUrl);
   URL.revokeObjectURL(browserProgramUrl);
-  runBrowserProgram(browserApi).catch((error) => console.error("anywhere browser program failed", error));
+  runBrowserProgram(browserApi).catch((error) => console.error("crepuscularity browser program failed", error));
 
   const messageSelectors = [
     "[data-message-author-role='assistant']",
@@ -238,7 +238,7 @@
       try {
         widgets = wasmModule.extract_widgets(text);
       } catch (error) {
-        console.error("anywhere failed to parse <ai-anywhere> tags", error);
+        console.error("crepuscularity: failed to parse <ai-anywhere> tags", error);
       }
       if (Array.isArray(widgets) && widgets.length > 0) {
         hasContent = true;
@@ -253,7 +253,7 @@
       try {
         specs = wasmModule.extract_specs(text);
       } catch (error) {
-        console.error("anywhere failed to parse widget blocks", error);
+        console.error("crepuscularity: failed to parse widget blocks", error);
       }
       if (Array.isArray(specs) && specs.length > 0) {
         hasContent = true;

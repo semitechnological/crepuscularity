@@ -1,6 +1,6 @@
 //! Structured compiler events for IDE integration.
 //!
-//! Emits typed JSON events to stdout when `--emit-events` is passed to `crepu dev`.
+//! Emits typed JSON events to stdout when `--emit-events` is passed to `crepus dev`.
 //! This follows the Equilibrium HotCompiler pattern for editor/IDE integration.
 
 use std::path::PathBuf;

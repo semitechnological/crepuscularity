@@ -35,4 +35,4 @@ pub use manifest::{
     WebAccessibleResources,
 };
 pub use scanner::{scan_crepus_for_capabilities, CapabilityUsage};
-pub use watcher::{CapabilityWatcher, WatchEvent};
+pub use watcher::{check_project_capabilities, CapabilityWatcher, WatchEvent};

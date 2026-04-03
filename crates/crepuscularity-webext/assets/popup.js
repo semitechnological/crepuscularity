@@ -41,14 +41,14 @@ async function runWasmDrivenPopup() {
     try {
       result = wasmModule.render_popup(state);
     } catch (err) {
-      console.error("anywhere render_popup failed", err);
+      console.error("crepuscularity render_popup failed", err);
       return;
     }
 
     // Inject / update app-supplied CSS on first render.
     if (result.css && !injectedStyle) {
       injectedStyle = document.createElement("style");
-      injectedStyle.id = "__anywhere-app-styles";
+      injectedStyle.id = "__crepus-app-styles";
       document.head.append(injectedStyle);
     }
     if (injectedStyle && result.css) {
@@ -80,7 +80,7 @@ async function runWasmDrivenPopup() {
     try {
       opResult = wasmModule.handle_popup_action(action, data);
     } catch (err) {
-      console.error("anywhere handle_popup_action failed", err);
+      console.error("crepuscularity handle_popup_action failed", err);
       return;
     }
 
@@ -99,7 +99,7 @@ async function runSettingsPopup() {
 
   root.innerHTML = `
 <main class="popup">
-  <div class="popup__eyebrow">anywhere</div>
+  <div class="popup__eyebrow">crepuscularity</div>
   <h1 class="popup__title" id="appName">Extension</h1>
   <p class="popup__copy" id="appDescription">Rust and crepus-powered extension.</p>
   <label class="popup__toggle">
