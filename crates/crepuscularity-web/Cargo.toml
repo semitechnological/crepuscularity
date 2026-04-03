@@ -3,5 +3,9 @@ name = "crepuscularity-web"
 version = "0.3.0"
 edition = "2021"
 
+[features]
+parallel = ["dep:rayon"]
+
 [dependencies]
 crepuscularity-core = { path = "../crepuscularity-core" }
+rayon = { version = "1", optional = true }

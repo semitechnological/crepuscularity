@@ -31,6 +31,84 @@ pub fn render_from_files(
     render_template_to_html(content, &ctx)
 }
 
+/// Render multiple entry points from a virtual file map in parallel (requires `parallel` feature).
+///
+/// Returns a `Vec` of `(entry, Result<String, String>)` in the same order as `entries`.
+/// Each entry is independent — rendering runs on a Rayon thread pool.
+/// Falls back to sequential iteration when the `parallel` feature is disabled (e.g. WASM).
+pub fn par_render_from_files(
+    files: &std::collections::HashMap<String, String>,
+    entries: &[&str],
+    ctx: &TemplateContext,
+) -> Vec<(String, Result<String, String>)> {
+    #[cfg(feature = "parallel")]
+    {
+        use rayon::prelude::*;
+        entries
+            .par_iter()
+            .map(|&entry| (entry.to_string(), render_from_files(files, entry, ctx)))
+            .collect()
+    }
+    #[cfg(not(feature = "parallel"))]
+    {
+        entries
+            .iter()
+            .map(|&entry| (entry.to_string(), render_from_files(files, entry, ctx)))
+            .collect()
+    }
+}
+
+/// Render all named components from a multi-component `.crepus` file in parallel.
+///
+/// Returns a `HashMap<component_name, Result<html, error>>`.
+/// Falls back to sequential iteration when the `parallel` feature is disabled.
+pub fn par_render_component_file(
+    content: &str,
+    ctx: &TemplateContext,
+) -> Result<std::collections::HashMap<String, Result<String, String>>, String> {
+    let file = parse_component_file(content)?;
+
+    #[cfg(feature = "parallel")]
+    {
+        use rayon::prelude::*;
+        let results = file
+            .components
+            .par_iter()
+            .map(|(name, comp)| {
+                let mut child_ctx = ctx.clone();
+                for (key, expr) in &comp.meta.defaults {
+                    child_ctx
+                        .vars
+                        .entry(key.clone())
+                        .or_insert_with(|| eval_expr(expr, &TemplateContext::new()));
+                }
+                let html = render_nodes_to_html(&comp.nodes, &child_ctx);
+                (name.clone(), html)
+            })
+            .collect();
+        Ok(results)
+    }
+    #[cfg(not(feature = "parallel"))]
+    {
+        let results = file
+            .components
+            .iter()
+            .map(|(name, comp)| {
+                let mut child_ctx = ctx.clone();
+                for (key, expr) in &comp.meta.defaults {
+                    child_ctx
+                        .vars
+                        .entry(key.clone())
+                        .or_insert_with(|| eval_expr(expr, &TemplateContext::new()));
+                }
+                let html = render_nodes_to_html(&comp.nodes, &child_ctx);
+                (name.clone(), html)
+            })
+            .collect();
+        Ok(results)
+    }
+}
+
 pub fn render_template_to_html(template: &str, ctx: &TemplateContext) -> Result<String, String> {
     let nodes = parse_template(template)?;
     render_nodes_to_html(&nodes, ctx)
