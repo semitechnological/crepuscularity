@@ -92,7 +92,7 @@ edition = "2021"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-crepuscularity-webext = {{ git = "https://github.com/yourusername/crepuscularity" }}
+crepuscularity-webext = {{ version = "0.1" }}
 serde = {{ version = "1.0", features = ["derive"] }}
 serde_json = "1.0"
 wasm-bindgen = "0.2"

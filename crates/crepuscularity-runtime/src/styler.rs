@@ -7,7 +7,7 @@
 ///   where the expression evaluates to a hex color string like "#1e1e2e" or "1e1e2e"
 use gpui::{
     hsla, point, prelude::*, px, relative, rems, rgb, rgba, AbsoluteLength, AlignItems, BoxShadow,
-    DefiniteLength, Div, Length,
+    DefiniteLength, Div, Length, TextTransform,
 };
 
 use crate::context::TemplateContext;
@@ -563,15 +563,18 @@ fn apply_static(d: Div, class: &str) -> Result<Div, Div> {
         }]),
         "ring-inset" => d, // GPUI has no inset shadow; accepted silently
 
+        // ── Text transform ──
+        "uppercase" => d.text_transform(TextTransform::Uppercase),
+        "lowercase" => d.text_transform(TextTransform::Lowercase),
+        "capitalize" => d.text_transform(TextTransform::Capitalize),
+        "normal-case" => d.text_transform(TextTransform::None),
+
         // ── Accepted silently (CSS-only or unsupported in GPUI) ──
         "inline-flex"
         | "inline"
         | "inline-block"
         | "select-none"
         | "pointer-events-none"
-        | "uppercase"
-        | "lowercase"
-        | "capitalize"
         | "whitespace-pre"
         | "sticky"
         | "fixed"
@@ -761,6 +764,30 @@ fn apply_dynamic(d: Div, class: &str) -> Div {
     if let Some(rest) = class.strip_prefix("grid-rows-") {
         if let Ok(n) = rest.parse::<u16>() {
             return d.grid_rows(n);
+        }
+    }
+
+    // ── tracking-* (letter-spacing) ──
+    // Named scale: tight = -0.05em, snug = -0.025em, normal = 0, wide = 0.025em,
+    // wider = 0.05em, widest = 0.1em — approximated in px at 16px base font size
+    match class {
+        "tracking-tighter" => return d.letter_spacing(px(-0.8)),
+        "tracking-tight" => return d.letter_spacing(px(-0.4)),
+        "tracking-normal" => return d.letter_spacing(px(0.)),
+        "tracking-wide" => return d.letter_spacing(px(0.4)),
+        "tracking-wider" => return d.letter_spacing(px(0.8)),
+        "tracking-widest" => return d.letter_spacing(px(1.6)),
+        _ => {}
+    }
+    if let Some(rest) = class.strip_prefix("tracking-[") {
+        if let Some(inner) = rest.strip_suffix(']') {
+            if let Some(abs) = parse_absolute_length(inner) {
+                let px_val = match abs {
+                    gpui::AbsoluteLength::Pixels(p) => p,
+                    gpui::AbsoluteLength::Rems(r) => px(r.0 * 16.0),
+                };
+                return d.letter_spacing(px_val);
+            }
         }
     }
 

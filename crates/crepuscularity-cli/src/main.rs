@@ -5,6 +5,7 @@
 //!   crepus dev [--bin NAME] [--release] [--emit-events]  watch → rebuild → relaunch
 //!   crepus build [--release]                     cargo build wrapper
 //!   crepus preview FILE                          live-preview a .crepus template
+//!   crepus render FILE [--ctx FILE] [--var k=v] [--component Name]
 //!   crepus webext new NAME                       scaffold a browser extension
 //!   crepus webext build [--app PATH]             build browser extension
 //!   crepus webext manifest [--app PATH]          print manifest.json
@@ -14,12 +15,21 @@ mod dev;
 pub mod events;
 mod hud;
 mod new;
+mod render;
 mod webext;
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
 
     match args.get(1).map(|s| s.as_str()) {
+        Some("--version") | Some("-V") => {
+            println!("crepus {}", env!("CARGO_PKG_VERSION"));
+        }
+
+        Some("--help") | Some("-h") => {
+            print_usage();
+        }
+
         Some("new") => {
             let name = args.get(2).map(|s| s.as_str()).unwrap_or_else(|| {
                 eprintln!("Usage: crepus new <name>");
@@ -75,6 +85,10 @@ fn main() {
             run_preview(path);
         }
 
+        Some("render") => {
+            render::run(&args[2..]);
+        }
+
         Some("webext") => {
             webext::run(&args[2..]);
         }
@@ -84,19 +98,26 @@ fn main() {
 }
 
 fn print_usage() {
-    eprintln!("crepus — Vite/Tauri for GPUI");
+    eprintln!("crepus {}", env!("CARGO_PKG_VERSION"));
+    eprintln!("Crepuscularity CLI — scaffold, develop, preview, and render .crepus templates");
     eprintln!();
     eprintln!("COMMANDS:");
     eprintln!("  new <name>                                    scaffold a new GPUI app");
     eprintln!("  dev [--bin NAME] [--release] [--emit-events]  hot-reload dev loop");
     eprintln!("  build [--release]                             cargo build wrapper");
-    eprintln!("  preview <file.crepus>                         live-preview a template");
+    eprintln!(
+        "  preview <file.crepus>                         live-preview a template (GPUI window)"
+    );
+    eprintln!("  render <file.crepus> [--ctx FILE] [--var k=v] [--component Name]");
+    eprintln!("                                                render template to HTML on stdout");
     eprintln!();
     eprintln!("  webext new <name>                             scaffold browser extension");
     eprintln!("  webext build [--app PATH]                     build extension to dist/");
     eprintln!("  webext manifest [--app PATH]                  print manifest.json");
     eprintln!();
     eprintln!("OPTIONS:");
+    eprintln!("  -h, --help       show this help");
+    eprintln!("  -V, --version    show version");
     eprintln!("  --emit-events    emit structured JSON events to stdout (IDE integration)");
 }
 
