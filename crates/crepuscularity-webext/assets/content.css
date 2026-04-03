@@ -1,0 +1,11 @@
+.aa-shell {
+  margin-top: 16px;
+}
+
+.aa-widget-frame {
+  width: 100%;
+  min-height: 180px;
+  border: 1px solid rgba(20, 20, 20, 0.12);
+  border-radius: 14px;
+  background: white;
+}

@@ -1,0 +1,40 @@
+body {
+  margin: 0;
+  min-width: 320px;
+  font-family: "Space Grotesk", "Segoe UI", sans-serif;
+  background: linear-gradient(180deg, #f3ecdf, #ece2d1);
+  color: #141414;
+}
+
+.popup {
+  padding: 18px;
+}
+
+.popup__eyebrow {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #174c63;
+  font-weight: 700;
+}
+
+.popup__title {
+  margin: 8px 0 10px;
+  font-size: 28px;
+}
+
+.popup__copy {
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.popup__toggle {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 12px 14px;
+  margin: 12px 0;
+  border: 2px solid #141414;
+  border-radius: 16px;
+  background: rgba(255,255,255,0.72);
+}
