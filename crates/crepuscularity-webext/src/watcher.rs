@@ -1,6 +1,6 @@
 //! File watcher for auto-detecting capability changes.
 //!
-//! Watches .crepus and .js/.ts files and webext.toml, emitting events when
+//! Watches .crepus files and webext.toml, emitting events when
 //! capabilities change or new ones are detected.
 
 use std::path::{Path, PathBuf};
@@ -42,7 +42,7 @@ impl CapabilityWatcher {
     /// Create a new watcher for the given project directory.
     ///
     /// Watches:
-    /// - `**/*.crepus`, `**/*.js`, `**/*.ts` files for API usage
+    /// - `**/*.crepus` files for API usage in expression slots
     /// - `webext.toml` for declared capabilities
     pub fn new(project_dir: &Path) -> Result<Self, notify::Error> {
         let (tx, rx) = channel();
@@ -90,9 +90,8 @@ fn handle_event(event: Event, project_dir: &Path, tx: &Sender<WatchEvent>) {
                 let ext = path.extension().and_then(|e| e.to_str());
                 let file_name = path.file_name().and_then(|n| n.to_str());
 
-                let is_source = matches!(ext, Some("crepus") | Some("js") | Some("ts"));
-                if is_source {
-                    // A source file changed — check for new capabilities
+                if ext == Some("crepus") {
+                    // A .crepus template changed — check for new capabilities
                     let _ = tx.send(WatchEvent::FileChanged { path: path.clone() });
 
                     if let Err(e) = check_capabilities(project_dir, tx) {

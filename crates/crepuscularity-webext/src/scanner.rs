@@ -1,7 +1,7 @@
-//! Scanner for detecting capability usage in source files.
+//! Scanner for detecting capability usage in .crepus templates.
 //!
-//! Scans .crepus templates and .js/.ts files to find browser API calls
-//! and maps them to required capabilities.
+//! Scans templates to find browser API calls in expression slots and maps
+//! them to required capabilities.
 
 use std::collections::HashMap;
 use std::path::Path;
@@ -89,7 +89,7 @@ fn api_capability_map() -> HashMap<&'static str, Capability> {
     map
 }
 
-/// Scan a source file (.crepus, .js, .ts) for browser API usage and return detected capabilities.
+/// Scan a .crepus file for browser API usage in expression slots and return detected capabilities.
 pub fn scan_crepus_for_capabilities(path: &Path) -> Result<Vec<CapabilityUsage>, std::io::Error> {
     let content = std::fs::read_to_string(path)?;
     let file_name = path.to_string_lossy().to_string();
@@ -129,10 +129,7 @@ pub fn scan_directory_for_capabilities(dir: &Path) -> Result<CapabilitySet, std:
                 let path = entry.path();
                 if path.is_dir() {
                     visit_dir(&path, set)?;
-                } else if path
-                    .extension()
-                    .is_some_and(|ext| matches!(ext.to_str(), Some("crepus" | "js" | "ts")))
-                {
+                } else if path.extension().is_some_and(|ext| ext == "crepus") {
                     let usages = scan_crepus_for_capabilities(&path)?;
                     for usage in usages {
                         set.add(usage.capability);
