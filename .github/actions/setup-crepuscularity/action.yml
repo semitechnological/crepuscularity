@@ -1,0 +1,65 @@
+name: 'Setup Crepuscularity'
+description: 'Install and configure crepuscularity for GPUI development'
+branding:
+  icon: 'zap'
+  color: 'purple'
+
+inputs:
+  rust-version:
+    description: 'Rust toolchain version'
+    required: false
+    default: 'stable'
+  cache:
+    description: 'Enable cargo caching'
+    required: false
+    default: 'true'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: ${{ inputs.rust-version }}
+    
+    - name: Set SDKROOT (macOS)
+      if: runner.os == 'macOS'
+      shell: bash
+      run: echo "SDKROOT=$(xcrun --show-sdk-path)" >> $GITHUB_ENV
+    
+    - name: Cache cargo registry
+      if: inputs.cache == 'true'
+      uses: actions/cache@v4
+      with:
+        path: ~/.cargo/registry
+        key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+    
+    - name: Cache cargo index
+      if: inputs.cache == 'true'
+      uses: actions/cache@v4
+      with:
+        path: ~/.cargo/git
+        key: ${{ runner.os }}-cargo-git-${{ hashFiles('**/Cargo.lock') }}
+    
+    - name: Cache cargo build
+      if: inputs.cache == 'true'
+      uses: actions/cache@v4
+      with:
+        path: target
+        key: ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
+    
+    - name: Install crepuscularity CLI
+      shell: bash
+      run: |
+        if ! command -v crepu &> /dev/null; then
+          cargo install --git https://github.com/semitechnological/crepuscularity crepuscularity-cli
+        fi
+    
+    - name: Verify installation
+      shell: bash
+      run: |
+        echo "✓ Rust: $(rustc --version)"
+        echo "✓ Cargo: $(cargo --version)"
+        if command -v crepu &> /dev/null; then
+          echo "✓ crepu CLI installed"
+        fi
