@@ -7,8 +7,15 @@ import { browserApi } from "./browser-shim.js";
 
 const viewMain = document.getElementById("view-main");
 const viewHelp = document.getElementById("view-help");
+const viewCrepus = document.getElementById("view-crepus");
 
 const DEFAULTS = { enabled: true, autoRender: false };
+
+function showView(which) {
+  if (viewMain) viewMain.hidden = which !== "main";
+  if (viewHelp) viewHelp.hidden = which !== "help";
+  if (viewCrepus) viewCrepus.hidden = which !== "crepus";
+}
 
 async function syncState() {
   const data = await browserApi.storage.sync
@@ -25,16 +32,30 @@ async function syncState() {
 syncState();
 
 document.addEventListener("click", (e) => {
-  const action = e.target.closest("[data-action]")?.dataset.action;
-  if (!action) return;
+  const btn = e.target.closest("[data-action]");
+  if (!btn) return;
+  const action = btn.dataset.action;
 
   if (action === "show-help") {
-    if (viewMain) viewMain.hidden = true;
-    if (viewHelp) viewHelp.hidden = false;
+    showView("help");
   } else if (action === "hide-help") {
-    if (viewMain) viewMain.hidden = false;
-    if (viewHelp) viewHelp.hidden = true;
+    showView("main");
     syncState();
+  } else if (action === "show-crepus") {
+    showView("crepus");
+  } else if (action === "hide-crepus") {
+    showView("help");
+  } else if (action === "copy-prompt") {
+    const pre = document.getElementById("system-prompt");
+    if (pre) {
+      navigator.clipboard.writeText(pre.textContent).then(() => {
+        const icon = btn.querySelector(".material-symbols-outlined");
+        if (icon) {
+          icon.textContent = "check";
+          setTimeout(() => { icon.textContent = "content_copy"; }, 1500);
+        }
+      }).catch(() => {});
+    }
   }
 });
 

@@ -183,6 +183,20 @@ fn is_jsx_mode(template: &str) -> bool {
     false
 }
 
+/// Strip exactly `n` leading spaces from `s`, leaving any additional
+/// whitespace intact (it is content, not structural indent).
+fn strip_structural_indent(s: &str, n: usize) -> &str {
+    let mut count = 0;
+    for (byte_pos, ch) in s.char_indices() {
+        if count >= n || ch != ' ' {
+            return &s[byte_pos..];
+        }
+        count += 1;
+    }
+    // Entire string was spaces (≤ n of them).
+    ""
+}
+
 fn collect_lines(template: &str) -> Vec<(usize, String)> {
     let source_lines: Vec<&str> = template.lines().collect();
     let mut raw: Vec<(usize, String)> = Vec::new();
@@ -200,11 +214,14 @@ fn collect_lines(template: &str) -> Vec<(usize, String)> {
 
         // Multi-line strings: a `"` that opens but doesn't close on the same line
         // is merged with subsequent lines until the closing `"` is found.
+        // Continuation lines have exactly `indent` leading spaces stripped (the
+        // structural indent of the opening `"` line); any additional whitespace
+        // is part of the string content and must be preserved.
         if trimmed.starts_with('"') && !string_is_closed(trimmed) {
             let mut combined = trimmed.to_string();
             while i < source_lines.len() {
                 combined.push('\n');
-                combined.push_str(source_lines[i].trim_start());
+                combined.push_str(strip_structural_indent(source_lines[i], indent));
                 i += 1;
                 if string_is_closed(&combined) {
                     break;
@@ -1425,4 +1442,76 @@ fn jsx_close<'a>(src: &'a str, tag: &str) -> Result<&'a str, String> {
         tag,
         &src[..src.len().min(40)]
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn strip_structural_indent_basic() {
+        assert_eq!(strip_structural_indent("    hello", 4), "hello");
+        assert_eq!(strip_structural_indent("    hello", 2), "  hello");
+        assert_eq!(strip_structural_indent("    hello", 0), "    hello");
+        assert_eq!(strip_structural_indent("hi", 4), "hi");
+        assert_eq!(strip_structural_indent("", 4), "");
+    }
+
+    fn text_from_node(node: &Node) -> String {
+        let Node::Text(parts) = node else {
+            panic!("expected Text node, got: {node:?}")
+        };
+        parts
+            .iter()
+            .map(|p| match p {
+                crate::ast::TextPart::Literal(s) => s.clone(),
+                crate::ast::TextPart::Expr(e) => format!("{{{e}}}"),
+            })
+            .collect()
+    }
+
+    #[test]
+    fn multiline_string_preserves_inner_indent() {
+        // `"` line is at indent=4 (4 leading spaces). Continuation "  indented line"
+        // has 2 spaces → after stripping 4 structural spaces it becomes "indented line"
+        // (only 4 available, so strip up to the string length → "indented line").
+        // Actually strip min(4, available) → strips 2 available → "indented line".
+        let template = "pre\n  \"line one\n  indented line\n    more indented\"";
+        let nodes = parse_template(template).unwrap();
+        let Node::Element(el) = &nodes[0] else {
+            panic!("expected element")
+        };
+        let text = text_from_node(&el.children[0]);
+        assert!(text.contains("indented line"), "got: {text:?}");
+        // "  indented line" with structural indent 2 → strips 2 → "indented line" (0 extra spaces)
+        let cont_indent = text
+            .lines()
+            .nth(1)
+            .map(|l| l.len() - l.trim_start().len())
+            .unwrap_or(0);
+        assert_eq!(cont_indent, 0, "continuation at same level should have 0 leading spaces, got: {text:?}");
+        // "    more indented" with structural indent 2 → strips 2 → "  more indented" (2 extra)
+        let deep_indent = text
+            .lines()
+            .nth(2)
+            .map(|l| l.len() - l.trim_start().len())
+            .unwrap_or(0);
+        assert_eq!(deep_indent, 2, "deeper line should have 2 preserved leading spaces, got: {text:?}");
+    }
+
+    #[test]
+    fn multiline_string_preserves_extra_indent() {
+        // structural indent of the `"` line is 2; continuation "    extra" has 4 spaces.
+        // After stripping 2 structural spaces: "  extra" (2 extra spaces remain).
+        let template = "pre\n  \"first\n    extra\"";
+        let nodes = parse_template(template).unwrap();
+        let Node::Element(el) = &nodes[0] else {
+            panic!("expected element")
+        };
+        let text = text_from_node(&el.children[0]);
+        assert!(
+            text.contains("  extra"),
+            "extra indent should be preserved, got: {text:?}"
+        );
+    }
 }

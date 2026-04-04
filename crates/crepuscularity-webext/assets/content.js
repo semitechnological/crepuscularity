@@ -4,7 +4,12 @@
     import(chrome.runtime.getURL("vendor/runtime.js"))
   ]);
 
-  await wasmModule.default({ module_or_path: chrome.runtime.getURL("vendor/runtime_bg.wasm") });
+  // Fetch bytes first so wasm-bindgen's __wbg_load receives an ArrayBuffer,
+  // bypassing instantiateStreaming (which Chrome blocks for extension URLs in
+  // content-script context even when the MIME type is correct).
+  const wasmBytes = await fetch(chrome.runtime.getURL("vendor/runtime_bg.wasm"))
+    .then(r => r.arrayBuffer());
+  await wasmModule.default({ module_or_path: wasmBytes });
 
   const settingsResponse = await browserApi.runtime.sendMessage({ type: "settings:get" });
   const settings = settingsResponse?.settings ?? { enabled: true, autoRender: false };

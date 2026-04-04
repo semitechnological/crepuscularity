@@ -385,10 +385,83 @@ fn build_wasm_runtime(app_path: &Path, runtime_dir: &Path, vendor_dir: &Path) {
     }
 }
 
-/// Render `views/popup.crepus` with two states (main + help) and embed both
-/// as sibling `<div>` elements in the returned HTML string. The popup opens
-/// instantly from the pre-rendered HTML; popup.js only reads storage to patch
-/// checkbox states and handles click events — no WASM needed in popup context.
+/// System prompt text passed as `{system_prompt}` context variable into the
+/// popup template. Defined here so it can be kept in sync with the pre-render
+/// step without duplicating it in the app's Rust source.
+pub const SYSTEM_PROMPT: &str = "\
+When creating charts, forms, interactive UI, or visualisations,
+wrap output in <ai-anywhere> tags for the AI Anywhere browser extension.
+
+── Format ───────────────────────────────────────────────────
+<ai-anywhere type=\"widget\" title=\"Widget Title\">
+  <anywhere-ui lang=\"crepus\">
+    <!-- crepus template here (see syntax below) -->
+  </anywhere-ui>
+  <anywhere-data>{\"key\": \"value\"}</anywhere-data>
+  <anywhere-script lang=\"js\">/* optional JS */</anywhere-script>
+</ai-anywhere>
+
+ui langs:     crepus (preferred) | html
+script langs: js | mermaid | latex
+types:        widget | chart | form | visualization | tool
+
+── Crepus template syntax ───────────────────────────────────
+Indent-based. Children are indented under their parent.
+
+Elements:
+  tag class1 class2 attr=\"value\" dynattr={expr}
+    \"child text with {variable} interpolation\"
+
+Conditionals:
+  if {condition}
+    span
+      \"yes\"
+  else
+    span
+      \"no\"
+
+Loops:
+  for item in {items}
+    div row
+      \"{item.name}: {item.value}\"
+
+Match:
+  match {status}
+    \"ok\" =>
+      span green
+        \"OK\"
+    _ =>
+      span
+        \"unknown\"
+
+Variables:
+  $: let total = {count * price}
+  $: default title = {\"Untitled\"}
+
+Actions (pass data-* as action payload):
+  button primary type=\"button\" data-action=\"submit\" data-id={item.id}
+    \"Submit\"
+
+── Crepus example ───────────────────────────────────────────
+<ai-anywhere type=\"chart\" title=\"Status\">
+  <anywhere-ui lang=\"crepus\">
+div dashboard
+  h2 title
+    \"{title}\"
+  for item in {items}
+    div row
+      span label
+        \"{item.label}\"
+      span value
+        \"{item.value}\"
+  </anywhere-ui>
+  <anywhere-data>{\"title\":\"Stats\",\"items\":[{\"label\":\"Users\",\"value\":\"42\"},{\"label\":\"Active\",\"value\":\"7\"}]}</anywhere-data>
+</ai-anywhere>";
+
+/// Render `views/popup.crepus` with three states (main / help / crepus-ref)
+/// and embed all three as sibling `<div>` elements in the returned HTML.
+/// The popup opens instantly from the pre-rendered HTML; popup.js only reads
+/// storage to patch checkbox states and handles click events — no WASM needed.
 fn prerender_popup_html(
     template_path: &Path,
     manifest: &crepuscularity_webext::ExtensionManifest,
@@ -400,19 +473,19 @@ fn prerender_popup_html(
     let mut files = HashMap::new();
     files.insert("popup.crepus".to_string(), source);
 
-    let render = |extra: &[(&str, bool)]| -> Result<String, String> {
+    let render = |show_help: bool, show_crepus: bool| -> Result<String, String> {
         let mut ctx = TemplateContext::new();
         ctx.set("enabled", true);
         ctx.set("auto_render", false);
-        ctx.set("show_help", false);
-        for (k, v) in extra {
-            ctx.set(*k, *v);
-        }
+        ctx.set("show_help", show_help);
+        ctx.set("show_crepus", show_crepus);
+        ctx.set("system_prompt", SYSTEM_PROMPT);
         render_from_files(&files, "popup.crepus", &ctx)
     };
 
-    let main_html = render(&[])?;
-    let help_html = render(&[("show_help", true)])?;
+    let main_html = render(false, false)?;
+    let help_html = render(true, false)?;
+    let crepus_html = render(false, true)?;
 
     let title = &manifest.extension.name;
     // Inline the CSS so the popup is a single self-contained file with zero
@@ -426,11 +499,13 @@ fn prerender_popup_html(
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{title}</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
   <style>{css}</style>
 </head>
 <body>
   <div id="view-main">{main_html}</div>
   <div id="view-help" hidden>{help_html}</div>
+  <div id="view-crepus" hidden>{crepus_html}</div>
   <script type="module" src="./popup.js"></script>
 </body>
 </html>"#

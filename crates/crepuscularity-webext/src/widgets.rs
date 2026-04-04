@@ -59,6 +59,9 @@ pub fn json_to_template(v: Value) -> TemplateValue {
 /// - `empty_msg` — fallback body HTML when `html` is empty
 pub fn build_frame_doc(html: &str, css: &str, js: &str, unocss: &str, empty_msg: &str) -> String {
     let base_css = r#"html,body{margin:0;padding:0;background:#fffdf8;color:#111;font-family:"IBM Plex Sans",sans-serif;}body{padding:16px;}"#;
+    let fonts_link = r#"<link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">"#;
     let unocss_tag = if unocss.is_empty() {
         String::new()
     } else {
@@ -73,6 +76,7 @@ pub fn build_frame_doc(html: &str, css: &str, js: &str, unocss: &str, empty_msg:
     format!(
         "<!doctype html>\n<html>\n<head>\n  <meta charset=\"utf-8\">\n  \
          <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n  \
+         {fonts_link}\n  \
          <style>{base_css}{css}</style>{unocss_tag}\n</head>\n<body>\n  \
          {body_html}{js_tag}\n</body>\n</html>"
     )
