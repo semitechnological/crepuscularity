@@ -51,7 +51,7 @@ div w-full h-full bg-zinc-950 text-white flex flex-col p-8
 - **Expressions** — arithmetic, comparison, logical operators, property access
 - **Components** — single-file and multi-component files with slot support
 - **Hot reload** — live template updates via the runtime renderer
-- **Browser extensions** — `crepus webext` commands for MV3 extensions; no JS bundler needed
+- **Browser extensions** — `crepus webext` commands for MV3 extensions; popup pre-rendered at build time; no JS bundler needed
 - **IDE integration** — structured JSON events with `--emit-events`
 
 ## Output Targets
@@ -75,7 +75,7 @@ crepus build [--release]             # Build wrapper
 crepus preview <file.crepus>         # Live preview
 
 crepus webext new <name>             # Scaffold browser extension
-crepus webext build [--app PATH]     # Build to dist/unpacked/
+crepus webext build [--app PATH]     # Build to dist/unpacked/ (WASM + manifest + popup pre-render)
 crepus webext manifest               # Print manifest.json
 ```
 
@@ -155,6 +155,14 @@ examples/
 ```
 
 ## Building
+
+Install the CLI:
+
+```bash
+cargo install --path crates/crepuscularity-cli
+```
+
+Pre-built binaries for Linux and Windows are in the repo root (`crepus-linux-x86_64`, `crepus-windows-x86_64.exe`).
 
 On macOS, GPUI requires the Xcode SDK path:
 

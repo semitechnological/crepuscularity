@@ -7,13 +7,20 @@ edition = "2021"
 name = "crepus"
 path = "src/main.rs"
 
+[features]
+# Desktop (GPUI) commands: `crepus new`, `crepus dev`, `crepus preview`.
+# Enabled by default. Disable for cross-compilation to platforms where GPUI
+# (and its DirectX/Metal shaders) cannot be compiled.
+default = ["desktop"]
+desktop = ["dep:gpui", "dep:crepuscularity-runtime", "dep:notify"]
+
 [dependencies]
-gpui                   = { workspace = true }
+gpui                   = { workspace = true, optional = true }
 crepuscularity-core    = { path = "../crepuscularity-core" }
-crepuscularity-runtime = { path = "../crepuscularity-runtime" }
+crepuscularity-runtime = { path = "../crepuscularity-runtime", optional = true }
 crepuscularity-web     = { path = "../crepuscularity-web" }
 crepuscularity-webext  = { path = "../crepuscularity-webext" }
-notify                 = "8"
+notify                 = { version = "8", optional = true }
 serde                  = { version = "1", features = ["derive"] }
 serde_json             = "1"
 console                = "0.16"

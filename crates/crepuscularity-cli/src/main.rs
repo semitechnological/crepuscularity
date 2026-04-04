@@ -10,9 +10,13 @@
 //!   crepus webext build [--app PATH]             build browser extension
 //!   crepus webext manifest [--app PATH]          print manifest.json
 
+#[cfg(feature = "desktop")]
 mod builder;
+#[cfg(feature = "desktop")]
 mod dev;
+#[cfg(feature = "desktop")]
 pub mod events;
+#[cfg(feature = "desktop")]
 mod hud;
 mod new;
 mod render;
@@ -20,6 +24,7 @@ pub mod ui;
 mod webext;
 
 use console::style;
+#[cfg(feature = "desktop")]
 use std::time::Instant;
 
 fn main() {
@@ -41,6 +46,7 @@ fn main() {
             new::run(name);
         }
 
+        #[cfg(feature = "desktop")]
         Some("dev") => {
             let mut bin: Option<String> = None;
             let mut release = false;
@@ -61,6 +67,7 @@ fn main() {
             dev::run(bin, release, emit_events);
         }
 
+        #[cfg(feature = "desktop")]
         Some("build") => {
             let t0 = Instant::now();
             let release = args.iter().any(|a| a == "--release");
@@ -80,6 +87,7 @@ fn main() {
             }
         }
 
+        #[cfg(feature = "desktop")]
         Some("preview") => {
             let path = args
                 .get(2)
@@ -178,6 +186,7 @@ fn print_usage() {
     );
 }
 
+#[cfg(feature = "desktop")]
 fn run_preview(path: std::path::PathBuf) {
     use crepuscularity_runtime::{HotReloadState, HotReloadView, TemplateContext};
     use gpui::{
@@ -230,6 +239,7 @@ fn run_preview(path: std::path::PathBuf) {
     });
 }
 
+#[cfg(feature = "desktop")]
 fn load_context_toml(path: &std::path::Path, ctx: &mut crepuscularity_runtime::TemplateContext) {
     use crepuscularity_runtime::TemplateValue;
     let Ok(content) = std::fs::read_to_string(path) else {
