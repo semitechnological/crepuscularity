@@ -597,7 +597,6 @@ impl LineLayoutCache {
 pub struct FontRun {
     pub(crate) len: usize,
     pub(crate) font_id: FontId,
-    /// Letter spacing added between characters, in pixels.
     pub(crate) letter_spacing: Option<Pixels>,
 }
 

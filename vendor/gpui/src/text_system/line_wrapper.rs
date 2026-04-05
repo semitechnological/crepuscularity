@@ -345,8 +345,47 @@ mod tests {
                 background_color: None,
                 underline: None,
                 strikethrough: None,
+                letter_spacing: None,
             })
             .collect()
+    }
+
+    #[test]
+    fn test_tracking_changes_measured_width() {
+        let dispatcher = TestDispatcher::new(StdRng::seed_from_u64(1));
+        let cx = TestAppContext::build(dispatcher, None);
+        let base = TextRun {
+            len: 4,
+            font: font(".ZedMono"),
+            color: Hsla::default(),
+            background_color: None,
+            underline: None,
+            strikethrough: None,
+            letter_spacing: None,
+        };
+
+        let no_tracking = cx.text_system().layout_line("TEST", px(16.), &[base.clone()], None);
+        let wide = cx.text_system().layout_line(
+            "TEST",
+            px(16.),
+            &[TextRun {
+                letter_spacing: Some(px(2.0)),
+                ..base.clone()
+            }],
+            None,
+        );
+        let tight = cx.text_system().layout_line(
+            "TEST",
+            px(16.),
+            &[TextRun {
+                letter_spacing: Some(px(-0.5)),
+                ..base
+            }],
+            None,
+        );
+
+        assert!(wide.width > no_tracking.width);
+        assert!(tight.width <= no_tracking.width);
     }
 
     #[test]
@@ -695,6 +734,7 @@ mod tests {
                 underline: Default::default(),
                 strikethrough: None,
                 background_color: None,
+                letter_spacing: None,
             };
             let bold = TextRun {
                 len: 0,
@@ -703,6 +743,7 @@ mod tests {
                 underline: Default::default(),
                 strikethrough: None,
                 background_color: None,
+                letter_spacing: None,
             };
 
             let text = "aa bbb cccc ddddd eeee".into();

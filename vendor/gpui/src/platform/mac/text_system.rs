@@ -25,7 +25,7 @@ use core_text::{
         kCTFontSlantTrait, kCTFontSymbolicTrait, kCTFontWeightTrait, kCTFontWidthTrait,
     },
     line::CTLine,
-    string_attributes::kCTFontAttributeName,
+    string_attributes::{kCTFontAttributeName, kCTKernAttributeName},
 };
 use font_kit::{
     font::Font as FontKitFont,
@@ -479,6 +479,13 @@ impl MacTextSystemState {
                         kCTFontAttributeName,
                         &font.native_font().clone_with_font_size(font_size.into()),
                     );
+                    if let Some(spacing) = run.letter_spacing {
+                        string.set_attribute(
+                            cf_range,
+                            kCTKernAttributeName,
+                            &CFNumber::from(spacing.0 as f64),
+                        );
+                    }
                 }
             }
         }

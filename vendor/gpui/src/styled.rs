@@ -650,7 +650,6 @@ pub trait Styled: Sized {
     }
 
     /// Sets the letter spacing (tracking) for text in this element and its children.
-    /// Positive values add space; negative values reduce it.
     fn letter_spacing(mut self, spacing: impl Into<Pixels>) -> Self {
         self.text_style()
             .get_or_insert_with(Default::default)
@@ -658,7 +657,7 @@ pub trait Styled: Sized {
         self
     }
 
-    /// Sets the text-transform for this element and its children.
+    /// Sets the case transform for text in this element and its children.
     fn text_transform(mut self, transform: crate::TextTransform) -> Self {
         self.text_style()
             .get_or_insert_with(Default::default)

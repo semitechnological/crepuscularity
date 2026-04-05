@@ -348,17 +348,17 @@ pub enum TextAlign {
     Right,
 }
 
-/// How to transform the case of text.
+/// How to transform text while preserving byte offsets.
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub enum TextTransform {
-    /// No transformation (default).
+    /// Do not transform text.
     #[default]
     None,
-    /// Convert all characters to uppercase.
+    /// Uppercase ASCII letters.
     Uppercase,
-    /// Convert all characters to lowercase.
+    /// Lowercase ASCII letters.
     Lowercase,
-    /// Capitalize the first letter of each word.
+    /// Uppercase the first ASCII letter in each word and lowercase the rest.
     Capitalize,
 }
 
@@ -411,11 +411,10 @@ pub struct TextStyle {
     /// The number of lines to display before truncating the text
     pub line_clamp: Option<usize>,
 
-    /// Letter spacing added between each character, in pixels.
-    /// Positive values increase spacing; negative values decrease it.
+    /// Letter spacing added between characters, in pixels.
     pub letter_spacing: Option<Pixels>,
 
-    /// Case transformation applied to the rendered text.
+    /// Case transformation applied at layout time.
     pub text_transform: Option<TextTransform>,
 }
 

@@ -748,7 +748,7 @@ pub struct TextRun {
     pub underline: Option<UnderlineStyle>,
     /// The strikethrough style (if any)
     pub strikethrough: Option<StrikethroughStyle>,
-    /// Letter spacing to add between characters, in pixels.
+    /// Letter spacing applied between glyphs, in pixels.
     pub letter_spacing: Option<Pixels>,
 }
 

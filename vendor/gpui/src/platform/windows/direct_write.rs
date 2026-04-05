@@ -586,12 +586,11 @@ impl DirectWriteState {
                     format.SetFontFallback(fallbacks)?;
                 }
 
-                let layout = self.components.factory.CreateTextLayout(
-                    &text_wide,
-                    &format,
-                    f32::INFINITY,
-                    f32::INFINITY,
-                )?;
+                let layout: IDWriteTextLayout1 = self
+                    .components
+                    .factory
+                    .CreateTextLayout(&text_wide, &format, f32::INFINITY, f32::INFINITY)?
+                    .cast()?;
                 let current_text = &text[utf8_offset..(utf8_offset + first_run.len)];
                 utf8_offset += first_run.len;
                 let current_text_utf16_length = current_text.encode_utf16().count() as u32;
@@ -600,6 +599,9 @@ impl DirectWriteState {
                     length: current_text_utf16_length,
                 };
                 layout.SetTypography(&font_info.features, text_range)?;
+                if let Some(spacing) = first_run.letter_spacing {
+                    layout.SetCharacterSpacing(0.0, spacing.0, 0.0, text_range)?;
+                }
                 utf16_offset += current_text_utf16_length;
 
                 layout
@@ -640,6 +642,9 @@ impl DirectWriteState {
                 text_layout.SetFontStyle(font_info.font_face.GetStyle(), text_range)?;
                 text_layout.SetFontWeight(font_info.font_face.GetWeight(), text_range)?;
                 text_layout.SetTypography(&font_info.features, text_range)?;
+                if let Some(spacing) = run.letter_spacing {
+                    text_layout.SetCharacterSpacing(0.0, spacing.0, 0.0, text_range)?;
+                }
             }
 
             let mut runs = Vec::new();
