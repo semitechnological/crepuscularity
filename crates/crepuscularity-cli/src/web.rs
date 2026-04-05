@@ -1,4 +1,4 @@
-//! Static marketing-site commands (`unthought-sites` payloads → HTML).
+//! Static marketing-site commands (`site-builder` payloads → HTML).
 
 use console::style;
 use std::fs;
@@ -105,7 +105,7 @@ fn print_web_usage() {
     eprintln!("{}", style("crepus web").cyan().bold());
     eprintln!(
         "{}",
-        style("Static sites from SiteBuilder JSON (unthought-sites crate).").dim()
+        style("Static sites from SiteBuilder JSON.").dim()
     );
     eprintln!();
     eprintln!("{}", style("COMMANDS").dim());
@@ -167,7 +167,7 @@ fn scaffold_site(name: &str) {
         ui::error(&format!("could not create directories: {e}"));
     });
 
-    let payload = unthought_sites::starter_site_payload(business_name);
+    let payload = site_builder::starter_site_payload(business_name);
     let json = serde_json::to_string_pretty(&payload)
         .unwrap_or_else(|e| ui::error(&format!("could not serialize site.json: {e}")));
     fs::write(base.join("site.json"), json).unwrap_or_else(|e| {
@@ -198,7 +198,7 @@ fn run_build(args: &[String]) {
 
     let t0 = Instant::now();
     let json_raw = read_json_payload(&plan.json_path);
-    let result = match unthought_sites::build_site_from_json(&json_raw) {
+    let result = match site_builder::build_site_from_json(&json_raw) {
         Ok(r) => r,
         Err(e) => ui::error(&format!("build failed: {e}")),
     };

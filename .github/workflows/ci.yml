@@ -21,7 +21,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Checkout unthought (path dependency for crepus web)
+    - name: Checkout site-builder (path dependency for crepus web)
       uses: actions/checkout@v4
       with:
         repository: thesoftwarecompanyofhongkong/unthought
@@ -71,7 +71,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Checkout unthought (path dependency for crepus web)
+    - name: Checkout site-builder (path dependency for crepus web)
       uses: actions/checkout@v4
       with:
         repository: thesoftwarecompanyofhongkong/unthought
@@ -99,7 +99,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Checkout unthought (path dependency for crepus web)
+    - name: Checkout site-builder (path dependency for crepus web)
       uses: actions/checkout@v4
       with:
         repository: thesoftwarecompanyofhongkong/unthought

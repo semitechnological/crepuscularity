@@ -23,7 +23,7 @@ mod hud;
 mod new;
 mod render;
 pub mod ui;
-#[cfg(feature = "unthought-web")]
+#[cfg(feature = "web")]
 mod web;
 mod webext;
 
@@ -117,15 +117,16 @@ fn main() {
         }
 
         Some("web") => {
-            #[cfg(feature = "unthought-web")]
-            {
-                web::run(&args[2..]);
-            }
-            #[cfg(not(feature = "unthought-web"))]
+            #[cfg(feature = "web")]
+            web::run(&args[2..]);
+
+            #[cfg(not(feature = "web"))]
             {
                 ui::error(
-                    "crepus web is disabled in this build. Rebuild crepuscularity-cli with --features unthought-web (needs the unthought repo next to crepuscularity; see CI / README).",
+                    "crepus web is disabled in this build. Rebuild crepuscularity-cli with --features web (needs the site-builder repo next to crepuscularity; see CI / README).",
                 );
+            }
+
             }
         }
 
