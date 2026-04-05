@@ -394,13 +394,16 @@ impl ManifestV3 {
             .commands
             .iter()
             .map(|(name, cmd)| {
-                let suggested_key = cmd.suggested_key.as_ref().map(|k| ManifestSuggestedKeyJson {
-                    default: k.default.clone(),
-                    mac: k.mac.clone(),
-                    windows: k.windows.clone(),
-                    linux: k.linux.clone(),
-                    chromeos: k.chromeos.clone(),
-                });
+                let suggested_key = cmd
+                    .suggested_key
+                    .as_ref()
+                    .map(|k| ManifestSuggestedKeyJson {
+                        default: k.default.clone(),
+                        mac: k.mac.clone(),
+                        windows: k.windows.clone(),
+                        linux: k.linux.clone(),
+                        chromeos: k.chromeos.clone(),
+                    });
                 (
                     name.clone(),
                     ManifestCommandJson {

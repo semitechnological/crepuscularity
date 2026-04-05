@@ -33,6 +33,8 @@ To auto-fix formatting: `cargo fmt --all`
 | `crates/crepuscularity-runtime` | Runtime parser, renderer, and hot-reload engine |
 | `crates/crepuscularity-dev` | `crepus-dev` binary — hot-reload dev server |
 | `crates/crepuscularity-cli` | `crepus` CLI for scaffolding and builds |
+| `crates/unthought-sites` | Static site builder from JSON payloads + bundled `.crepus` templates |
+| `examples/text-features` | GPUI demo for letter-spacing and text-transform (vendored gpui) |
 | `examples/weather` | Full weather-app example using the runtime |
 
 ## DSL quick reference
