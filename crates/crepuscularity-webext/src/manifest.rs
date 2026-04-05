@@ -45,6 +45,33 @@ impl std::fmt::Display for ManifestError {
 
 impl std::error::Error for ManifestError {}
 
+/// Optional `suggested_key` for [`ExtensionManifestCommand`] (Chrome `commands` API).
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct ExtensionManifestSuggestedKey {
+    #[serde(default)]
+    pub default: Option<String>,
+    #[serde(default)]
+    pub mac: Option<String>,
+    #[serde(default)]
+    pub windows: Option<String>,
+    #[serde(default)]
+    pub linux: Option<String>,
+    #[serde(default)]
+    pub chromeos: Option<String>,
+}
+
+/// One entry under `commands` in `manifest.json` (MV3).
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct ExtensionManifestCommand {
+    #[serde(default)]
+    pub description: Option<String>,
+    #[serde(default)]
+    pub suggested_key: Option<ExtensionManifestSuggestedKey>,
+    /// When true, the shortcut may be active even when Chrome is not focused (platform-dependent).
+    #[serde(default)]
+    pub global: Option<bool>,
+}
+
 /// The extension manifest (.crex file).
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ExtensionManifest {
@@ -57,6 +84,9 @@ pub struct ExtensionManifest {
     pub plugins: HashMap<String, PluginEntry>,
     #[serde(default)]
     pub options: ManifestOptions,
+    /// Map of Chrome command name → spec. Use `_execute_action` to open the toolbar popup from a keybinding.
+    #[serde(default)]
+    pub commands: BTreeMap<String, ExtensionManifestCommand>,
 }
 
 /// Basic extension information.
@@ -183,6 +213,33 @@ pub struct ManifestV3 {
     pub content_scripts: Vec<ContentScriptSpec>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub web_accessible_resources: Vec<WebAccessibleResources>,
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub commands: BTreeMap<String, ManifestCommandJson>,
+}
+
+/// Serialized form of a `commands` entry for `manifest.json`.
+#[derive(Clone, Debug, Serialize)]
+pub struct ManifestCommandJson {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub suggested_key: Option<ManifestSuggestedKeyJson>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub global: Option<bool>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct ManifestSuggestedKeyJson {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub default: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mac: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub windows: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub linux: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub chromeos: Option<String>,
 }
 
 /// Content Security Policy for extension pages.
@@ -331,6 +388,28 @@ impl ManifestV3 {
             default_icon: opts.icons.clone(),
         });
 
+        let commands: BTreeMap<String, ManifestCommandJson> = manifest
+            .commands
+            .iter()
+            .map(|(name, cmd)| {
+                let suggested_key = cmd.suggested_key.as_ref().map(|k| ManifestSuggestedKeyJson {
+                    default: k.default.clone(),
+                    mac: k.mac.clone(),
+                    windows: k.windows.clone(),
+                    linux: k.linux.clone(),
+                    chromeos: k.chromeos.clone(),
+                });
+                (
+                    name.clone(),
+                    ManifestCommandJson {
+                        description: cmd.description.clone(),
+                        suggested_key,
+                        global: cmd.global,
+                    },
+                )
+            })
+            .collect();
+
         ManifestV3 {
             manifest_version: 3,
             name: manifest.extension.name.clone(),
@@ -346,6 +425,7 @@ impl ManifestV3 {
             action,
             content_scripts,
             web_accessible_resources,
+            commands,
         }
     }
 
@@ -543,6 +623,7 @@ host-permissions = ["https://example.com/*"]
             content_scripts: vec![],
             plugins: HashMap::new(),
             options: ManifestOptions::default(),
+            commands: BTreeMap::new(),
         };
 
         let browser = manifest.to_browser_manifest();
@@ -569,6 +650,7 @@ host-permissions = ["https://example.com/*"]
             content_scripts: vec![],
             plugins: HashMap::new(),
             options: ManifestOptions::default(),
+            commands: BTreeMap::new(),
         };
 
         let mv3 = manifest.to_manifest_v3();
@@ -619,6 +701,7 @@ host-permissions = ["https://example.com/*"]
                 ]),
                 ..Default::default()
             },
+            commands: BTreeMap::new(),
         };
 
         let mv3 = manifest.to_manifest_v3();
@@ -631,5 +714,29 @@ host-permissions = ["https://example.com/*"]
         let json = mv3.to_json();
         assert!(json.contains("\"manifest_version\": 3"));
         assert!(json.contains("wasm-unsafe-eval"));
+    }
+
+    #[test]
+    fn test_commands_in_manifest_json() {
+        let toml = r#"
+[extension]
+name = "cmd-ext"
+version = "1.0.0"
+
+[capabilities]
+storage = true
+
+[commands._execute_action]
+description = "Open popup"
+
+[commands._execute_action.suggested_key]
+default = "Alt+Shift+W"
+mac = "Alt+Shift+W"
+"#;
+        let manifest: ExtensionManifest = toml::from_str(toml).unwrap();
+        let json = manifest.to_manifest_v3_json();
+        assert!(json.contains("\"commands\""));
+        assert!(json.contains("_execute_action"));
+        assert!(json.contains("Alt+Shift+W"));
     }
 }
