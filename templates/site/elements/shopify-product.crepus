@@ -24,7 +24,7 @@ section class="py-24 px-6 lg:px-8 bg-[var(--surface)]"
           div class="grid grid-cols-4 gap-4"
             for image in {productImages}
               div class="aspect-square overflow-hidden rounded-lg border border-[var(--border)] cursor-pointer hover:border-[var(--accent)] transition-colors"
-                img src={image.url} alt={image.alt} class="h-full w-full object-cover"
+                img src={url} alt={alt} class="h-full w-full object-cover"
       
       # Product info
       div class="flex flex-col"
@@ -51,11 +51,11 @@ section class="py-24 px-6 lg:px-8 bg-[var(--surface)]"
           div class="mt-8 space-y-4"
             for variant in {productVariants}
               label class="flex items-center gap-3 cursor-pointer"
-                input type="radio" name="variant" value={variant.id} class="h-4 w-4 text-[var(--accent)] focus:ring-[var(--accent)]"
+                input type="radio" name="variant" value={id} class="h-4 w-4 text-[var(--accent)] focus:ring-[var(--accent)]"
                 span class="text-[var(--text)]"
-                  {variant.title}
+                  {title}
                 span class="text-[var(--muted)]"
-                  {variant.price}
+                  {price}
         
         # Add to cart button
         div class="mt-8"

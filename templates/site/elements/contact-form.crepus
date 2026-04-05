@@ -22,23 +22,23 @@ section id="contact" class="py-24 px-6 lg:px-8 bg-[var(--surface)]"
     form action={endpoint} method={method} data-form-id={formId} class="space-y-6"
       for field in {fields}
         div
-          label for={field.name} class="block text-sm font-medium text-[var(--text)] mb-2"
-            {field.label}
-            if {field.required}
+          label for={name} class="block text-sm font-medium text-[var(--text)] mb-2"
+            {label}
+            if {required}
               span class="text-red-500 ml-1"
                 "*"
           
-          if {field.type == "textarea"}
-            textarea id={field.name} name={field.name} rows="4" placeholder={field.placeholder} class="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-[var(--text)] placeholder-[var(--muted)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)] transition-colors"
-          else if {field.type == "select"}
-            select id={field.name} name={field.name} class="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-[var(--text)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)] transition-colors"
+          if {type == "textarea"}
+            textarea id={name} name={name} rows="4" placeholder={placeholder} class="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-[var(--text)] placeholder-[var(--muted)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)] transition-colors"
+          else if {type == "select"}
+            select id={name} name={name} class="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-[var(--text)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)] transition-colors"
               option value=""
                 "Select..."
-              for option in {field.options}
-                option value={option.value}
-                  {option.label}
+              for option in {options}
+                option value={value}
+                  {label}
           else
-            input type={field.type} id={field.name} name={field.name} placeholder={field.placeholder} class="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-[var(--text)] placeholder-[var(--muted)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)] transition-colors"
+            input type={type} id={name} name={name} placeholder={placeholder} class="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-[var(--text)] placeholder-[var(--muted)] focus:border-[var(--accent)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)] transition-colors"
       
       # Submit button
       div class="pt-4"

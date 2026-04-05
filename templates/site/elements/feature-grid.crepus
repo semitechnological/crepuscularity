@@ -23,20 +23,20 @@ section class="py-24 px-6 lg:px-8 bg-[var(--surface)]"
     else if {columns == 4}
       $: let gridClass = "grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-4"
     
-    div class="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3"
+    div class={gridClass}
       for feature in {features}
         div class="relative rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6"
           # Badge (if present)
-          if {feature.badge}
+          if {badge}
             div class="absolute -top-3 left-4"
               span class="inline-flex items-center rounded-full bg-[var(--accent)] px-3 py-1 text-xs font-medium text-white"
-                {feature.badge}
+                {badge}
           
           # Feature title
           h3 class="text-lg font-semibold text-[var(--text)] mb-2"
-            {feature.title}
+            {title}
           
           # Feature description
-          if {feature.description}
+          if {description}
             p class="text-[var(--muted)] text-sm leading-relaxed"
-              {feature.description}
+              {description}

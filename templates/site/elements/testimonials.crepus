@@ -26,17 +26,17 @@ section class="py-24 px-6 lg:px-8 bg-[var(--surface)]"
           # Quote text
           blockquote class="mt-4"
             p class="text-[var(--muted)] leading-relaxed italic"
-              "\"{testimonial.quote}\""
+              "\"{quote}\""
           
           # Attribution
           div class="mt-6 flex items-center gap-3"
             # Avatar placeholder
             div class="h-10 w-10 rounded-full bg-[var(--accent)]/20 flex items-center justify-center"
               span class="text-[var(--accent)] font-semibold text-sm"
-                {testimonial.initial}
+                {initial}
             div
               div class="font-semibold text-[var(--text)]"
-                {testimonial.author}
-              if {testimonial.role}
+                {author}
+              if {role}
                 div class="text-sm text-[var(--muted)]"
-                  {testimonial.role}
+                  {role}

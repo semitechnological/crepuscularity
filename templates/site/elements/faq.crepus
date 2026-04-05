@@ -19,9 +19,9 @@ section class="py-24 px-6 lg:px-8 bg-[var(--surface)]"
         details class="group rounded-lg border border-[var(--border)] bg-[var(--surface)]"
           summary class="flex cursor-pointer items-center justify-between px-6 py-4 text-[var(--text)] font-medium hover:bg-[var(--border)]/10 transition-colors"
             span
-              {item.question}
+              {question}
             # Chevron icon (rotates when open)
             svg class="h-5 w-5 text-[var(--muted)] group-open:rotate-180 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"
               path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"
           div class="px-6 pb-4 text-[var(--muted)] leading-relaxed"
-            {item.answer}
+            {answer}

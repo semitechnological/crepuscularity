@@ -18,12 +18,12 @@ section class="py-24 px-6 lg:px-8 bg-[var(--surface)]"
     # Products grid
     div class="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-4"
       for product in {products}
-        a href="/products/{product.handle}" class="group"
+        a href={href} class="group"
           div class="relative overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)]"
             # Product image
-            if {product.image}
+            if {image}
               div class="aspect-square overflow-hidden"
-                img src={product.image} alt={product.title} class="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300"
+                img src={image} alt={imageAlt} class="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300"
             else
               div class="aspect-square bg-[var(--border)]/20 flex items-center justify-center"
                 span class="text-[var(--muted)]"
@@ -32,11 +32,11 @@ section class="py-24 px-6 lg:px-8 bg-[var(--surface)]"
             # Product info
             div class="p-4"
               h3 class="text-[var(--text)] font-medium group-hover:text-[var(--accent)] transition-colors"
-                {product.title}
+                {title}
               
               div class="mt-2 flex items-center gap-2"
                 span class="text-[var(--text)] font-semibold"
-                  {product.price}
-                if {product.compareAtPrice}
+                  {price}
+                if {compareAtPrice}
                   span class="text-[var(--muted)] line-through text-sm"
-                    {product.compareAtPrice}
+                    {compareAtPrice}

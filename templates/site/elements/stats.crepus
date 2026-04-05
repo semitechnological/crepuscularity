@@ -19,13 +19,13 @@ section class="py-24 px-6 lg:px-8 bg-[var(--accent)]/5"
         div class="flex flex-col items-center text-center"
           # Value (large number)
           div class="text-4xl font-bold text-[var(--accent)] sm:text-5xl"
-            {stat.value}
+            {value}
           
           # Label
           div class="mt-2 text-lg font-medium text-[var(--text)]"
-            {stat.label}
+            {label}
           
           # Optional detail
-          if {stat.detail}
+          if {detail}
             div class="mt-1 text-sm text-[var(--muted)]"
-              {stat.detail}
+              {detail}
