@@ -768,15 +768,13 @@ fn apply_dynamic(d: Div, class: &str) -> Div {
     }
 
     // ── tracking-* (letter-spacing) ──
-    // Named scale: tight = -0.05em, snug = -0.025em, normal = 0, wide = 0.025em,
-    // wider = 0.05em, widest = 0.1em — approximated in px at 16px base font size
     match class {
-        "tracking-tighter" => return d.letter_spacing(px(-0.8)),
-        "tracking-tight" => return d.letter_spacing(px(-0.4)),
+        "tracking-tighter" => return d.letter_spacing(px(-2.0)),
+        "tracking-tight" => return d.letter_spacing(px(-1.0)),
         "tracking-normal" => return d.letter_spacing(px(0.)),
-        "tracking-wide" => return d.letter_spacing(px(0.4)),
-        "tracking-wider" => return d.letter_spacing(px(0.8)),
-        "tracking-widest" => return d.letter_spacing(px(1.6)),
+        "tracking-wide" => return d.letter_spacing(px(1.5)),
+        "tracking-wider" => return d.letter_spacing(px(3.0)),
+        "tracking-widest" => return d.letter_spacing(px(5.0)),
         _ => {}
     }
     if let Some(rest) = class.strip_prefix("tracking-[") {

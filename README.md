@@ -109,7 +109,8 @@ The GPUI renderer maps Tailwind-style class strings to native GPUI style calls. 
 | **Border radius** | `rounded-*` — all sizes, all sides, all corners |
 | **Typography** | Font weight (`font-thin` → `font-black`), style (`italic`), size (`text-xs` → `text-9xl`, `text-[Npx]`) |
 | **Typography** | Alignment (`text-left/center/right`), decoration (`underline`, `line-through`, `decoration-*`) |
-| **Typography** | Line height (`leading-*`, `leading-[N]`), truncation (`truncate`, `text-ellipsis`, `whitespace-nowrap`) |
+| **Typography** | Line height (`leading-*`, `leading-[N]`), tracking (`tracking-*`, `tracking-[Npx]`), truncation (`truncate`, `text-ellipsis`, `whitespace-nowrap`) |
+| **Typography** | Text transform (`uppercase`, `lowercase`, `capitalize`, `normal-case`) |
 | **Font** | `font-['Family']`, `line-clamp-N`, `font-features` via `FontFeatures` API |
 | **Shadow** | `shadow-2xs` → `shadow-2xl`, `shadow-none` |
 | **Ring** | `ring`, `ring-0/1/2/4/8`, `ring-[Npx]` — rendered as box-shadow spread |
@@ -126,8 +127,6 @@ These cannot be added without forking GPUI itself:
 
 | Gap | Reason |
 |---|---|
-| `tracking-*` (letter-spacing) | Not in GPUI's `TextStyle` — no letter-spacing in the text layout engine |
-| `uppercase` / `lowercase` / `capitalize` | No text-transform in GPUI — text is rendered as-is |
 | `ring-{color}` | Ring color customisation requires architectural change; default ring is blue-500/50 |
 | `md:` / `lg:` / `xl:` breakpoints | No CSS cascade or viewport queries — GPUI uses Taffy layout |
 | `dark:` variant | No built-in dark mode detection — use `bg-{theme.surface}` context expressions instead |
