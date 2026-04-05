@@ -6,6 +6,8 @@
 //!   crepus build [--release]                     cargo build wrapper
 //!   crepus preview FILE                          live-preview a .crepus template
 //!   crepus render FILE [--ctx FILE] [--var k=v] [--component Name]
+//!   crepus web new NAME                          scaffold SiteBuilder JSON project
+//!   crepus web build [--site DIR] [--json FILE] [-o FILE] [site.json]
 //!   crepus webext new NAME                       scaffold a browser extension
 //!   crepus webext build [--app PATH]             build browser extension
 //!   crepus webext manifest [--app PATH]          print manifest.json
@@ -21,6 +23,7 @@ mod hud;
 mod new;
 mod render;
 pub mod ui;
+mod web;
 mod webext;
 
 use console::style;
@@ -110,6 +113,10 @@ fn main() {
             render::run(&args[2..]);
         }
 
+        Some("web") => {
+            web::run(&args[2..]);
+        }
+
         Some("webext") => {
             webext::run(&args[2..]);
         }
@@ -150,6 +157,16 @@ fn print_usage() {
         "  {}  {}",
         style("render <file.crepus> [--ctx] [--var] ").green(),
         style("render template to HTML on stdout").dim()
+    );
+    eprintln!(
+        "  {}  {}",
+        style("web new <name>                       ").green(),
+        style("scaffold SiteBuilder site.json project").dim()
+    );
+    eprintln!(
+        "  {}  {}",
+        style("web build [--site] [--json] [-o]     ").green(),
+        style("static site HTML from JSON").dim()
     );
     eprintln!();
     eprintln!(
