@@ -144,3 +144,23 @@ fn web_build_missing_json_file_fails() {
         .expect("spawn");
     assert!(!status.success());
 }
+
+#[test]
+fn web_build_docs_site_works() {
+    let out = crepus()
+        .args(["web", "build", "--site", "../../docs-site", "-o", "docs.html"])
+        .output()
+        .expect("spawn crepus web build");
+    
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        out.status.success(),
+        "crepus web build docs-site failed with status {}. \nstdout: {}\nstderr: {}",
+        out.status,
+        stdout,
+        stderr
+    );
+    assert!(std::path::Path::new("docs.html").exists());
+    let _ = std::fs::remove_file("docs.html");
+}
