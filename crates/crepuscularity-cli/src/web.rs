@@ -1,11 +1,13 @@
 //! Static site commands for `crepus web` — structured `site.json` to a single HTML page.
 
 use console::style;
+use crepuscularity_core::{DriverCache, Fingerprint};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use crate::ui;
+use crate::web_serve::ServeOptions;
 
 // ── Entry point ──────────────────────────────────────────────────────────────
 
@@ -28,7 +30,50 @@ pub fn run(args: &[String]) {
             print_site_json(&site_dir);
         }
 
+        Some("serve") => {
+            let opts = parse_serve_args(&args[1..]);
+            crate::web_serve::run(opts);
+        }
+
         _ => print_web_usage(),
+    }
+}
+
+fn parse_serve_args(args: &[String]) -> ServeOptions {
+    let mut site_dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let mut port: u16 = 4000;
+    let mut entry = "index.crepus".to_string();
+
+    let mut i = 0;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--site" => {
+                if let Some(p) = args.get(i + 1) {
+                    site_dir = PathBuf::from(p);
+                    i += 1;
+                }
+            }
+            "--port" => {
+                if let Some(p) = args.get(i + 1) {
+                    port = p.parse().unwrap_or(4000);
+                    i += 1;
+                }
+            }
+            "--entry" => {
+                if let Some(e) = args.get(i + 1) {
+                    entry = e.clone();
+                    i += 1;
+                }
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+
+    ServeOptions {
+        site_dir,
+        port,
+        entry,
     }
 }
 
@@ -69,18 +114,40 @@ fn print_web_usage() {
     eprintln!("{}", style("COMMANDS").dim());
     eprintln!(
         "  {}  {}",
-        style("new <name>              ").green(),
+        style("new <name>                     ").green(),
         style("scaffold site.json project + web.toml").dim()
     );
     eprintln!(
         "  {}  {}",
-        style("build [--site DIR] ...  ").green(),
+        style("build [--site DIR] ...         ").green(),
         style("render HTML from site.json").dim()
     );
     eprintln!(
         "  {}  {}",
-        style("site-json [--site DIR]  ").green(),
+        style("site-json [--site DIR]         ").green(),
         style("print site.json (pretty)").dim()
+    );
+    eprintln!(
+        "  {}  {}",
+        style("serve [--site DIR] [--port N]  ").green(),
+        style("live-reload dev server for .crepus files").dim()
+    );
+    eprintln!();
+    eprintln!("{}", style("SERVE ARGS").dim());
+    eprintln!(
+        "  {}  {}",
+        style("--site DIR             ").green(),
+        style("directory of .crepus files (default: cwd)").dim()
+    );
+    eprintln!(
+        "  {}  {}",
+        style("--port N               ").green(),
+        style("HTTP port (default: 4000)").dim()
+    );
+    eprintln!(
+        "  {}  {}",
+        style("--entry FILE           ").green(),
+        style("entry template (default: index.crepus)").dim()
     );
     eprintln!();
     eprintln!("{}", style("BUILD ARGS").dim());
@@ -382,6 +449,28 @@ fn build_site(args: &WebBuildArgs) {
     let html = render_site_html(&site);
 
     if let Some(out_path) = &args.out {
+        // Phase 2: skip write when output is unchanged (Turbopack-style).
+        let project_root = args
+            .site_dir
+            .clone()
+            .or_else(|| std::env::current_dir().ok())
+            .unwrap_or_else(|| PathBuf::from("."));
+        let cache = DriverCache::open(&project_root);
+        let fp = Fingerprint::new(&json_str, None, "render");
+
+        // Only skip the write when the output file already exists on disk and
+        // the cache confirms its content is unchanged.  If the file is missing
+        // (e.g. cleaned up by a test or `git clean`) we always write.
+        if out_path.exists() && cache.is_up_to_date(&fp, &html) {
+            eprintln!(
+                "\n{} {} (no change — skipped write)",
+                ui::ok(),
+                style(out_path.display().to_string()).dim()
+            );
+            ui::done_in(t0.elapsed());
+            return;
+        }
+
         if let Some(parent) = out_path.parent() {
             if !parent.as_os_str().is_empty() {
                 std::fs::create_dir_all(parent).unwrap_or_else(|e| {
@@ -392,6 +481,7 @@ fn build_site(args: &WebBuildArgs) {
         std::fs::write(out_path, &html).unwrap_or_else(|e| {
             ui::error(&format!("write {}: {e}", out_path.display()));
         });
+        cache.record(&fp, &html);
         eprintln!(
             "\n{} wrote {}",
             ui::ok(),

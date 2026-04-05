@@ -20,6 +20,9 @@ gpui = { version = "0.2.2", default-features = false, features = ["font-kit"] }
 proc-macro2 = "1"
 quote = "1"
 syn = { version = "2", features = ["full", "extra-traits"] }
+sha2 = "0.10"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 [patch.crates-io]
 gpui = { path = "vendor/gpui" }

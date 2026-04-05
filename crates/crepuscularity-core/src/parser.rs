@@ -65,6 +65,7 @@ pub struct ComponentFile {
 }
 
 /// Parse a multi-component `.crepus` file into a [`ComponentFile`].
+#[tracing::instrument(skip(content), fields(len = content.len()))]
 pub fn parse_component_file(content: &str) -> Result<ComponentFile, String> {
     let (frontmatter_str, body) = split_frontmatter(content);
 
@@ -160,6 +161,7 @@ fn toml_value_to_expr(v: &toml::Value) -> String {
     }
 }
 
+#[tracing::instrument(skip(template), fields(len = template.len()))]
 pub fn parse_template(template: &str) -> Result<Vec<Node>, String> {
     if is_jsx_mode(template) {
         parse_jsx_template(template)

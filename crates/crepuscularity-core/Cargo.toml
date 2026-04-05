@@ -5,3 +5,8 @@ edition = "2021"
 
 [dependencies]
 toml = "1"
+sha2 = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3"

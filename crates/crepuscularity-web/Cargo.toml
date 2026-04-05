@@ -9,3 +9,4 @@ parallel = ["dep:rayon"]
 [dependencies]
 crepuscularity-core = { path = "../crepuscularity-core" }
 rayon = { version = "1", optional = true }
+tracing = { workspace = true }

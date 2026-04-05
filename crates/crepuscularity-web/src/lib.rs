@@ -10,6 +10,7 @@ use crepuscularity_core::parser::{parse_component_file, parse_template};
 /// `entry` is `"path/to/file.crepus"` or `"path/to/file.crepus#ComponentName"`.
 /// `files` maps paths to `.crepus` source strings.
 /// All `include` directives within the templates are resolved from `files`.
+#[tracing::instrument(skip(files, ctx), fields(entry = entry))]
 pub fn render_from_files(
     files: &std::collections::HashMap<String, String>,
     entry: &str,
@@ -109,6 +110,7 @@ pub fn par_render_component_file(
     }
 }
 
+#[tracing::instrument(skip(template, ctx), fields(template_len = template.len()))]
 pub fn render_template_to_html(template: &str, ctx: &TemplateContext) -> Result<String, String> {
     let nodes = parse_template(template)?;
     render_nodes_to_html(&nodes, ctx)
@@ -141,6 +143,7 @@ pub fn render_nodes_to_html(nodes: &[Node], ctx: &TemplateContext) -> Result<Str
 }
 
 fn render_nodes_with_ctx(nodes: &[Node], mut ctx: TemplateContext) -> Result<String, String> {
+    let _span = tracing::debug_span!("render_html", node_count = nodes.len()).entered();
     let mut html = String::new();
 
     for node in nodes {

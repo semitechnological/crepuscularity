@@ -25,6 +25,7 @@ mod new;
 mod render;
 pub mod ui;
 mod web;
+mod web_serve;
 mod webext;
 
 use console::style;
@@ -32,6 +33,14 @@ use console::style;
 use std::time::Instant;
 
 fn main() {
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::from_default_env()
+                .add_directive("crepuscularity=info".parse().unwrap()),
+        )
+        .with_target(false)
+        .init();
+
     let args: Vec<String> = std::env::args().collect();
 
     match args.get(1).map(|s| s.as_str()) {
@@ -178,6 +187,11 @@ fn print_usage() {
         "  {}  {}",
         style("web site-json [--site DIR]           ").green(),
         style("pretty-print site.json").dim()
+    );
+    eprintln!(
+        "  {}  {}",
+        style("web serve [--site DIR] [--port N]    ").green(),
+        style("live-reload dev server for .crepus files").dim()
     );
     eprintln!();
     eprintln!(
