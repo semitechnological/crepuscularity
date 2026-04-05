@@ -26,9 +26,11 @@
 //! const html = build_site_wasm(JSON.stringify(payload));
 //! ```
 
+pub mod starter;
 pub mod transform;
 pub mod types;
 
+pub use starter::starter_site_payload;
 pub use transform::{build_site, build_site_from_json};
 pub use types::*;
 

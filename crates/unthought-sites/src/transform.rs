@@ -460,9 +460,19 @@ fn shopify_product_to_context(product: &ShopifyProduct) -> TemplateContext {
 mod tests {
     use super::*;
 
-    #[test]
-    fn builds_runtime_payload() {
-        let payload = SiteBuilderData {
+    fn theme() -> SiteTheme {
+        SiteTheme {
+            accent: "#3b82f6".to_string(),
+            accent_soft: "#60a5fa".to_string(),
+            surface: "#09090b".to_string(),
+            text: "#fafafa".to_string(),
+            muted: "#a1a1aa".to_string(),
+            border: "#27272a".to_string(),
+        }
+    }
+
+    fn payload(elements: Vec<SiteElement>) -> SiteBuilderData {
+        SiteBuilderData {
             business_name: "Test Business".to_string(),
             domain: Some("example.com".to_string()),
             seo: SiteSeo {
@@ -470,34 +480,221 @@ mod tests {
                 description: "A test business site".to_string(),
                 og_image: None,
             },
-            theme: SiteTheme {
-                accent: "#3b82f6".to_string(),
-                accent_soft: "#60a5fa".to_string(),
-                surface: "#09090b".to_string(),
-                text: "#fafafa".to_string(),
-                muted: "#a1a1aa".to_string(),
-                border: "#27272a".to_string(),
-            },
-            elements: vec![SiteElement::Hero(HeroElement {
-                id: "hero-1".to_string(),
-                props: HeroProps {
-                    eyebrow: None,
-                    headline: "Welcome to Test Business".to_string(),
-                    subheadline: "We make great things".to_string(),
-                    primary: SiteButton {
-                        label: "Get Started".to_string(),
-                        href: "#contact".to_string(),
-                        external: None,
-                    },
-                    secondary: None,
-                    media: None,
-                },
-            })],
+            theme: theme(),
+            elements,
             analytics: None,
             turnstile: None,
-        };
+        }
+    }
 
-        let result = build_site(&payload).expect("runtime payload should render");
+    fn hero() -> SiteElement {
+        SiteElement::Hero(HeroElement {
+            id: "hero-1".to_string(),
+            props: HeroProps {
+                eyebrow: Some("Launch faster".to_string()),
+                headline: "Welcome to Test Business".to_string(),
+                subheadline: "We make great things".to_string(),
+                primary: SiteButton {
+                    label: "Get Started".to_string(),
+                    href: "#contact".to_string(),
+                    external: None,
+                },
+                secondary: Some(SiteButton {
+                    label: "See services".to_string(),
+                    href: "#services".to_string(),
+                    external: None,
+                }),
+                media: None,
+            },
+        })
+    }
+
+    fn services() -> SiteElement {
+        SiteElement::Services(ServicesElement {
+            id: "services-1".to_string(),
+            props: ServicesProps {
+                eyebrow: Some("What we do".to_string()),
+                title: "Services".to_string(),
+                description: Some("Choose a package that fits.".to_string()),
+                items: vec![
+                    SiteService {
+                        title: "Launch setup".to_string(),
+                        description: "Brand, domain and hosting setup".to_string(),
+                        href: None,
+                        badge: Some("Popular".to_string()),
+                    },
+                    SiteService {
+                        title: "Ongoing support".to_string(),
+                        description: "Monthly updates and fixes".to_string(),
+                        href: None,
+                        badge: None,
+                    },
+                ],
+            },
+        })
+    }
+
+    fn contact_form() -> SiteElement {
+        SiteElement::ContactForm(ContactFormElement {
+            id: "contact-1".to_string(),
+            props: ContactFormProps {
+                eyebrow: Some("Book a call".to_string()),
+                title: "Contact".to_string(),
+                description: Some("Tell us what you need.".to_string()),
+                form_id: "lead-form".to_string(),
+                fields: vec![
+                    SiteField {
+                        name: "email".to_string(),
+                        label: "Email".to_string(),
+                        placeholder: Some("hello@example.com".to_string()),
+                        field_type: Some("email".to_string()),
+                        required: Some(true),
+                        options: None,
+                    },
+                    SiteField {
+                        name: "budget".to_string(),
+                        label: "Budget".to_string(),
+                        placeholder: None,
+                        field_type: Some("select".to_string()),
+                        required: Some(false),
+                        options: Some(vec!["<$5k".to_string(), "$5k-$10k".to_string()]),
+                    },
+                ],
+                submission: ContactSubmission::Url {
+                    target: "https://forms.example.com/submit".to_string(),
+                    method: Some("post".to_string()),
+                },
+                submit_label: Some("Send enquiry".to_string()),
+                success_message: Some("Thanks, we’ll be in touch.".to_string()),
+                hidden_fields: None,
+            },
+        })
+    }
+
+    fn commerce() -> Vec<SiteElement> {
+        vec![
+            SiteElement::ShopifyCollection(ShopifyCollectionElement {
+                id: "collection-1".to_string(),
+                props: ShopifyCollectionProps {
+                    eyebrow: Some("Store".to_string()),
+                    title: "Featured collection".to_string(),
+                    description: Some("Best sellers and bundles".to_string()),
+                    collection: ShopifyCollection {
+                        handle: "bundles".to_string(),
+                        title: "Featured collection".to_string(),
+                        description: Some("Best sellers and bundles".to_string()),
+                        href: Some("https://shop.example.com/collections/bundles".to_string()),
+                        products: vec![
+                            ShopifyProduct {
+                                name: "Starter kit".to_string(),
+                                description: "Everything to get going".to_string(),
+                                price: "$49".to_string(),
+                                compare_at_price: Some("$69".to_string()),
+                                image: Some(SiteMedia {
+                                    src: "https://cdn.example.com/starter.jpg".to_string(),
+                                    alt: "Starter kit".to_string(),
+                                }),
+                                href: "https://shop.example.com/products/starter-kit".to_string(),
+                                badge: Some("Best seller".to_string()),
+                            },
+                            ShopifyProduct {
+                                name: "Pro kit".to_string(),
+                                description: "For higher-volume use".to_string(),
+                                price: "$99".to_string(),
+                                compare_at_price: None,
+                                image: Some(SiteMedia {
+                                    src: "https://cdn.example.com/pro.jpg".to_string(),
+                                    alt: "Pro kit".to_string(),
+                                }),
+                                href: "https://shop.example.com/products/pro-kit".to_string(),
+                                badge: None,
+                            },
+                        ],
+                    },
+                },
+            }),
+            SiteElement::ShopifyProduct(ShopifyProductElement {
+                id: "product-1".to_string(),
+                props: ShopifyProductProps {
+                    eyebrow: Some("Featured product".to_string()),
+                    title: "Starter kit".to_string(),
+                    description: Some("A complete launch bundle".to_string()),
+                    product: ShopifyProduct {
+                        name: "Starter kit".to_string(),
+                        description: "A complete launch bundle".to_string(),
+                        price: "$49".to_string(),
+                        compare_at_price: Some("$69".to_string()),
+                        image: Some(SiteMedia {
+                            src: "https://cdn.example.com/starter.jpg".to_string(),
+                            alt: "Starter kit".to_string(),
+                        }),
+                        href: "https://shop.example.com/products/starter-kit".to_string(),
+                        badge: Some("Best seller".to_string()),
+                    },
+                },
+            }),
+        ]
+    }
+
+    #[test]
+    fn services_element_exposes_list_items() {
+        let data = payload(vec![services()]);
+        let mut ctx = TemplateContext::new();
+        ctx.set("businessName", data.business_name.clone());
+        ctx.set("seoTitle", data.seo.title.clone());
+        ctx.set("seoDescription", data.seo.description.clone());
+        ctx.set("seoOgImage", data.seo.og_image.clone().unwrap_or_default());
+        ctx.set("themeAccent", data.theme.accent.clone());
+        ctx.set("themeAccentSoft", data.theme.accent_soft.clone());
+        ctx.set("themeSurface", data.theme.surface.clone());
+        ctx.set("themeText", data.theme.text.clone());
+        ctx.set("themeMuted", data.theme.muted.clone());
+        ctx.set("themeBorder", data.theme.border.clone());
+        let elements = data
+            .elements
+            .iter()
+            .map(element_to_context)
+            .collect::<Vec<_>>();
+        ctx.set("elements", elements);
+        let row = &ctx.get_list("elements")[0];
+        let svc_items = row.get_list("services");
+        assert_eq!(svc_items.len(), 2);
+        assert_eq!(
+            svc_items[0].get_str("title"),
+            "Launch setup",
+            "debug vars: {:?}",
+            svc_items[0].vars
+        );
+    }
+
+    #[test]
+    fn renders_marketing_slice() {
+        let result = build_site(&payload(vec![hero(), services(), contact_form()]))
+            .expect("runtime payload should render");
+
+        assert!(result.html.contains("Launch faster"));
         assert!(result.html.contains("Welcome to Test Business"));
+        assert!(result.html.contains("What we do"));
+        assert!(result.html.contains("Launch setup"));
+        assert!(result.html.contains("data-form-id=\"lead-form\""));
+        assert!(result.html.contains("Send enquiry"));
+        assert!(result.html.contains("Thanks, we’ll be in touch."));
+    }
+
+    #[test]
+    fn renders_commerce_slice_and_json_roundtrip() {
+        let payload = payload(commerce());
+        let json = serde_json::to_string(&payload).expect("payload should serialize");
+        let result = build_site_from_json(&json).expect("JSON payload should render");
+
+        assert!(result.html.contains("Store"));
+        assert!(result.html.contains("Featured collection"));
+        assert!(result.html.contains("Best sellers and bundles"));
+        assert!(result.html.contains("Starter kit"));
+        assert!(result.html.contains("$49"));
+        assert!(result.html.contains("$69"));
+        assert!(result.html.contains("Featured product"));
+        assert!(result.html.contains("A complete launch bundle"));
+        assert!(result.html.contains("https://cdn.example.com/starter.jpg"));
     }
 }
