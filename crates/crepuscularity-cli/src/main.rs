@@ -37,10 +37,12 @@ fn main() {
     match args.get(1).map(|s| s.as_str()) {
         Some("--version") | Some("-V") => {
             println!("crepus cli {}", env!("CARGO_PKG_VERSION"));
+            std::process::exit(0);
         }
 
         Some("--help") | Some("-h") => {
             print_usage();
+            std::process::exit(0);
         }
 
         Some("new") => {
@@ -131,7 +133,10 @@ fn main() {
             webext::run(&args[2..]);
         }
 
-        _ => print_usage(),
+        _ => {
+            print_usage();
+            std::process::exit(1);
+        }
     }
 }
 

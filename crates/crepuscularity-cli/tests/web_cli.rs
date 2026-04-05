@@ -117,11 +117,18 @@ fn web_new_fails_when_dir_exists() {
 #[test]
 fn root_help_lists_web_commands() {
     let out = crepus().args(["--help"]).output().expect("help");
-    assert!(out.status.success());
-    let text = String::from_utf8_lossy(&out.stderr);
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(
-        text.contains("web new") && text.contains("web build"),
-        "usage should list web commands:\n{text}"
+        out.status.success(),
+        "crepus --help failed with status {}. \nstdout: {}\nstderr: {}",
+        out.status,
+        stdout,
+        stderr
+    );
+    assert!(
+        stderr.contains("web new") && stderr.contains("web build"),
+        "usage should list web commands in stderr:\n{stderr}"
     );
 }
 
