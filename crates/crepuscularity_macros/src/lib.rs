@@ -76,12 +76,46 @@ pub fn view(input: TokenStream) -> TokenStream {
     let template = lit.value();
     let span = lit.span();
 
-    let lines = collect_lines(&template);
-    let (nodes, _) = parse_nodes(&lines, 0, 0);
+    let dec = crepuscularity_core::preprocess::strip_indent_decorators(&template);
+    let lines = collect_lines(&dec.body);
+    let (mut nodes, _) = parse_nodes(&lines, 0, 0);
+    expand_view_class_aliases(&mut nodes, &dec.class_aliases);
 
     match generate_root(&nodes) {
         Ok(tokens) => tokens.into(),
         Err(message) => syn::Error::new(span, message).to_compile_error().into(),
+    }
+}
+
+fn expand_view_class_aliases(
+    nodes: &mut [Node],
+    aliases: &std::collections::HashMap<String, String>,
+) {
+    use crepuscularity_core::preprocess::expand_class_list_in_place;
+
+    if aliases.is_empty() {
+        return;
+    }
+    for n in nodes.iter_mut() {
+        match n {
+            Node::Element(el) => {
+                expand_class_list_in_place(&mut el.classes, aliases);
+                expand_view_class_aliases(&mut el.children, aliases);
+            }
+            Node::If(b) => {
+                expand_view_class_aliases(&mut b.then_children, aliases);
+                if let Some(e) = &mut b.else_children {
+                    expand_view_class_aliases(e, aliases);
+                }
+            }
+            Node::For(b) => expand_view_class_aliases(&mut b.body, aliases),
+            Node::Match(b) => {
+                for arm in &mut b.arms {
+                    expand_view_class_aliases(&mut arm.body, aliases);
+                }
+            }
+            Node::Text(_) | Node::RawExpr(_) | Node::LetDecl(_) => {}
+        }
     }
 }
 

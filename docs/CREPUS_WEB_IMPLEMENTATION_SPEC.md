@@ -138,7 +138,8 @@ If a row points only to **§8.12**, see the subsection below for the one-paragra
 | `crates/crepuscularity-runtime` | Runtime parse, renderer, hot-reload engine (GPUI-oriented) |
 | `crates/crepuscularity-web` | `parse_template` → **HTML string** (`render_*_to_html`), virtual `TemplateContext::virtual_files`, optional **`parallel`** + **Rayon** (host only) |
 | `crates/crepuscularity_macros` | `view!` compile-time path (GPUI); not full web story |
-| `crates/crepuscularity-cli` | `crepus web` / **`crepus webext`** scaffolding, builds, manifest |
+| `crates/crepuscularity-cli` | **`crepus web`** — `.crepus` + `runtime/` → `dist/` (HTML shell, `crepus-bundle.json`, wasm-bindgen `pkg/`); **`crepus webext`** scaffolding, builds, manifest |
+| `crates/crepuscularity-web` | **`render_bundle`** parses `crepus-bundle.json` and calls **`render_from_files`** (shared with **`crepus web serve`** and wasm site runtimes) |
 | `crates/crepuscularity-dev` | `crepus-dev` — dev server / hot reload direction |
 | `crates/crepuscularity-webext` | MV3 manifest types, **capability scan** of `.crepus`, **`widgets`**: `json_to_template`, `build_frame_doc` for sandboxed iframe `srcdoc`; see [webext.md](./webext.md) |
 

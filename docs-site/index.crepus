@@ -1,0 +1,77 @@
+google-font Inter
+google-font JetBrains Mono
+
+div min-h-screen bg-zinc-950 text-zinc-100 antialiased
+ header sticky top-0 z-10 border-b border-zinc-800/80 backdrop-blur-md bg-zinc-950/85
+  div max-w-5xl mx-auto px-6 h-14 flex items-center justify-between
+   a href="#" class="text-sm font-semibold text-zinc-100 tracking-tight"
+    "Crepuscularity"
+   nav flex items-center gap-6 text-sm text-zinc-400
+    a href="https://github.com/semitechnological/crepuscularity" class="hover:text-zinc-100 transition-colors" rel="noopener noreferrer" target="_blank"
+     "GitHub"
+    a href="https://github.com/semitechnological/crepuscularity/blob/main/docs/CREPUS_WEB_IMPLEMENTATION_SPEC.md" class="hover:text-zinc-100 transition-colors" rel="noopener noreferrer" target="_blank"
+     "Spec"
+
+ main max-w-5xl mx-auto px-6
+  section pt-20 pb-16 md:pt-28 md:pb-24
+   p text-xs font-medium uppercase tracking-widest text-zinc-500 mb-6
+    "Documentation"
+   pre font-mono text-4xl sm:text-5xl md:text-6xl font-semibold text-white leading-none tracking-tight mb-10
+    "> crepus new"
+   p text-lg md:text-xl text-zinc-400 leading-relaxed max-w-3xl
+    span
+     "Crepuscularity is "
+    slot-rotate interval={3200} slot-lede
+     "a GPUI-first template pipeline"
+     "a .crepus DSL with hot reload"
+     "a CLI that ships native apps and WASM sites"
+     "an MV3 extension toolchain"
+     "one syntax for GPUI, web, and extensions"
+    span
+     " that lets you describe UI once and render it to GPUI, static WASM pages, or browser extensions — without forking your mental model."
+
+  section py-16 border-t border-zinc-800/80
+   h2 text-sm font-semibold uppercase tracking-widest text-zinc-500 mb-8
+    "Why it exists"
+   div grid gap-10 md:grid-cols-2 max-w-4xl
+    div
+     h3 text-base font-semibold text-zinc-100 mb-2
+      "One language"
+     p text-sm text-zinc-400 leading-relaxed m-0
+      "Write .crepus templates with the same rules in dev (crepus web serve) and production (crepus web build): virtual includes, components, and eval — no duplicate HTML from JSON."
+    div
+     h3 text-base font-semibold text-zinc-100 mb-2
+      "Rust where it belongs"
+     p text-sm text-zinc-400 leading-relaxed m-0
+      "Your site runtime is a small wasm32 crate, like crepus webext: optional logic in Rust, markup in .crepus, optional client islands in static JS."
+    div
+     h3 text-base font-semibold text-zinc-100 mb-2
+      "Room for reactivity"
+     p text-sm text-zinc-400 leading-relaxed m-0
+      "First paint comes from WASM + bundle; fine-grained updates can layer on with small scripts, islands, or the reactive crate — compile-time templates, runtime patches where you want them."
+    div
+     h3 text-base font-semibold text-zinc-100 mb-2
+      "Ship anywhere"
+     p text-sm text-zinc-400 leading-relaxed m-0
+      "dist/ is static files for Vercel, GitHub Pages, or any CDN — fetch the bundle, boot WASM, hydrate only what you opt into."
+
+  section py-16 border-t border-zinc-800/80
+   div flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6
+    div
+     h2 text-lg font-semibold text-zinc-100 mb-1
+      "Try it"
+     p text-sm text-zinc-500 m-0
+      "Scaffold a GPUI app or a WASM web site from the same CLI."
+    div flex flex-wrap gap-3
+     code class="text-xs font-mono text-zinc-300 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2"
+      "cargo install --path crates/crepuscularity-cli"
+
+ footer border-t border-zinc-800/80 py-10
+  div max-w-5xl mx-auto px-6 footer-row
+   span
+    "© Crepuscularity"
+   span
+    "Built with crepus web build"
+
+.slot-lede text-zinc-100 font-medium
+.footer-row flex flex-col sm:flex-row justify-between gap-4 text-sm text-zinc-500

@@ -1,0 +1,132 @@
+//! Shared helpers for `wasm32-unknown-unknown` + wasm-bindgen (web + webext).
+
+use std::path::{Path, PathBuf};
+use std::process::Command;
+
+/// Locate the first `*.wasm` artifact in a release directory (ignores `.d.wasm`).
+pub fn find_wasm_file(dir: &Path) -> Option<PathBuf> {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return None;
+    };
+    for entry in entries.flatten() {
+        let p = entry.path();
+        if p.extension().map(|e| e == "wasm").unwrap_or(false)
+            && !p
+                .file_name()
+                .map(|n| n.to_string_lossy().ends_with(".d.wasm"))
+                .unwrap_or(false)
+        {
+            return Some(p);
+        }
+    }
+    None
+}
+
+pub fn wasm_release_dirs(app_path: &Path, runtime_dir: &Path) -> (PathBuf, PathBuf) {
+    let workspace_target = app_path.join("target/wasm32-unknown-unknown/release");
+    let local_target = runtime_dir.join("target/wasm32-unknown-unknown/release");
+    (workspace_target, local_target)
+}
+
+/// `~/.cargo/bin` when present — must be **before** Homebrew `/opt/homebrew/bin` on `PATH` so
+/// nested builds invoke rustup's `rustc` (with wasm std), not a standalone `rustc`.
+fn rustup_bin_dir() -> Option<PathBuf> {
+    if let Some(home) = std::env::var_os("HOME") {
+        let p = Path::new(&home).join(".cargo/bin");
+        if p.is_dir() {
+            return Some(p);
+        }
+    }
+    #[cfg(windows)]
+    if let Some(profile) = std::env::var_os("USERPROFILE") {
+        let p = Path::new(&profile).join(".cargo/bin");
+        if p.is_dir() {
+            return Some(p);
+        }
+    }
+    None
+}
+
+fn prepend_rustup_bin_to_path(cmd: &mut Command) {
+    let Some(bin) = rustup_bin_dir() else {
+        return;
+    };
+    let new_path = match std::env::var_os("PATH") {
+        Some(rest) => {
+            let mut v = std::ffi::OsString::from(&bin);
+            v.push(if cfg!(windows) { ";" } else { ":" });
+            v.push(rest);
+            v
+        }
+        None => bin.into_os_string(),
+    };
+    cmd.env("PATH", new_path);
+}
+
+fn cargo_executable() -> std::ffi::OsString {
+    if let Some(c) = std::env::var_os("CARGO") {
+        return c;
+    }
+    if let Some(home) = std::env::var_os("HOME") {
+        let p = Path::new(&home).join(".cargo/bin/cargo");
+        if p.is_file() {
+            return p.into_os_string();
+        }
+    }
+    #[cfg(windows)]
+    if let Some(profile) = std::env::var_os("USERPROFILE") {
+        let p = Path::new(&profile).join(".cargo/bin/cargo.exe");
+        if p.is_file() {
+            return p.into_os_string();
+        }
+    }
+    "cargo".into()
+}
+
+/// Prefer rustup's `cargo` when `PATH` points at a non-rustup toolchain (e.g. Homebrew rustc
+/// without wasm std). Uses `CARGO` if set, else `~/.cargo/bin/cargo` when present.
+pub fn cargo_build_wasm32(runtime_dir: &Path) -> Result<(), String> {
+    let cargo_exe = cargo_executable();
+    let mut cmd = Command::new(cargo_exe);
+    prepend_rustup_bin_to_path(&mut cmd);
+    let out = cmd
+        .args([
+            "build",
+            "--target",
+            "wasm32-unknown-unknown",
+            "--release",
+            "--quiet",
+        ])
+        .current_dir(runtime_dir)
+        .output()
+        .map_err(|e| format!("cargo: {e}"))?;
+    if out.status.success() {
+        Ok(())
+    } else {
+        Err(String::from_utf8_lossy(&out.stderr).into_owned())
+    }
+}
+
+pub fn run_wasm_bindgen(wasm_path: &Path, out_dir: &Path, out_name: &str) -> Result<(), String> {
+    let out_dir = out_dir.to_string_lossy();
+    let wasm = wasm_path.to_str().ok_or("wasm path utf-8")?;
+    let mut cmd = Command::new("wasm-bindgen");
+    prepend_rustup_bin_to_path(&mut cmd);
+    let out = cmd
+        .args([
+            "--target",
+            "web",
+            "--out-dir",
+            out_dir.as_ref(),
+            "--out-name",
+            out_name,
+            wasm,
+        ])
+        .output()
+        .map_err(|e| format!("wasm-bindgen: {e}"))?;
+    if out.status.success() {
+        Ok(())
+    } else {
+        Err(String::from_utf8_lossy(&out.stderr).into_owned())
+    }
+}

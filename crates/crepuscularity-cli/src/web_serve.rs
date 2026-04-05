@@ -27,7 +27,10 @@ use std::time::{Duration, Instant};
 use notify::{Event, EventKind, RecursiveMode, Watcher};
 
 use crepuscularity_core::context::TemplateContext;
+use crepuscularity_core::preprocess::google_fonts_head_markup;
 use crepuscularity_web::render_from_files;
+
+use crate::web::merged_site_google_fonts;
 
 // ── Options ──────────────────────────────────────────────────────────────────
 
@@ -287,7 +290,7 @@ fn serve_template(
     stream: &mut TcpStream,
     vfm: &Arc<RwLock<HashMap<String, String>>>,
     entry: &str,
-    _site_dir: &Path,
+    site_dir: &Path,
 ) {
     let files = vfm.read().unwrap().clone();
     let ctx = TemplateContext::new();
@@ -302,6 +305,12 @@ fn serve_template(
             html_escape(&e)
         ),
     };
+
+    let fonts = merged_site_google_fonts(site_dir, &files);
+    let font_markup = google_fonts_head_markup(&fonts);
+    if !font_markup.is_empty() {
+        html = format!("{font_markup}\n{html}");
+    }
 
     // Inject hot-reload script.
     if let Some(pos) = html.rfind("</body>") {

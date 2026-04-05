@@ -7,7 +7,7 @@ fn crepus() -> Command {
 }
 
 #[test]
-fn web_new_then_build_emits_html() {
+fn web_new_scaffolds_crepus_and_runtime() {
     let tmp = tempfile::tempdir().expect("tempdir");
     let status = crepus()
         .current_dir(tmp.path())
@@ -17,34 +17,83 @@ fn web_new_then_build_emits_html() {
     assert!(status.success());
 
     let site_dir = tmp.path().join("acme-labs");
-    assert!(site_dir.join("site.json").is_file());
-    let site_json = std::fs::read_to_string(site_dir.join("site.json")).expect("read site.json");
-    assert!(site_json.contains("Acme Labs"));
+    assert!(site_dir.join("index.crepus").is_file());
+    assert!(site_dir.join("runtime/Cargo.toml").is_file());
+    assert!(site_dir.join("runtime/src/lib.rs").is_file());
+    let idx = std::fs::read_to_string(site_dir.join("index.crepus")).expect("read index");
+    assert!(idx.contains(".crepus"));
+}
 
-    let out = site_dir.join("dist").join("index.html");
+#[test]
+fn web_build_example_site_emits_wasm() {
+    let out = tempfile::tempdir().expect("tempdir");
+    let example = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../examples/web-site")
+        .canonicalize()
+        .expect("canonicalize examples/web-site");
+
     let status = crepus()
-        .current_dir(tmp.path())
         .args([
             "web",
             "build",
             "--site",
-            "acme-labs",
-            "-o",
-            out.to_str().unwrap(),
+            example.to_str().unwrap(),
+            "--out-dir",
+            out.path().to_str().unwrap(),
         ])
         .status()
         .expect("spawn crepus web build");
-    assert!(status.success());
+    assert!(
+        status.success(),
+        "crepus web build should succeed with wasm32 + wasm-bindgen"
+    );
 
-    let html = std::fs::read_to_string(&out).expect("read html");
-    assert!(html.contains("<html"));
-    assert!(html.contains("Acme Labs"));
+    let has_wasm = std::fs::read_dir(out.path().join("pkg"))
+        .expect("read pkg")
+        .flatten()
+        .any(|e| e.path().extension().map(|x| x == "wasm").unwrap_or(false));
+    assert!(
+        has_wasm,
+        "expected pkg/*.wasm (wasm-bindgen output); install wasm-bindgen-cli and rustup target add wasm32-unknown-unknown"
+    );
+    let bundle = std::fs::read_to_string(out.path().join("crepus-bundle.json")).expect("bundle");
+    assert!(bundle.contains("index.crepus"));
+    assert!(bundle.contains("entry"));
+    let html = std::fs::read_to_string(out.path().join("index.html")).expect("index.html");
+    assert!(html.contains("<!DOCTYPE html>") || html.contains("<!doctype html>"));
+    assert!(html.contains("crepus-root"));
 }
 
 #[test]
-fn web_build_from_stdin_dash() {
-    // Minimal site.json (starter shape) for stdin build.
-    // Use `r##"..."##` so hex colors like `"#fafafa"` do not terminate the raw string.
+fn web_build_docs_site_emits_wasm() {
+    let out = tempfile::tempdir().expect("tempdir");
+    let docs_site = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../docs-site")
+        .canonicalize()
+        .expect("canonicalize docs-site");
+
+    let status = crepus()
+        .args([
+            "web",
+            "build",
+            "--site",
+            docs_site.to_str().unwrap(),
+            "--out-dir",
+            out.path().to_str().unwrap(),
+        ])
+        .status()
+        .expect("spawn");
+    assert!(status.success());
+
+    let has_wasm = std::fs::read_dir(out.path().join("pkg"))
+        .expect("pkg dir")
+        .flatten()
+        .any(|e| e.path().extension().map(|x| x == "wasm").unwrap_or(false));
+    assert!(has_wasm);
+}
+
+#[test]
+fn web_build_legacy_site_json_stdout() {
     let json = r##"{
   "businessName": "Stdin Co",
   "domain": null,
@@ -77,28 +126,23 @@ fn web_build_from_stdin_dash() {
   ],
   "analytics": null,
   "turnstile": null
-}"##
-    .to_string();
+}"##;
 
-    let out = tempfile::tempdir().expect("tempdir");
-    let html_path = out.path().join("p.html");
-
-    let mut child = crepus()
-        .current_dir(out.path())
-        .args(["web", "build", "-", "-o", html_path.to_str().unwrap()])
+    let out = crepus()
+        .args(["web", "build", "--legacy-site-json", "-"])
         .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
         .spawn()
         .expect("spawn");
     use std::io::Write;
-    child
-        .stdin
-        .as_mut()
+    out.stdin
+        .as_ref()
         .unwrap()
         .write_all(json.as_bytes())
         .unwrap();
-    let status = child.wait().expect("wait");
-    assert!(status.success());
-    let html = std::fs::read_to_string(&html_path).expect("html");
+    let out = out.wait_with_output().expect("wait");
+    assert!(out.status.success());
+    let html = String::from_utf8_lossy(&out.stdout);
     assert!(html.contains("Stdin Co"));
 }
 
@@ -133,41 +177,14 @@ fn root_help_lists_web_commands() {
 }
 
 #[test]
-fn web_build_missing_json_file_fails() {
+fn web_build_legacy_missing_json_file_fails() {
     let tmp = tempfile::tempdir().expect("tempdir");
     let ghost = tmp.path().join("nope.json");
     let status = crepus()
         .current_dir(tmp.path())
-        .args(["web", "build", "--json"])
+        .args(["web", "build", "--legacy-site-json", "--json"])
         .arg(&ghost)
         .status()
         .expect("spawn");
     assert!(!status.success());
-}
-
-#[test]
-fn web_build_docs_site_works() {
-    let out = crepus()
-        .args([
-            "web",
-            "build",
-            "--site",
-            "../../docs-site",
-            "-o",
-            "docs.html",
-        ])
-        .output()
-        .expect("spawn crepus web build");
-
-    let stderr = String::from_utf8_lossy(&out.stderr);
-    let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(
-        out.status.success(),
-        "crepus web build docs-site failed with status {}. \nstdout: {}\nstderr: {}",
-        out.status,
-        stdout,
-        stderr
-    );
-    assert!(std::path::Path::new("docs.html").exists());
-    let _ = std::fs::remove_file("docs.html");
 }

@@ -4,6 +4,12 @@ use crepuscularity_core::ast::*;
 use crepuscularity_core::context::{value_to_str, TemplateContext, TemplateValue};
 use crepuscularity_core::eval::eval_expr;
 use crepuscularity_core::parser::{parse_component_file, parse_template};
+use crepuscularity_core::preprocess::{slot_rotate_child_phrases, slot_rotate_words_json_attr};
+
+mod bundle;
+
+pub use bundle::render_bundle;
+pub use crepuscularity_core::preprocess::google_fonts_head_markup;
 
 /// Render an entry point from an in-memory file map — no filesystem access.
 ///
@@ -183,6 +189,79 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<String, String>
         };
     }
 
+    if el.tag == "slot-rotate" {
+        let phrases = slot_rotate_child_phrases(&el.children)?;
+        if phrases.len() < 2 {
+            return Err("slot-rotate needs at least two plain-text phrase children".into());
+        }
+        let mut interval_ms = 3200u64;
+        for b in &el.bindings {
+            if b.prop == "interval" {
+                let v = value_to_str(&eval_expr(&b.value, ctx));
+                let v = v.trim_matches('"').trim();
+                interval_ms = v.parse().unwrap_or(3200);
+            }
+        }
+        let words_json = slot_rotate_words_json_attr(&phrases);
+
+        let mut class_names = vec!["crepus-slot".to_string()];
+        class_names.extend(el.classes.clone());
+        for cc in &el.conditional_classes {
+            if ctx.eval_condition(&cc.condition) {
+                class_names.push(cc.class.clone());
+            }
+        }
+
+        let mut out = String::new();
+        out.push_str("<span");
+        out.push_str(" class=\"");
+        out.push_str(&escape_html(&ctx.interpolate(&class_names.join(" "))));
+        out.push('"');
+        out.push_str(" data-slot-words=\"");
+        out.push_str(&escape_html(&words_json));
+        out.push('"');
+        out.push_str(" data-slot-interval=\"");
+        out.push_str(&escape_html(&interval_ms.to_string()));
+        out.push('"');
+        out.push_str(" aria-live=\"polite\"");
+
+        for binding in &el.bindings {
+            if binding.prop == "interval" {
+                continue;
+            }
+            out.push(' ');
+            out.push_str(&binding.prop);
+            out.push_str("=\"");
+            let value = value_to_str(&eval_expr(&binding.value, ctx));
+            out.push_str(&escape_html(&value));
+            out.push('"');
+        }
+
+        for handler in &el.event_handlers {
+            out.push(' ');
+            out.push_str("data-on");
+            out.push_str(&handler.event);
+            out.push_str("=\"");
+            out.push_str(&escape_html(&handler.handler));
+            out.push('"');
+        }
+
+        for animation in &el.animations {
+            out.push(' ');
+            out.push_str("data-animate-");
+            out.push_str(&animation.property);
+            out.push_str("=\"");
+            out.push_str(&escape_html(&format!(
+                "{} {}",
+                animation.duration_expr, animation.easing
+            )));
+            out.push('"');
+        }
+
+        out.push_str("></span>");
+        return Ok(out);
+    }
+
     let mut class_names = el.classes.clone();
     for cc in &el.conditional_classes {
         if ctx.eval_condition(&cc.condition) {
@@ -324,7 +403,14 @@ fn read_file(ctx: &TemplateContext, path: &Path) -> Result<String, String> {
             return Ok(content.clone());
         }
     }
-    std::fs::read_to_string(path).map_err(|e| format!("include error: {:?}: {}", path, e))
+    if cfg!(not(target_arch = "wasm32")) {
+        std::fs::read_to_string(path).map_err(|e| format!("include error: {:?}: {}", path, e))
+    } else {
+        Err(format!(
+            "include error: file not in virtual bundle: {}",
+            key
+        ))
+    }
 }
 
 fn render_include(inc: &IncludeNode, ctx: &TemplateContext) -> Result<String, String> {
@@ -388,7 +474,11 @@ fn resolve_include_path(base_dir: Option<&Path>, path: &str) -> PathBuf {
     } else {
         PathBuf::from(path)
     };
-    std::fs::canonicalize(&candidate).unwrap_or(candidate)
+    if cfg!(not(target_arch = "wasm32")) {
+        std::fs::canonicalize(&candidate).unwrap_or(candidate)
+    } else {
+        candidate
+    }
 }
 
 fn escape_html(input: &str) -> String {

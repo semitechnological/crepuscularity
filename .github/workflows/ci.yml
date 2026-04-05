@@ -47,6 +47,12 @@ jobs:
     - name: Set SDKROOT (macOS)
       if: runner.os == 'macOS'
       run: echo "SDKROOT=$(xcrun --show-sdk-path)" >> $GITHUB_ENV
+
+    - name: WASM target and wasm-bindgen (crepus web build integration tests)
+      run: |
+        rustup target add wasm32-unknown-unknown
+        cargo install wasm-bindgen-cli --locked
+      shell: bash
     
     - name: Run tests
       run: cargo test --all-features --workspace

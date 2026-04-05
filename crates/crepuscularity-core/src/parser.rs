@@ -166,8 +166,10 @@ pub fn parse_template(template: &str) -> Result<Vec<Node>, String> {
     if is_jsx_mode(template) {
         parse_jsx_template(template)
     } else {
-        let lines = collect_lines(template);
-        let (nodes, _) = parse_nodes(&lines, 0, 0);
+        let dec = crate::preprocess::strip_indent_decorators(template);
+        let lines = collect_lines(&dec.body);
+        let (mut nodes, _) = parse_nodes(&lines, 0, 0);
+        crate::preprocess::expand_class_aliases_in_nodes(&mut nodes, &dec.class_aliases);
         Ok(nodes)
     }
 }

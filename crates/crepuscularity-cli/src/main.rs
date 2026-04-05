@@ -6,9 +6,9 @@
 //!   crepus build [--release]                     cargo build wrapper
 //!   crepus preview FILE                          live-preview a .crepus template
 //!   crepus render FILE [--ctx FILE] [--var k=v] [--component Name]
-//!   crepus web new NAME                          scaffold site.json + web.toml
-//!   crepus web build [--site DIR] [--json FILE] [-o FILE] [site.json]
-//!   crepus web site-json [--site DIR]             pretty-print site.json
+//!   crepus web new NAME                          scaffold index.crepus + runtime/ + web.toml
+//!   crepus web build [--site DIR] [--out-dir DIR]   dist/ with WASM + crepus-bundle.json
+//!   crepus web site-json [--site DIR]             pretty-print site.json (deprecated)
 //!   crepus webext new NAME                       scaffold a browser extension
 //!   crepus webext build [--app PATH]             build browser extension
 //!   crepus webext manifest [--app PATH]          print manifest.json
@@ -24,6 +24,7 @@ mod hud;
 mod new;
 mod render;
 pub mod ui;
+mod wasm_bundle;
 mod web;
 mod web_serve;
 mod webext;
@@ -176,12 +177,12 @@ fn print_usage() {
     eprintln!(
         "  {}  {}",
         style("web new <name>                       ").green(),
-        style("scaffold site.json + web.toml").dim()
+        style("scaffold .crepus site + WASM runtime/").dim()
     );
     eprintln!(
         "  {}  {}",
-        style("web build [--site] [--json] [-o]     ").green(),
-        style("static page HTML from site.json").dim()
+        style("web build [--site] [--out-dir]       ").green(),
+        style("static dist/ — HTML shell + WASM bundle").dim()
     );
     eprintln!(
         "  {}  {}",

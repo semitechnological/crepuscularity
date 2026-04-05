@@ -2,3 +2,7 @@
 Cargo.lock
 .DS_Store
 .crepus-cache/
+.claude/
+docs-site/dist/
+examples/web-site/dist/
+**/runtime/target/

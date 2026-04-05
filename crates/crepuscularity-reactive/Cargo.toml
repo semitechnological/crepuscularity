@@ -21,4 +21,4 @@ web-sys = { version = "0.3", optional = true, features = [
     "Node",
 ] }
 wasm-bindgen = { version = "0.2", optional = true }
-js-sys = { version = "0.2", optional = true }
+js-sys = { version = "0.3", optional = true }
