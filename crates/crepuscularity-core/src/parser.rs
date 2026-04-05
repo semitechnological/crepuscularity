@@ -186,12 +186,10 @@ fn is_jsx_mode(template: &str) -> bool {
 /// Strip exactly `n` leading spaces from `s`, leaving any additional
 /// whitespace intact (it is content, not structural indent).
 fn strip_structural_indent(s: &str, n: usize) -> &str {
-    let mut count = 0;
-    for (byte_pos, ch) in s.char_indices() {
+    for (count, (byte_pos, ch)) in s.char_indices().enumerate() {
         if count >= n || ch != ' ' {
             return &s[byte_pos..];
         }
-        count += 1;
     }
     // Entire string was spaces (≤ n of them).
     ""
@@ -1489,14 +1487,20 @@ mod tests {
             .nth(1)
             .map(|l| l.len() - l.trim_start().len())
             .unwrap_or(0);
-        assert_eq!(cont_indent, 0, "continuation at same level should have 0 leading spaces, got: {text:?}");
+        assert_eq!(
+            cont_indent, 0,
+            "continuation at same level should have 0 leading spaces, got: {text:?}"
+        );
         // "    more indented" with structural indent 2 → strips 2 → "  more indented" (2 extra)
         let deep_indent = text
             .lines()
             .nth(2)
             .map(|l| l.len() - l.trim_start().len())
             .unwrap_or(0);
-        assert_eq!(deep_indent, 2, "deeper line should have 2 preserved leading spaces, got: {text:?}");
+        assert_eq!(
+            deep_indent, 2,
+            "deeper line should have 2 preserved leading spaces, got: {text:?}"
+        );
     }
 
     #[test]
