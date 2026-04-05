@@ -129,6 +129,10 @@ fn classify_element(el: &Element) -> (Region, usize) {
     let mut expr_count = 0;
     let mut is_dynamic = false;
 
+    if el.tag == "slot-rotate" {
+        return (Region::Dynamic, 1);
+    }
+
     // Dynamic attribute bindings.
     expr_count += el.bindings.len();
     if !el.bindings.is_empty() {
@@ -139,6 +143,17 @@ fn classify_element(el: &Element) -> (Region, usize) {
     expr_count += el.conditional_classes.len();
     if !el.conditional_classes.is_empty() {
         is_dynamic = true;
+    }
+
+    // Class tokens that use `{…}` interpolation are dynamic.
+    if el.classes.iter().any(|c| c.contains('{')) {
+        is_dynamic = true;
+    }
+
+    // GPUI / web animations participate in runtime binding.
+    if !el.animations.is_empty() {
+        is_dynamic = true;
+        expr_count += el.animations.len();
     }
 
     // Event handlers make the element dynamic (client-side binding site).

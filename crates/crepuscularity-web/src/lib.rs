@@ -14,6 +14,15 @@ pub use bundle::render_bundle;
 pub use crepuscularity_core::preprocess::google_fonts_head_markup;
 pub use crepuscularity_macros::crepus_refs;
 
+#[cfg(feature = "ssr")]
+mod ssr;
+
+#[cfg(feature = "ssr")]
+pub use ssr::{
+    render_bundle_with_ssr, render_from_files_with_ssr, render_ssr_document,
+    render_template_to_html_with_ssr, serialize_ctx_for_ssr, SsrDocument,
+};
+
 /// Render an entry point from an in-memory file map — no filesystem access.
 ///
 /// `entry` is `"path/to/file.crepus"` or `"path/to/file.crepus#ComponentName"`.
@@ -335,7 +344,7 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<String, String>
     Ok(out)
 }
 
-fn render_text(parts: &[TextPart], ctx: &TemplateContext) -> String {
+pub(crate) fn render_text(parts: &[TextPart], ctx: &TemplateContext) -> String {
     let mut result = String::new();
     for part in parts {
         match part {
@@ -405,7 +414,7 @@ fn render_match(block: &MatchBlock, ctx: &TemplateContext) -> Result<String, Str
     Ok(String::new())
 }
 
-fn read_file(ctx: &TemplateContext, path: &Path) -> Result<String, String> {
+pub(crate) fn read_file(ctx: &TemplateContext, path: &Path) -> Result<String, String> {
     // Check virtual files first (enables WASM / no-filesystem rendering).
     let key = path.to_string_lossy();
     if let Some(content) = ctx.virtual_files.get(key.as_ref()) {
@@ -482,7 +491,7 @@ fn render_named_component(
     render_nodes_to_html(&comp.nodes, &child_ctx)
 }
 
-fn resolve_include_path(base_dir: Option<&Path>, path: &str) -> PathBuf {
+pub(crate) fn resolve_include_path(base_dir: Option<&Path>, path: &str) -> PathBuf {
     let candidate = if let Some(base) = base_dir {
         base.join(path)
     } else {
@@ -720,9 +729,17 @@ fn serialize_ctx_to_json(ctx: &TemplateContext) -> String {
     serde_json::to_string(&Value::Object(map)).unwrap_or_else(|_| "{}".to_string())
 }
 
-fn escape_html(input: &str) -> String {
+pub(crate) fn escape_html(input: &str) -> String {
     input
         .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+}
+
+#[cfg(feature = "ssr")]
+pub(crate) fn escape_html_attr(s: &str) -> String {
+    s.replace('&', "&amp;")
         .replace('<', "&lt;")
         .replace('>', "&gt;")
         .replace('"', "&quot;")
