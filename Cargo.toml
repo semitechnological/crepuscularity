@@ -10,6 +10,7 @@ members = [
     "crates/crepuscularity-runtime",
     "crates/crepuscularity-dev",
     "crates/crepuscularity-cli",
+    "crates/crepuscularity-reactive",
     "examples/text-features",
     "examples/weather",
     "examples/todo",
