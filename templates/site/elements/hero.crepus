@@ -1,0 +1,39 @@
+--- Hero
+$: default headline = "Welcome"
+$: default subheadline = ""
+$: default primaryCtaLabel = ""
+$: default primaryCtaHref = "#contact"
+$: default secondaryCtaLabel = ""
+$: default secondaryCtaHref = "#services"
+$: default imageUrl = ""
+$: default imageAlt = ""
+section class="relative min-h-[80vh] flex items-center justify-center px-6 py-24 lg:px-8"
+  # Background gradient
+  div class="absolute inset-0 bg-gradient-to-br from-[var(--surface)] via-[var(--surface)] to-[var(--accent)]/10 -z-10"
+  
+  div class="mx-auto max-w-4xl text-center"
+    if {eyebrow}
+      p class="mb-4 text-sm font-semibold uppercase tracking-[0.24em] text-[var(--accent)]"
+        {eyebrow}
+    # Headline
+    h1 class="text-4xl font-bold tracking-tight text-[var(--text)] sm:text-6xl lg:text-7xl"
+      {headline}
+    
+    # Subheadline
+    if {subheadline}
+      p class="mt-6 text-lg leading-8 text-[var(--muted)] sm:text-xl max-w-2xl mx-auto"
+        {subheadline}
+    
+    # CTA Buttons
+    if {primaryCtaLabel}
+      div class="mt-10 flex items-center justify-center gap-x-4 flex-wrap gap-y-4"
+        a href={primaryCtaHref} class="rounded-lg bg-[var(--accent)] px-6 py-3 text-sm font-semibold text-white shadow-sm hover:bg-[var(--accent-soft)] transition-colors"
+          {primaryCtaLabel}
+        if {secondaryCtaLabel}
+          a href={secondaryCtaHref} class="rounded-lg border border-[var(--border)] px-6 py-3 text-sm font-semibold text-[var(--text)] hover:bg-[var(--border)]/20 transition-colors"
+            {secondaryCtaLabel}
+    
+    # Optional hero image
+    if {imageUrl}
+      div class="mt-16 relative"
+        img src={imageUrl} alt={imageAlt} class="mx-auto rounded-xl shadow-2xl ring-1 ring-[var(--border)]"

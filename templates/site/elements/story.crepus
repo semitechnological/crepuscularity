@@ -1,0 +1,23 @@
+--- Story
+$: default title = "Our Story"
+$: default body = ""
+$: default signature = ""
+section class="py-24 px-6 lg:px-8 bg-[var(--surface)]"
+  div class="mx-auto max-w-3xl"
+    if {eyebrow}
+      p class="mb-4 text-sm font-semibold uppercase tracking-[0.24em] text-[var(--accent)]"
+        {eyebrow}
+    # Section title
+    h2 class="text-3xl font-bold tracking-tight text-[var(--text)] sm:text-4xl mb-8"
+      {title}
+    
+    # Body text - rendered as prose
+    div class="prose prose-lg prose-invert max-w-none"
+      div class="text-[var(--muted)] leading-relaxed space-y-4 text-lg"
+        {body}
+    
+    # Optional signature/attribution
+    if {signature}
+      div class="mt-12 pt-8 border-t border-[var(--border)]"
+        p class="text-[var(--text)] font-medium italic"
+          "— {signature}"

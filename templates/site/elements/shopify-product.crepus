@@ -1,0 +1,63 @@
+--- ShopifyProduct
+$: default productHandle = ""
+$: default productTitle = ""
+$: default productDescription = ""
+$: default productImage = ""
+$: default productImageAlt = ""
+$: default productPrice = ""
+$: default productCompareAtPrice = ""
+section class="py-24 px-6 lg:px-8 bg-[var(--surface)]"
+  div class="mx-auto max-w-6xl"
+    div class="grid grid-cols-1 gap-12 lg:grid-cols-2"
+      # Product images
+      div class="space-y-4"
+        if {eyebrow}
+          p class="text-sm font-semibold uppercase tracking-[0.24em] text-[var(--accent)]"
+            {eyebrow}
+        # Main image
+        if {productImage}
+          div class="aspect-square overflow-hidden rounded-xl border border-[var(--border)]"
+            img src={productImage} alt={productImageAlt} class="h-full w-full object-cover"
+        
+        # Thumbnail gallery
+        if {productImages}
+          div class="grid grid-cols-4 gap-4"
+            for image in {productImages}
+              div class="aspect-square overflow-hidden rounded-lg border border-[var(--border)] cursor-pointer hover:border-[var(--accent)] transition-colors"
+                img src={image.url} alt={image.alt} class="h-full w-full object-cover"
+      
+      # Product info
+      div class="flex flex-col"
+        h1 class="text-3xl font-bold text-[var(--text)] sm:text-4xl"
+          {productTitle}
+        
+        # Price
+        div class="mt-4 flex items-center gap-3"
+          span class="text-2xl font-semibold text-[var(--text)]"
+            {productPrice}
+          if {productCompareAtPrice}
+            span class="text-lg text-[var(--muted)] line-through"
+              {productCompareAtPrice}
+            span class="rounded-full bg-red-500/10 px-3 py-1 text-sm font-medium text-red-400"
+              "Sale"
+        
+        # Description
+        if {productDescription}
+          div class="mt-6 text-[var(--muted)] leading-relaxed"
+            {productDescription}
+        
+        # Variant selector (if multiple variants)
+        if {productVariants}
+          div class="mt-8 space-y-4"
+            for variant in {productVariants}
+              label class="flex items-center gap-3 cursor-pointer"
+                input type="radio" name="variant" value={variant.id} class="h-4 w-4 text-[var(--accent)] focus:ring-[var(--accent)]"
+                span class="text-[var(--text)]"
+                  {variant.title}
+                span class="text-[var(--muted)]"
+                  {variant.price}
+        
+        # Add to cart button
+        div class="mt-8"
+          button type="button" class="w-full rounded-lg bg-[var(--accent)] px-8 py-4 text-base font-semibold text-white shadow-sm hover:bg-[var(--accent-soft)] transition-colors"
+            "Add to Cart"

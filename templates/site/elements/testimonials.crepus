@@ -1,0 +1,42 @@
+--- Testimonials
+$: default title = "What Our Clients Say"
+section class="py-24 px-6 lg:px-8 bg-[var(--surface)]"
+  div class="mx-auto max-w-7xl"
+    if {eyebrow}
+      p class="text-center text-sm font-semibold uppercase tracking-[0.24em] text-[var(--accent)]"
+        {eyebrow}
+    # Section title
+    if {title}
+      h2 class="text-3xl font-bold tracking-tight text-[var(--text)] sm:text-4xl text-center mb-6"
+        {title}
+    if {description}
+      p class="mx-auto mb-16 max-w-3xl text-center text-lg text-[var(--muted)]"
+        {description}
+    
+    # Testimonials grid
+    div class="grid grid-cols-1 gap-8 lg:grid-cols-3"
+      for testimonial in {testimonials}
+        div class="relative rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-8"
+          # Quote icon
+          div class="absolute -top-4 left-6"
+            div class="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--accent)]"
+              span class="text-white text-xl font-serif"
+                "\""
+          
+          # Quote text
+          blockquote class="mt-4"
+            p class="text-[var(--muted)] leading-relaxed italic"
+              "\"{testimonial.quote}\""
+          
+          # Attribution
+          div class="mt-6 flex items-center gap-3"
+            # Avatar placeholder
+            div class="h-10 w-10 rounded-full bg-[var(--accent)]/20 flex items-center justify-center"
+              span class="text-[var(--accent)] font-semibold text-sm"
+                {testimonial.initial}
+            div
+              div class="font-semibold text-[var(--text)]"
+                {testimonial.author}
+              if {testimonial.role}
+                div class="text-sm text-[var(--muted)]"
+                  {testimonial.role}

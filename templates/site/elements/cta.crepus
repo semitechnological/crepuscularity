@@ -1,0 +1,28 @@
+--- Cta
+$: default title = "Ready to Get Started?"
+$: default body = ""
+$: default primaryLabel = "Get Started"
+$: default primaryHref = "#contact"
+$: default secondaryLabel = ""
+$: default secondaryHref = ""
+section class="py-24 px-6 lg:px-8 bg-gradient-to-r from-[var(--accent)] to-[var(--accent-soft)]"
+  div class="mx-auto max-w-4xl text-center"
+    if {eyebrow}
+      p class="mb-4 text-sm font-semibold uppercase tracking-[0.24em] text-white/80"
+        {eyebrow}
+    # Title
+    h2 class="text-3xl font-bold tracking-tight text-white sm:text-4xl"
+      {title}
+    
+    # Body text
+    if {body}
+      p class="mt-6 text-lg leading-8 text-white/80 max-w-2xl mx-auto"
+        {body}
+    
+    # CTA Buttons
+    div class="mt-10 flex items-center justify-center gap-x-4 flex-wrap gap-y-4"
+      a href={primaryHref} class="rounded-lg bg-white px-6 py-3 text-sm font-semibold text-[var(--accent)] shadow-sm hover:bg-white/90 transition-colors"
+        {primaryLabel}
+      if {secondaryLabel}
+        a href={secondaryHref} class="rounded-lg border border-white/30 px-6 py-3 text-sm font-semibold text-white hover:bg-white/10 transition-colors"
+          {secondaryLabel}

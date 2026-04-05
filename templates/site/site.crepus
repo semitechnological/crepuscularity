@@ -1,0 +1,67 @@
+--- Page
+$: default businessName = "My Business"
+html lang="en"
+  include site.crepus#Head title={seoTitle} description={seoDescription} ogImage={seoOgImage}
+  body class="min-h-screen bg-[var(--surface)] text-[var(--text)]"
+    include site.crepus#ThemeStyles accent={themeAccent} accentSoft={themeAccentSoft} surface={themeSurface} text={themeText} muted={themeMuted} border={themeBorder}
+    main class="flex flex-col"
+      for element in {elements}
+        if {type == "hero"}
+          include elements/hero.crepus#Hero eyebrow={eyebrow} headline={headline} subheadline={subheadline} primaryCtaLabel={primaryCtaLabel} primaryCtaHref={primaryCtaHref} secondaryCtaLabel={secondaryCtaLabel} secondaryCtaHref={secondaryCtaHref} imageUrl={imageUrl} imageAlt={imageAlt}
+        else if {type == "stats"}
+          include elements/stats.crepus#Stats eyebrow={eyebrow} title={title} description={description} stats={stats}
+        else if {type == "services"}
+          include elements/services.crepus#Services eyebrow={eyebrow} title={title} description={description} services={services}
+        else if {type == "feature_grid"}
+          include elements/feature-grid.crepus#FeatureGrid eyebrow={eyebrow} title={title} description={description} columns={columns} features={features}
+        else if {type == "story"}
+          include elements/story.crepus#Story eyebrow={eyebrow} title={title} body={body} signature={signature}
+        else if {type == "process"}
+          include elements/process.crepus#Process eyebrow={eyebrow} title={title} description={description} steps={steps}
+        else if {type == "testimonials"}
+          include elements/testimonials.crepus#Testimonials eyebrow={eyebrow} title={title} description={description} testimonials={testimonials}
+        else if {type == "faq"}
+          include elements/faq.crepus#Faq eyebrow={eyebrow} title={title} description={description} items={items}
+        else if {type == "cta"}
+          include elements/cta.crepus#Cta eyebrow={eyebrow} title={title} body={body} primaryLabel={primaryLabel} primaryHref={primaryHref} secondaryLabel={secondaryLabel} secondaryHref={secondaryHref}
+        else if {type == "contact_form"}
+          include elements/contact-form.crepus#ContactForm eyebrow={eyebrow} title={title} description={description} formId={formId} submitLabel={submitLabel} endpoint={endpoint} method={method} fields={fields} successMessage={successMessage}
+        else if {type == "shopify_collection"}
+          include elements/shopify-collection.crepus#ShopifyCollection eyebrow={eyebrow} title={title} description={description} collectionHandle={collectionHandle} products={products}
+        else if {type == "shopify_product"}
+          include elements/shopify-product.crepus#ShopifyProduct eyebrow={eyebrow} productHandle={productHandle} productTitle={productTitle} productDescription={productDescription} productImage={productImage} productImageAlt={productImageAlt} productPrice={productPrice} productCompareAtPrice={productCompareAtPrice} productImages={productImages} productVariants={productVariants}
+
+--- Head
+$: default title = "My Business"
+$: default description = ""
+$: default ogImage = ""
+head
+  meta charset="UTF-8"
+  meta name="viewport" content="width=device-width, initial-scale=1.0"
+  title
+    {title}
+  if {description}
+    meta name="description" content={description}
+  if {ogImage}
+    meta property="og:image" content={ogImage}
+  meta property="og:title" content={title}
+  if {description}
+    meta property="og:description" content={description}
+  # Tailwind CSS via CDN for static sites
+  script src="https://cdn.tailwindcss.com"
+  # Custom font
+  link rel="preconnect" href="https://fonts.googleapis.com"
+  link rel="preconnect" href="https://fonts.gstatic.com" crossorigin=""
+  link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"
+  style
+    "body { font-family: 'Inter', sans-serif; }"
+
+--- ThemeStyles
+$: default accent = "#3b82f6"
+$: default accentSoft = "#60a5fa"
+$: default surface = "#09090b"
+$: default text = "#fafafa"
+$: default muted = "#a1a1aa"
+$: default border = "#27272a"
+style
+  ":root { --accent: {accent}; --accent-soft: {accentSoft}; --surface: {surface}; --text: {text}; --muted: {muted}; --border: {border}; }"

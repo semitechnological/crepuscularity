@@ -10,6 +10,8 @@ members = [
     "crates/crepuscularity-runtime",
     "crates/crepuscularity-dev",
     "crates/crepuscularity-cli",
+    "crates/unthought-sites",
+    "examples/text-features",
     "examples/weather",
     "examples/todo",
 ]

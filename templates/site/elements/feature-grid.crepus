@@ -1,0 +1,42 @@
+--- FeatureGrid
+$: default title = ""
+$: default columns = 3
+section class="py-24 px-6 lg:px-8 bg-[var(--surface)]"
+  div class="mx-auto max-w-7xl"
+    if {eyebrow}
+      p class="text-center text-sm font-semibold uppercase tracking-[0.24em] text-[var(--accent)]"
+        {eyebrow}
+    # Section title
+    if {title}
+      h2 class="text-3xl font-bold tracking-tight text-[var(--text)] sm:text-4xl text-center mb-6"
+        {title}
+    if {description}
+      p class="mx-auto mb-16 max-w-3xl text-center text-lg text-[var(--muted)]"
+        {description}
+    
+    # Features grid - columns vary based on setting
+    $: let gridClass = "grid grid-cols-1 gap-8 sm:grid-cols-2"
+    if {columns == 2}
+      $: let gridClass = "grid grid-cols-1 gap-8 sm:grid-cols-2"
+    else if {columns == 3}
+      $: let gridClass = "grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3"
+    else if {columns == 4}
+      $: let gridClass = "grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-4"
+    
+    div class="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3"
+      for feature in {features}
+        div class="relative rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6"
+          # Badge (if present)
+          if {feature.badge}
+            div class="absolute -top-3 left-4"
+              span class="inline-flex items-center rounded-full bg-[var(--accent)] px-3 py-1 text-xs font-medium text-white"
+                {feature.badge}
+          
+          # Feature title
+          h3 class="text-lg font-semibold text-[var(--text)] mb-2"
+            {feature.title}
+          
+          # Feature description
+          if {feature.description}
+            p class="text-[var(--muted)] text-sm leading-relaxed"
+              {feature.description}
