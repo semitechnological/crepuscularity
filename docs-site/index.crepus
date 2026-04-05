@@ -1,5 +1,4 @@
-google-font Inter
-google-font JetBrains Mono
+google-fonts "Inter" "JetBrains Mono"
 
 div min-h-screen bg-zinc-950 text-zinc-100 antialiased
  header sticky top-0 z-10 border-b border-zinc-800/80 backdrop-blur-md bg-zinc-950/85

@@ -1,4 +1,9 @@
-//! Indent-syntax decorators: top-of-file `google-font` lines and trailing `.alias` class shortcuts.
+//! Indent-syntax decorators: top-of-file Google Font pragmas and trailing `.alias` class shortcuts.
+//!
+//! Font pragmas (only at the top of the file, before real template lines):
+//! - `google-font Inter` or `google-font: Inter` — one family, unquoted (spaces allowed).
+//! - `google-font "Inter"` — one family, quoted (use quotes when the name has edge cases).
+//! - `google-fonts "Inter" "JetBrains Mono"` — several families in one line (each must be quoted).
 
 use std::collections::{HashMap, HashSet};
 
@@ -15,7 +20,7 @@ pub struct IndentDecorators {
     pub class_aliases: HashMap<String, String>,
 }
 
-/// Strip `google-font …` lines from the top and `.name tokens…` alias lines from the bottom.
+/// Strip `google-font` / `google-fonts` lines from the top and `.name tokens…` alias lines from the bottom.
 /// JSX mode templates are returned unchanged (no stripping).
 pub fn strip_indent_decorators(raw: &str) -> IndentDecorators {
     let lines: Vec<&str> = raw.lines().collect();
@@ -35,8 +40,8 @@ pub fn strip_indent_decorators(raw: &str) -> IndentDecorators {
             i += 1;
             continue;
         }
-        if let Some(family) = parse_google_font_line(t) {
-            google_fonts.push(family);
+        if let Some(families) = parse_google_font_pragma(t) {
+            google_fonts.extend(families);
             i += 1;
             continue;
         }
@@ -72,19 +77,76 @@ pub fn strip_indent_decorators(raw: &str) -> IndentDecorators {
     }
 }
 
-fn parse_google_font_line(line: &str) -> Option<String> {
+/// Returns font families declared on this line, or `None` if the line is not a font pragma.
+fn parse_google_font_pragma(line: &str) -> Option<Vec<String>> {
     let t = line.trim();
-    let rest = t.strip_prefix("google-font")?;
-    let rest = rest.trim_start();
+    // `google-font` is a prefix of `google-fonts` — match plural first.
+    let (plural, after_kw) = if let Some(r) = t.strip_prefix("google-fonts") {
+        (true, r.trim_start())
+    } else if let Some(r) = t.strip_prefix("google-font") {
+        (false, r.trim_start())
+    } else {
+        return None;
+    };
+
+    let rest = after_kw
+        .strip_prefix(':')
+        .map(str::trim)
+        .unwrap_or(after_kw)
+        .trim();
     if rest.is_empty() {
         return None;
     }
-    // `google-font: Inter` or `google-font Inter`
-    let name = rest.strip_prefix(':').map(str::trim).unwrap_or(rest).trim();
-    if name.is_empty() {
+
+    let quoted = parse_quoted_font_names(rest);
+    if !quoted.is_empty() {
+        if plural {
+            return Some(quoted);
+        }
+        return Some(vec![quoted[0].clone()]);
+    }
+
+    if plural {
+        // `google-fonts` requires quoted family names so multi-word names are unambiguous.
         return None;
     }
-    Some(name.to_string())
+
+    Some(vec![rest.to_string()])
+}
+
+/// Parses consecutive `"..."` tokens (supports `\"` and `\\` inside quotes).
+fn parse_quoted_font_names(s: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let b = s.as_bytes();
+    let mut i = 0usize;
+    while i < b.len() {
+        while i < b.len() && b[i].is_ascii_whitespace() {
+            i += 1;
+        }
+        if i >= b.len() {
+            break;
+        }
+        if b[i] != b'"' {
+            return out;
+        }
+        i += 1;
+        let start = i;
+        while i < b.len() {
+            match b[i] {
+                b'\\' if i + 1 < b.len() => i += 2,
+                b'"' => break,
+                _ => i += 1,
+            }
+        }
+        if i >= b.len() {
+            break;
+        }
+        let inner = &s[start..i];
+        let decoded = inner.replace("\\\\", "\\").replace("\\\"", "\"");
+        out.push(decoded);
+        i += 1;
+    }
+    out
 }
 
 fn parse_class_alias_line(line: &str) -> Option<(String, String)> {
@@ -275,6 +337,24 @@ div center
         assert!(d.body.contains("div center"));
         assert!(!d.body.contains("google-font"));
         assert!(!d.body.contains(".center"));
+    }
+
+    #[test]
+    fn google_fonts_one_line_quoted() {
+        let s = r#"google-fonts "Inter" "JetBrains Mono"
+
+div
+  "x"
+"#;
+        let d = strip_indent_decorators(s);
+        assert_eq!(d.google_fonts, vec!["Inter", "JetBrains Mono"]);
+    }
+
+    #[test]
+    fn google_font_quoted_single() {
+        let s = "google-font \"IBM Plex Sans\"\ndiv\n";
+        let d = strip_indent_decorators(s);
+        assert_eq!(d.google_fonts, vec!["IBM Plex Sans"]);
     }
 
     #[test]

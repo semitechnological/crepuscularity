@@ -7,9 +7,24 @@ pub use crepuscularity_core as core;
 pub use crepuscularity_web as html;
 pub use crepuscularity_web as web;
 
-/// Pragma line for indent `.crepus` source: load a family from Google Fonts when the site shell is built.
+/// Pragma line for indent `.crepus` source: load one family from Google Fonts when the site shell is built.
 pub fn google_font(family: &str) -> String {
-    format!("google-font {}\n", family.trim())
+    let q = family.trim().replace('\\', r"\\").replace('"', "\\\"");
+    format!("google-font \"{q}\"\n")
+}
+
+/// One line, multiple quoted families (same as `google-fonts "A" "B"` in `.crepus`).
+pub fn google_fonts(families: &[&str]) -> String {
+    let mut s = String::from("google-fonts");
+    for f in families {
+        let q = f.trim().replace('\\', r"\\").replace('"', "\\\"");
+        s.push(' ');
+        s.push('"');
+        s.push_str(&q);
+        s.push('"');
+    }
+    s.push('\n');
+    s
 }
 
 pub mod prelude {
