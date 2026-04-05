@@ -222,6 +222,10 @@ fn build_extension(app_path: &Path) {
         std::fs::write(src_dir.join("popup.css"), ASSET_POPUP_CSS).unwrap();
         std::fs::write(src_dir.join("popup.js"), ASSET_POPUP_JS).unwrap();
         std::fs::write(src_dir.join("background.js"), ASSET_BACKGROUND_JS).unwrap();
+        let custom_bg = app_path.join("src/background.js");
+        if custom_bg.exists() {
+            std::fs::copy(&custom_bg, src_dir.join("background.js")).unwrap();
+        }
         std::fs::write(src_dir.join("content.js"), ASSET_CONTENT_JS).unwrap();
         std::fs::write(src_dir.join("content.css"), ASSET_CONTENT_CSS).unwrap();
         std::fs::write(src_dir.join("browser-shim.js"), ASSET_BROWSER_SHIM).unwrap();

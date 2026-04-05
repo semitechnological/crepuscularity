@@ -41,6 +41,8 @@ pub enum Capability {
     Scripting,
     /// Alarms API
     Alarms,
+    /// Native Messaging (connect to a local native host)
+    NativeMessaging,
     /// Context menus
     ContextMenus,
     /// Host permission pattern
@@ -70,6 +72,7 @@ impl Capability {
             Capability::ActiveTab => "activeTab".to_string(),
             Capability::Scripting => "scripting".to_string(),
             Capability::Alarms => "alarms".to_string(),
+            Capability::NativeMessaging => "nativeMessaging".to_string(),
             Capability::ContextMenus => "contextMenus".to_string(),
             Capability::HostPermission(pattern) => pattern.clone(),
             Capability::Custom(name) => name.clone(),

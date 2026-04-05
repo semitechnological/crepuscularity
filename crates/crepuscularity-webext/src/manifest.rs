@@ -139,6 +139,8 @@ pub struct CapabilitiesSection {
     pub scripting: bool,
     #[serde(default)]
     pub alarms: bool,
+    #[serde(default, rename = "native-messaging")]
+    pub native_messaging: bool,
     #[serde(default, rename = "context-menus")]
     pub context_menus: bool,
     #[serde(default, rename = "host-permissions")]
@@ -505,6 +507,9 @@ impl ExtensionManifest {
         if self.capabilities.alarms {
             set.add(Capability::Alarms);
         }
+        if self.capabilities.native_messaging {
+            set.add(Capability::NativeMessaging);
+        }
         if self.capabilities.context_menus {
             set.add(Capability::ContextMenus);
         }
@@ -738,5 +743,24 @@ mac = "Alt+Shift+W"
         assert!(json.contains("\"commands\""));
         assert!(json.contains("_execute_action"));
         assert!(json.contains("Alt+Shift+W"));
+    }
+
+    #[test]
+    fn native_messaging_in_permissions() {
+        let toml = r#"
+[extension]
+name = "nm-ext"
+version = "1.0.0"
+
+[capabilities]
+storage = true
+native-messaging = true
+alarms = true
+"#;
+        let manifest: ExtensionManifest = toml::from_str(toml).unwrap();
+        assert!(manifest.capabilities.native_messaging);
+        let mv3 = manifest.to_manifest_v3();
+        assert!(mv3.permissions.contains(&"nativeMessaging".to_string()));
+        assert!(mv3.permissions.contains(&"alarms".to_string()));
     }
 }
