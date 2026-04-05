@@ -6,8 +6,9 @@
 //!   crepus build [--release]                     cargo build wrapper
 //!   crepus preview FILE                          live-preview a .crepus template
 //!   crepus render FILE [--ctx FILE] [--var k=v] [--component Name]
-//!   crepus web new NAME                          scaffold SiteBuilder JSON project
+//!   crepus web new NAME                          scaffold site.json + web.toml
 //!   crepus web build [--site DIR] [--json FILE] [-o FILE] [site.json]
+//!   crepus web site-json [--site DIR]             pretty-print site.json
 //!   crepus webext new NAME                       scaffold a browser extension
 //!   crepus webext build [--app PATH]             build browser extension
 //!   crepus webext manifest [--app PATH]          print manifest.json
@@ -23,7 +24,6 @@ mod hud;
 mod new;
 mod render;
 pub mod ui;
-#[cfg(feature = "web")]
 mod web;
 mod webext;
 
@@ -117,17 +117,7 @@ fn main() {
         }
 
         Some("web") => {
-            #[cfg(feature = "web")]
             web::run(&args[2..]);
-
-            #[cfg(not(feature = "web"))]
-            {
-                ui::error(
-                    "crepus web is disabled in this build. Rebuild crepuscularity-cli with --features web (needs the site-builder repo next to crepuscularity; see CI / README).",
-                );
-            }
-
-            }
         }
 
         Some("webext") => {
@@ -177,12 +167,17 @@ fn print_usage() {
     eprintln!(
         "  {}  {}",
         style("web new <name>                       ").green(),
-        style("scaffold SiteBuilder site.json project").dim()
+        style("scaffold site.json + web.toml").dim()
     );
     eprintln!(
         "  {}  {}",
         style("web build [--site] [--json] [-o]     ").green(),
-        style("static site HTML from JSON").dim()
+        style("static page HTML from site.json").dim()
+    );
+    eprintln!(
+        "  {}  {}",
+        style("web site-json [--site DIR]           ").green(),
+        style("pretty-print site.json").dim()
     );
     eprintln!();
     eprintln!(

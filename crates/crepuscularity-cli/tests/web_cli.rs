@@ -43,7 +43,7 @@ fn web_new_then_build_emits_html() {
 
 #[test]
 fn web_build_from_stdin_dash() {
-    // Minimal SiteBuilder JSON (matches `starter_site_payload` shape) without a dev-dependency.
+    // Minimal site.json (starter shape) for stdin build.
     // Use `r##"..."##` so hex colors like `"#fafafa"` do not terminate the raw string.
     let json = r##"{
   "businessName": "Stdin Co",
@@ -127,7 +127,7 @@ fn root_help_lists_web_commands() {
         stderr
     );
     assert!(
-        stderr.contains("web new") && stderr.contains("web build"),
+        stderr.contains("web new") && stderr.contains("web build") && stderr.contains("site-json"),
         "usage should list web commands in stderr:\n{stderr}"
     );
 }
@@ -148,10 +148,17 @@ fn web_build_missing_json_file_fails() {
 #[test]
 fn web_build_docs_site_works() {
     let out = crepus()
-        .args(["web", "build", "--site", "../../docs-site", "-o", "docs.html"])
+        .args([
+            "web",
+            "build",
+            "--site",
+            "../../docs-site",
+            "-o",
+            "docs.html",
+        ])
         .output()
         .expect("spawn crepus web build");
-    
+
     let stderr = String::from_utf8_lossy(&out.stderr);
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(
