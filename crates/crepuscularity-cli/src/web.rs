@@ -105,7 +105,7 @@ fn print_web_usage() {
     eprintln!("{}", style("crepus web").cyan().bold());
     eprintln!(
         "{}",
-        style("Static sites from SiteBuilder JSON (see unthought-sites).").dim()
+        style("Static sites from SiteBuilder JSON (unthought-sites crate).").dim()
     );
     eprintln!();
     eprintln!("{}", style("COMMANDS").dim());

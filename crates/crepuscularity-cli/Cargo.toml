@@ -7,12 +7,22 @@ edition = "2021"
 name = "crepus"
 path = "src/main.rs"
 
+[[test]]
+name = "web_cli"
+path = "tests/web_cli.rs"
+required-features = ["unthought-web"]
+
 [features]
 # Desktop (GPUI) commands: `crepus new`, `crepus dev`, `crepus preview`.
 # Enabled by default. Disable for cross-compilation to platforms where GPUI
 # (and its DirectX/Metal shaders) cannot be compiled.
-default = ["desktop"]
+#
+# `unthought-web`: `crepus web` — requires sibling checkout of the `unthought`
+# repo (see CI and path below). Build with `--no-default-features` or without
+# `unthought-web` if that path is unavailable.
+default = ["desktop", "unthought-web"]
 desktop = ["dep:gpui", "dep:crepuscularity-runtime", "dep:notify"]
+unthought-web = ["dep:unthought-sites"]
 
 [dependencies]
 gpui                   = { workspace = true, optional = true }
@@ -20,7 +30,7 @@ crepuscularity-core    = { path = "../crepuscularity-core" }
 crepuscularity-runtime = { path = "../crepuscularity-runtime", optional = true }
 crepuscularity-web     = { path = "../crepuscularity-web" }
 crepuscularity-webext  = { path = "../crepuscularity-webext" }
-unthought-sites        = { path = "../unthought-sites" }
+unthought-sites        = { path = "../../../unthought/crates/unthought-sites", optional = true }
 notify                 = { version = "8", optional = true }
 serde                  = { version = "1", features = ["derive"] }
 serde_json             = "1"
@@ -28,5 +38,4 @@ console                = "0.16"
 indicatif              = "0.18"
 
 [dev-dependencies]
-serde_json = "1"
 tempfile = "3"

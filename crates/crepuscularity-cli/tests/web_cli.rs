@@ -43,8 +43,42 @@ fn web_new_then_build_emits_html() {
 
 #[test]
 fn web_build_from_stdin_dash() {
-    let payload = unthought_sites::starter_site_payload("Stdin Co");
-    let json = serde_json::to_string(&payload).expect("json");
+    // Minimal SiteBuilder JSON (matches `starter_site_payload` shape) without a dev-dependency.
+    // Use `r##"..."##` so hex colors like `"#fafafa"` do not terminate the raw string.
+    let json = r##"{
+  "businessName": "Stdin Co",
+  "domain": null,
+  "seo": {
+    "title": "Stdin Co",
+    "description": "test",
+    "ogImage": null
+  },
+  "theme": {
+    "accent": "#3b82f6",
+    "accentSoft": "#60a5fa",
+    "surface": "#09090b",
+    "text": "#fafafa",
+    "muted": "#a1a1aa",
+    "border": "#27272a"
+  },
+  "elements": [
+    {
+      "type": "hero",
+      "id": "hero-1",
+      "props": {
+        "eyebrow": "Welcome",
+        "headline": "Meet Stdin Co",
+        "subheadline": "Ship a polished landing page from structured data.",
+        "primary": { "label": "Get started", "href": "#contact", "external": null },
+        "secondary": null,
+        "media": null
+      }
+    }
+  ],
+  "analytics": null,
+  "turnstile": null
+}"##
+    .to_string();
 
     let out = tempfile::tempdir().expect("tempdir");
     let html_path = out.path().join("p.html");

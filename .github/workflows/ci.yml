@@ -20,6 +20,12 @@ jobs:
     
     steps:
     - uses: actions/checkout@v4
+
+    - name: Checkout unthought (path dependency for crepus web)
+      uses: actions/checkout@v4
+      with:
+        repository: thesoftwarecompanyofhongkong/unthought
+        path: ../unthought
     
     - name: Install Rust
       uses: dtolnay/rust-toolchain@master
@@ -64,6 +70,12 @@ jobs:
     
     steps:
     - uses: actions/checkout@v4
+
+    - name: Checkout unthought (path dependency for crepus web)
+      uses: actions/checkout@v4
+      with:
+        repository: thesoftwarecompanyofhongkong/unthought
+        path: ../unthought
     
     - name: Install Rust
       uses: dtolnay/rust-toolchain@stable
@@ -86,6 +98,12 @@ jobs:
     
     steps:
     - uses: actions/checkout@v4
+
+    - name: Checkout unthought (path dependency for crepus web)
+      uses: actions/checkout@v4
+      with:
+        repository: thesoftwarecompanyofhongkong/unthought
+        path: ../unthought
     
     - name: Install Rust
       uses: dtolnay/rust-toolchain@stable
