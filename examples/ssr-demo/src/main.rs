@@ -5,6 +5,8 @@ use crepuscularity_web::{SsrDocument, render_ssr_document};
 const INDEX_CREPUS: &str = include_str!("../templates/index.crepus");
 const ABOUT_CREPUS: &str = include_str!("../templates/about.crepus");
 
+const TAILWIND: &str = r#"<script src="https://cdn.tailwindcss.com"></script>"#;
+
 fn render_page(template: &str, title: &str) -> Result<String, String> {
     let ctx = TemplateContext::new();
     render_ssr_document(
@@ -12,6 +14,7 @@ fn render_page(template: &str, title: &str) -> Result<String, String> {
         &ctx,
         &SsrDocument {
             title,
+            head_extra: TAILWIND,
             ..Default::default()
         },
         true,
