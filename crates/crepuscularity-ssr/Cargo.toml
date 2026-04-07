@@ -1,0 +1,12 @@
+[package]
+name = "crepuscularity-ssr"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+crepuscularity-web = { path = "../crepuscularity-web" }
+crepuscularity-core = { path = "../crepuscularity-core" }
+axum = "0.7"
+tokio = { version = "1", features = ["full"] }
+serde_json = "1"
+tracing = { workspace = true }
