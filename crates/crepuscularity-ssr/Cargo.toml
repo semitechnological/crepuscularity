@@ -8,5 +8,8 @@ crepuscularity-web = { path = "../crepuscularity-web" }
 crepuscularity-core = { path = "../crepuscularity-core" }
 axum = "0.7"
 tokio = { version = "1", features = ["full"] }
+tokio-stream = { version = "0.1", features = ["net"] }
+futures-util = "0.3"
+http = "1"
 serde_json = "1"
 tracing = { workspace = true }

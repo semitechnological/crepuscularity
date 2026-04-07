@@ -1,6 +1,6 @@
 use axum::{extract::State, response::Html};
 use crepuscularity_core::{TemplateContext, TemplateValue};
-use crepuscularity_web::render_template_to_html;
+use crepuscularity_web::{render_ssr_document, SsrDocument};
 use std::{collections::HashMap, sync::Arc};
 
 #[derive(Clone)]
@@ -9,6 +9,8 @@ pub struct SsrOptions {
     pub template: &'static str,
     /// Default context variables injected on every request.
     pub defaults: HashMap<String, TemplateValue>,
+    /// HTML `<title>` for the rendered document.
+    pub title: String,
 }
 
 pub struct SsrHandler {
@@ -24,7 +26,7 @@ impl SsrHandler {
         }
     }
 
-    /// Axum-compatible handler: renders the template with the provided context.
+    /// Axum-compatible handler: renders the template with SSR markers and wraps it in an HTML5 shell.
     pub async fn handle(State(opts): State<Arc<SsrOptions>>) -> Html<String> {
         let ctx = TemplateContext {
             vars: opts.defaults.clone(),
@@ -34,16 +36,21 @@ impl SsrHandler {
         };
         let html = tokio::task::spawn_blocking({
             let template = opts.template;
+            let title = opts.title.clone();
             let ctx = ctx.clone();
-            move || render_template_to_html(template, &ctx)
+            move || -> Result<String, String> {
+                let doc = SsrDocument {
+                    title: &title,
+                    ..Default::default()
+                };
+                render_ssr_document(template, &ctx, &doc, true)
+            }
         })
         .await
         .unwrap_or_else(|e| Err(format!("spawn_blocking panicked: {e}")));
 
         match html {
-            Ok(body) => Html(format!(
-                "<!doctype html><html><head><meta charset=utf-8></head><body>{body}</body></html>"
-            )),
+            Ok(page) => Html(page),
             Err(e) => Html(format!("<pre style='color:red'>{e}</pre>")),
         }
     }

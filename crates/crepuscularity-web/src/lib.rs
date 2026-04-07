@@ -508,6 +508,7 @@ pub(crate) fn resolve_include_path(base_dir: Option<&Path>, path: &str) -> PathB
 
 /// Returns `true` if a node is "dynamic" — contains interpolated expressions,
 /// control flow, or other content that can change based on context.
+#[cfg(feature = "hydration")]
 fn node_is_dynamic(node: &Node) -> bool {
     match node {
         Node::If(_) | Node::For(_) | Node::Match(_) | Node::RawText(_) => true,

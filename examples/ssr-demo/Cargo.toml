@@ -1,0 +1,16 @@
+[workspace]
+
+[package]
+name = "ssr-demo"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "ssr-demo"
+path = "src/main.rs"
+
+[dependencies]
+crepuscularity-web = { path = "../../crates/crepuscularity-web", default-features = true }
+crepuscularity-core = { path = "../../crates/crepuscularity-core" }
+axum = "0.7"
+tokio = { version = "1", features = ["full"] }
