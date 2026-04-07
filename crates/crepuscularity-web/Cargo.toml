@@ -5,6 +5,7 @@ edition = "2021"
 
 [features]
 parallel = ["dep:rayon"]
+hydration = []
 
 [dependencies]
 crepuscularity-core = { path = "../crepuscularity-core" }

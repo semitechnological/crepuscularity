@@ -1,0 +1,7 @@
+div max-w-sm mx-auto p-6 bg-zinc-900 text-white rounded-xl
+  h1 text-xl font-bold mb-2
+    "{city}"
+  p text-5xl font-light mb-4
+    "{temp}°C"
+  p text-zinc-400
+    "{description}"

@@ -481,6 +481,231 @@ fn resolve_include_path(base_dir: Option<&Path>, path: &str) -> PathBuf {
     }
 }
 
+// ── Hydration ─────────────────────────────────────────────────────────────────
+
+/// Returns `true` if a node is "dynamic" — contains interpolated expressions,
+/// control flow, or other content that can change based on context.
+fn node_is_dynamic(node: &Node) -> bool {
+    match node {
+        Node::If(_) | Node::For(_) | Node::Match(_) | Node::RawText(_) => true,
+        Node::Text(parts) => parts
+            .iter()
+            .any(|p| matches!(p, crepuscularity_core::ast::TextPart::Expr(_))),
+        Node::Element(el) => {
+            !el.conditional_classes.is_empty()
+                || !el.bindings.is_empty()
+                || el.children.iter().any(node_is_dynamic)
+        }
+        Node::Include(_) => true,
+        Node::LetDecl(_) => false,
+    }
+}
+
+/// Render a template to HTML with hydration markers injected.
+///
+/// - The root wrapping element gets `data-crepus-root`.
+/// - Each dynamic descendant element gets a unique `data-crepus-id="N"`.
+/// - A `<script>window.__crepus_ctx__ = {...};</script>` is appended with the
+///   serialized context variables.
+///
+/// Enable with the `hydration` cargo feature.
+#[cfg(feature = "hydration")]
+pub fn render_template_to_html_with_hydration(
+    template: &str,
+    ctx: &TemplateContext,
+) -> Result<String, String> {
+    use std::sync::atomic::AtomicU32;
+
+    let nodes = parse_template(template)?;
+
+    // Counter for data-crepus-id assignment.
+    let counter = AtomicU32::new(0);
+
+    let rendered = render_nodes_with_hydration_impl(&nodes, ctx, &counter, /*is_root=*/ true)?;
+
+    // Serialize context vars to JSON.
+    let ctx_json = serialize_ctx_to_json(ctx);
+    let script = format!("<script>window.__crepus_ctx__ = {};</script>", ctx_json);
+
+    Ok(format!("{rendered}{script}"))
+}
+
+#[cfg(feature = "hydration")]
+fn render_nodes_with_hydration_impl(
+    nodes: &[Node],
+    ctx: &TemplateContext,
+    counter: &std::sync::atomic::AtomicU32,
+    is_root: bool,
+) -> Result<String, String> {
+    use std::sync::atomic::Ordering;
+
+    // Process LetDecl nodes first.
+    let mut ctx = ctx.clone();
+    for node in nodes {
+        if let Node::LetDecl(decl) = node {
+            if decl.is_default && ctx.vars.contains_key(&decl.name) {
+                continue;
+            }
+            let val = crepuscularity_core::eval::eval_expr(&decl.expr, &ctx);
+            ctx.vars.insert(decl.name.clone(), val);
+        }
+    }
+
+    let mut html = String::new();
+    let mut is_first = is_root;
+
+    for node in nodes {
+        if let Node::LetDecl(_) = node {
+            continue;
+        }
+        if let Node::Element(el) = node {
+            let dyn_id = if node_is_dynamic(node) {
+                Some(counter.fetch_add(1, Ordering::Relaxed))
+            } else {
+                None
+            };
+            html.push_str(&render_element_with_hydration(
+                el, &ctx, counter, is_first, dyn_id,
+            )?);
+            is_first = false;
+        } else {
+            html.push_str(&render_node(node, &ctx)?);
+            is_first = false;
+        }
+    }
+
+    Ok(html)
+}
+
+#[cfg(feature = "hydration")]
+fn render_element_with_hydration(
+    el: &crepuscularity_core::ast::Element,
+    ctx: &TemplateContext,
+    counter: &std::sync::atomic::AtomicU32,
+    is_root: bool,
+    dyn_id: Option<u32>,
+) -> Result<String, String> {
+    if el.tag == "slot" {
+        return if let Some((slot_nodes, slot_ctx)) = &ctx.slot {
+            render_nodes_to_html(slot_nodes, slot_ctx)
+        } else {
+            render_nodes_to_html(&el.children, ctx)
+        };
+    }
+
+    let mut class_names = el.classes.clone();
+    for cc in &el.conditional_classes {
+        if ctx.eval_condition(&cc.condition) {
+            class_names.push(cc.class.clone());
+        }
+    }
+
+    let mut out = String::new();
+    out.push('<');
+    out.push_str(&el.tag);
+
+    if is_root {
+        out.push_str(" data-crepus-root");
+    }
+    if let Some(id) = dyn_id {
+        out.push_str(&format!(" data-crepus-id=\"{id}\""));
+    }
+
+    if !class_names.is_empty() {
+        out.push_str(" class=\"");
+        out.push_str(&escape_html(&ctx.interpolate(&class_names.join(" "))));
+        out.push('"');
+    }
+
+    for binding in &el.bindings {
+        out.push(' ');
+        out.push_str(&binding.prop);
+        out.push_str("=\"");
+        let value = crepuscularity_core::context::value_to_str(
+            &crepuscularity_core::eval::eval_expr(&binding.value, ctx),
+        );
+        out.push_str(&escape_html(&value));
+        out.push('"');
+    }
+
+    for handler in &el.event_handlers {
+        out.push(' ');
+        out.push_str("data-on");
+        out.push_str(&handler.event);
+        out.push_str("=\"");
+        out.push_str(&escape_html(&handler.handler));
+        out.push('"');
+    }
+
+    for animation in &el.animations {
+        out.push(' ');
+        out.push_str("data-animate-");
+        out.push_str(&animation.property);
+        out.push_str("=\"");
+        out.push_str(&escape_html(&format!(
+            "{} {}",
+            animation.duration_expr, animation.easing
+        )));
+        out.push('"');
+    }
+
+    out.push('>');
+
+    out.push_str(&render_nodes_with_hydration_impl(
+        &el.children,
+        ctx,
+        counter,
+        false,
+    )?);
+
+    out.push_str("</");
+    out.push_str(&el.tag);
+    out.push('>');
+    Ok(out)
+}
+
+#[cfg(feature = "hydration")]
+fn serialize_ctx_to_json(ctx: &TemplateContext) -> String {
+    use serde_json::{Map, Value};
+    let mut map = Map::new();
+    for (key, val) in &ctx.vars {
+        let json_val = match val {
+            TemplateValue::Str(s) => Value::String(s.clone()),
+            TemplateValue::Int(n) => Value::Number((*n).into()),
+            TemplateValue::Float(f) => serde_json::Number::from_f64(*f)
+                .map(Value::Number)
+                .unwrap_or(Value::Null),
+            TemplateValue::Bool(b) => Value::Bool(*b),
+            TemplateValue::Null => Value::Null,
+            TemplateValue::List(items) => Value::Array(
+                items
+                    .iter()
+                    .map(|item_ctx| {
+                        let mut item_map = Map::new();
+                        for (k, v) in &item_ctx.vars {
+                            item_map.insert(
+                                k.clone(),
+                                match v {
+                                    TemplateValue::Str(s) => Value::String(s.clone()),
+                                    TemplateValue::Int(n) => Value::Number((*n).into()),
+                                    TemplateValue::Float(f) => serde_json::Number::from_f64(*f)
+                                        .map(Value::Number)
+                                        .unwrap_or(Value::Null),
+                                    TemplateValue::Bool(b) => Value::Bool(*b),
+                                    _ => Value::Null,
+                                },
+                            );
+                        }
+                        Value::Object(item_map)
+                    })
+                    .collect(),
+            ),
+        };
+        map.insert(key.clone(), json_val);
+    }
+    serde_json::to_string(&Value::Object(map)).unwrap_or_else(|_| "{}".to_string())
+}
+
 fn escape_html(input: &str) -> String {
     input
         .replace('&', "&amp;")

@@ -53,6 +53,11 @@ pub fn run(args: &[String]) {
             crate::web_serve::run(opts);
         }
 
+        Some("build-full") => {
+            let b = parse_build_full_args(&args[1..]);
+            run_build_full(&b);
+        }
+
         _ => print_web_usage(),
     }
 }
@@ -157,6 +162,11 @@ fn print_web_usage() {
         "  {}  {}",
         style("serve [--site DIR] [--port N]  ").green(),
         style("live-reload dev server for .crepus files").dim()
+    );
+    eprintln!(
+        "  {}  {}",
+        style("build-full [OPTIONS]           ").green(),
+        style("parallel .crepus render + optional wasm/server cargo builds").dim()
     );
     eprintln!();
     eprintln!("{}", style("SERVE ARGS").dim());
@@ -1249,6 +1259,140 @@ fn feature_icon_char(icon: &str) -> String {
         "browser" => "🧭".to_string(),
         _ => "◆".to_string(),
     }
+}
+
+// ── build-full ───────────────────────────────────────────────────────────────
+
+struct BuildFullArgs {
+    site_dir: PathBuf,
+    wasm: bool,
+    server: bool,
+}
+
+fn parse_build_full_args(args: &[String]) -> BuildFullArgs {
+    let mut site_dir = std::env::current_dir().unwrap();
+    let mut wasm = false;
+    let mut server = false;
+    let mut i = 0;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--site" => {
+                if let Some(p) = args.get(i + 1) {
+                    site_dir = PathBuf::from(p);
+                    i += 1;
+                }
+            }
+            "--wasm" => wasm = true,
+            "--server" => server = true,
+            _ => {}
+        }
+        i += 1;
+    }
+    BuildFullArgs {
+        site_dir,
+        wasm,
+        server,
+    }
+}
+
+fn run_build_full(args: &BuildFullArgs) {
+    let t0 = Instant::now();
+    eprintln!("{}", style("crepus web build-full").dim());
+    eprintln!();
+
+    // L1 Rayon: collect all .crepus files in the site dir.
+    let mut crepus_files: HashMap<String, String> = HashMap::new();
+    let mut entries: Vec<String> = Vec::new();
+
+    match std::fs::read_dir(&args.site_dir) {
+        Ok(dir) => {
+            for entry in dir.flatten() {
+                let path = entry.path();
+                if path.extension().and_then(|e| e.to_str()) == Some("crepus") {
+                    let key = path
+                        .file_name()
+                        .unwrap_or_default()
+                        .to_string_lossy()
+                        .to_string();
+                    if let Ok(content) = std::fs::read_to_string(&path) {
+                        entries.push(key.clone());
+                        crepus_files.insert(key, content);
+                    }
+                }
+            }
+        }
+        Err(e) => {
+            ui::error(&format!("read dir {}: {e}", args.site_dir.display()));
+        }
+    }
+
+    let ctx = crepuscularity_core::TemplateContext::new();
+    let entry_refs: Vec<&str> = entries.iter().map(|s| s.as_str()).collect();
+    let results = crepuscularity_web::par_render_from_files(&crepus_files, &entry_refs, &ctx);
+
+    for (entry, result) in &results {
+        match result {
+            Ok(_html) => ui::step(&format!("rendered {entry}")),
+            Err(e) => ui::warning(&format!("error rendering {entry}: {e}")),
+        }
+    }
+
+    // Derive site name from directory for cargo build targets.
+    let site_name = args
+        .site_dir
+        .file_name()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .to_string();
+
+    // L2 overlapped cargo builds — spawn both before waiting on either.
+    let mut wasm_child = None;
+    let mut server_child = None;
+
+    if args.wasm {
+        let target = format!("{site_name}-runtime");
+        ui::step(&format!(
+            "spawning cargo build --target wasm32-unknown-unknown -p {target}"
+        ));
+        match std::process::Command::new("cargo")
+            .args(["build", "--target", "wasm32-unknown-unknown", "-p", &target])
+            .spawn()
+        {
+            Ok(child) => wasm_child = Some(child),
+            Err(e) => ui::warning(&format!("could not spawn wasm build: {e}")),
+        }
+    }
+
+    if args.server {
+        let target = format!("{site_name}-server");
+        ui::step(&format!("spawning cargo build -p {target}"));
+        match std::process::Command::new("cargo")
+            .args(["build", "-p", &target])
+            .spawn()
+        {
+            Ok(child) => server_child = Some(child),
+            Err(e) => ui::warning(&format!("could not spawn server build: {e}")),
+        }
+    }
+
+    // Wait on both (order doesn't matter; both were already spawned).
+    if let Some(mut child) = wasm_child {
+        match child.wait() {
+            Ok(status) if status.success() => ui::step("wasm build complete"),
+            Ok(status) => ui::warning(&format!("wasm build exited with {status}")),
+            Err(e) => ui::warning(&format!("wasm build wait error: {e}")),
+        }
+    }
+    if let Some(mut child) = server_child {
+        match child.wait() {
+            Ok(status) if status.success() => ui::step("server build complete"),
+            Ok(status) => ui::warning(&format!("server build exited with {status}")),
+            Err(e) => ui::warning(&format!("server build wait error: {e}")),
+        }
+    }
+
+    ui::success(&format!("{} files rendered", results.len()));
+    ui::done_in(t0.elapsed());
 }
 
 fn escape_html_legacy(s: &str) -> String {
