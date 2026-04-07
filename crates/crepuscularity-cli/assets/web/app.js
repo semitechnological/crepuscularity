@@ -1,4 +1,16 @@
-import init, { crepus_render } from "./pkg/runtime.js";
+import init, * as runtime from "./pkg/runtime.js";
+
+const delegatedEvents = [
+  "click",
+  "input",
+  "change",
+  "keydown",
+  "keyup",
+  "mousedown",
+  "mouseup",
+  "mousemove",
+  "scroll",
+];
 
 function setRootHtml(root, html) {
   const doc = new DOMParser().parseFromString(html, "text/html");
@@ -74,6 +86,43 @@ function initInteractive(root) {
   initSlotRotate(root);
 }
 
+function findHandlerTarget(root, eventName, startNode) {
+  const attr = `data-on${eventName}`;
+  let node = startNode instanceof Element ? startNode : startNode?.parentElement;
+  while (node && node !== root) {
+    if (node.hasAttribute?.(attr)) {
+      return node;
+    }
+    node = node.parentElement;
+  }
+  return root?.hasAttribute?.(attr) ? root : null;
+}
+
+function initDelegatedEvents(root) {
+  if (!root || root.dataset.crepusEventsBound === "true") return;
+  root.dataset.crepusEventsBound = "true";
+
+  for (const eventName of delegatedEvents) {
+    root.addEventListener(eventName, (event) => {
+      const target = findHandlerTarget(root, eventName, event.target);
+      if (!target) return;
+
+      const handlerName = target.getAttribute(`data-on${eventName}`);
+      const handler = handlerName ? runtime[handlerName] : null;
+      if (typeof handler !== "function") {
+        console.warn(`Missing WASM handler export: ${handlerName}`);
+        return;
+      }
+
+      Promise.resolve()
+        .then(() => handler())
+        .catch((error) => {
+          console.error(`crepus event handler failed: ${handlerName}`, error);
+        });
+    });
+  }
+}
+
 async function main() {
   await init();
   const res = await fetch("./crepus-bundle.json", { cache: "no-store" });
@@ -81,10 +130,11 @@ async function main() {
     throw new Error(`crepus-bundle.json: HTTP ${res.status}`);
   }
   const bundle = await res.json();
-  const html = crepus_render(JSON.stringify(bundle));
+  const html = runtime.crepus_render(JSON.stringify(bundle));
   const root = document.getElementById("crepus-root");
   if (root) {
     setRootHtml(root, html);
+    initDelegatedEvents(root);
     initInteractive(root);
   }
 }

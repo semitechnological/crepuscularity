@@ -3,12 +3,12 @@ google-fonts "Inter" "JetBrains Mono"
 div min-h-screen bg-zinc-950 text-zinc-100 antialiased
  header sticky top-0 z-10 border-b border-zinc-800/80 backdrop-blur-md bg-zinc-950/85
   div max-w-5xl mx-auto px-6 h-14 flex items-center justify-between
-   a href="#" class="text-sm font-semibold text-zinc-100 tracking-tight"
+   a href="#" text-sm font-semibold text-zinc-100 tracking-tight
     "Crepuscularity"
    nav flex items-center gap-6 text-sm text-zinc-400
-    a href="https://github.com/semitechnological/crepuscularity" class="hover:text-zinc-100 transition-colors" rel="noopener noreferrer" target="_blank"
+    a href="https://github.com/semitechnological/crepuscularity" hover:text-zinc-100 transition-colors rel="noopener noreferrer" target="_blank"
      "GitHub"
-    a href="https://github.com/semitechnological/crepuscularity/blob/main/docs/CREPUS_WEB_IMPLEMENTATION_SPEC.md" class="hover:text-zinc-100 transition-colors" rel="noopener noreferrer" target="_blank"
+    a href="https://github.com/semitechnological/crepuscularity/blob/main/docs/CREPUS_WEB_IMPLEMENTATION_SPEC.md" hover:text-zinc-100 transition-colors rel="noopener noreferrer" target="_blank"
      "Spec"
 
  main max-w-5xl mx-auto px-6
@@ -62,7 +62,7 @@ div min-h-screen bg-zinc-950 text-zinc-100 antialiased
      p text-sm text-zinc-500 m-0
       "Scaffold a GPUI app or a WASM web site from the same CLI."
     div flex flex-wrap gap-3
-     code class="text-xs font-mono text-zinc-300 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2"
+     code text-xs font-mono text-zinc-300 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2
       "cargo install --path crates/crepuscularity-cli"
 
  footer border-t border-zinc-800/80 py-10

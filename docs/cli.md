@@ -108,6 +108,76 @@ First paint is **`.crepus` → WASM** (same as `crepus web serve`). You can stil
 
 So: **flexible** — static SSR-like WASM output by default, **opt-in** client reactivity where you want it.
 
+### DOM refs and events
+
+Enable DOM helpers in the site runtime when you want typed `#id` access:
+
+```toml
+[dependencies]
+crepuscularity-web = { path = "../../crates/crepuscularity-web", features = ["dom"] }
+wasm-bindgen = "0.2"
+```
+
+Template:
+
+```text
+div #hero "Hi"
+button @click="on_refresh_status" type="button"
+  "Refresh"
+```
+
+Runtime:
+
+```rust
+use wasm_bindgen::prelude::*;
+
+#[wasm_bindgen]
+pub fn on_refresh_status() -> Result<(), JsValue> {
+    let crepus = crepuscularity_web::crepus_refs!("../index.crepus");
+    crepus.hero.text("Bye")
+}
+```
+
+`crepus_refs!` scans the referenced `.crepus` file and reachable `include`s at compile time, then generates typed fields for discovered `#id`s. Missing DOM nodes return `Result::Err`; the web production path does not panic.
+
+### Optional web features
+
+- `dom`: wasm-side DOM lookup and mutation helpers such as `crepus.hero.text(...)`.
+- `event-router`: reserved for event-router-related Rust glue. The default shell-side `data-on*` delegation lives in `app.js`, so it does not increase wasm size on its own.
+- `full-web`: convenience feature enabling the optional web-facing feature set.
+
+Keep minimal sites on default features and opt in only when the runtime needs DOM mutations.
+
+### HTMX and Alpine in the shell
+
+`crepus web build` copies `static/` into `dist/static/`. To vendor HTMX or Alpine without blocking WASM-first paint, add the script file under `static/vendor/` and inject it from `web.toml`:
+
+```toml
+[site]
+head_html = """
+  <script defer src="./static/vendor/htmx.min.js"></script>
+  <script defer src="./static/vendor/alpine.min.js"></script>
+"""
+```
+
+HTMX and Alpine should target stable subtrees that your Rust/WASM code is not replacing wholesale. Practical rule:
+
+- Let WASM own `#hero`, `#status`, and other nodes mutated through `crepus_refs!`.
+- Point HTMX swaps at sibling containers or leaf regions that Rust is not patching.
+- Use Alpine for local state inside self-contained islands; avoid mixing Alpine `x-text` and Rust `text(...)` writes on the same node unless one side is clearly authoritative.
+
+Canonical Alpine coexistence:
+
+```text
+div x-data="{ n: 0 }"
+  span #counter_display x-text="n"
+    "0"
+  button x-on:click="n++" type="button"
+    "++"
+```
+
+Use `x-on:*` for Alpine inside `.crepus`; Crepus reserves `@event=...` for Rust/WASM handler wiring.
+
 ### `crepus web serve`
 
 Dev server with hot reload — see `crepus web --help`.

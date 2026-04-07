@@ -12,6 +12,15 @@ div w-full h-full bg-zinc-950 text-white
     "Hello"
 ```
 
+### `#id` shorthand
+
+Any element line may include `#name`, which emits `id="name"`:
+
+```text
+section #hero
+  "Hello"
+```
+
 ## Text and Interpolation
 
 Quoted strings are text nodes. Use `{expr}` for interpolation:
@@ -20,6 +29,23 @@ Quoted strings are text nodes. Use `{expr}` for interpolation:
 div
   "Hello {name}"
   "Score: {score * 10}"
+```
+
+The indent DSL also accepts one same-line quoted literal after the tag/classes/bindings. It becomes the first child text node, then any indented children follow:
+
+```text
+div #hero "Hello"
+  span
+    "World"
+```
+
+This is equivalent to:
+
+```text
+div #hero
+  "Hello"
+  span
+    "World"
 ```
 
 Bare expressions render as text:
@@ -92,9 +118,11 @@ $: default variant = "primary"
 ### Event Handlers
 
 ```text
-button @click=handle_click
+button @click="handle_click"
   "Click me"
 ```
+
+On the web/WASM path, `@click="name"` renders `data-onclick="name"` and the generated shell dispatches it to an exported `#[wasm_bindgen] pub fn name()`.
 
 ### Conditional Classes
 
@@ -108,6 +136,8 @@ div class:hidden={!visible} class:active={selected}
 ```text
 input type="text" value={input_value} placeholder="Enter text"
 ```
+
+This same attribute path is how you emit HTMX and Alpine attributes, for example `hx-get="/status"` or `x-text="n"`.
 
 ## Animations
 

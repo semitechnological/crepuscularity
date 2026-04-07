@@ -7,9 +7,12 @@ use crepuscularity_core::parser::{parse_component_file, parse_template};
 use crepuscularity_core::preprocess::{slot_rotate_child_phrases, slot_rotate_words_json_attr};
 
 mod bundle;
+#[cfg(all(target_arch = "wasm32", feature = "dom"))]
+pub mod dom;
 
 pub use bundle::render_bundle;
 pub use crepuscularity_core::preprocess::google_fonts_head_markup;
+pub use crepuscularity_macros::crepus_refs;
 
 /// Render an entry point from an in-memory file map — no filesystem access.
 ///
@@ -214,6 +217,11 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<String, String>
 
         let mut out = String::new();
         out.push_str("<span");
+        if let Some(id) = &el.id {
+            out.push_str(" id=\"");
+            out.push_str(&escape_html(id));
+            out.push('"');
+        }
         out.push_str(" class=\"");
         out.push_str(&escape_html(&ctx.interpolate(&class_names.join(" "))));
         out.push('"');
@@ -272,6 +280,12 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<String, String>
     let mut out = String::new();
     out.push('<');
     out.push_str(&el.tag);
+
+    if let Some(id) = &el.id {
+        out.push_str(" id=\"");
+        out.push_str(&escape_html(id));
+        out.push('"');
+    }
 
     if !class_names.is_empty() {
         out.push_str(" class=\"");

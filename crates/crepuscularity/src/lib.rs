@@ -6,6 +6,7 @@
 pub use crepuscularity_core as core;
 pub use crepuscularity_web as html;
 pub use crepuscularity_web as web;
+pub use crepuscularity_web::crepus_refs;
 
 /// Pragma line for indent `.crepus` source: load one family from Google Fonts when the site shell is built.
 pub fn google_font(family: &str) -> String {

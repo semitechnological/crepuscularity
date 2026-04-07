@@ -588,6 +588,7 @@ struct SiteHead {
     page_title: String,
     description: String,
     og_image: Option<String>,
+    extra_head_html: String,
     theme: ThemeCss,
 }
 
@@ -597,6 +598,7 @@ impl Default for SiteHead {
             page_title: "Crepus site".into(),
             description: "Built with Crepuscularity".into(),
             og_image: None,
+            extra_head_html: String::new(),
             theme: ThemeCss::default(),
         }
     }
@@ -746,6 +748,9 @@ fn load_site_head(site_dir: &Path) -> SiteHead {
                         head.page_title = name.to_string();
                     }
                 }
+                if let Some(extra_head_html) = site.get("head_html").and_then(|x| x.as_str()) {
+                    head.extra_head_html = extra_head_html.to_string();
+                }
             }
         }
     }
@@ -778,6 +783,7 @@ fn render_index_html(head: &SiteHead, google_fonts: &[String]) -> String {
         .replace("__CREPUS_DESC__", &escape_html_attr(&head.description))
         .replace("__CREPUS_OG__", &og)
         .replace("__CREPUS_GOOGLE_FONTS__", &font_markup)
+        .replace("__CREPUS_EXTRA_HEAD__", &head.extra_head_html)
         .replace("__CREPUS_BODY_FONT__", &body_font_css)
         .replace("__THEME_ACCENT__", &escape_html_attr(&t.accent))
         .replace("__THEME_ACCENT_SOFT__", &escape_html_attr(&t.accent_soft))
