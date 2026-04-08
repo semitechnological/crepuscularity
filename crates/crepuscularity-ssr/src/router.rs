@@ -3,13 +3,13 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use axum::{
-    Router,
     extract::{Path, State},
     response::Html,
     routing::get,
+    Router,
 };
 use crepuscularity_core::TemplateContext;
-use crepuscularity_web::{SsrDocument, render_ssr_document};
+use crepuscularity_web::{render_ssr_document, SsrDocument};
 
 /// A single route entry pairing a template source with a page title.
 pub struct RouteEntry {
@@ -72,9 +72,7 @@ impl SsrRouter {
     }
 }
 
-async fn handle_root(
-    State(routes): State<Arc<HashMap<String, RouteEntry>>>,
-) -> Html<String> {
+async fn handle_root(State(routes): State<Arc<HashMap<String, RouteEntry>>>) -> Html<String> {
     render_entry(&routes, "/")
 }
 

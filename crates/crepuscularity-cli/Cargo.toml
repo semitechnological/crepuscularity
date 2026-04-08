@@ -25,6 +25,7 @@ crepuscularity-runtime = { path = "../crepuscularity-runtime", optional = true }
 crepuscularity-web     = { path = "../crepuscularity-web" }
 crepuscularity-webext  = { path = "../crepuscularity-webext" }
 notify                 = "8"
+walkdir                = "2"
 serde                  = { version = "1", features = ["derive"] }
 serde_json             = "1"
 toml                   = "0.8"

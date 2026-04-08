@@ -46,19 +46,92 @@ pub struct ServeOptions {
 
 // ── Hot-reload script ────────────────────────────────────────────────────────
 
-const RELOAD_SCRIPT: &str = r#"<script>
+const RELOAD_SCRIPT: &str = "<script>
 (function(){
-  var src=new EventSource('/dev-reload');
-  src.onmessage=function(e){if(e.data==='reload')location.reload();};
-  src.onerror=function(){setTimeout(function(){location.reload();},500);};
+  function showErrorOverlay(msg){
+    var el=document.getElementById('__crepus_err__');
+    if(!el){
+      el=document.createElement('div');
+      el.id='__crepus_err__';
+      el.style.cssText='position:fixed;inset:0;z-index:99999;background:rgba(10,0,0,0.93);color:#ff6e6e;font-family:monospace;font-size:14px;padding:40px;white-space:pre-wrap;overflow-y:auto;display:flex;flex-direction:column;gap:12px';
+      document.body.appendChild(el);
+    }
+    while(el.firstChild){el.removeChild(el.firstChild);}
+    var h=document.createElement('strong');
+    h.style.cssText='font-size:20px;color:#ff9999';
+    h.textContent='\u{26a0} Crepus error';
+    var b=document.createElement('pre');
+    b.style.cssText='margin:0;white-space:pre-wrap;color:#ff6e6e';
+    b.textContent=msg;
+    var hint=document.createElement('span');
+    hint.style.cssText='color:#555;font-size:12px';
+    hint.textContent='Fix the template and save to dismiss.';
+    el.appendChild(h);el.appendChild(b);el.appendChild(hint);
+  }
+  function dismissErrorOverlay(){var el=document.getElementById('__crepus_err__');if(el)el.remove();}
+  function showToast(text){
+    var t=document.createElement('div');
+    t.style.cssText='position:fixed;bottom:16px;right:16px;z-index:99998;background:#18181b;color:#a1a1aa;font-family:monospace;font-size:12px;padding:8px 14px;border-radius:6px;border:1px solid #3f3f46;pointer-events:none;transition:opacity 0.3s';
+    t.textContent=text;
+    document.body.appendChild(t);
+    setTimeout(function(){t.style.opacity='0';setTimeout(function(){t.remove();},300);},1800);
+  }
+  var es=new EventSource('/dev-reload');
+  es.addEventListener('crepus-reload',function(e){
+    dismissErrorOverlay();
+    var info={};try{info=JSON.parse(e.data);}catch(_){}
+    showToast('\u{21bb} '+(info.file||'template')+' updated');
+    setTimeout(function(){location.reload();},150);
+  });
+  es.addEventListener('crepus-error',function(e){
+    showErrorOverlay(e.data.replace(/\\\\n/g,'\\n'));
+  });
+  es.onmessage=function(e){if(e.data==='reload'){dismissErrorOverlay();location.reload();}};
+  es.onerror=function(){};
 })();
-</script>"#;
+</script>";
+
+// ── Startup validation ───────────────────────────────────────────────────────
+
+/// Walk `site_dir` and parse every `.crepus` file, printing pass/fail per file.
+fn validate_templates(site_dir: &std::path::Path) {
+    use crepuscularity_core::parser::parse_template;
+    let mut found = false;
+    for entry in walkdir::WalkDir::new(site_dir)
+        .into_iter()
+        .flatten()
+        .filter(|e| {
+            !e.file_type().is_dir()
+                && e.path().extension().and_then(|x| x.to_str()) == Some("crepus")
+        })
+    {
+        found = true;
+        let rel = entry.path().strip_prefix(site_dir).unwrap_or(entry.path());
+        match std::fs::read_to_string(entry.path()).map(|s| parse_template(&s)) {
+            Ok(Ok(_)) => eprintln!("  {} {}", console::style("✓").green(), rel.display()),
+            Ok(Err(e)) => eprintln!("  {} {} — {}", console::style("✗").red(), rel.display(), e),
+            Err(e) => eprintln!(
+                "  {} {} — read error: {}",
+                console::style("✗").red(),
+                rel.display(),
+                e
+            ),
+        }
+    }
+    if !found {
+        eprintln!("  {} no .crepus files found", console::style("⚠").yellow());
+    }
+}
 
 // ── Public entry point ───────────────────────────────────────────────────────
 
 /// Run the dev server, blocking until the process is killed.
 pub fn run(opts: ServeOptions) {
     let site_dir = opts.site_dir.clone();
+
+    // Validate all templates at startup.
+    eprintln!("\n  {} validating templates…", console::style("→").dim());
+    validate_templates(&site_dir);
 
     // Build initial virtual file map.
     let vfm: Arc<RwLock<HashMap<String, String>>> = Arc::new(RwLock::new(HashMap::new()));
@@ -67,8 +140,16 @@ pub fn run(opts: ServeOptions) {
     // Generation counter — bumped on every hot reload.
     let generation: Arc<AtomicU64> = Arc::new(AtomicU64::new(0));
 
+    // Last SSE message — updated by the watcher, read by SSE long-poll handlers.
+    let last_sse_msg: Arc<RwLock<String>> = Arc::new(RwLock::new(String::new()));
+
     // Spawn watcher + debounce.
-    start_watcher(site_dir.clone(), Arc::clone(&vfm), Arc::clone(&generation));
+    start_watcher(
+        site_dir.clone(),
+        Arc::clone(&vfm),
+        Arc::clone(&generation),
+        Arc::clone(&last_sse_msg),
+    );
 
     // Bind TCP listener.
     let addr = format!("127.0.0.1:{}", opts.port);
@@ -92,10 +173,11 @@ pub fn run(opts: ServeOptions) {
             Ok(s) => {
                 let vfm = Arc::clone(&vfm);
                 let gen = Arc::clone(&generation);
+                let sse_msg = Arc::clone(&last_sse_msg);
                 let entry = entry.clone();
                 let site_dir = site_dir.clone();
                 std::thread::spawn(move || {
-                    handle_connection(s, vfm, gen, &entry, &site_dir);
+                    handle_connection(s, vfm, gen, sse_msg, &entry, &site_dir);
                 });
             }
             Err(e) => {
@@ -138,12 +220,43 @@ fn relative_key(root: &Path, abs: &Path) -> String {
         .replace('\\', "/")
 }
 
+// ── SSE message builder ──────────────────────────────────────────────────────
+
+/// Try to parse `path` and return the appropriate SSE event string.
+fn build_sse_message(path: &Path) -> String {
+    use crepuscularity_core::parser::parse_template;
+    let filename = path
+        .file_name()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .to_string();
+    let ts = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis();
+    match std::fs::read_to_string(path).map(|s| parse_template(&s)) {
+        Ok(Ok(_)) => format!(
+            "event: crepus-reload\ndata: {{\"file\":\"{}\",\"ts\":{}}}\n\n",
+            filename, ts
+        ),
+        Ok(Err(e)) => {
+            let escaped = e.replace('\n', "\\n");
+            format!("event: crepus-error\ndata: {escaped}\n\n")
+        }
+        Err(e) => {
+            let escaped = e.to_string().replace('\n', "\\n");
+            format!("event: crepus-error\ndata: read error: {escaped}\n\n")
+        }
+    }
+}
+
 // ── File watcher + debounce ──────────────────────────────────────────────────
 
 fn start_watcher(
     site_dir: PathBuf,
     vfm: Arc<RwLock<HashMap<String, String>>>,
     generation: Arc<AtomicU64>,
+    last_sse_msg: Arc<RwLock<String>>,
 ) {
     let (tx, rx) = mpsc::channel::<PathBuf>();
 
@@ -193,12 +306,15 @@ fn start_watcher(
                         // Apply all pending changes.
                         let mut map = vfm.write().unwrap();
                         let mut changed = 0usize;
+                        // Track the last path for SSE message composition.
+                        let mut last_changed_path: Option<PathBuf> = None;
                         for path in pending.drain(..) {
                             let key = relative_key(&site_dir, &path);
                             match std::fs::read_to_string(&path) {
                                 Ok(content) => {
                                     map.insert(key, content);
                                     changed += 1;
+                                    last_changed_path = Some(path);
                                 }
                                 Err(_) => {
                                     // File may have been deleted.
@@ -209,6 +325,15 @@ fn start_watcher(
                         }
                         drop(map);
                         if changed > 0 {
+                            // Compose the SSE message for this reload event.
+                            let sse = if let Some(ref path) = last_changed_path {
+                                build_sse_message(path)
+                            } else {
+                                "data: reload\n\n".to_string()
+                            };
+                            if let Ok(mut msg) = last_sse_msg.write() {
+                                *msg = sse;
+                            }
                             generation.fetch_add(1, Ordering::Release);
                             let _span = tracing::info_span!("hot_reload", changed_files = changed)
                                 .entered();
@@ -228,6 +353,7 @@ fn handle_connection(
     mut stream: TcpStream,
     vfm: Arc<RwLock<HashMap<String, String>>>,
     generation: Arc<AtomicU64>,
+    last_sse_msg: Arc<RwLock<String>>,
     entry: &str,
     site_dir: &Path,
 ) {
@@ -253,7 +379,7 @@ fn handle_connection(
 
     match (method, path) {
         ("GET", "/dev-reload") => {
-            long_poll_sse(stream, generation);
+            long_poll_sse(stream, generation, last_sse_msg);
         }
 
         ("GET", "/" | "/index.html") => {
@@ -356,8 +482,12 @@ fn serve_static_file(stream: &mut TcpStream, url_path: &str, site_dir: &Path) {
 }
 
 /// Server-Sent Events long-poll: blocks until the generation counter changes,
-/// then sends `data: reload\n\n` and closes.
-fn long_poll_sse(mut stream: TcpStream, generation: Arc<AtomicU64>) {
+/// then sends a typed SSE message (crepus-reload or crepus-error) and closes.
+fn long_poll_sse(
+    mut stream: TcpStream,
+    generation: Arc<AtomicU64>,
+    last_sse_msg: Arc<RwLock<String>>,
+) {
     let headers =
         "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nCache-Control: no-cache\r\nConnection: keep-alive\r\n\r\n";
     if stream.write_all(headers.as_bytes()).is_err() {
@@ -371,7 +501,16 @@ fn long_poll_sse(mut stream: TcpStream, generation: Arc<AtomicU64>) {
     loop {
         std::thread::sleep(Duration::from_millis(100));
         if generation.load(Ordering::Acquire) != start_gen {
-            let _ = stream.write_all(b"data: reload\n\n");
+            let msg = last_sse_msg
+                .read()
+                .map(|g| g.clone())
+                .unwrap_or_else(|_| "data: reload\n\n".to_string());
+            let msg = if msg.is_empty() {
+                "data: reload\n\n".to_string()
+            } else {
+                msg
+            };
+            let _ = stream.write_all(msg.as_bytes());
             let _ = stream.flush();
             break;
         }
