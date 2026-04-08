@@ -1217,7 +1217,7 @@ fn map_class_to_style(class: &str) -> Option<TokenStream2> {
         "grow" => Some(quote! { .grow() }),
         "grow-0" => Some(quote! { .grow_0() }),
         "shrink" => Some(quote! { .shrink() }),
-        "shrink-0" => Some(quote! { .shrink_0() }),
+        "shrink-0" => Some(quote! { .flex_shrink_0() }),
         "inline-flex" | "inline" => Some(quote! { .flex() }),
         "block" => Some(quote! { .block() }),
         "hidden" => Some(quote! { .hidden() }),
