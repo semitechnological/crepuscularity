@@ -11,6 +11,7 @@ path = "src/main.rs"
 crepuscularity-web = { path = "../../../crates/crepuscularity-web", features = ["hydration"] }
 axum = "0.7"
 tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
 
 crepuscularity-core = { path = "../../../crates/crepuscularity-core" }
 [workspace]
