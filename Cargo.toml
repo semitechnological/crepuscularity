@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "crates/crepuscularity",
     "crates/crepuscularity-core",
+    "crates/crepuscularity-native",
     "crates/crepuscularity-gpui",
     "crates/crepuscularity-web",
     "crates/crepuscularity-webext",

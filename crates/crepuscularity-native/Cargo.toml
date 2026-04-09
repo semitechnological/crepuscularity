@@ -1,0 +1,13 @@
+[package]
+name = "crepuscularity-native"
+version = "0.3.0"
+edition = "2021"
+license = "MPL-2.0"
+description = "View intermediate representation (JSON) for native SwiftUI / Compose shells (UNSTABLE)."
+repository = "https://github.com/semitechnological/crepuscularity"
+readme = "../../README.md"
+
+[dependencies]
+crepuscularity-core = { path = "../crepuscularity-core", version = "0.3.0" }
+serde = { workspace = true }
+serde_json = { workspace = true }

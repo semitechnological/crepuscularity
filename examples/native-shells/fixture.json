@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "root": [
+    {
+      "kind": "stack",
+      "axis": "column",
+      "spacing": 16,
+      "children": [
+        {
+          "kind": "stack",
+          "axis": "column",
+          "children": [
+            {
+              "kind": "text",
+              "content": "Hello Ada"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
