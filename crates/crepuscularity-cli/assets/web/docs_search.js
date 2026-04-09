@@ -9,9 +9,22 @@
   var loaded = false;
   var loadError = "";
 
+  // Resolve against the docs *directory* (not the HTML filename) so GitHub Pages
+  // paths like /repo/docs/cli.html load /repo/docs/docs-search-index.json.
   var INDEX_URL = (function () {
     try {
-      return new URL("docs-search-index.json", window.location.href).href;
+      var page = new URL(window.location.href);
+      var path = page.pathname;
+      var dir;
+      if (path === "" || path.endsWith("/")) {
+        dir = path;
+      } else if (/\.html?$/i.test(path)) {
+        dir = path.replace(/[^/]+$/, "");
+      } else {
+        dir = path.endsWith("/") ? path : path + "/";
+      }
+      var base = new URL(dir || "/", page.origin);
+      return new URL("docs-search-index.json", base).href;
     } catch (err) {
       return "docs-search-index.json";
     }

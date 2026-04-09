@@ -1,5 +1,6 @@
 //! Emit static HTML from repository `docs/*.md` when running `crepus web build`.
 
+use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 
@@ -23,6 +24,13 @@ struct DocNavItem {
     stem: String,
     title: String,
     href: String,
+}
+
+#[derive(Clone, Debug)]
+struct OutlineItem {
+    level: u8,
+    text: String,
+    id: String,
 }
 
 /// Writes `out_docs_dir/*.html` plus `out_docs_dir/index.html`. No-op if `docs_src` is missing.
@@ -75,6 +83,7 @@ pub fn emit_markdown_docs(
         "Documentation",
         theme,
         &render_nav_list(&items, Some("index.html")),
+        "",
         &index_body,
         true,
     );
@@ -96,13 +105,17 @@ pub fn emit_markdown_docs(
             "text": text,
         }));
 
+        let outline = extract_outline(&raw);
         let body_html = markdown_to_html(&raw);
+        let body_html = inject_heading_ids(&body_html, &outline);
+        let toc = render_toc_nav(&outline);
         let nav = render_nav_list(&items, Some(&item.href));
         let doc_html = render_doc_shell(
             site_name,
             &item.title,
             theme,
             &nav,
+            &toc,
             &format!(r#"<article class="prose">{body_html}</article>"#),
             false,
         );
@@ -169,7 +182,6 @@ fn doc_blurb(stem: &str) -> String {
         "components" => "include, slots, defaults, and multi-component files.",
         "cli" => "new, dev, build, web, webext, preview, and more.",
         "webext" => "Manifest V3 extensions from .crepus and Rust.",
-        "WEB_BUILD_MIGRATION" => "Notes for migrating WASM static site builds.",
         _ => "Documentation page.",
     })
 }
@@ -241,6 +253,124 @@ fn fix_local_md_href(url: &str) -> String {
     }
 }
 
+fn slugify_heading_title(title: &str) -> String {
+    let mut slug = String::new();
+    let mut prev_hyphen = true;
+    for c in title.chars() {
+        let c = c.to_ascii_lowercase();
+        if c.is_ascii_alphanumeric() {
+            slug.push(c);
+            prev_hyphen = false;
+        } else if !prev_hyphen {
+            slug.push('-');
+            prev_hyphen = true;
+        }
+    }
+    while slug.ends_with('-') {
+        slug.pop();
+    }
+    if slug.is_empty() {
+        "section".into()
+    } else {
+        slug
+    }
+}
+
+fn extract_outline(md: &str) -> Vec<OutlineItem> {
+    let mut out = Vec::new();
+    let mut seen: HashMap<String, usize> = HashMap::new();
+    let mut in_fence = false;
+    for line in md.lines() {
+        let t = line.trim_start();
+        if t.starts_with("```") {
+            in_fence = !in_fence;
+            continue;
+        }
+        if in_fence {
+            continue;
+        }
+        let t = t.trim();
+        let (level, title_raw) = if t.starts_with("### ") && !t.starts_with("#### ") {
+            (3u8, t[4..].trim())
+        } else if t.starts_with("## ") && !t.starts_with("### ") {
+            (2u8, t[3..].trim())
+        } else {
+            continue;
+        };
+        if title_raw.is_empty() {
+            continue;
+        }
+        let text = title_raw.to_string();
+        let base = slugify_heading_title(title_raw);
+        let n = seen.entry(base.clone()).or_insert(0);
+        *n += 1;
+        let id = if *n == 1 {
+            base
+        } else {
+            format!("{}-{}", base, n)
+        };
+        out.push(OutlineItem { level, text, id });
+    }
+    out
+}
+
+fn inject_heading_ids(html: &str, outline: &[OutlineItem]) -> String {
+    let mut out = String::with_capacity(html.len().saturating_add(outline.len() * 24));
+    let mut rest = html;
+    for item in outline {
+        let (open_pat, close_pat) = if item.level == 2 {
+            ("<h2>", "</h2>")
+        } else {
+            ("<h3>", "</h3>")
+        };
+        let Some(pos) = rest.find(open_pat) else {
+            out.push_str(rest);
+            return out;
+        };
+        out.push_str(&rest[..pos]);
+        rest = &rest[pos + open_pat.len()..];
+        let Some(close_pos) = rest.find(close_pat) else {
+            out.push_str(open_pat);
+            out.push_str(rest);
+            return out;
+        };
+        let inner = &rest[..close_pos];
+        out.push_str(&format!(
+            r#"<h{} id="{}">"#,
+            item.level,
+            escape_html_attr(&item.id)
+        ));
+        out.push_str(inner);
+        out.push_str(close_pat);
+        rest = &rest[close_pos + close_pat.len()..];
+    }
+    out.push_str(rest);
+    out
+}
+
+fn render_toc_nav(outline: &[OutlineItem]) -> String {
+    if outline.is_empty() {
+        return String::new();
+    }
+    let mut s = String::from(
+        r#"<nav class="doc-toc" aria-label="On this page"><div class="doc-toc-title">On this page</div><ul>"#,
+    );
+    for it in outline {
+        let li_cls = if it.level == 3 {
+            r#" class="doc-toc-h3""#
+        } else {
+            ""
+        };
+        s.push_str(&format!(
+            r##"<li{li_cls}><a href="#{}">{}</a></li>"##,
+            escape_html_attr(&it.id),
+            escape_html(&it.text)
+        ));
+    }
+    s.push_str("</ul></nav>");
+    s
+}
+
 fn render_nav_list(items: &[DocNavItem], active_href: Option<&str>) -> String {
     let mut lis = String::new();
     let home_active = active_href == Some("index.html");
@@ -270,6 +400,7 @@ fn render_doc_shell(
     page_title: &str,
     theme: &DocsSiteTheme,
     nav: &str,
+    page_toc: &str,
     main_inner: &str,
     wide: bool,
 ) -> String {
@@ -315,13 +446,25 @@ fn render_doc_shell(
       display: grid;
       grid-template-columns: minmax(220px, 280px) 1fr;
       min-height: 100vh;
+      align-items: start;
     }}
     @media (max-width: 860px) {{
       .doc-shell {{ grid-template-columns: 1fr; }}
-      aside {{ border-bottom: 1px solid var(--border); border-right: none; }}
+      aside {{
+        position: relative;
+        top: auto;
+        max-height: none;
+        border-bottom: 1px solid var(--border);
+        border-right: none;
+      }}
     }}
     aside {{
-      padding: 1.75rem 1.35rem 3rem;
+      position: sticky;
+      top: 0;
+      align-self: start;
+      max-height: 100vh;
+      overflow-y: auto;
+      padding: 1.75rem 1.35rem 1.5rem;
       border-right: 1px solid var(--border);
       background: color-mix(in srgb, var(--surface) 92%, white 8%);
       display: flex;
@@ -376,6 +519,38 @@ fn render_doc_shell(
     .doc-nav a {{ color: var(--muted); display: inline-block; }}
     .doc-nav a:hover {{ color: var(--text); }}
     .doc-nav a.active {{ color: var(--text); font-weight: 600; }}
+    .doc-toc {{
+      margin: 0.25rem 0 0;
+      padding-top: 0.75rem;
+      border-top: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+    }}
+    .doc-toc-title {{
+      font-size: 0.68rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin: 0 0 0.45rem;
+    }}
+    .doc-toc ul {{
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      font-size: 0.8125rem;
+      line-height: 1.35;
+    }}
+    .doc-toc li {{ margin: 0.3rem 0; }}
+    .doc-toc a {{
+      color: var(--muted);
+      display: inline-block;
+      text-decoration: none;
+    }}
+    .doc-toc a:hover {{ color: var(--text); text-decoration: underline; text-underline-offset: 2px; }}
+    .doc-toc li.doc-toc-h3 {{
+      padding-left: 0.75rem;
+      font-size: 0.78rem;
+      opacity: 0.95;
+    }}
     .doc-main {{
       padding: 2.5rem 2.75rem 5rem;
       max-width: 50rem;
@@ -383,9 +558,9 @@ fn render_doc_shell(
     .doc-main.doc-main--wide {{
       max-width: 72rem;
     }}
-    .prose h1 {{ font-size: 2rem; font-weight: 700; margin: 0 0 1rem; letter-spacing: -0.03em; line-height: 1.2; }}
-    .prose h2 {{ font-size: 1.35rem; font-weight: 600; margin: 2rem 0 0.75rem; letter-spacing: -0.02em; }}
-    .prose h3 {{ font-size: 1.05rem; font-weight: 600; margin: 1.5rem 0 0.5rem; }}
+    .prose h1 {{ font-size: 2rem; font-weight: 700; margin: 0 0 1rem; letter-spacing: -0.03em; line-height: 1.2; scroll-margin-top: 1.25rem; }}
+    .prose h2 {{ font-size: 1.35rem; font-weight: 600; margin: 2rem 0 0.75rem; letter-spacing: -0.02em; scroll-margin-top: 1.25rem; }}
+    .prose h3 {{ font-size: 1.05rem; font-weight: 600; margin: 1.5rem 0 0.5rem; scroll-margin-top: 1.25rem; }}
     .prose p {{ margin: 0.75rem 0; color: color-mix(in srgb, var(--text) 88%, var(--muted)); }}
     .prose ul, .prose ol {{ margin: 0.75rem 0; padding-left: 1.25rem; color: color-mix(in srgb, var(--text) 88%, var(--muted)); }}
     .prose li {{ margin: 0.25rem 0; }}
@@ -489,7 +664,7 @@ fn render_doc_shell(
     }}
     .doc-footer {{
       margin-top: auto;
-      padding-top: 1.5rem;
+      padding-top: 1.25rem;
       font-size: 0.75rem;
       color: var(--muted);
       line-height: 1.45;
@@ -574,6 +749,7 @@ fn render_doc_shell(
       <nav aria-label="Documentation">
         {nav}
       </nav>
+      {page_toc}
       <footer class="doc-footer">
         <strong>crepuscularity-web</strong> renders these pages from Markdown.<br>
         Press <kbd style="font-size:0.65rem;padding:0.1rem 0.3rem;border:1px solid var(--border);border-radius:3px;">⌘K</kbd> or <kbd style="font-size:0.65rem;padding:0.1rem 0.3rem;border:1px solid var(--border);border-radius:3px;">Ctrl+K</kbd> to search.
@@ -597,6 +773,7 @@ fn render_doc_shell(
         main_cls = main_cls,
         main_inner = main_inner,
         nav = nav,
+        page_toc = page_toc,
         a = theme.accent,
         as = theme.accent_soft,
         s = theme.surface,
@@ -617,4 +794,8 @@ fn escape_html(s: &str) -> String {
             _ => c.to_string(),
         })
         .collect()
+}
+
+fn escape_html_attr(s: &str) -> String {
+    escape_html(s)
 }

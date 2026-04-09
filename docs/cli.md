@@ -94,12 +94,6 @@ crepus web build --site ./my-site --out-dir ./dist
 
 Optional **`site.json`**: SEO (`seo.title`, `seo.description`, `ogImage`) and **CSS variables** in the HTML shell only — not page structure.
 
-Legacy pipeline (HTML only from structured `site.json`):
-
-```bash
-crepus web build --legacy-site-json --site ./old-site -o ./out.html
-```
-
 ### Interactivity (Svelte-style flexibility)
 
 First paint is **`.crepus` → WASM** (same as `crepus web serve`). You can still add **fine-grained reactivity** the same way as on the web in general:
@@ -187,8 +181,6 @@ Dev server with hot reload — see `crepus web --help`.
 ### `crepus web site-json`
 
 Deprecated pretty-printer for `site.json`.
-
-**Migration from `site.json`-only builds:** see [WEB_BUILD_MIGRATION.md](./WEB_BUILD_MIGRATION.md).
 
 ## Browser Extension Commands
 

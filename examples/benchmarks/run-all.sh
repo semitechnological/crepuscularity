@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # Run every target in benchmark.toml (same as: crepus benchmark all).
-# Extra args are forwarded, e.g. ./run-all.sh --json > bench.json
+# Extra args are forwarded, e.g.
+#   ./run-all.sh --json > bench.json        # machine-readable timings
+#   ./run-all.sh --quiet                    # no streaming output (CI / logs)
+# Default (no --quiet): live cargo/npm output + step preambles.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

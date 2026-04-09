@@ -365,7 +365,7 @@ struct WebBuildArgs {
 fn parse_build_args(args: &[String]) -> WebBuildArgs {
     if args.iter().any(|a| a == "--legacy-site-json") {
         ui::error(
-            "crepus web build no longer supports --legacy-site-json; use .crepus + WASM (docs/WEB_BUILD_MIGRATION.md)",
+            "crepus web build no longer supports --legacy-site-json; use `crepus web new` and `crepus web build` with `.crepus` + WASM (see docs/cli.md).",
         );
     }
     if args.iter().any(|a| a == "--json") {
@@ -525,6 +525,8 @@ fn build_site_wasm(cli: &WebBuildArgs) {
 
     copy_unocss(&vendor_dir);
     let index_html = render_index_html(&head, &google_fonts);
+    std::fs::write(b.out_dir.join(".nojekyll"), b"")
+        .unwrap_or_else(|e| ui::error(&format!("write .nojekyll: {e}")));
     std::fs::write(b.out_dir.join("index.html"), index_html).unwrap_or_else(|e| {
         ui::error(&format!("write index.html: {e}"));
     });

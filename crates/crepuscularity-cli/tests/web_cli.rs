@@ -102,6 +102,22 @@ fn web_build_docs_site_emits_wasm() {
         dsl.contains("prose") && dsl.contains("DSL"),
         "expected dsl.md rendered to HTML"
     );
+    assert!(
+        dsl.contains("position: sticky") && dsl.contains(".doc-toc"),
+        "docs sidebar should be sticky with in-page TOC"
+    );
+    assert!(
+        dsl.contains("<h2 id=\""),
+        "prose headings should get anchor ids for TOC links"
+    );
+    assert!(
+        out.path().join(".nojekyll").is_file(),
+        "GitHub Pages should receive .nojekyll in site root"
+    );
+    assert!(
+        !docs_index.contains("WEB_BUILD_MIGRATION"),
+        "generated docs must not link removed migration pages"
+    );
     let search = std::fs::read_to_string(out.path().join("docs/docs-search-index.json"))
         .expect("docs-search-index.json");
     assert!(
