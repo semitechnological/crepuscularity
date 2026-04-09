@@ -1,5 +1,7 @@
 # Crepuscularity — runtime & web framework: master build plan
 
+**Also:** [Documentation home](README.md) · [DSL](dsl.md) · [Web extensions](webext.md)
+
 **Audience:** Engineers or AI agents shipping the **`.crepus` runtime**, **web + webext** targets, **compiler driver**, and **dev/prod toolchains**.  
 **Product intent:** **Maximum practical speed**—fast dev feedback, fast SSR/SSG, fast client updates, fast CI—using the same techniques as the best stacks (fine-grained reactivity, incremental compilation, aggressive caching, parallel task graphs).
 

@@ -1,5 +1,7 @@
 # Migration: `crepus web build` (site.json → `.crepus` + WASM)
 
+**Also:** [Documentation home](README.md) · [DSL](dsl.md) · [CLI](cli.md)
+
 ## What changed
 
 - **Default `crepus web build`** no longer turns **`site.json`** into a single static HTML document.

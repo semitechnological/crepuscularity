@@ -1,5 +1,7 @@
 # Components
 
+**Also:** [Documentation home](README.md) · [DSL](dsl.md) · [CLI](cli.md) · [Extensions](webext.md)
+
 Crepuscularity supports reusable components via `include` statements.
 
 ## Single-File Components

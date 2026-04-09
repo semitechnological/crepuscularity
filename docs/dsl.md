@@ -1,5 +1,7 @@
 # DSL Reference
 
+**Also:** [Documentation home](README.md) · [Components](components.md) · [CLI](cli.md) · [Extensions](webext.md)
+
 The `.crepus` template language uses indentation-based syntax for defining UI structures.
 
 ## Elements

@@ -1,5 +1,7 @@
 # CLI Guide
 
+**Also:** [Documentation home](README.md) · [DSL](dsl.md) · [Components](components.md) · [Extensions](webext.md)
+
 The `crepus` CLI provides commands for scaffolding, building, and developing crepuscularity applications.
 
 ## Installation
