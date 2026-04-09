@@ -1,0 +1,4 @@
+[site]
+name = "Web site example"
+version = "0.1.0"
+description = "Example for crepus web build (WASM + .crepus)"

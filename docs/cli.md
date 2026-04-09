@@ -69,6 +69,125 @@ score = 1200
 logged_in = true
 ```
 
+## Static web sites (`crepus web`)
+
+Author pages in `.crepus` (same virtual-file semantics as `crepus web serve`). Production **`crepus web build`** compiles the site’s `runtime/` crate to **`wasm32-unknown-unknown`**, runs **wasm-bindgen**, and writes a **`dist/`** folder: thin **`index.html`**, **`app.js`**, **`crepus-bundle.json`** (all `*.crepus` sources), **`vendor/unocss.js`**, and **`pkg/runtime.js`** + **`runtime_bg.wasm`**. Copy and dynamic data live in **`.crepus`** (quoted text nodes) and, when you need typed Rust context, in **`runtime/src/lib.rs`** via **`crepuscularity_web::render_from_files`** (same pattern as extension runtimes calling into `crepuscularity-web`).
+
+### Prerequisites
+
+- `rustup target add wasm32-unknown-unknown`
+- `cargo install wasm-bindgen-cli`
+
+If both **Homebrew** and **rustup** ship `cargo`/`rustc`, ensure rustup’s toolchain wins for WASM (the CLI prepends `~/.cargo/bin` to `PATH` for nested builds).
+
+### `crepus web new <name>`
+
+Scaffolds `index.crepus`, `web.toml`, and `runtime/` (thin `#[wasm_bindgen]` shim that calls **`crepuscularity_web::render_bundle`**).
+
+### `crepus web build`
+
+```bash
+crepus web build --site ./my-site --out-dir ./dist
+```
+
+Optional **`site.json`**: SEO (`seo.title`, `seo.description`, `ogImage`) and **CSS variables** in the HTML shell only — not page structure.
+
+Legacy pipeline (HTML only from structured `site.json`):
+
+```bash
+crepus web build --legacy-site-json --site ./old-site -o ./out.html
+```
+
+### Interactivity (Svelte-style flexibility)
+
+First paint is **`.crepus` → WASM** (same as `crepus web serve`). You can still add **fine-grained reactivity** the same way as on the web in general:
+
+- **Client islands** — small scripts under **`static/`** (copied to `dist/static/`) or hooks in the shipped **`app.js`** pattern; the template can emit `data-*` hooks (see **`docs-site/index.crepus`** + **`initSlotRotate`** in `assets/web/app.js` for a slot-machine phrase example).
+- **Reactive graph** — the **`crepuscularity-reactive`** crate is the direction for signal-driven DOM updates; compose with WASM templates as “compiled shell + targeted patches”.
+- **Hydration / islands** — described in **`docs/CREPUS_WEB_IMPLEMENTATION_SPEC.md`**; goal is optional client graphs without duplicating template semantics.
+
+So: **flexible** — static SSR-like WASM output by default, **opt-in** client reactivity where you want it.
+
+### DOM refs and events
+
+Enable DOM helpers in the site runtime when you want typed `#id` access:
+
+```toml
+[dependencies]
+crepuscularity-web = { path = "../../crates/crepuscularity-web", features = ["dom"] }
+wasm-bindgen = "0.2"
+```
+
+Template:
+
+```text
+div #hero "Hi"
+button @click="on_refresh_status" type="button"
+  "Refresh"
+```
+
+Runtime:
+
+```rust
+use wasm_bindgen::prelude::*;
+
+#[wasm_bindgen]
+pub fn on_refresh_status() -> Result<(), JsValue> {
+    let crepus = crepuscularity_web::crepus_refs!("../index.crepus");
+    crepus.hero.text("Bye")
+}
+```
+
+`crepus_refs!` scans the referenced `.crepus` file and reachable `include`s at compile time, then generates typed fields for discovered `#id`s. Missing DOM nodes return `Result::Err`; the web production path does not panic.
+
+### Optional web features
+
+- `dom`: wasm-side DOM lookup and mutation helpers such as `crepus.hero.text(...)`.
+- `event-router`: reserved for event-router-related Rust glue. The default shell-side `data-on*` delegation lives in `app.js`, so it does not increase wasm size on its own.
+- `full-web`: convenience feature enabling the optional web-facing feature set.
+
+Keep minimal sites on default features and opt in only when the runtime needs DOM mutations.
+
+### HTMX and Alpine in the shell
+
+`crepus web build` copies `static/` into `dist/static/`. To vendor HTMX or Alpine without blocking WASM-first paint, add the script file under `static/vendor/` and inject it from `web.toml`:
+
+```toml
+[site]
+head_html = """
+  <script defer src="./static/vendor/htmx.min.js"></script>
+  <script defer src="./static/vendor/alpine.min.js"></script>
+"""
+```
+
+HTMX and Alpine should target stable subtrees that your Rust/WASM code is not replacing wholesale. Practical rule:
+
+- Let WASM own `#hero`, `#status`, and other nodes mutated through `crepus_refs!`.
+- Point HTMX swaps at sibling containers or leaf regions that Rust is not patching.
+- Use Alpine for local state inside self-contained islands; avoid mixing Alpine `x-text` and Rust `text(...)` writes on the same node unless one side is clearly authoritative.
+
+Canonical Alpine coexistence:
+
+```text
+div x-data="{ n: 0 }"
+  span #counter_display x-text="n"
+    "0"
+  button x-on:click="n++" type="button"
+    "++"
+```
+
+Use `x-on:*` for Alpine inside `.crepus`; Crepus reserves `@event=...` for Rust/WASM handler wiring.
+
+### `crepus web serve`
+
+Dev server with hot reload — see `crepus web --help`.
+
+### `crepus web site-json`
+
+Deprecated pretty-printer for `site.json`.
+
+**Migration from `site.json`-only builds:** see [WEB_BUILD_MIGRATION.md](./WEB_BUILD_MIGRATION.md).
+
 ## Browser Extension Commands
 
 ### `crepus webext new <name>`

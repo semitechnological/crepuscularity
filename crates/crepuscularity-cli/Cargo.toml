@@ -16,7 +16,7 @@ path = "tests/web_cli.rs"
 # Enabled by default. Disable for cross-compilation to platforms where GPUI
 # (and its DirectX/Metal shaders) cannot be compiled.
 default = ["desktop"]
-desktop = ["dep:gpui", "dep:crepuscularity-runtime", "dep:notify"]
+desktop = ["dep:gpui", "dep:crepuscularity-runtime"]
 
 [dependencies]
 gpui                   = { workspace = true, optional = true }
@@ -24,11 +24,15 @@ crepuscularity-core    = { path = "../crepuscularity-core" }
 crepuscularity-runtime = { path = "../crepuscularity-runtime", optional = true }
 crepuscularity-web     = { path = "../crepuscularity-web" }
 crepuscularity-webext  = { path = "../crepuscularity-webext" }
-notify                 = { version = "8", optional = true }
+notify                 = "8"
+walkdir                = "2"
 serde                  = { version = "1", features = ["derive"] }
 serde_json             = "1"
+toml                   = "0.8"
 console                = "0.16"
 indicatif              = "0.18"
+tracing                = { workspace = true }
+tracing-subscriber     = { workspace = true }
 
 [dev-dependencies]
 tempfile = "3"

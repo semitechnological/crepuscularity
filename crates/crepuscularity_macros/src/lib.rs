@@ -1,6 +1,8 @@
 use proc_macro::TokenStream;
 use proc_macro2::{Span, TokenStream as TokenStream2};
 use quote::quote;
+use std::collections::BTreeSet;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use syn::{parse_macro_input, LitStr};
 
@@ -76,12 +78,197 @@ pub fn view(input: TokenStream) -> TokenStream {
     let template = lit.value();
     let span = lit.span();
 
-    let lines = collect_lines(&template);
-    let (nodes, _) = parse_nodes(&lines, 0, 0);
+    let dec = crepuscularity_core::preprocess::strip_indent_decorators(&template);
+    let lines = collect_lines(&dec.body);
+    let (mut nodes, _) = parse_nodes(&lines, 0, 0);
+    expand_view_class_aliases(&mut nodes, &dec.class_aliases);
 
     match generate_root(&nodes) {
         Ok(tokens) => tokens.into(),
         Err(message) => syn::Error::new(span, message).to_compile_error().into(),
+    }
+}
+
+/// Generate typed DOM accessors for all `#id` shorthand IDs reachable from a `.crepus` entry file.
+///
+/// ```ignore
+/// let crepus = crepuscularity_web::crepus_refs!("../index.crepus");
+/// crepus.hero.text("Updated")?;
+/// ```
+#[proc_macro]
+pub fn crepus_refs(input: TokenStream) -> TokenStream {
+    let lit = parse_macro_input!(input as LitStr);
+    let rel_path = lit.value();
+    let span = lit.span();
+    let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
+    let entry_path = PathBuf::from(manifest_dir).join(&rel_path);
+
+    match collect_ids_from_path(&entry_path) {
+        Ok(ids) => {
+            let fields: Vec<TokenStream2> = ids
+                .iter()
+                .filter_map(|id| {
+                    make_rust_ident(id).map(|ident| {
+                        quote! { pub #ident: ::crepuscularity_web::dom::StaticElementRef }
+                    })
+                })
+                .collect();
+            let inits: Vec<TokenStream2> = ids
+                .iter()
+                .filter_map(|id| {
+                    make_rust_ident(id).map(|ident| {
+                        quote! { #ident: ::crepuscularity_web::dom::StaticElementRef::new(#id) }
+                    })
+                })
+                .collect();
+
+            quote! {{
+                #[allow(non_camel_case_types)]
+                struct __CrepusRefs {
+                    #(#fields),*
+                }
+
+                __CrepusRefs {
+                    #(#inits),*
+                }
+            }}
+            .into()
+        }
+        Err(message) => syn::Error::new(span, message).to_compile_error().into(),
+    }
+}
+
+fn collect_ids_from_path(entry_path: &Path) -> Result<Vec<String>, String> {
+    let mut seen = BTreeSet::new();
+    let mut ids = BTreeSet::new();
+    collect_ids_recursive(entry_path, &mut seen, &mut ids)?;
+    Ok(ids.into_iter().collect())
+}
+
+fn collect_ids_recursive(
+    path: &Path,
+    seen: &mut BTreeSet<PathBuf>,
+    ids: &mut BTreeSet<String>,
+) -> Result<(), String> {
+    let canonical = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+    if !seen.insert(canonical.clone()) {
+        return Ok(());
+    }
+
+    let content = std::fs::read_to_string(&canonical)
+        .map_err(|e| format!("crepus_refs! could not read {}: {e}", canonical.display()))?;
+    if let Ok(file) = crepuscularity_core::parse_component_file(&content) {
+        if !file.components.is_empty() {
+            for component in file.components.values() {
+                collect_ids_from_nodes(&component.nodes, canonical.parent(), seen, ids)?;
+            }
+            return Ok(());
+        }
+    }
+    let nodes = crepuscularity_core::parse_template(&content)
+        .map_err(|e| format!("crepus_refs! parse error in {}: {e}", canonical.display()))?;
+    collect_ids_from_nodes(&nodes, canonical.parent(), seen, ids)
+}
+
+fn collect_ids_from_nodes(
+    nodes: &[crepuscularity_core::ast::Node],
+    base_dir: Option<&Path>,
+    seen: &mut BTreeSet<PathBuf>,
+    ids: &mut BTreeSet<String>,
+) -> Result<(), String> {
+    use crepuscularity_core::ast::Node;
+
+    for node in nodes {
+        match node {
+            Node::Element(el) => {
+                if let Some(id) = &el.id {
+                    ids.insert(id.clone());
+                }
+                collect_ids_from_nodes(&el.children, base_dir, seen, ids)?;
+            }
+            Node::If(block) => {
+                collect_ids_from_nodes(&block.then_children, base_dir, seen, ids)?;
+                if let Some(else_children) = &block.else_children {
+                    collect_ids_from_nodes(else_children, base_dir, seen, ids)?;
+                }
+            }
+            Node::For(block) => collect_ids_from_nodes(&block.body, base_dir, seen, ids)?,
+            Node::Match(block) => {
+                for arm in &block.arms {
+                    collect_ids_from_nodes(&arm.body, base_dir, seen, ids)?;
+                }
+            }
+            Node::Include(inc) => {
+                let include_path = inc
+                    .path
+                    .split_once('#')
+                    .map(|(p, _)| p)
+                    .unwrap_or(&inc.path);
+                let resolved = if let Some(base) = base_dir {
+                    base.join(include_path)
+                } else {
+                    PathBuf::from(include_path)
+                };
+                collect_ids_recursive(&resolved, seen, ids)?;
+                collect_ids_from_nodes(&inc.slot, base_dir, seen, ids)?;
+            }
+            Node::Text(_) | Node::RawText(_) | Node::LetDecl(_) => {}
+        }
+    }
+
+    Ok(())
+}
+
+fn make_rust_ident(id: &str) -> Option<syn::Ident> {
+    let mut out = String::new();
+    for (i, ch) in id.chars().enumerate() {
+        if ch.is_ascii_alphanumeric() || ch == '_' {
+            if i == 0 && ch.is_ascii_digit() {
+                out.push('_');
+            }
+            out.push(ch);
+        } else {
+            out.push('_');
+        }
+    }
+    if out.is_empty() {
+        None
+    } else if syn::parse_str::<syn::Ident>(&out).is_ok() {
+        Some(syn::Ident::new(&out, Span::call_site()))
+    } else {
+        Some(syn::Ident::new(&format!("_{out}"), Span::call_site()))
+    }
+}
+
+fn expand_view_class_aliases(
+    nodes: &mut [Node],
+    aliases: &std::collections::HashMap<String, String>,
+) {
+    use crepuscularity_core::preprocess::expand_class_list_in_place;
+
+    if aliases.is_empty() {
+        return;
+    }
+    for n in nodes.iter_mut() {
+        match n {
+            Node::Element(el) => {
+                expand_class_list_in_place(&mut el.classes, aliases);
+                expand_view_class_aliases(&mut el.children, aliases);
+            }
+            Node::If(b) => {
+                expand_view_class_aliases(&mut b.then_children, aliases);
+                if let Some(e) = &mut b.else_children {
+                    expand_view_class_aliases(e, aliases);
+                }
+            }
+            Node::For(b) => expand_view_class_aliases(&mut b.body, aliases),
+            Node::Match(b) => {
+                for arm in &mut b.arms {
+                    expand_view_class_aliases(&mut arm.body, aliases);
+                }
+            }
+            Node::Text(_) | Node::RawExpr(_) | Node::LetDecl(_) => {}
+        }
     }
 }
 
@@ -103,6 +290,7 @@ enum Node {
 #[derive(Debug, Clone)]
 struct Element {
     tag: String,
+    id: Option<String>,
     classes: Vec<String>,
     conditional_classes: Vec<ConditionalClass>,
     event_handlers: Vec<EventHandler>,
@@ -447,6 +635,7 @@ fn parse_element_line(line: &str, children: Vec<Node>) -> Element {
     if tokens.is_empty() {
         return Element {
             tag: "div".to_string(),
+            id: None,
             classes: vec![],
             conditional_classes: vec![],
             event_handlers: vec![],
@@ -456,17 +645,32 @@ fn parse_element_line(line: &str, children: Vec<Node>) -> Element {
     }
 
     let tag = tokens[0].clone();
+    let mut children = children;
+    let inline_text = tokens
+        .last()
+        .filter(|token| is_inline_text_token(token))
+        .cloned();
+    let parse_limit = if inline_text.is_some() {
+        tokens.len().saturating_sub(1)
+    } else {
+        tokens.len()
+    };
+    if let Some(text) = inline_text {
+        children.insert(0, Node::Text(parse_text_template(&text)));
+    }
+
+    let mut id = None;
     let mut classes = Vec::new();
     let mut conditional_classes = Vec::new();
     let mut event_handlers = Vec::new();
     let mut bindings = Vec::new();
 
-    for token in &tokens[1..] {
+    for token in &tokens[1..parse_limit] {
         if let Some(rest) = token.strip_prefix('@') {
             // Event: @event|mod1|mod2=handler
             if let Some(eq_pos) = rest.find('=') {
                 let event_part = &rest[..eq_pos];
-                let handler = rest[eq_pos + 1..].to_string();
+                let handler = strip_optional_quotes(&rest[eq_pos + 1..]).to_string();
                 let mut parts = event_part.splitn(2, '|');
                 let event = parts.next().unwrap_or("").to_string();
                 let modifiers: Vec<String> = rest[..eq_pos]
@@ -500,6 +704,10 @@ fn parse_element_line(line: &str, children: Vec<Node>) -> Element {
                     .to_string();
                 bindings.push(Binding { prop, value });
             }
+        } else if let Some(rest) = token.strip_prefix('#') {
+            if !rest.is_empty() {
+                id = Some(rest.to_string());
+            }
         } else {
             classes.push(token.clone());
         }
@@ -507,6 +715,7 @@ fn parse_element_line(line: &str, children: Vec<Node>) -> Element {
 
     Element {
         tag,
+        id,
         classes,
         conditional_classes,
         event_handlers,
@@ -566,6 +775,20 @@ fn tokenize_line(line: &str) -> Vec<String> {
     }
 
     tokens
+}
+
+fn is_inline_text_token(token: &str) -> bool {
+    token.len() >= 2 && token.starts_with('"') && token.ends_with('"')
+}
+
+fn strip_optional_quotes(s: &str) -> &str {
+    if s.len() >= 2
+        && ((s.starts_with('"') && s.ends_with('"')) || (s.starts_with('\'') && s.ends_with('\'')))
+    {
+        &s[1..s.len() - 1]
+    } else {
+        s
+    }
 }
 
 fn parse_text_template(line: &str) -> Vec<TextPart> {
@@ -738,13 +961,12 @@ fn generate_element(element: &Element) -> Result<TokenStream2, String> {
         .map(generate_child_call)
         .collect::<Result<_, _>>()?;
 
-    // on_click (and other StatefulInteractiveElement methods) require the element
-    // to have been given an ElementId via .id(). Inject .id() when click handlers
-    // are present so the Div is promoted to Stateful<Div>.
-    let needs_id = element.event_handlers.iter().any(|h| h.event == "click");
-    let id_call = if needs_id {
-        let id = ELEM_ID_COUNTER.fetch_add(1, Ordering::Relaxed) as usize;
-        quote! { .id(#id as usize) }
+    // on_click (and other StatefulInteractiveElement methods) require an ElementId.
+    let id_call = if let Some(id) = &element.id {
+        quote! { .id(#id) }
+    } else if element.event_handlers.iter().any(|h| h.event == "click") {
+        let generated_id = ELEM_ID_COUNTER.fetch_add(1, Ordering::Relaxed) as usize;
+        quote! { .id(#generated_id as usize) }
     } else {
         quote! {}
     };
@@ -1138,6 +1360,7 @@ fn generate_binding(binding: &Binding) -> Result<TokenStream2, String> {
         .map_err(|e| format!("Invalid binding value `{}`: {e}", binding.value))?;
 
     match binding.prop.as_str() {
+        "id" => Ok(quote! { .id(#value) }),
         "value" => Ok(quote! { .value(#value) }),
         "checked" => Ok(quote! { .checked(#value) }),
         "disabled" => Ok(quote! { .when(#value, |el| el.cursor_not_allowed().opacity(0.5)) }),

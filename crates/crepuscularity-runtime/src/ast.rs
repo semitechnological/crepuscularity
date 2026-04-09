@@ -15,6 +15,7 @@ pub enum Node {
 #[derive(Debug, Clone)]
 pub struct Element {
     pub tag: String,
+    pub id: Option<String>,
     pub classes: Vec<String>,
     pub conditional_classes: Vec<ConditionalClass>,
     pub event_handlers: Vec<EventHandler>,

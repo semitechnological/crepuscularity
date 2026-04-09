@@ -11,6 +11,8 @@ use gpui::{
     AnyElement, ElementId, IntoElement, ParentElement, SharedString, Styled,
 };
 
+use crepuscularity_core::preprocess::slot_rotate_child_phrases;
+
 use crate::ast::*;
 use crate::context::{value_to_str, TemplateContext, TemplateValue};
 use crate::styler::{apply_class_with_ctx, parse_duration_ms};
@@ -79,6 +81,24 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> AnyElement {
         } else {
             render_nodes(&el.children, ctx)
         };
+    }
+
+    // Web-only rotating text: GPUI shows the first phrase as a static preview.
+    if el.tag == "slot-rotate" {
+        let label = slot_rotate_child_phrases(&el.children)
+            .ok()
+            .and_then(|p| p.into_iter().next())
+            .unwrap_or_default();
+        let mut d = div();
+        for class in &el.classes {
+            d = apply_class_with_ctx(d, class, Some(ctx));
+        }
+        for cc in &el.conditional_classes {
+            if ctx.eval_condition(&cc.condition) {
+                d = apply_class_with_ctx(d, &cc.class, Some(ctx));
+            }
+        }
+        return d.child(SharedString::from(label)).into_any_element();
     }
 
     let mut d = base_tag_element(&el.tag);

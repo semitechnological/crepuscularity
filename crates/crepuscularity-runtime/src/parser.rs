@@ -563,6 +563,7 @@ fn parse_element_line(line: &str, children: Vec<Node>) -> Element {
     if tokens.is_empty() {
         return Element {
             tag: "div".to_string(),
+            id: None,
             classes: vec![],
             conditional_classes: vec![],
             event_handlers: vec![],
@@ -573,17 +574,32 @@ fn parse_element_line(line: &str, children: Vec<Node>) -> Element {
     }
 
     let tag = tokens[0].clone();
+    let mut children = children;
+    let inline_text = tokens
+        .last()
+        .filter(|token| is_inline_text_token(token))
+        .cloned();
+    let parse_limit = if inline_text.is_some() {
+        tokens.len().saturating_sub(1)
+    } else {
+        tokens.len()
+    };
+    if let Some(text) = inline_text {
+        children.insert(0, Node::Text(parse_text_template(&text)));
+    }
+
+    let mut id = None;
     let mut classes = Vec::new();
     let mut conditional_classes = Vec::new();
     let mut event_handlers = Vec::new();
     let mut bindings = Vec::new();
     let mut animations = Vec::new();
 
-    for token in &tokens[1..] {
+    for token in &tokens[1..parse_limit] {
         if let Some(rest) = token.strip_prefix('@') {
             if let Some(eq_pos) = rest.find('=') {
                 let event_part = &rest[..eq_pos];
-                let handler = rest[eq_pos + 1..].to_string();
+                let handler = strip_optional_quotes(&rest[eq_pos + 1..]).to_string();
                 let event = event_part.split('|').next().unwrap_or("").to_string();
                 let modifiers: Vec<String> = event_part
                     .split('|')
@@ -634,6 +650,10 @@ fn parse_element_line(line: &str, children: Vec<Node>) -> Element {
                     repeat,
                 });
             }
+        } else if let Some(rest) = token.strip_prefix('#') {
+            if !rest.is_empty() {
+                id = Some(rest.to_string());
+            }
         } else {
             classes.push(token.clone());
         }
@@ -641,12 +661,27 @@ fn parse_element_line(line: &str, children: Vec<Node>) -> Element {
 
     Element {
         tag,
+        id,
         classes,
         conditional_classes,
         event_handlers,
         bindings,
         animations,
         children,
+    }
+}
+
+fn is_inline_text_token(token: &str) -> bool {
+    token.len() >= 2 && token.starts_with('"') && token.ends_with('"')
+}
+
+fn strip_optional_quotes(s: &str) -> &str {
+    if s.len() >= 2
+        && ((s.starts_with('"') && s.ends_with('"')) || (s.starts_with('\'') && s.ends_with('\'')))
+    {
+        &s[1..s.len() - 1]
+    } else {
+        s
     }
 }
 

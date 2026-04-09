@@ -510,6 +510,11 @@ fn apply_property(val: TemplateValue, prop: &str) -> TemplateValue {
 // ── Public API ────────────────────────────────────────────────────────────────
 
 pub fn eval_expr(expr: &str, ctx: &TemplateContext) -> TemplateValue {
+    let _span = if tracing::enabled!(tracing::Level::TRACE) {
+        Some(tracing::trace_span!("eval_expr", expr = %expr).entered())
+    } else {
+        None
+    };
     let expr = expr.trim();
     if expr.is_empty() {
         return TemplateValue::Null;

@@ -1,5 +1,7 @@
 # Browser Extensions
 
+> **Implementation spec (web + webext + cross-language perf patterns):** [CREPUS_WEB_IMPLEMENTATION_SPEC.md](./CREPUS_WEB_IMPLEMENTATION_SPEC.md) — canonical doc for AI/agents; **§9** covers MV3 and this crate.
+
 The `crepuscularity-webext` crate provides support for building Chrome/Firefox extensions with Manifest V3.
 
 ## Quick Start

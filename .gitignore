@@ -1,3 +1,12 @@
 /target
 Cargo.lock
 .DS_Store
+.crepus-cache/
+.claude/
+docs-site/dist/
+examples/web-site/dist/
+# standalone example builds (server/, ssr-demo/, etc.)
+examples/**/target/
+examples/**/Cargo.lock
+docs-site/**/target/
+docs-site/**/Cargo.lock

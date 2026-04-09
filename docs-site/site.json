@@ -1,82 +1,21 @@
 {
   "businessName": "Crepuscularity",
-  "title": "Crepuscularity Docs",
+  "title": "Crepuscularity",
   "domain": "crepuscularity.dev",
   "seo": {
-    "title": "Crepuscularity — Fast, type-safe DSL for GPUI & Web",
-    "description": "Scaffold, develop, and deploy GPUI applications and static websites with a modern, hot-reloading DSL.",
+    "title": "Crepuscularity — .crepus for GPUI, web, and extensions",
+    "description": "One template DSL and CLI: crepus new, crepus web build, crepus webext. Hot reload, wasm32 sites, native GPUI apps.",
     "ogImage": null
   },
   "theme": {
-    "accent": "#3b82f6",
-    "accentSoft": "#60a5fa",
-    "surface": "#09090b",
+    "accent": "#0070f3",
+    "accentSoft": "#3291ff",
+    "surface": "#000000",
     "text": "#fafafa",
-    "muted": "#a1a1aa",
-    "border": "#27272a"
+    "muted": "#888888",
+    "border": "#333333"
   },
-  "elements": [
-    {
-      "type": "hero",
-      "id": "hero-1",
-      "props": {
-        "eyebrow": "Now in Beta",
-        "headline": "Build Beautiful Native Apps and Web Sites",
-        "subheadline": "Crepuscularity is a modern DSL and CLI for the GPUI framework. Hot-reload, type-safety, and seamless cross-platform deployment.",
-        "primary": {
-          "label": "Get Started",
-          "href": "https://github.com/thesoftwarecompanyofhongkong/crepuscularity",
-          "external": true
-        },
-        "secondary": {
-          "label": "Read the Docs",
-          "href": "#features",
-          "external": false
-        },
-        "media": null
-      }
-    },
-    {
-      "type": "feature_grid",
-      "id": "features",
-      "props": {
-        "eyebrow": "Features",
-        "title": "Everything you need to ship fast",
-        "items": [
-          {
-            "icon": "terminal",
-            "title": "Powerful CLI",
-            "description": "Scaffold projects, start a hot-reload dev loop, and build for production with a single command: `crepus dev`."
-          },
-          {
-            "icon": "code",
-            "title": "Modern DSL",
-            "description": "A familiar, type-safe syntax for building UI components that works across GPUI and the web."
-          },
-          {
-            "icon": "zap",
-            "title": "Hot Reload",
-            "description": "See your changes instantly with a sub-second hot-reload loop that maintains application state."
-          },
-          {
-            "icon": "globe",
-            "title": "Web & Native",
-            "description": "Write once, deploy everywhere. Render your components to native GPUI windows or static HTML."
-          },
-          {
-            "icon": "layout",
-            "title": "Component Library",
-            "description": "Build reusable UI components with slots, props, and conditional styling out of the box."
-          },
-          {
-            "icon": "browser",
-            "title": "Browser Extensions",
-            "description": "Scaffold and build browser extensions with Rust and WASM using the same familiar DSL."
-          }
-        ]
-      }
-    }
-  ],
+  "elements": [],
   "analytics": null,
   "turnstile": null
 }

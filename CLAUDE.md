@@ -31,10 +31,13 @@ To auto-fix formatting: `cargo fmt --all`
 | `crates/crepuscularity` | Main library re-exporting `view!` macro + prelude |
 | `crates/crepuscularity_macros` | Proc-macro: compiles `.crepus` DSL strings at build time |
 | `crates/crepuscularity-runtime` | Runtime parser, renderer, and hot-reload engine |
+| `crates/crepuscularity-reactive` | Reactive signal/memo/effect graph for WASM client |
 | `crates/crepuscularity-dev` | `crepus-dev` binary — hot-reload dev server |
 | `crates/crepuscularity-cli` | `crepus` CLI for scaffolding and builds |
 | `examples/text-features` | GPUI demo for letter-spacing and text-transform (vendored gpui) |
 | `examples/weather` | Full weather-app example using the runtime |
+
+**Web / compiler / hot-reload implementation spec (single doc for agents):** [docs/CREPUS_WEB_IMPLEMENTATION_SPEC.md](docs/CREPUS_WEB_IMPLEMENTATION_SPEC.md)
 
 ## DSL quick reference
 
@@ -79,6 +82,127 @@ For developers familiar with React/TSX. Same semantics, angle-bracket style.
 Control-flow tags: `<if condition={...}>`, `<else>`, `<else-if condition={...}>`, `<for let="var" in={list}>`, `<match on={expr}><case pattern="...">`.
 Include: `<include src="file.crepus#Card" title={t} />` or with slot children.
 Declarations: `<let name="x" value={42} />`, `<let-default name="x" value={42} />`, or `$: let x = 42` lines still work.
+
+## Writing .crepus templates
+
+### Pragmas
+
+File-level directives go at the very top, before any elements.
+
+```
+google-font "Inter"
+google-fonts "Inter" "JetBrains Mono"
+```
+
+`google-font` loads a single family; `google-fonts` loads multiple in one pragma. Both inject the appropriate `<link>` tag on the web path.
+
+### Element syntax
+
+`tag classes… #id "inline-text"` on one line. `#id` emits `id="…"` on the element; an inline quoted literal becomes the first child text node.
+
+```
+section py-16 #hero "Hello"
+  span text-sm
+    "World"
+```
+
+### Text nodes
+
+Quoted strings are text nodes. `{expr}` inside quotes interpolates. A bare `{expr}` on its own line renders the value directly.
+
+```
+div
+  "Hello {name}, score: {score * 10}"
+  {username}
+```
+
+### Control flow
+
+```
+if {score > 100}
+  div text-green-400
+    "High score!"
+else if {score > 50}
+  div text-yellow-400
+    "Medium"
+else
+  div text-red-400
+    "Low"
+
+for item in {items}
+  div p-2 border-b
+    {item.name}
+
+match {status}
+  "active" =>
+    div text-green-400
+      "Active"
+  _ =>
+    div text-gray-400
+      "Unknown"
+```
+
+### Variables
+
+`$: let` computes a local variable from an expression; `$: default` sets a variable only when it is not already in context (canonical way to declare optional component props).
+
+```
+$: let total = {price * quantity}
+$: default variant = "primary"
+```
+
+### Attributes
+
+Static values use `key=value`, dynamic values use `key={expr}`. Event handlers use `@event="fn_name"` (on the web/WASM path this emits `data-onclick="fn_name"` and dispatches to an exported Rust function). Conditional classes use `class:name={expr}`.
+
+```
+input type="text" value={input_value} placeholder="Enter text"
+button @click="handle_submit"
+  "Submit"
+div class:hidden={!visible} class:active={selected}
+  "Content"
+```
+
+### Slot-rotate
+
+`slot-rotate` is a built-in widget for cycling through text children at a fixed interval. Give it an `interval={ms}` attribute and optionally a class-alias name to style the active item. Each indented string child is one rotation slot.
+
+```
+slot-rotate interval={3200} slot-lede
+  "a GPUI-first template pipeline"
+  "a .crepus DSL with hot reload"
+  "one syntax for GPUI, web, and extensions"
+```
+
+### Class aliases
+
+Lines at the bottom of a `.crepus` file starting with `.name` define reusable class groups. Any element with that name in its class list expands to the aliased classes at render time.
+
+```
+.slot-lede text-zinc-100 font-medium
+.footer-row flex flex-col sm:flex-row justify-between gap-4 text-sm text-zinc-500
+```
+
+Usage: `div footer-row` expands to `div flex flex-col sm:flex-row justify-between gap-4 text-sm text-zinc-500`.
+
+### Include
+
+`include` embeds another component. Props are passed as `key=value` or `key={expr}`. Indented children under the include call become the `slot` content inside the component.
+
+```
+include components/card.crepus title="Hello" subtitle={sub}
+  div p-4
+    "Slot content rendered inside the component"
+```
+
+### Animations
+
+`animate:property={duration timing-function}` attaches a CSS transition or entry animation to the element.
+
+```
+div animate:opacity={300ms ease-in-out}
+  "Fades in on mount"
+```
 
 ## Component system
 

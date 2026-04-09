@@ -4,8 +4,28 @@ version = "0.3.0"
 edition = "2021"
 
 [features]
+default = ["ssr"]
+dom = ["dep:js-sys", "dep:wasm-bindgen", "dep:web-sys"]
+event-router = ["dom"]
+htmx = []
+alpine = []
+full-web = ["dom", "event-router", "htmx", "alpine"]
 parallel = ["dep:rayon"]
+hydration = []
+ssr = ["dep:base64"]
 
 [dependencies]
+base64 = { version = "0.22", optional = true }
 crepuscularity-core = { path = "../crepuscularity-core" }
+crepuscularity_macros = { path = "../crepuscularity_macros" }
+js-sys = { version = "0.3", optional = true }
 rayon = { version = "1", optional = true }
+serde_json = "1"
+tracing = { workspace = true }
+wasm-bindgen = { version = "0.2", optional = true }
+web-sys = { version = "0.3", optional = true, features = ["Document", "Element", "HtmlElement", "Node", "Window"] }
+
+[[test]]
+name = "ssr"
+path = "tests/ssr.rs"
+required-features = ["ssr"]
