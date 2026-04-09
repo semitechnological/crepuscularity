@@ -9,6 +9,11 @@
 #
 # Quick check (fixtures only, no npm):
 #   crepus benchmark --config examples/benchmarks/benchmark.toml --only crepus-web,crepus-webext
+#
+# Reading results:
+#   Human runs end with an "insight" table: % of total wall time per completed target (slowest first),
+#   plus per-target overhead (wall clock minus summed step times — shell/fs outside the child timer).
+#   `crepus benchmark --json` emits `summary.by_wall_time` with the same ranking for charts/spreadsheets.
 
 version = 1
 

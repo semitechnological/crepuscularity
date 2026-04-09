@@ -50,7 +50,33 @@ struct BenchStep {
 
 #[derive(Serialize)]
 struct JsonReport {
+    summary: JsonRunSummary,
     suites: Vec<JsonSuite>,
+}
+
+#[derive(Serialize)]
+struct JsonRunSummary {
+    /// Sum of `total_ms` for targets that finished successfully (`skipped: false`).
+    total_wall_ms_completed: u128,
+    completed_target_count: usize,
+    skipped_target_count: usize,
+    /// Completed targets sorted slowest first (compare-across stacks).
+    by_wall_time: Vec<JsonInsightRow>,
+}
+
+#[derive(Serialize)]
+struct JsonInsightRow {
+    suite: String,
+    id: String,
+    label: String,
+    wall_ms: u128,
+    step_sum_ms: u128,
+    /// `wall_ms − step_sum_ms` (setup, shell, logging, or clock skew).
+    overhead_ms: u128,
+    /// `100 * wall_ms / total_wall_ms_completed` (0 if alone or no completed runs).
+    share_of_completed_wall_pct: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    peak_rss_kb: Option<u64>,
 }
 
 #[derive(Serialize)]
@@ -68,7 +94,14 @@ struct JsonTargetResult {
     #[serde(skip_serializing_if = "Option::is_none")]
     error: Option<String>,
     steps: Vec<JsonStepResult>,
+    /// Wall time for this target (harness around all steps).
     total_ms: u128,
+    /// Sum of per-step `duration_ms` (serial work as measured).
+    step_sum_ms: u128,
+    /// `total_ms.saturating_sub(step_sum_ms)`.
+    overhead_ms: u128,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    peak_rss_kb: Option<u64>,
 }
 
 struct StepRunCtx<'a> {
@@ -79,6 +112,144 @@ struct StepRunCtx<'a> {
     verbose: bool,
     measure_memory: bool,
     step_total: usize,
+}
+
+fn step_aggregates(steps: &[JsonStepResult], wall_ms: u128) -> (u128, u128, Option<u64>) {
+    let sum: u128 = steps.iter().map(|s| s.duration_ms).sum();
+    let overhead = wall_ms.saturating_sub(sum);
+    let peak = steps.iter().filter_map(|s| s.max_rss_kb).max();
+    (sum, overhead, peak)
+}
+
+fn json_target_result(
+    id: String,
+    label: String,
+    optional: bool,
+    skipped: bool,
+    error: Option<String>,
+    steps: Vec<JsonStepResult>,
+    total_ms: u128,
+) -> JsonTargetResult {
+    let (step_sum_ms, overhead_ms, peak_rss_kb) = step_aggregates(&steps, total_ms);
+    JsonTargetResult {
+        id,
+        label,
+        optional,
+        skipped,
+        error,
+        steps,
+        total_ms,
+        step_sum_ms,
+        overhead_ms,
+        peak_rss_kb,
+    }
+}
+
+fn compute_run_summary(suites: &[JsonSuite]) -> JsonRunSummary {
+    let mut skipped_target_count = 0usize;
+    let mut rows: Vec<JsonInsightRow> = Vec::new();
+    for suite in suites {
+        for t in &suite.targets {
+            if t.skipped {
+                skipped_target_count += 1;
+                continue;
+            }
+            rows.push(JsonInsightRow {
+                suite: suite.id.clone(),
+                id: t.id.clone(),
+                label: t.label.clone(),
+                wall_ms: t.total_ms,
+                step_sum_ms: t.step_sum_ms,
+                overhead_ms: t.overhead_ms,
+                share_of_completed_wall_pct: 0.0,
+                peak_rss_kb: t.peak_rss_kb,
+            });
+        }
+    }
+    rows.sort_by(|a, b| b.wall_ms.cmp(&a.wall_ms));
+    let total_wall_ms_completed: u128 = rows.iter().map(|r| r.wall_ms).sum();
+    let completed_target_count = rows.len();
+    for r in &mut rows {
+        r.share_of_completed_wall_pct = if total_wall_ms_completed > 0 {
+            (r.wall_ms as f64) * 100.0 / (total_wall_ms_completed as f64)
+        } else {
+            0.0
+        };
+    }
+    JsonRunSummary {
+        total_wall_ms_completed,
+        completed_target_count,
+        skipped_target_count,
+        by_wall_time: rows,
+    }
+}
+
+fn print_human_insights(summary: &JsonRunSummary, dry_run: bool) {
+    eprintln!();
+    if dry_run {
+        eprintln!(
+            "  {}",
+            style("insight: dry-run — re-run without --dry-run for wall times and RSS.").dim()
+        );
+        return;
+    }
+    if summary.completed_target_count == 0 {
+        eprintln!(
+            "  {}",
+            style("insight: no completed targets — check skips or failures above.").dim()
+        );
+        return;
+    }
+    eprintln!(
+        "{}",
+        style("insight — where time went (completed targets, slowest first)")
+            .cyan()
+            .bold()
+    );
+    eprintln!(
+        "  {}",
+        style("% of sum(wall) · suite · wall / Σ steps / overhead — overhead is shell/setup outside step clocks")
+            .dim()
+    );
+    let show = summary.by_wall_time.len().min(25);
+    for row in summary.by_wall_time.iter().take(show) {
+        let wall = fmt_ms(row.wall_ms);
+        let steps_lbl = fmt_ms(row.step_sum_ms);
+        let oh = fmt_ms(row.overhead_ms);
+        let rss = row.peak_rss_kb.map_or(String::new(), |k| {
+            format!("  peak {:.1} MiB", k as f64 / 1024.0)
+        });
+        eprintln!(
+            "  {:>5.1}%  {:<8}  wall {:>8}  Σ {:>8}  OH {:>8}{}",
+            row.share_of_completed_wall_pct,
+            style(&row.suite).dim(),
+            style(wall).white(),
+            style(steps_lbl).cyan(),
+            style(oh).yellow(),
+            style(rss).dim(),
+        );
+        eprintln!("          {}", style(&row.label).white().bold());
+    }
+    if summary.by_wall_time.len() > 25 {
+        eprintln!(
+            "  {}",
+            style(format!(
+                "… {} more rows in --json (summary.by_wall_time)",
+                summary.by_wall_time.len() - 25
+            ))
+            .dim()
+        );
+    }
+    eprintln!(
+        "  {}",
+        style("speed up Crepus: slimmer WASM graph, `cargo build --timings`, reuse CARGO_TARGET_DIR, or LTO settings in fixture crates.")
+            .dim()
+    );
+    eprintln!(
+        "  {}",
+        style("compare stacks: match cold/warm cache policy (--clean) so % shares are meaningful.")
+            .dim()
+    );
 }
 
 #[derive(Serialize, Clone)]
@@ -262,15 +433,15 @@ pub fn run(args: &[String]) {
                     if !json_out {
                         ui::warning(&format!("{} — skipped ({msg})", style(&t.label).yellow()));
                     }
-                    json_targets.push(JsonTargetResult {
-                        id: t.id.clone(),
-                        label: t.label.clone(),
-                        optional: t.optional,
-                        skipped: true,
-                        error: Some(msg.into()),
-                        steps: vec![],
-                        total_ms: 0,
-                    });
+                    json_targets.push(json_target_result(
+                        t.id.clone(),
+                        t.label.clone(),
+                        t.optional,
+                        true,
+                        Some(msg.into()),
+                        vec![],
+                        0,
+                    ));
                     continue;
                 } else {
                     ui::error(msg);
@@ -324,15 +495,15 @@ pub fn run(args: &[String]) {
                     if !json_out {
                         ui::warning(&format!("{} — {msg}", style(&t.label).yellow()));
                     }
-                    json_targets.push(JsonTargetResult {
-                        id: t.id.clone(),
-                        label: t.label.clone(),
-                        optional: t.optional,
-                        skipped: true,
-                        error: Some(msg),
-                        steps: step_results,
-                        total_ms: total,
-                    });
+                    json_targets.push(json_target_result(
+                        t.id.clone(),
+                        t.label.clone(),
+                        t.optional,
+                        true,
+                        Some(msg),
+                        step_results,
+                        total,
+                    ));
                 } else {
                     if !json_out && !dry_run {
                         print_target_wall_footer(total, &step_results);
@@ -349,15 +520,15 @@ pub fn run(args: &[String]) {
                 print_target_wall_footer(total, &step_results);
             }
 
-            json_targets.push(JsonTargetResult {
-                id: t.id.clone(),
-                label: t.label.clone(),
-                optional: t.optional,
-                skipped: false,
-                error: None,
-                steps: step_results,
-                total_ms: total,
-            });
+            json_targets.push(json_target_result(
+                t.id.clone(),
+                t.label.clone(),
+                t.optional,
+                false,
+                None,
+                step_results,
+                total,
+            ));
         }
 
         json_suites.push(JsonSuite {
@@ -366,12 +537,15 @@ pub fn run(args: &[String]) {
         });
     }
 
+    let summary = compute_run_summary(&json_suites);
     if json_out {
         let report = JsonReport {
+            summary,
             suites: json_suites,
         };
         println!("{}", serde_json::to_string_pretty(&report).unwrap());
     } else {
+        print_human_insights(&summary, dry_run);
         eprintln!();
         ui::success("benchmark finished");
     }
@@ -463,6 +637,10 @@ fn print_benchmark_usage() {
     eprintln!("  crepus benchmark --config examples/benchmarks/benchmark.toml");
     eprintln!("  crepus benchmark --only crepus-web,crepus-webext --json > bench.json");
     eprintln!("  examples/benchmarks/run-all.sh --json   # same from repo root via shell");
+    eprintln!(
+        "{}",
+        style("JSON includes summary.by_wall_time (ranked timings + % of total wall).").dim()
+    );
 }
 
 fn planned_step_count(t: &BenchTarget) -> usize {
@@ -543,11 +721,14 @@ fn print_target_wall_footer(wall_ms: u128, steps: &[JsonStepResult]) {
     let sum: u128 = steps.iter().map(|s| s.duration_ms).sum();
     let wall = fmt_ms(wall_ms);
     let steps_lbl = fmt_ms(sum);
+    let overhead_ms = wall_ms.saturating_sub(sum);
+    let oh = fmt_ms(overhead_ms);
     eprintln!(
-        "      {} wall {}  ·  step times sum {}",
+        "      {} wall {}  ·  step times sum {}  ·  overhead {}",
         style("--").dim(),
         style(wall).white().bold(),
         style(steps_lbl).dim(),
+        style(oh).yellow(),
     );
     if let Some(peak_kb) = steps.iter().filter_map(|s| s.max_rss_kb).max() {
         eprintln!(

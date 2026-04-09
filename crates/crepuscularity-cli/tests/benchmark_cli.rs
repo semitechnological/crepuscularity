@@ -1,5 +1,6 @@
 //! Integration tests for `crepus benchmark`.
 
+use serde_json::Value;
 use std::path::PathBuf;
 use std::process::Command;
 
@@ -102,4 +103,34 @@ fn benchmark_desktop_fixture_cargo_check() {
         st.success(),
         "examples/benchmarks/crepus-desktop must compile for `crepus benchmark` (set SDKROOT on macOS if needed)"
     );
+}
+
+#[test]
+fn benchmark_json_includes_summary() {
+    let config = repo_root().join("examples/benchmarks/benchmark.toml");
+    let out = crepus()
+        .current_dir(repo_root())
+        .args([
+            "benchmark",
+            "--config",
+            config.to_str().unwrap(),
+            "--dry-run",
+            "--only",
+            "crepus-web",
+            "--json",
+        ])
+        .output()
+        .expect("spawn crepus benchmark --json");
+
+    assert!(
+        out.status.success(),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let v: Value = serde_json::from_slice(&out.stdout).expect("stdout is JSON");
+    assert!(v.get("summary").is_some(), "expected summary: {v}");
+    assert!(v.get("suites").is_some(), "expected suites: {v}");
+    let summary = v.get("summary").unwrap();
+    assert!(summary.get("by_wall_time").is_some());
+    assert!(summary.get("total_wall_ms_completed").is_some());
 }
