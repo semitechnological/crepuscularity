@@ -1,0 +1,19 @@
+{
+  "version": 2,
+  "root": [
+    {
+      "kind": "stack",
+      "axis": "column",
+      "spacing": 8.0,
+      "children": [
+        {
+          "kind": "text",
+          "content": "Hi",
+          "style": {
+            "fontSize": 14.0
+          }
+        }
+      ]
+    }
+  ]
+}

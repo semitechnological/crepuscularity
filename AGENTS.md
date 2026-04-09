@@ -46,8 +46,10 @@ Use **semver `0.y.z`**. Until `1.0`:
 | `crates/crepuscularity-reactive` | Reactive signal/memo/effect graph for WASM client |
 | `crates/crepuscularity-dev` | `crepus-dev` binary — hot-reload dev server |
 | `crates/crepuscularity-cli` | `crepus` CLI for scaffolding and builds |
+| `crates/crepuscularity-native` | View IR (JSON) for SwiftUI / Jetpack Compose shells — `render_template_to_ir`, schema export |
 | `examples/text-features` | GPUI demo for letter-spacing and text-transform (vendored gpui) |
 | `examples/weather` | Full weather-app example using the runtime |
+| `examples/native-shells` | SwiftPM (**`ios/`**) + Gradle (**`android/`**) apps decoding View IR; shared [`fixture.json`](examples/native-shells/fixture.json) |
 
 **Web / compiler / hot-reload implementation spec (single doc for agents):** [docs/CREPUS_WEB_IMPLEMENTATION_SPEC.md](docs/CREPUS_WEB_IMPLEMENTATION_SPEC.md)
 

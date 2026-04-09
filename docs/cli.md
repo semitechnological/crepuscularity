@@ -182,6 +182,27 @@ Dev server with hot reload — see `crepus web --help`.
 
 Deprecated pretty-printer for `site.json`.
 
+## iOS host apps (`crepus ios`)
+
+Scaffold an **XcodeGen** + **SwiftPM** app with a local **`NativeShell`** package that renders **View IR** JSON (same contract as **`crepuscularity-native`**). Prerequisite: [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen`).
+
+```bash
+crepus ios new my-native-demo
+cd my-native-demo
+crepus ios generate   # run xcodegen (walks up until it finds crepus.toml [ios])
+open *.xcodeproj
+```
+
+Build for the iOS Simulator from the app tree (after generate):
+
+```bash
+crepus ios build
+```
+
+`crepus ios generate` and `crepus ios build` **walk up** from the current directory until they find **`crepus.toml`** with an **`[ios]`** section — you normally do not need `--dir` or `--scheme`. Optional overrides: `crepus ios build --dir . --scheme Foo --destination 'platform=iOS Simulator,name=iPhone 15'`.
+
+To refresh bundled fixtures after template changes, regenerate IR with **`crepuscularity-native`** (`render_template_to_ir` / `to_json_pretty`) and replace `NativeShell/Sources/NativeShell/fixture.json`. See [`examples/native-shells/README.md`](../examples/native-shells/README.md).
+
 ## Browser Extension Commands
 
 ### `crepus webext new <name>`

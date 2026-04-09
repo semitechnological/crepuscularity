@@ -11,6 +11,7 @@ members = [
     "crates/crepuscularity-dev",
     "crates/crepuscularity-cli",
     "crates/crepuscularity-reactive",
+    "crates/crepuscularity-native",
     "crates/crepuscularity-ssr",
     "examples/text-features",
     "examples/weather",
@@ -46,6 +47,8 @@ tokio-stream = { version = "0.1", features = ["net"] }
 walkdir = "2"
 wasm-bindgen = "0.2"
 web-sys = "0.3"
+regex = "1"
+schemars = { version = "0.8", features = ["derive"] }
 
 # Default build uses crates.io `gpui` 0.2.2 so `cargo publish` matches consumers. For `vendor/gpui`,
 # copy `.cargo/config.toml.example` → `.cargo/config.toml` and enable `gpui-text-extras` where needed.

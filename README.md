@@ -10,7 +10,7 @@ Write UI in a concise, indentation-based template DSL (`.crepus` files). Templat
 
 - **First GPUI component system with hot reload** — live template updates without recompiling; no other GPUI framework offers this
 - **First plug-and-play browser extension framework in Rust** — write your popup/background/content scripts in `.crepus`, get a MV3-compliant extension bundle out; no JavaScript framework or bundler required
-- **One syntax, multiple backends** — the same template works across GPUI (native desktop), HTML, React/JSX, and browser extensions today, with native mobile (SwiftUI/Jetpack Compose) on the roadmap
+- **One syntax, multiple backends** — the same template works across GPUI (native desktop), HTML, React/JSX, and browser extensions today; **`crepuscularity-native`** lowers `.crepus` to JSON **View IR** for SwiftUI / Jetpack Compose shells (see [`examples/native-shells`](examples/native-shells/README.md))
 - **Compile-time and runtime paths** — `view!` macro for zero-overhead AOT compilation; `parse_template` / `render_nodes` for full runtime flexibility and hot reload
 
 ## Quick Start
@@ -68,6 +68,7 @@ The `.crepus` DSL is the primary language. Each output target is a renderer that
 | Crate                   | Output                                                         |
 | ----------------------- | -------------------------------------------------------------- |
 | `crepuscularity-gpui`   | Native desktop (GPUI elements) — primary target                |
+| `crepuscularity-native` | View IR JSON for SwiftUI / Compose host apps (not an on-screen renderer) |
 | `crepuscularity-web`    | HTML strings — server rendering, WASM, browser extensions      |
 | `crepuscularity-webext` | MV3 browser extensions — manifest, assets, capability scanning |
 
@@ -85,12 +86,17 @@ crepus preview <file.crepus>         # Live preview
 crepus webext new <name>             # Scaffold browser extension
 crepus webext build [--app PATH]     # Build to dist/unpacked/ (WASM + manifest + popup pre-render)
 crepus webext manifest               # Print manifest.json
+
+crepus ios new <name>                # XcodeGen + SwiftPM NativeShell (View IR) host app
+crepus ios generate [--dir]          # Run xcodegen (finds crepus.toml [ios] upward)
+crepus ios build [--dir] [...]       # Simulator build via xcodebuild
 ```
 
 ## Documentation
 
 - **Rendered site (GitHub Pages):** [semitechnological.github.io/crepuscularity](https://semitechnological.github.io/crepuscularity/) — WASM landing page plus HTML generated from the Markdown in [`docs/`](docs/). Built in CI with `crepus web build --site docs-site`.
 - **Sources:** [docs/README.md](docs/README.md) indexes [DSL](docs/dsl.md), [components](docs/components.md), [CLI](docs/cli.md), and [extensions](docs/webext.md). Compiler-focused detail stays in-repo as [CREPUS_WEB_IMPLEMENTATION_SPEC.md](docs/CREPUS_WEB_IMPLEMENTATION_SPEC.md) but is not shipped on the public docs site.
+- **Native shells:** [examples/native-shells](examples/native-shells/README.md) — SwiftPM (**`ios/`**), Gradle (**`android/`**), and shared **View IR** `fixture.json` next to **`crepuscularity-native`** (replaces the old separate **`crepuscularity-native-ui`** checkout).
 - **Contributors & coding agents:** root [**`AGENTS.md`**](AGENTS.md) is the canonical instructions (macOS `SDKROOT`, `cargo fmt` / `clippy` / `test` before push, workspace layout, DSL notes). **`CLAUDE.md`** is a symlink to **`AGENTS.md`** so duplicate context files cannot drift.
 
 ## GPUI — Tailwind Class Support
