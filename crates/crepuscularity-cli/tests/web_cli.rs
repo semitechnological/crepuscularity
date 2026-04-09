@@ -90,6 +90,18 @@ fn web_build_docs_site_emits_wasm() {
         .flatten()
         .any(|e| e.path().extension().map(|x| x == "wasm").unwrap_or(false));
     assert!(has_wasm);
+
+    let docs_index =
+        std::fs::read_to_string(out.path().join("docs/index.html")).expect("docs index");
+    assert!(
+        docs_index.contains("doc-grid") && docs_index.contains("Documentation"),
+        "expected markdown docs HTML hub"
+    );
+    let dsl = std::fs::read_to_string(out.path().join("docs/dsl.html")).expect("dsl.html");
+    assert!(
+        dsl.contains("prose") && dsl.contains("DSL"),
+        "expected dsl.md rendered to HTML"
+    );
 }
 
 #[test]

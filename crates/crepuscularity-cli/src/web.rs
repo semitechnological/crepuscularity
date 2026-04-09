@@ -498,6 +498,28 @@ fn build_site_wasm(cli: &WebBuildArgs) {
         ui::error(&format!("write app.js: {e}"));
     });
 
+    if let Some(repo_root) = b.site_dir.parent() {
+        let docs_path = repo_root.join("docs");
+        if docs_path.is_dir() {
+            let theme = crate::web_docs::DocsSiteTheme {
+                accent: head.theme.accent.clone(),
+                accent_soft: head.theme.accent_soft.clone(),
+                surface: head.theme.surface.clone(),
+                text: head.theme.text.clone(),
+                muted: head.theme.muted.clone(),
+                border: head.theme.border.clone(),
+            };
+            if let Err(e) = crate::web_docs::emit_markdown_docs(
+                &docs_path,
+                &b.out_dir.join("docs"),
+                &theme,
+                &head.page_title,
+            ) {
+                ui::error(&format!("emit docs HTML: {e}"));
+            }
+        }
+    }
+
     let static_src = b.site_dir.join("static");
     if static_src.is_dir() {
         copy_dir_recursive(&static_src, &b.out_dir.join("static")).unwrap_or_else(|e| {

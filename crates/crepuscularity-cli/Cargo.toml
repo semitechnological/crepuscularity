@@ -1,6 +1,6 @@
 [package]
 name = "crepuscularity-cli"
-version = "0.4.0"
+version = "0.4.1"
 edition = "2021"
 license = "MPL-2.0"
 description = "crepus CLI — scaffolding and builds for Crepuscularity (UNSTABLE; in active development)."
@@ -37,6 +37,7 @@ console                = { workspace = true }
 indicatif              = { workspace = true }
 tracing                = { workspace = true }
 tracing-subscriber     = { workspace = true }
+pulldown-cmark         = "0.12"
 
 [dev-dependencies]
 tempfile = { workspace = true }

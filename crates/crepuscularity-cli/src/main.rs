@@ -26,6 +26,7 @@ mod render;
 pub mod ui;
 mod wasm_bundle;
 mod web;
+mod web_docs;
 mod web_serve;
 mod webext;
 
