@@ -12,6 +12,9 @@
 //!   crepus webext new NAME                       scaffold a browser extension
 //!   crepus webext build [--app PATH]             build browser extension
 //!   crepus webext manifest [--app PATH]          print manifest.json
+//!   crepus ios new NAME                      XcodeGen + SwiftPM NativeShell host app
+//!   crepus ios generate [--dir PATH]         run xcodegen (brew install xcodegen)
+//!   crepus ios build [--dir] [--scheme] [...]  xcodegen + xcodebuild (simulator)
 
 #[cfg(feature = "desktop")]
 mod builder;
@@ -21,6 +24,7 @@ mod dev;
 pub mod events;
 #[cfg(feature = "desktop")]
 mod hud;
+mod ios;
 mod new;
 mod render;
 pub mod ui;
@@ -135,6 +139,10 @@ fn main() {
             webext::run(&args[2..]);
         }
 
+        Some("ios") => {
+            ios::run(&args[2..]);
+        }
+
         _ => {
             print_usage();
             std::process::exit(1);
@@ -210,6 +218,21 @@ fn print_usage() {
         "  {}  {}",
         style("webext manifest [--app PATH]         ").green(),
         style("print manifest.json").dim()
+    );
+    eprintln!(
+        "  {}  {}",
+        style("ios new <name>                         ").green(),
+        style("XcodeGen + NativeShell SwiftPM app").dim()
+    );
+    eprintln!(
+        "  {}  {}",
+        style("ios generate [--dir] [--spec]          ").green(),
+        style("xcodegen; finds crepus.toml [ios] up-tree").dim()
+    );
+    eprintln!(
+        "  {}  {}",
+        style("ios build [--dir] [--scheme] [...]     ").green(),
+        style("xcodegen + xcodebuild; toml = defaults").dim()
     );
     eprintln!();
     eprintln!("{}", style("OPTIONS").dim());
