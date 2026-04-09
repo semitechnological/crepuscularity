@@ -1108,6 +1108,19 @@ fn expand_vars(s: &str, vars: &HashMap<String, String>) -> String {
     out
 }
 
+/// Step `cwd` supports `$REPO` / `$WORK` / `$TARGET` like `shell`. If the expanded path is
+/// absolute, it is used as-is; otherwise it is resolved under the per-target work dir.
+fn resolve_step_cwd(ctx: &StepRunCtx<'_>, step: &BenchStep) -> PathBuf {
+    let raw = step.cwd.as_deref().unwrap_or(".");
+    let expanded = expand_vars(raw, ctx.vars);
+    let path = PathBuf::from(expanded);
+    if path.is_absolute() {
+        path
+    } else {
+        ctx.target_dir.join(path)
+    }
+}
+
 fn run_steps(
     steps: &[BenchStep],
     ctx: StepRunCtx<'_>,
@@ -1117,11 +1130,7 @@ fn run_steps(
     let inherit_io = ctx.verbose && !ctx.json_out && !ctx.dry_run;
     for (i, step) in steps.iter().enumerate() {
         let one = i + 1;
-        let cwd = step
-            .cwd
-            .as_ref()
-            .map(|c| ctx.target_dir.join(c))
-            .unwrap_or_else(|| ctx.target_dir.to_path_buf());
+        let cwd = resolve_step_cwd(&ctx, step);
         let script = expand_vars(&step.shell, ctx.vars);
 
         if ctx.dry_run {
@@ -1846,13 +1855,6 @@ fn print_bench_stack_notes(selected: &[&BenchTarget], json_out: bool) {
         eprintln!(
             "  {}",
             style("note: Tauri needs Rust + Bun/OS prerequisites — see https://tauri.app/start/prerequisites/")
-                .dim()
-        );
-    }
-    if ids.contains("dotnet-maui") {
-        eprintln!(
-            "  {}",
-            style("note: .NET MAUI requires extra workloads (maui-ios / maui-android, etc.).")
                 .dim()
         );
     }
