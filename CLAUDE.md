@@ -26,6 +26,14 @@ cargo test --workspace              # tests
 
 To auto-fix formatting: `cargo fmt --all`
 
+## Crate versioning (pre-1.0, publishable crates)
+
+Use **semver `0.y.z`**. Until `1.0`:
+
+- Bump **`z` (patch)** on **every change** you merge that affects a publishable crate’s behavior, API surface, or **published dependency graph** (for example aligning `version =` on path deps before/after a `cargo publish`).
+- Bump **`y` (minor)** for a **larger feature batch** or substantive capability/API expansion in `0.x` (treat it like a minor release).
+- Reserve **`1.0.x`** for the eventual stable API contract.
+
 ## Workspace layout
 
 | Crate | Purpose |

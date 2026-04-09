@@ -12,4 +12,4 @@ path = "src/lib.rs"
 
 [dependencies]
 crepuscularity-core = { path = "../crepuscularity-core", version = "0.3.0" }
-crepuscularity-web = { path = "../crepuscularity-web", version = "0.3.0" }
+crepuscularity-web = { path = "../crepuscularity-web", version = "0.3.1" }
