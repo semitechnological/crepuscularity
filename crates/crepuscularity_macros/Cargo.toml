@@ -1,11 +1,16 @@
 [package]
 name = "crepuscularity_macros"
-version = "0.3.0"
+version = "0.3.1"
 edition = "2021"
 license = "MPL-2.0"
 description = "Compile-time view! macro for Crepuscularity templates (UNSTABLE; in active development)."
 repository = "https://github.com/semitechnological/crepuscularity"
 readme = "../../README.md"
+
+[features]
+default = []
+# `Div::letter_spacing`, `Div::text_transform`, and `gpui::TextTransform` (needs GPUI newer than crates.io 0.2.2; this repo uses a patched vendor tree).
+gpui_text_run_styles = []
 
 [lib]
 proc-macro = true

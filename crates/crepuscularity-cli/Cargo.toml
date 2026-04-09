@@ -23,20 +23,20 @@ default = ["desktop"]
 desktop = ["dep:gpui", "dep:crepuscularity-runtime"]
 
 [dependencies]
-gpui                   = { workspace = true, optional = true }
+gpui                   = { version = "=0.2.2", default-features = false, features = ["font-kit"], optional = true }
 crepuscularity-core    = { path = "../crepuscularity-core", version = "0.3.0" }
 crepuscularity-runtime = { path = "../crepuscularity-runtime", version = "0.3.0", optional = true }
 crepuscularity-web     = { path = "../crepuscularity-web", version = "0.3.0" }
 crepuscularity-webext  = { path = "../crepuscularity-webext", version = "0.1.0" }
-notify                 = "8"
-walkdir                = "2"
-serde                  = { version = "1", features = ["derive"] }
-serde_json             = "1"
-toml                   = "0.8"
-console                = "0.16"
-indicatif              = "0.18"
+notify                 = { workspace = true }
+walkdir                = { workspace = true }
+serde                  = { workspace = true }
+serde_json             = { workspace = true }
+toml                   = { workspace = true }
+console                = { workspace = true }
+indicatif              = { workspace = true }
 tracing                = { workspace = true }
 tracing-subscriber     = { workspace = true }
 
 [dev-dependencies]
-tempfile = "3"
+tempfile = { workspace = true }

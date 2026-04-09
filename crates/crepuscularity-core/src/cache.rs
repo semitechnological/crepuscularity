@@ -15,6 +15,7 @@ use std::path::{Path, PathBuf};
 use sha2::{Digest, Sha256};
 
 use crate::analysis::Fingerprint;
+use crate::util::bytes_to_hex;
 
 /// An on-disk content-addressed cache for driver pipeline outputs.
 ///
@@ -59,6 +60,6 @@ impl DriverCache {
     fn output_hash(&self, output: &str) -> String {
         let mut h = Sha256::new();
         h.update(output.as_bytes());
-        format!("{:x}", h.finalize())
+        bytes_to_hex(h.finalize().as_ref())
     }
 }

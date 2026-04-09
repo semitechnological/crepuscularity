@@ -1,3 +1,5 @@
+#[cfg(feature = "gpui_text_run_styles")]
+use gpui::TextTransform;
 /// Runtime Tailwind class → GPUI style applicator.
 ///
 /// Supports:
@@ -7,7 +9,7 @@
 ///   where the expression evaluates to a hex color string like "#1e1e2e" or "1e1e2e"
 use gpui::{
     hsla, point, prelude::*, px, relative, rems, rgb, rgba, AbsoluteLength, AlignItems, BoxShadow,
-    DefiniteLength, Div, Length, TextTransform,
+    DefiniteLength, Div, Length,
 };
 
 use crate::context::TemplateContext;
@@ -563,11 +565,17 @@ fn apply_static(d: Div, class: &str) -> Result<Div, Div> {
         }]),
         "ring-inset" => d, // GPUI has no inset shadow; accepted silently
 
-        // ── Text transform ──
+        // ── Text transform (GPUI APIs newer than crates.io 0.2.2; vendored gpui in this repo) ──
+        #[cfg(feature = "gpui_text_run_styles")]
         "uppercase" => d.text_transform(TextTransform::Uppercase),
+        #[cfg(feature = "gpui_text_run_styles")]
         "lowercase" => d.text_transform(TextTransform::Lowercase),
+        #[cfg(feature = "gpui_text_run_styles")]
         "capitalize" => d.text_transform(TextTransform::Capitalize),
+        #[cfg(feature = "gpui_text_run_styles")]
         "normal-case" => d.text_transform(TextTransform::None),
+        #[cfg(not(feature = "gpui_text_run_styles"))]
+        "uppercase" | "lowercase" | "capitalize" | "normal-case" => d,
 
         // ── Accepted silently (CSS-only or unsupported in GPUI) ──
         "inline-flex"
@@ -767,24 +775,27 @@ fn apply_dynamic(d: Div, class: &str) -> Div {
         }
     }
 
-    // ── tracking-* (letter-spacing) ──
-    match class {
-        "tracking-tighter" => return d.letter_spacing(px(-2.0)),
-        "tracking-tight" => return d.letter_spacing(px(-1.0)),
-        "tracking-normal" => return d.letter_spacing(px(0.)),
-        "tracking-wide" => return d.letter_spacing(px(1.5)),
-        "tracking-wider" => return d.letter_spacing(px(3.0)),
-        "tracking-widest" => return d.letter_spacing(px(5.0)),
-        _ => {}
-    }
-    if let Some(rest) = class.strip_prefix("tracking-[") {
-        if let Some(inner) = rest.strip_suffix(']') {
-            if let Some(abs) = parse_absolute_length(inner) {
-                let px_val = match abs {
-                    gpui::AbsoluteLength::Pixels(p) => p,
-                    gpui::AbsoluteLength::Rems(r) => px(r.0 * 16.0),
-                };
-                return d.letter_spacing(px_val);
+    // ── tracking-* (letter-spacing) — same gpui_text_run_styles gating as macros/view! ──
+    #[cfg(feature = "gpui_text_run_styles")]
+    {
+        match class {
+            "tracking-tighter" => return d.letter_spacing(px(-2.0)),
+            "tracking-tight" => return d.letter_spacing(px(-1.0)),
+            "tracking-normal" => return d.letter_spacing(px(0.)),
+            "tracking-wide" => return d.letter_spacing(px(1.5)),
+            "tracking-wider" => return d.letter_spacing(px(3.0)),
+            "tracking-widest" => return d.letter_spacing(px(5.0)),
+            _ => {}
+        }
+        if let Some(rest) = class.strip_prefix("tracking-[") {
+            if let Some(inner) = rest.strip_suffix(']') {
+                if let Some(abs) = parse_absolute_length(inner) {
+                    let px_val = match abs {
+                        gpui::AbsoluteLength::Pixels(p) => p,
+                        gpui::AbsoluteLength::Rems(r) => px(r.0 * 16.0),
+                    };
+                    return d.letter_spacing(px_val);
+                }
             }
         }
     }

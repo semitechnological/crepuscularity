@@ -5,6 +5,7 @@ pub mod context;
 pub mod eval;
 pub mod parser;
 pub mod preprocess;
+mod util;
 
 pub use analysis::{analyze_template, classify_node, BindingMap, Fingerprint, Region};
 #[cfg(not(target_arch = "wasm32"))]

@@ -55,10 +55,10 @@ jobs:
       shell: bash
     
     - name: Run tests
-      run: cargo test --all-features --workspace
-    
+      run: cargo test --workspace
+
     - name: Run clippy
-      run: cargo clippy --all-features --workspace -- -D warnings
+      run: cargo clippy --workspace -- -D warnings
       if: matrix.os == 'ubuntu-latest'
 
   build-examples:
@@ -97,9 +97,9 @@ jobs:
       uses: dtolnay/rust-toolchain@stable
     
     - name: Build docs
-      run: cargo doc --all-features --no-deps --workspace
-    
+      run: cargo doc --no-deps --workspace
+
     - name: Check docs links
-      run: cargo doc --all-features --no-deps --workspace
+      run: cargo doc --no-deps --workspace
       env:
         RUSTDOCFLAGS: -D warnings

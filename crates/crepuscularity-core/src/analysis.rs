@@ -18,6 +18,7 @@
 use sha2::{Digest, Sha256};
 
 use crate::ast::*;
+use crate::util::bytes_to_hex;
 
 // ── Region ───────────────────────────────────────────────────────────────────
 
@@ -199,7 +200,7 @@ impl Fingerprint {
     pub fn new(source: &str, section: Option<&str>, stage: &str) -> Self {
         let mut hasher = Sha256::new();
         hasher.update(source.as_bytes());
-        let hash = format!("{:x}", hasher.finalize());
+        let hash = bytes_to_hex(hasher.finalize().as_ref());
         Self {
             content_hash: hash,
             section: section.map(|s| s.to_string()),

@@ -12,13 +12,15 @@ SDKROOT=$(xcrun --show-sdk-path) cargo build
 
 `dispatch.h` lives inside the Xcode SDK, not `/usr/include`, so the explicit `SDKROOT` is always required on macOS without the extra command-line tools package. You can also add `SDKROOT=$(xcrun --show-sdk-path)` to your shell profile to avoid repeating it.
 
+**Vendored GPUI (optional):** CI and `cargo publish` use **crates.io `gpui` 0.2.2** (the latest published release). The tree under `vendor/gpui` adds `letter_spacing` / `text_transform` on `Div`; to use it locally, copy `.cargo/config.toml.example` to `.cargo/config.toml` and enable `crepuscularity-gpui`’s `gpui-text-extras` feature (see `examples/text-features`’s `vendor-gpui-text`).
+
 ## Before pushing / CI requirements
 
 All three checks must pass before pushing:
 
 ```bash
 cargo fmt --all -- --check          # formatting
-cargo clippy --all-features --workspace -- -D warnings  # lints
+cargo clippy --workspace -- -D warnings              # lints
 cargo test --workspace              # tests
 ```
 

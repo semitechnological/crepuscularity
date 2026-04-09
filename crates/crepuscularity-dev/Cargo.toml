@@ -13,4 +13,4 @@ path = "src/main.rs"
 
 [dependencies]
 crepuscularity-runtime = { path = "../crepuscularity-runtime", version = "0.3.0" }
-gpui = { workspace = true }
+gpui = { version = "=0.2.2", default-features = false, features = ["font-kit"] }

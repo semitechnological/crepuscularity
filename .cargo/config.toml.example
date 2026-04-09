@@ -1,0 +1,3 @@
+# The workspace root `Cargo.toml` declares `[patch.crates-io]` → `vendor/gpui`.
+# Copy this file to `config.toml` only if you need additional `[patch]` or `[alias]`
+# entries without editing the workspace manifest.
