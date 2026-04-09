@@ -2,6 +2,10 @@
 name = "crepuscularity-reactive"
 version = "0.1.0"
 edition = "2021"
+license = "MPL-2.0"
+description = "Reactive signals for Crepuscularity WASM clients (UNSTABLE; in active development)."
+repository = "https://github.com/semitechnological/crepuscularity"
+readme = "../../README.md"
 
 [lib]
 crate-type = ["cdylib", "rlib"]

@@ -2,6 +2,10 @@
 name = "crepuscularity-web"
 version = "0.3.0"
 edition = "2021"
+license = "MPL-2.0"
+description = "Web / SSR / DOM integration for Crepuscularity (UNSTABLE; in active development)."
+repository = "https://github.com/semitechnological/crepuscularity"
+readme = "../../README.md"
 
 [features]
 default = ["ssr"]
@@ -16,8 +20,8 @@ ssr = ["dep:base64"]
 
 [dependencies]
 base64 = { version = "0.22", optional = true }
-crepuscularity-core = { path = "../crepuscularity-core" }
-crepuscularity_macros = { path = "../crepuscularity_macros" }
+crepuscularity-core = { path = "../crepuscularity-core", version = "0.3.0" }
+crepuscularity_macros = { path = "../crepuscularity_macros", version = "0.3.0" }
 js-sys = { version = "0.3", optional = true }
 rayon = { version = "1", optional = true }
 serde_json = "1"

@@ -2,9 +2,13 @@
 name = "crepuscularity-runtime"
 version = "0.3.0"
 edition = "2021"
+license = "MPL-2.0"
+description = "Runtime parser, GPUI renderer, and hot-reload engine for Crepuscularity (UNSTABLE; in active development)."
+repository = "https://github.com/semitechnological/crepuscularity"
+readme = "../../README.md"
 
 [dependencies]
-crepuscularity-core = { path = "../crepuscularity-core" }
+crepuscularity-core = { path = "../crepuscularity-core", version = "0.3.0" }
 gpui = { workspace = true }
 notify = "8"
 toml = "1"

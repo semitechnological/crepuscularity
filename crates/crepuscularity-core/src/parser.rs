@@ -690,6 +690,19 @@ fn parse_element_line(line: &str, children: Vec<Node>) -> Element {
                     handler,
                 });
             }
+        } else if let Some(rest) = token.strip_prefix("when:") {
+            if let Some((condition, raw_classes)) = parse_when_attribute_suffix(rest) {
+                let classes_src = strip_optional_quotes(raw_classes.trim());
+                for class in classes_src.split_whitespace() {
+                    if class.is_empty() {
+                        continue;
+                    }
+                    conditional_classes.push(ConditionalClass {
+                        class: class.to_string(),
+                        condition: condition.clone(),
+                    });
+                }
+            }
         } else if let Some(rest) = token.strip_prefix("class:") {
             if let Some(eq_pos) = rest.find('=') {
                 let class = rest[..eq_pos].to_string();
@@ -817,6 +830,46 @@ fn strip_optional_quotes(s: &str) -> &str {
     } else {
         s
     }
+}
+
+/// Parses the right-hand side of a `when:` attribute (everything after the `when:` prefix).
+///
+/// Accepts:
+/// - `{expr}=quoted-or-bare-classes` — expression may contain `=` (e.g. `{a == b}="x y"`)
+/// - `ident=classes` — simple condition (variable name)
+///
+/// Returns `(condition_source, raw_value)`; the caller should run [`strip_optional_quotes`] on
+/// `raw_value` and split on whitespace for Tailwind tokens.
+pub fn parse_when_attribute_suffix(src: &str) -> Option<(String, String)> {
+    let s = src.trim();
+    if s.is_empty() {
+        return None;
+    }
+    if s.starts_with('{') {
+        let mut depth = 0usize;
+        for (i, c) in s.char_indices() {
+            match c {
+                '{' => depth += 1,
+                '}' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        let cond = s[1..i].trim().to_string();
+                        let mut tail = s[i + 1..].trim_start();
+                        tail = tail.strip_prefix('=')?;
+                        return Some((cond, tail.trim().to_string()));
+                    }
+                }
+                _ => {}
+            }
+        }
+        return None;
+    }
+    let eq_pos = s.find('=')?;
+    let cond = s[..eq_pos].trim().to_string();
+    if cond.is_empty() {
+        return None;
+    }
+    Some((cond, s[eq_pos + 1..].trim().to_string()))
 }
 
 fn tokenize_line(line: &str) -> Vec<String> {
@@ -1236,6 +1289,33 @@ fn jsx_build_element(tag: &str, attrs: Vec<JsxAttr>, children: Vec<Node>) -> Ele
             continue;
         }
 
+        // when:{condition}="class1 class2 …"
+        if let Some(cond_src) = key.strip_prefix("when:") {
+            let condition = if cond_src.starts_with('{') && cond_src.ends_with('}') {
+                cond_src[1..cond_src.len() - 1].trim().to_string()
+            } else {
+                cond_src.trim().to_string()
+            };
+            if condition.is_empty() {
+                continue;
+            }
+            match &attr.value {
+                JsxAttrValue::Str(s) => {
+                    for class in s.split_whitespace() {
+                        if class.is_empty() {
+                            continue;
+                        }
+                        conditional_classes.push(ConditionalClass {
+                            class: class.to_string(),
+                            condition: condition.clone(),
+                        });
+                    }
+                }
+                JsxAttrValue::Expr(_) | JsxAttrValue::Bool(_) => {}
+            }
+            continue;
+        }
+
         // @event={handler}
         if let Some(event_part) = key.strip_prefix('@') {
             let event = event_part.split('|').next().unwrap_or("").to_string();
@@ -1519,6 +1599,54 @@ mod tests {
                 crate::ast::TextPart::Expr(e) => format!("{{{e}}}"),
             })
             .collect()
+    }
+
+    #[test]
+    fn parse_when_attribute_suffix_braced_condition_with_equals() {
+        let (c, v) = parse_when_attribute_suffix(r#"{a == b}="x y z""#).unwrap();
+        assert_eq!(c, "a == b");
+        assert_eq!(v, r#""x y z""#);
+    }
+
+    #[test]
+    fn parse_when_attribute_suffix_simple_ident() {
+        let (c, v) = parse_when_attribute_suffix(r#"active=bg-red-500"#).unwrap();
+        assert_eq!(c, "active");
+        assert_eq!(v, "bg-red-500");
+    }
+
+    #[test]
+    fn when_attribute_indent_expands_to_conditional_classes() {
+        let nodes = parse_template(
+            r#"div base when:{flag}="a b" when:{!flag}="c"
+  "hi""#,
+        )
+        .unwrap();
+        let Node::Element(el) = &nodes[0] else {
+            panic!("expected element");
+        };
+        assert_eq!(el.classes, vec!["base".to_string()]);
+        assert_eq!(el.conditional_classes.len(), 3);
+        assert_eq!(el.conditional_classes[0].class, "a");
+        assert_eq!(el.conditional_classes[0].condition, "flag");
+        assert_eq!(el.conditional_classes[1].class, "b");
+        assert_eq!(el.conditional_classes[2].class, "c");
+        assert_eq!(el.conditional_classes[2].condition, "!flag");
+    }
+
+    #[test]
+    fn when_attribute_jsx_expands_to_conditional_classes() {
+        let nodes =
+            parse_template(r#"<div class="base" when:{active}="font-bold text-white"></div>"#)
+                .unwrap();
+        let Node::Element(el) = &nodes[0] else {
+            panic!("expected element");
+        };
+        assert_eq!(el.classes, vec!["base".to_string()]);
+        assert_eq!(el.conditional_classes.len(), 2);
+        assert_eq!(el.conditional_classes[0].class, "font-bold");
+        assert_eq!(el.conditional_classes[0].condition, "active");
+        assert_eq!(el.conditional_classes[1].class, "text-white");
     }
 
     #[test]

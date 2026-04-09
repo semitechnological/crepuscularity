@@ -2,10 +2,14 @@
 name = "crepuscularity"
 version = "0.3.0"
 edition = "2021"
+license = "MPL-2.0"
+description = "Crepuscularity UI framework: .crepus templates for GPUI and web (UNSTABLE; in active development)."
+repository = "https://github.com/semitechnological/crepuscularity"
+readme = "../../README.md"
 
 [lib]
 path = "src/lib.rs"
 
 [dependencies]
-crepuscularity-core = { path = "../crepuscularity-core" }
-crepuscularity-web = { path = "../crepuscularity-web" }
+crepuscularity-core = { path = "../crepuscularity-core", version = "0.3.0" }
+crepuscularity-web = { path = "../crepuscularity-web", version = "0.3.0" }

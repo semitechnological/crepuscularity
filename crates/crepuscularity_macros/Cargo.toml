@@ -2,13 +2,17 @@
 name = "crepuscularity_macros"
 version = "0.3.0"
 edition = "2021"
+license = "MPL-2.0"
+description = "Compile-time view! macro for Crepuscularity templates (UNSTABLE; in active development)."
+repository = "https://github.com/semitechnological/crepuscularity"
+readme = "../../README.md"
 
 [lib]
 proc-macro = true
 path = "src/lib.rs"
 
 [dependencies]
-crepuscularity-core = { path = "../crepuscularity-core" }
+crepuscularity-core = { path = "../crepuscularity-core", version = "0.3.0" }
 proc-macro2 = { workspace = true }
 quote = { workspace = true }
 syn = { workspace = true }

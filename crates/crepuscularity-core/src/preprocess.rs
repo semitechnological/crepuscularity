@@ -7,7 +7,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use crate::ast::{Node, TextPart};
+use crate::ast::{ConditionalClass, Node, TextPart};
 
 /// Result of stripping indent-only decorators before parse.
 #[derive(Debug, Clone)]
@@ -185,6 +185,16 @@ pub fn expand_class_aliases_in_nodes(nodes: &mut [Node], aliases: &HashMap<Strin
                     out.extend(expand_class_token(&c, aliases));
                 }
                 el.classes = out;
+                let mut out_cc: Vec<ConditionalClass> = Vec::new();
+                for cc in std::mem::take(&mut el.conditional_classes) {
+                    for c in expand_class_token(&cc.class, aliases) {
+                        out_cc.push(ConditionalClass {
+                            class: c,
+                            condition: cc.condition.clone(),
+                        });
+                    }
+                }
+                el.conditional_classes = out_cc;
                 expand_class_aliases_in_nodes(&mut el.children, aliases);
             }
             Node::If(b) => {

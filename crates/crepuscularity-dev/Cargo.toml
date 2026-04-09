@@ -2,11 +2,15 @@
 name = "crepuscularity-dev"
 version = "0.3.0"
 edition = "2021"
+license = "MPL-2.0"
+description = "crepus-dev hot-reload development server (UNSTABLE; in active development)."
+repository = "https://github.com/semitechnological/crepuscularity"
+readme = "../../README.md"
 
 [[bin]]
 name = "crepus-dev"
 path = "src/main.rs"
 
 [dependencies]
-crepuscularity-runtime = { path = "../crepuscularity-runtime" }
+crepuscularity-runtime = { path = "../crepuscularity-runtime", version = "0.3.0" }
 gpui = { workspace = true }

@@ -2,10 +2,14 @@
 name = "crepuscularity-ssr"
 version = "0.1.0"
 edition = "2021"
+license = "MPL-2.0"
+description = "Axum/Tokio SSR helpers for Crepuscularity (UNSTABLE; in active development)."
+repository = "https://github.com/semitechnological/crepuscularity"
+readme = "../../README.md"
 
 [dependencies]
-crepuscularity-web = { path = "../crepuscularity-web" }
-crepuscularity-core = { path = "../crepuscularity-core" }
+crepuscularity-web = { path = "../crepuscularity-web", version = "0.3.0" }
+crepuscularity-core = { path = "../crepuscularity-core", version = "0.3.0" }
 axum = "0.7"
 tokio = { version = "1", features = ["full"] }
 tokio-stream = { version = "0.1", features = ["net"] }

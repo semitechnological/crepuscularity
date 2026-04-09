@@ -2,6 +2,10 @@
 name = "crepuscularity-cli"
 version = "0.4.0"
 edition = "2021"
+license = "MPL-2.0"
+description = "crepus CLI — scaffolding and builds for Crepuscularity (UNSTABLE; in active development)."
+repository = "https://github.com/semitechnological/crepuscularity"
+readme = "../../README.md"
 
 [[bin]]
 name = "crepus"
@@ -20,10 +24,10 @@ desktop = ["dep:gpui", "dep:crepuscularity-runtime"]
 
 [dependencies]
 gpui                   = { workspace = true, optional = true }
-crepuscularity-core    = { path = "../crepuscularity-core" }
-crepuscularity-runtime = { path = "../crepuscularity-runtime", optional = true }
-crepuscularity-web     = { path = "../crepuscularity-web" }
-crepuscularity-webext  = { path = "../crepuscularity-webext" }
+crepuscularity-core    = { path = "../crepuscularity-core", version = "0.3.0" }
+crepuscularity-runtime = { path = "../crepuscularity-runtime", version = "0.3.0", optional = true }
+crepuscularity-web     = { path = "../crepuscularity-web", version = "0.3.0" }
+crepuscularity-webext  = { path = "../crepuscularity-webext", version = "0.1.0" }
 notify                 = "8"
 walkdir                = "2"
 serde                  = { version = "1", features = ["derive"] }

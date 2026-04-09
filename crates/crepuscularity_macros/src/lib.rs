@@ -55,7 +55,9 @@ static ELEM_ID_COUNTER: AtomicU64 = AtomicU64::new(0);
 /// ```
 ///
 /// ## Conditional classes
-/// `class:hidden={condition}` — applies class when condition is true
+/// `class:hidden={condition}` — applies one utility class when condition is true
+///
+/// `when:{condition}="class1 class2 …"` — applies several classes under the same condition (fewer repetition than many `class:` lines)
 ///
 /// ## Event modifiers
 /// `@keydown|Enter=handler` — only fires when Enter is pressed
@@ -253,6 +255,17 @@ fn expand_view_class_aliases(
         match n {
             Node::Element(el) => {
                 expand_class_list_in_place(&mut el.classes, aliases);
+                let mut out_cc = Vec::new();
+                for cc in std::mem::take(&mut el.conditional_classes) {
+                    for c in crepuscularity_core::preprocess::expand_class_token(&cc.class, aliases)
+                    {
+                        out_cc.push(ConditionalClass {
+                            class: c,
+                            condition: cc.condition.clone(),
+                        });
+                    }
+                }
+                el.conditional_classes = out_cc;
                 expand_view_class_aliases(&mut el.children, aliases);
             }
             Node::If(b) => {
@@ -683,6 +696,21 @@ fn parse_element_line(line: &str, children: Vec<Node>) -> Element {
                     modifiers,
                     handler,
                 });
+            }
+        } else if let Some(rest) = token.strip_prefix("when:") {
+            if let Some((condition, raw_classes)) =
+                crepuscularity_core::parser::parse_when_attribute_suffix(rest)
+            {
+                let classes_src = strip_optional_quotes(raw_classes.trim());
+                for class in classes_src.split_whitespace() {
+                    if class.is_empty() {
+                        continue;
+                    }
+                    conditional_classes.push(ConditionalClass {
+                        class: class.to_string(),
+                        condition: condition.clone(),
+                    });
+                }
             }
         } else if let Some(rest) = token.strip_prefix("class:") {
             // Conditional class: class:hidden={condition}

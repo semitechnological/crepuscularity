@@ -1,4 +1,5 @@
 /target
+vendor/gpui/target/
 Cargo.lock
 .DS_Store
 .crepus-cache/

@@ -2,11 +2,15 @@
 name = "crepuscularity-gpui"
 version = "0.3.0"
 edition = "2021"
+license = "MPL-2.0"
+description = "GPUI backend for Crepuscularity (view! macro re-exports) — UNSTABLE; in active development."
+repository = "https://github.com/semitechnological/crepuscularity"
+readme = "../../README.md"
 
 [lib]
 path = "src/lib.rs"
 
 [dependencies]
 gpui = { workspace = true }
-crepuscularity_macros = { path = "../crepuscularity_macros" }
-crepuscularity-runtime = { path = "../crepuscularity-runtime" }
+crepuscularity_macros = { path = "../crepuscularity_macros", version = "0.3.0" }
+crepuscularity-runtime = { path = "../crepuscularity-runtime", version = "0.3.0" }

@@ -2,6 +2,8 @@
 /// Mirrors the compile-time proc-macro parser but operates on strings at runtime.
 use std::collections::HashMap;
 
+use crepuscularity_core::parser::parse_when_attribute_suffix;
+
 use crate::ast::*;
 
 // ── Multi-component files ─────────────────────────────────────────────────────
@@ -611,6 +613,19 @@ fn parse_element_line(line: &str, children: Vec<Node>) -> Element {
                     modifiers,
                     handler,
                 });
+            }
+        } else if let Some(rest) = token.strip_prefix("when:") {
+            if let Some((condition, raw_classes)) = parse_when_attribute_suffix(rest) {
+                let classes_src = strip_optional_quotes(raw_classes.trim());
+                for class in classes_src.split_whitespace() {
+                    if class.is_empty() {
+                        continue;
+                    }
+                    conditional_classes.push(ConditionalClass {
+                        class: class.to_string(),
+                        condition: condition.clone(),
+                    });
+                }
             }
         } else if let Some(rest) = token.strip_prefix("class:") {
             if let Some(eq_pos) = rest.find('=') {
