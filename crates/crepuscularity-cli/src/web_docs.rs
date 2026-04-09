@@ -446,7 +446,7 @@ fn render_doc_shell(
       display: grid;
       grid-template-columns: minmax(220px, 280px) 1fr;
       min-height: 100vh;
-      align-items: start;
+      align-items: stretch;
     }}
     @media (max-width: 860px) {{
       .doc-shell {{ grid-template-columns: 1fr; }}
@@ -454,17 +454,24 @@ fn render_doc_shell(
         position: relative;
         top: auto;
         max-height: none;
+        overflow: visible;
         border-bottom: 1px solid var(--border);
         border-right: none;
+        padding: 1rem 1rem 1.1rem;
+        gap: 0.85rem;
+      }}
+      .doc-main {{
+        padding: 1.25rem 1rem 3rem;
       }}
     }}
     aside {{
       position: sticky;
       top: 0;
       align-self: start;
+      height: 100vh;
       max-height: 100vh;
       overflow-y: auto;
-      padding: 1.75rem 1.35rem 1.5rem;
+      padding: 1.5rem 1.25rem 1.35rem;
       border-right: 1px solid var(--border);
       background: color-mix(in srgb, var(--surface) 92%, white 8%);
       display: flex;
@@ -552,11 +559,11 @@ fn render_doc_shell(
       opacity: 0.95;
     }}
     .doc-main {{
-      padding: 2.5rem 2.75rem 5rem;
-      max-width: 50rem;
+      padding: clamp(1.5rem, 3vw, 2.5rem) clamp(1rem, 3vw, 2.75rem) clamp(3.25rem, 5vw, 5rem);
+      max-width: 52rem;
     }}
     .doc-main.doc-main--wide {{
-      max-width: 72rem;
+      max-width: 74rem;
     }}
     .prose h1 {{ font-size: 2rem; font-weight: 700; margin: 0 0 1rem; letter-spacing: -0.03em; line-height: 1.2; scroll-margin-top: 1.25rem; }}
     .prose h2 {{ font-size: 1.35rem; font-weight: 600; margin: 2rem 0 0.75rem; letter-spacing: -0.02em; scroll-margin-top: 1.25rem; }}
@@ -580,15 +587,15 @@ fn render_doc_shell(
     .prose pre {{
       background: #0a0a0a;
       border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 1rem 1.1rem;
+      border-radius: 12px;
+      padding: 0.95rem 1rem;
       overflow-x: auto;
       margin: 1rem 0;
     }}
     .prose pre code {{
       background: none;
       padding: 0;
-      font-size: 0.82rem;
+      font-size: 0.8rem;
       line-height: 1.5;
     }}
     .prose table {{
@@ -610,7 +617,7 @@ fn render_doc_shell(
     .prose a {{ color: color-mix(in srgb, var(--text) 90%, var(--muted)); border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, var(--muted)); }}
     .prose a:hover {{ color: var(--text); border-bottom-color: var(--text); }}
     .docs-landing .lede {{
-      font-size: 1.05rem;
+      font-size: 1rem;
       max-width: 48rem;
       margin: 0 0 2rem;
       color: color-mix(in srgb, var(--text) 85%, var(--muted));
@@ -630,11 +637,11 @@ fn render_doc_shell(
     .doc-grid {{
       display: grid;
       gap: 1rem;
-      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
     }}
     .doc-card {{
       display: block;
-      padding: 1.25rem 1.35rem;
+      padding: 1.15rem 1.2rem;
       border: 1px solid var(--border);
       border-radius: 12px;
       background: color-mix(in srgb, var(--surface) 92%, white 8%);
@@ -658,13 +665,13 @@ fn render_doc_shell(
       line-height: 1.5;
     }}
     .footnote {{
-      margin-top: 2.5rem;
+      margin-top: 2rem;
       font-size: 0.875rem;
       color: var(--muted);
     }}
     .doc-footer {{
       margin-top: auto;
-      padding-top: 1.25rem;
+      padding-top: 1rem;
       font-size: 0.75rem;
       color: var(--muted);
       line-height: 1.45;
@@ -678,7 +685,7 @@ fn render_doc_shell(
       display: flex;
       align-items: flex-start;
       justify-content: center;
-      padding: 8vh 1rem;
+      padding: min(8vh, 4rem) 0.75rem 1rem;
     }}
     .doc-search-overlay--hidden {{
       display: none !important;
@@ -692,7 +699,7 @@ fn render_doc_shell(
     }}
     .doc-search-error {{ color: #f87171; }}
     .doc-search-dialog {{
-      width: min(520px, 100%);
+      width: min(560px, 100%);
       background: color-mix(in srgb, var(--surface) 94%, white 6%);
       border: 1px solid var(--border);
       border-radius: 12px;
@@ -715,7 +722,7 @@ fn render_doc_shell(
       list-style: none;
       margin: 0;
       padding: 0.5rem;
-      max-height: min(340px, 50vh);
+      max-height: min(340px, 48vh);
       overflow-y: auto;
     }}
     .doc-search-dialog li {{
@@ -735,6 +742,94 @@ fn render_doc_shell(
       font-size: 0.75rem;
       color: var(--muted);
       line-height: 1.35;
+    }}
+    @media (max-width: 640px) {{
+      .doc-shell {{
+        min-height: auto;
+      }}
+      aside {{
+        padding: 0.95rem 0.9rem 1rem;
+        gap: 0.75rem;
+      }}
+      .brand {{
+        font-size: 0.9rem;
+      }}
+      .doc-search-trigger {{
+        padding: 0.6rem 0.7rem;
+        font-size: 0.8rem;
+      }}
+      .doc-search-trigger kbd {{
+        display: none;
+      }}
+      .doc-nav {{
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.35rem 0.75rem;
+        font-size: 0.82rem;
+      }}
+      .doc-nav li {{
+        margin: 0;
+      }}
+      .doc-toc {{
+        padding-top: 0.65rem;
+      }}
+      .doc-toc ul {{
+        font-size: 0.78rem;
+      }}
+      .doc-main {{
+        padding: 1.1rem 0.9rem 2.5rem;
+      }}
+      .prose h1 {{
+        font-size: 1.65rem;
+        margin-bottom: 0.85rem;
+      }}
+      .prose h2 {{
+        font-size: 1.15rem;
+        margin-top: 1.5rem;
+      }}
+      .prose h3 {{
+        font-size: 0.98rem;
+      }}
+      .prose p,
+      .prose ul,
+      .prose ol {{
+        margin-top: 0.65rem;
+        margin-bottom: 0.65rem;
+      }}
+      .prose pre {{
+        padding: 0.8rem 0.85rem;
+        border-radius: 10px;
+      }}
+      .prose pre code {{
+        font-size: 0.75rem;
+      }}
+      .prose table {{
+        display: block;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+      }}
+      .docs-landing .lede {{
+        font-size: 0.95rem;
+        margin-bottom: 1.5rem;
+      }}
+      .doc-grid {{
+        grid-template-columns: 1fr;
+      }}
+      .doc-card {{
+        padding: 1rem 1.05rem;
+      }}
+      .footnote {{
+        margin-top: 1.5rem;
+      }}
+      .doc-search-overlay {{
+        padding-top: 0.75rem;
+      }}
+      .doc-search-dialog {{
+        width: 100%;
+      }}
+      .doc-search-dialog input {{
+        padding: 0.9rem 1rem;
+      }}
     }}
   </style>
 </head>

@@ -1,14 +1,14 @@
 google-fonts "Inter" "JetBrains Mono"
 
 div min-h-screen overflow-x-hidden antialiased crepus-twilight-page
- main max-w-6xl mx-auto px-4 sm:px-6 relative z-10 w-full min-w-0
-  div flex items-center gap-3 pt-8 pb-2 crepus-entrance crepus-e1
+ main max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 w-full min-w-0
+  div flex items-center gap-3 pt-6 sm:pt-8 pb-2 crepus-entrance crepus-e1
    a href="./index.html" flex items-center gap-3 group shrink-0 no-underline crepus-t-text hover:opacity-90
     img src="./static/favicon.svg" alt="" w-9 h-9 sm:w-10 sm:h-10 shrink-0 rounded-lg
     span text-sm sm:text-base font-semibold tracking-tight
      "Crepuscularity"
-  section pt-8 pb-16 sm:pt-10 sm:pb-20 md:pt-12 md:pb-24 crepus-entrance crepus-e2
-   div grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_min(100%,380px)] gap-10 lg:gap-12 items-start
+  section pt-6 pb-12 sm:pt-10 sm:pb-20 md:pt-12 md:pb-24 crepus-entrance crepus-e2
+   div grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_min(100%,380px)] gap-8 lg:gap-12 items-start
     div max-w-3xl min-w-0
      h1 text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold crepus-t-text tracking-tight leading-[1.1] mb-5 sm:mb-6
       "UI templates that compile "
@@ -28,10 +28,10 @@ div min-h-screen overflow-x-hidden antialiased crepus-twilight-page
         "→"
       a href="./docs/cli.html" no-underline inline-flex items-center px-5 py-2.5 rounded-lg crepus-t-btn-ghost text-sm font-medium transition-colors hover:bg-[var(--cp-elevated)]
        "CLI reference"
-     div mt-8 flex flex-col items-stretch w-full max-w-xl gap-5
+     div mt-8 flex flex-col items-stretch w-full max-w-xl gap-4 sm:gap-5
       p text-xs font-semibold uppercase tracking-widest crepus-t-muted m-0 text-center sm:text-left
        "One toolchain"
-      div grid grid-cols-2 sm:grid-cols-4 gap-6 sm:gap-4 text-center
+      div grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-5 text-center
        div flex flex-col items-center gap-2
         span material-symbols-outlined crepus-toolchain-icon text-[var(--cp-accent)]
          "computer"
@@ -68,14 +68,14 @@ div min-h-screen overflow-x-hidden antialiased crepus-twilight-page
       pre font-mono text-[11px] sm:text-[13px] leading-relaxed p-3 sm:p-4 m-0 crepus-t-pre whitespace-pre-wrap overflow-x-auto
        "# New desktop app\n$ crepus new my-app && cargo run\n\n# WASM site (this page)\n$ crepus web build --site docs-site\n\n# Browser extension\n$ crepus webext new ext"
 
-  section py-12 sm:py-14 border-t crepus-t-border crepus-entrance crepus-e3
-   div rounded-xl p-6 sm:p-8 max-w-4xl crepus-t-card
+  section py-10 sm:py-14 border-t crepus-t-border crepus-entrance crepus-e3
+   div rounded-xl p-5 sm:p-8 max-w-4xl crepus-t-card
     p text-xs font-semibold uppercase tracking-widest crepus-t-muted mb-3
      "One workspace · surfaces that stay fast"
     p text-sm sm:text-base crepus-t-muted leading-relaxed m-0 border-l-2 pl-4 border-[var(--cp-accent)]
      "Ship Manifest V3 browser extensions without a separate front-end toolchain. The same templates power native GPUI windows, static WASM sites, and extension popups — small artifacts, instant dev reload, and a layout path that stays on the GPU instead of funneling every interaction through a JS runtime."
 
-  section py-14 sm:py-16 border-t crepus-t-border crepus-entrance crepus-e4
+  section py-10 sm:py-14 border-t crepus-t-border crepus-entrance crepus-e4
    h2 text-lg font-semibold crepus-t-text mb-2
     "Three ways to write the same tree"
    p text-sm crepus-t-muted mb-2 max-w-2xl m-0
@@ -99,9 +99,9 @@ div min-h-screen overflow-x-hidden antialiased crepus-twilight-page
      pre font-mono text-[10px] sm:text-xs m-0 flex-1 leading-relaxed crepus-t-pre p-3 rounded-lg whitespace-pre-wrap overflow-x-auto
       "use crepuscularity::prelude::*;\n\nfn ui(cx: &mut ViewContext) -> impl IntoElement {\n    view!(cx,\n        div(class=\"flex items-center gap-2 p-4 font-bold\") ｛\n            \"Hello from GPUI and Rust\",\n        ｝\n    )\n}"
 
-  section py-14 sm:py-16 border-t crepus-t-border crepus-entrance crepus-e5
-   div flex flex-col lg:flex-row lg:items-stretch gap-6 lg:gap-8
-    div flex-1 rounded-xl p-6 sm:p-8 crepus-t-card
+  section py-10 sm:py-14 border-t crepus-t-border crepus-entrance crepus-e5
+   div flex flex-col lg:flex-row lg:items-stretch gap-5 sm:gap-6 lg:gap-8
+    div flex-1 rounded-xl p-5 sm:p-8 crepus-t-card
      p text-xs font-semibold uppercase tracking-widest crepus-t-muted mb-3 sm:mb-4
       "Why it's different"
      p text-xl sm:text-2xl md:text-3xl font-semibold crepus-t-text leading-snug mb-5 sm:mb-6
@@ -113,29 +113,29 @@ div min-h-screen overflow-x-hidden antialiased crepus-twilight-page
      p text-sm crepus-t-muted m-0 leading-relaxed
       "The same parser and evaluator back the macro, the WASM renderer, and the dev server — so what you author is what ships."
     div flex-1 grid gap-4 sm:grid-cols-2
-     div rounded-xl p-5 crepus-t-card
+     div rounded-xl p-4 sm:p-5 crepus-t-card
       h3 text-sm font-semibold crepus-t-text mb-2
        "One syntax"
       p text-xs crepus-t-muted leading-relaxed m-0
        "Indent or JSX-style tags; control flow, slots, and includes behave the same across backends."
-     div rounded-xl p-5 crepus-t-card
+     div rounded-xl p-4 sm:p-5 crepus-t-card
       h3 text-sm font-semibold crepus-t-text mb-2
        "Rust + WASM"
       p text-xs crepus-t-muted leading-relaxed m-0
        "Thin wasm32 runtimes, optional reactive layer, and HTML output for SSR and extensions."
-     div rounded-xl p-5 crepus-t-card
+     div rounded-xl p-4 sm:p-5 crepus-t-card
       h3 text-sm font-semibold crepus-t-text mb-2
        "Tailwind on GPUI"
       p text-xs crepus-t-muted leading-relaxed m-0
        "Class strings map to native styles — layout, color, type, and more (see README)."
-     div rounded-xl p-5 crepus-t-card
+     div rounded-xl p-4 sm:p-5 crepus-t-card
       h3 text-sm font-semibold crepus-t-text mb-2
        "Documentation site"
       p text-xs crepus-t-muted leading-relaxed m-0
        "Markdown in docs/ is rendered to styled HTML on every crepus web build."
 
-  section py-14 sm:py-16 border-t crepus-t-border
-   div flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-8 sm:mb-10
+  section py-10 sm:py-14 border-t crepus-t-border
+   div flex flex-col md:flex-row md:items-end md:justify-between gap-5 sm:gap-6 mb-7 sm:mb-10
     div
      h2 text-lg font-semibold crepus-t-text mb-1
       "Documentation"
@@ -173,8 +173,8 @@ div min-h-screen overflow-x-hidden antialiased crepus-twilight-page
      span text-xs crepus-t-muted mt-1 block
       "MV3 toolchain"
 
- footer border-t py-10 sm:py-12 crepus-t-border crepus-entrance crepus-e6
-  div max-w-6xl mx-auto px-4 sm:px-6 footer-row
+ footer border-t py-8 sm:py-10 crepus-t-border crepus-entrance crepus-e6
+  div max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 footer-row
    div flex flex-col gap-2
     a href="./index.html" flex items-center gap-2 no-underline crepus-t-text hover:opacity-90
      img src="./static/favicon.svg" alt="" w-7 h-7 shrink-0 rounded-md
@@ -193,5 +193,5 @@ div min-h-screen overflow-x-hidden antialiased crepus-twilight-page
      "GitHub"
 
 .slot-lede text-[var(--cp-fg)] font-medium
-.footer-row flex flex-col sm:flex-row justify-between gap-6 sm:items-center
-.doc-card group flex flex-col rounded-xl p-5 transition-all crepus-t-card hover:border-[var(--cp-accent)]
+.footer-row flex flex-col sm:flex-row justify-between gap-4 sm:gap-6 sm:items-center
+.doc-card group flex flex-col rounded-xl p-4 sm:p-5 transition-all crepus-t-card hover:border-[var(--cp-accent)]
