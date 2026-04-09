@@ -1,0 +1,6 @@
+[site]
+name = "Crepuscularity"
+description = "Documentation and landing (crepus web build)"
+head_html = """
+<link rel="icon" href="./static/favicon.svg" type="image/svg+xml">
+"""

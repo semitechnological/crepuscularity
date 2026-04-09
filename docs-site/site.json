@@ -3,17 +3,17 @@
   "title": "Crepuscularity",
   "domain": "crepuscularity.dev",
   "seo": {
-    "title": "Crepuscularity — .crepus for GPUI, web, and extensions",
-    "description": "One template DSL and CLI: crepus new, crepus web build, crepus webext. Hot reload, wasm32 sites, native GPUI apps.",
+    "title": "Crepuscularity — .crepus templates for GPUI, WASM, and browser extensions",
+    "description": "Write UI once in .crepus: native GPUI apps with hot reload, static WASM sites (this page), and MV3 extensions. Docs, CLI, and crates on crates.io.",
     "ogImage": null
   },
   "theme": {
-    "accent": "#0070f3",
-    "accentSoft": "#3291ff",
-    "surface": "#000000",
-    "text": "#fafafa",
-    "muted": "#888888",
-    "border": "#333333"
+    "accent": "#8b5cf6",
+    "accentSoft": "#38bdf8",
+    "surface": "#030712",
+    "text": "#f4f4f5",
+    "muted": "#94a3b8",
+    "border": "#27272a"
   },
   "elements": [],
   "analytics": null,
