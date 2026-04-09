@@ -19,6 +19,8 @@
 //! host-permissions = ["https://example.com/*"]
 //! ```
 
+pub mod extension_assets;
+
 mod api;
 mod capabilities;
 mod manifest;

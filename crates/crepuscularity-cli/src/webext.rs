@@ -8,20 +8,6 @@ use std::time::Instant;
 use crate::ui;
 use crate::wasm_bundle::{cargo_build_wasm32, find_wasm_file, run_wasm_bindgen, wasm_release_dirs};
 
-// ── Embedded runtime assets ──────────────────────────────────────────────────
-
-const ASSET_POPUP_HTML: &str = include_str!("../../crepuscularity-webext/assets/popup.html");
-const ASSET_POPUP_JS: &str = include_str!("../../crepuscularity-webext/assets/popup.js");
-const ASSET_POPUP_CSS: &str = include_str!("../../crepuscularity-webext/assets/popup.css");
-const ASSET_BACKGROUND_JS: &str = include_str!("../../crepuscularity-webext/assets/background.js");
-const ASSET_CONTENT_JS: &str = include_str!("../../crepuscularity-webext/assets/content.js");
-const ASSET_CONTENT_CSS: &str = include_str!("../../crepuscularity-webext/assets/content.css");
-const ASSET_BROWSER_SHIM: &str = include_str!("../../crepuscularity-webext/assets/browser-shim.js");
-const ASSET_RUNTIME_ADAPTER: &str =
-    include_str!("../../crepuscularity-webext/assets/runtime-as-adapter.js");
-const ASSET_UNOCSS_JS: &[u8] =
-    include_bytes!("../../crepuscularity-webext/assets/vendor/unocss.js");
-
 // ── Entry point ──────────────────────────────────────────────────────────────
 
 pub fn run(args: &[String]) {
@@ -219,19 +205,55 @@ fn build_extension(app_path: &Path) {
     // ── Step 2: runtime assets ───────────────────────────────────────────────
     {
         let sp = ui::spinner("writing runtime assets");
-        std::fs::write(src_dir.join("popup.html"), ASSET_POPUP_HTML).unwrap();
-        std::fs::write(src_dir.join("popup.css"), ASSET_POPUP_CSS).unwrap();
-        std::fs::write(src_dir.join("popup.js"), ASSET_POPUP_JS).unwrap();
-        std::fs::write(src_dir.join("background.js"), ASSET_BACKGROUND_JS).unwrap();
+        std::fs::write(
+            src_dir.join("popup.html"),
+            crepuscularity_webext::extension_assets::POPUP_HTML,
+        )
+        .unwrap();
+        std::fs::write(
+            src_dir.join("popup.css"),
+            crepuscularity_webext::extension_assets::POPUP_CSS,
+        )
+        .unwrap();
+        std::fs::write(
+            src_dir.join("popup.js"),
+            crepuscularity_webext::extension_assets::POPUP_JS,
+        )
+        .unwrap();
+        std::fs::write(
+            src_dir.join("background.js"),
+            crepuscularity_webext::extension_assets::BACKGROUND_JS,
+        )
+        .unwrap();
         let custom_bg = app_path.join("src/background.js");
         if custom_bg.exists() {
             std::fs::copy(&custom_bg, src_dir.join("background.js")).unwrap();
         }
-        std::fs::write(src_dir.join("content.js"), ASSET_CONTENT_JS).unwrap();
-        std::fs::write(src_dir.join("content.css"), ASSET_CONTENT_CSS).unwrap();
-        std::fs::write(src_dir.join("browser-shim.js"), ASSET_BROWSER_SHIM).unwrap();
-        std::fs::write(src_dir.join("runtime-as-adapter.js"), ASSET_RUNTIME_ADAPTER).unwrap();
-        std::fs::write(vendor_dir.join("unocss.js"), ASSET_UNOCSS_JS).unwrap();
+        std::fs::write(
+            src_dir.join("content.js"),
+            crepuscularity_webext::extension_assets::CONTENT_JS,
+        )
+        .unwrap();
+        std::fs::write(
+            src_dir.join("content.css"),
+            crepuscularity_webext::extension_assets::CONTENT_CSS,
+        )
+        .unwrap();
+        std::fs::write(
+            src_dir.join("browser-shim.js"),
+            crepuscularity_webext::extension_assets::BROWSER_SHIM,
+        )
+        .unwrap();
+        std::fs::write(
+            src_dir.join("runtime-as-adapter.js"),
+            crepuscularity_webext::extension_assets::RUNTIME_ADAPTER,
+        )
+        .unwrap();
+        std::fs::write(
+            vendor_dir.join("unocss.js"),
+            crepuscularity_webext::extension_assets::UNOCSS_JS,
+        )
+        .unwrap();
         ui::spinner_ok(&sp, "runtime assets");
     }
 
@@ -457,7 +479,7 @@ fn prerender_popup_html(
     // Inline the CSS so the popup is a single self-contained file with zero
     // external fetches before it renders. UnoCSS is not needed here — the popup
     // uses BEM class names from popup.css, not utility classes.
-    let css = ASSET_POPUP_CSS;
+    let css = crepuscularity_webext::extension_assets::POPUP_CSS;
     Ok(format!(
         r#"<!doctype html>
 <html lang="en">
