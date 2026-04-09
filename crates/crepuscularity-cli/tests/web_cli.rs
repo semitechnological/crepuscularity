@@ -102,60 +102,92 @@ fn web_build_docs_site_emits_wasm() {
         dsl.contains("prose") && dsl.contains("DSL"),
         "expected dsl.md rendered to HTML"
     );
+    let search = std::fs::read_to_string(out.path().join("docs/docs-search-index.json"))
+        .expect("docs-search-index.json");
+    assert!(
+        search.contains("\"entries\"") && search.contains("index.html"),
+        "expected fuzzy search index beside docs"
+    );
 }
 
 #[test]
-fn web_build_legacy_site_json_stdout() {
-    let json = r##"{
-  "businessName": "Stdin Co",
-  "domain": null,
-  "seo": {
-    "title": "Stdin Co",
-    "description": "test",
-    "ogImage": null
-  },
-  "theme": {
-    "accent": "#3b82f6",
-    "accentSoft": "#60a5fa",
-    "surface": "#09090b",
-    "text": "#fafafa",
-    "muted": "#a1a1aa",
-    "border": "#27272a"
-  },
-  "elements": [
-    {
-      "type": "hero",
-      "id": "hero-1",
-      "props": {
-        "eyebrow": "Welcome",
-        "headline": "Meet Stdin Co",
-        "subheadline": "Ship a polished landing page from structured data.",
-        "primary": { "label": "Get started", "href": "#contact", "external": null },
-        "secondary": null,
-        "media": null
-      }
-    }
-  ],
-  "analytics": null,
-  "turnstile": null
-}"##;
+fn web_build_via_crepus_toml_target_docs_emits_wasm() {
+    use std::path::Path;
 
+    let out = tempfile::tempdir().expect("tempdir");
+    let repo = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .canonicalize()
+        .expect("repo root");
+
+    let manifest = repo.join("crepus.toml");
+    assert!(
+        manifest.is_file(),
+        "repo crepus.toml missing (needed for --target docs test)"
+    );
+
+    let status = crepus()
+        .current_dir(&repo)
+        .args([
+            "web",
+            "build",
+            "--target",
+            "docs",
+            "--manifest",
+            manifest.to_str().unwrap(),
+            "--out-dir",
+            out.path().to_str().unwrap(),
+        ])
+        .status()
+        .expect("spawn");
+    assert!(
+        status.success(),
+        "crepus web build --target docs should succeed"
+    );
+
+    let has_wasm = std::fs::read_dir(out.path().join("pkg"))
+        .expect("pkg dir")
+        .flatten()
+        .any(|e| e.path().extension().map(|x| x == "wasm").unwrap_or(false));
+    assert!(has_wasm);
+}
+
+#[test]
+fn web_build_multi_target_manifest_requires_target_flag() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let root = tmp.path();
+    let tom = r#"
+[[targets]]
+type = "web"
+id = "a"
+site = "a"
+out = "a/dist"
+
+[[targets]]
+type = "web"
+id = "b"
+site = "b"
+out = "b/dist"
+"#;
+    std::fs::write(root.join("crepus.toml"), tom).expect("write manifest");
+    std::fs::create_dir_all(root.join("a")).expect("mkdir a");
+    std::fs::create_dir_all(root.join("b")).expect("mkdir b");
+
+    let man = root.join("crepus.toml");
     let out = crepus()
-        .args(["web", "build", "--legacy-site-json", "-"])
-        .stdin(std::process::Stdio::piped())
+        .current_dir(root)
+        .args(["web", "build", "--manifest", man.to_str().unwrap()])
+        .stderr(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
         .spawn()
         .expect("spawn");
-    use std::io::Write;
-    out.stdin
-        .as_ref()
-        .unwrap()
-        .write_all(json.as_bytes())
-        .unwrap();
     let out = out.wait_with_output().expect("wait");
-    assert!(out.status.success());
-    let html = String::from_utf8_lossy(&out.stdout);
-    assert!(html.contains("Stdin Co"));
+    assert!(!out.status.success());
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("--target") || stderr.contains("target"),
+        "stderr: {stderr}"
+    );
 }
 
 #[test]
@@ -189,13 +221,11 @@ fn root_help_lists_web_commands() {
 }
 
 #[test]
-fn web_build_legacy_missing_json_file_fails() {
+fn web_build_rejects_legacy_site_json_flag() {
     let tmp = tempfile::tempdir().expect("tempdir");
-    let ghost = tmp.path().join("nope.json");
     let status = crepus()
         .current_dir(tmp.path())
-        .args(["web", "build", "--legacy-site-json", "--json"])
-        .arg(&ghost)
+        .args(["web", "build", "--legacy-site-json"])
         .status()
         .expect("spawn");
     assert!(!status.success());

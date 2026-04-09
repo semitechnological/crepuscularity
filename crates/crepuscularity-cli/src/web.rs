@@ -10,7 +10,7 @@ use crepuscularity_core::preprocess::{
     google_fonts_head_markup, merge_unique_font_families, strip_indent_decorators,
 };
 use crepuscularity_core::{DriverCache, Fingerprint};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::json;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -36,11 +36,7 @@ pub fn run(args: &[String]) {
 
         Some("build") => {
             let b = parse_build_args(&args[1..]);
-            if b.legacy_site_json {
-                build_site_legacy(&b);
-            } else {
-                build_site_wasm(&b);
-            }
+            build_site_wasm(&b);
         }
 
         Some("site-json") => {
@@ -62,10 +58,39 @@ pub fn run(args: &[String]) {
     }
 }
 
+fn parse_target_and_manifest(args: &[String]) -> (Option<String>, Option<PathBuf>) {
+    let mut target = None;
+    let mut manifest = None;
+    let mut i = 0;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--target" | "-t" => {
+                if let Some(x) = args.get(i + 1) {
+                    target = Some(x.clone());
+                    i += 1;
+                }
+            }
+            "--manifest" => {
+                if let Some(x) = args.get(i + 1) {
+                    manifest = Some(PathBuf::from(x));
+                    i += 1;
+                }
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+    (target, manifest)
+}
+
 fn parse_serve_args(args: &[String]) -> ServeOptions {
+    let (target_id, manifest) = parse_target_and_manifest(args);
+
     let mut site_dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
     let mut port: u16 = 4000;
     let mut entry = "index.crepus".to_string();
+    let mut explicit_site = false;
+    let mut entry_from_args = false;
 
     let mut i = 0;
     while i < args.len() {
@@ -73,6 +98,7 @@ fn parse_serve_args(args: &[String]) -> ServeOptions {
             "--site" => {
                 if let Some(p) = args.get(i + 1) {
                     site_dir = PathBuf::from(p);
+                    explicit_site = true;
                     i += 1;
                 }
             }
@@ -85,12 +111,24 @@ fn parse_serve_args(args: &[String]) -> ServeOptions {
             "--entry" => {
                 if let Some(e) = args.get(i + 1) {
                     entry = e.clone();
+                    entry_from_args = true;
                     i += 1;
                 }
             }
             _ => {}
         }
         i += 1;
+    }
+
+    if !explicit_site {
+        if let Some(targets) = crate::crepus_toml::load_web_targets(manifest) {
+            let picked = crate::crepus_toml::resolve_pick(&targets, target_id.as_deref())
+                .unwrap_or_else(|m| ui::error(&m));
+            site_dir = picked.site_dir;
+            if !entry_from_args {
+                entry = picked.entry;
+            }
+        }
     }
 
     ServeOptions {
@@ -185,17 +223,27 @@ fn print_web_usage() {
         style("--entry FILE           ").green(),
         style("entry template (default: index.crepus)").dim()
     );
+    eprintln!(
+        "  {}  {}",
+        style("--target, -t ID        ").green(),
+        style("web target id from crepus.toml (when multiple)").dim()
+    );
+    eprintln!(
+        "  {}  {}",
+        style("--manifest FILE        ").green(),
+        style("path to crepus.toml (skip walk-up)").dim()
+    );
     eprintln!();
     eprintln!("{}", style("BUILD ARGS").dim());
     eprintln!(
         "  {}  {}",
         style("--site DIR              ").green(),
-        style("site root (default: cwd)").dim()
+        style("site root (default: cwd, or crepus.toml target)").dim()
     );
     eprintln!(
         "  {}  {}",
         style("--out-dir, -o DIR       ").green(),
-        style("output directory (default: SITE/dist)").dim()
+        style("output directory (default: SITE/dist or target out)").dim()
     );
     eprintln!(
         "  {}  {}",
@@ -204,23 +252,13 @@ fn print_web_usage() {
     );
     eprintln!(
         "  {}  {}",
-        style("--legacy-site-json      ").green(),
-        style("old pipeline: HTML from structured site.json only").dim()
+        style("--target, -t ID         ").green(),
+        style("pick [[targets]] type=web entry (multiple sites)").dim()
     );
     eprintln!(
         "  {}  {}",
-        style("--json FILE             ").green(),
-        style("(legacy) explicit site.json path").dim()
-    );
-    eprintln!(
-        "  {}  {}",
-        style("[FILE | -]              ").green(),
-        style("(legacy) site.json path or stdin").dim()
-    );
-    eprintln!(
-        "  {}  {}",
-        style("-o FILE.html            ").green(),
-        style("(legacy) single HTML output with --legacy-site-json").dim()
+        style("--manifest FILE         ").green(),
+        style("crepus.toml path").dim()
     );
 }
 
@@ -318,23 +356,27 @@ struct WasmBuildArgs {
 
 struct WebBuildArgs {
     site_dir: Option<PathBuf>,
-    json_path: Option<PathBuf>,
-    positional: Option<String>,
-    out: Option<PathBuf>,
     out_dir: Option<PathBuf>,
     entry: Option<String>,
-    legacy_site_json: bool,
+    target_id: Option<String>,
+    manifest: Option<PathBuf>,
 }
 
 fn parse_build_args(args: &[String]) -> WebBuildArgs {
-    let legacy_site_json = args.iter().any(|a| a == "--legacy-site-json");
+    if args.iter().any(|a| a == "--legacy-site-json") {
+        ui::error(
+            "crepus web build no longer supports --legacy-site-json; use .crepus + WASM (docs/WEB_BUILD_MIGRATION.md)",
+        );
+    }
+    if args.iter().any(|a| a == "--json") {
+        ui::error("crepus web build no longer supports --json for site.json paths.");
+    }
+
+    let (target_id, manifest) = parse_target_and_manifest(args);
 
     let mut site_dir = None;
-    let mut json_path = None;
-    let mut out = None;
     let mut out_dir = None;
     let mut entry = None;
-    let mut positional = None;
 
     let mut i = 0;
     while i < args.len() {
@@ -342,12 +384,6 @@ fn parse_build_args(args: &[String]) -> WebBuildArgs {
             "--site" => {
                 if let Some(p) = args.get(i + 1) {
                     site_dir = Some(PathBuf::from(p));
-                    i += 1;
-                }
-            }
-            "--json" => {
-                if let Some(p) = args.get(i + 1) {
-                    json_path = Some(PathBuf::from(p));
                     i += 1;
                 }
             }
@@ -363,27 +399,11 @@ fn parse_build_args(args: &[String]) -> WebBuildArgs {
                     i += 1;
                 }
             }
-            "--legacy-site-json" => {}
             "-o" | "--output" | "--out" => {
                 if let Some(p) = args.get(i + 1) {
-                    let pb = PathBuf::from(p);
-                    if legacy_site_json {
-                        if pb.extension().is_some_and(|e| e == "html") {
-                            out = Some(pb);
-                        } else {
-                            out_dir = Some(pb);
-                        }
-                    } else {
-                        out_dir = Some(pb);
-                    }
+                    out_dir = Some(PathBuf::from(p));
                     i += 1;
                 }
-            }
-            "-" if positional.is_none() => {
-                positional = Some("-".to_string());
-            }
-            s if !s.starts_with('-') && positional.is_none() => {
-                positional = Some(s.to_string());
             }
             _ => {}
         }
@@ -392,32 +412,46 @@ fn parse_build_args(args: &[String]) -> WebBuildArgs {
 
     WebBuildArgs {
         site_dir,
-        json_path,
-        positional,
-        out,
         out_dir,
         entry,
-        legacy_site_json,
+        target_id,
+        manifest,
     }
 }
 
 fn resolve_wasm_build_args(args: &WebBuildArgs) -> WasmBuildArgs {
-    let site_dir = args
-        .site_dir
-        .clone()
-        .or_else(|| std::env::current_dir().ok())
-        .unwrap_or_else(|| PathBuf::from("."));
+    if let Some(site_dir) = &args.site_dir {
+        let out_dir = args
+            .out_dir
+            .clone()
+            .unwrap_or_else(|| site_dir.join("dist"));
+        let entry = args.entry.clone().unwrap_or_else(|| "index.crepus".into());
+        return WasmBuildArgs {
+            site_dir: site_dir.clone(),
+            out_dir,
+            entry,
+        };
+    }
 
+    let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    if let Some(targets) = crate::crepus_toml::load_web_targets(args.manifest.clone()) {
+        let picked = crate::crepus_toml::resolve_pick(&targets, args.target_id.as_deref())
+            .unwrap_or_else(|m| ui::error(&m));
+        let out_dir = args.out_dir.clone().unwrap_or(picked.out_dir);
+        let entry = args.entry.clone().unwrap_or(picked.entry);
+        return WasmBuildArgs {
+            site_dir: picked.site_dir,
+            out_dir,
+            entry,
+        };
+    }
+
+    let site_dir = cwd;
     let out_dir = args
         .out_dir
         .clone()
-        .or_else(|| args.out.clone())
         .unwrap_or_else(|| site_dir.join("dist"));
-
-    let entry = args
-        .entry
-        .clone()
-        .unwrap_or_else(|| "index.crepus".to_string());
+    let entry = args.entry.clone().unwrap_or_else(|| "index.crepus".into());
 
     WasmBuildArgs {
         site_dir,
@@ -606,12 +640,12 @@ fn relative_key(root: &Path, abs: &Path) -> String {
 }
 
 #[derive(Debug, Clone)]
-struct SiteHead {
-    page_title: String,
-    description: String,
-    og_image: Option<String>,
-    extra_head_html: String,
-    theme: ThemeCss,
+pub(crate) struct SiteHead {
+    pub(crate) page_title: String,
+    pub(crate) description: String,
+    pub(crate) og_image: Option<String>,
+    pub(crate) extra_head_html: String,
+    pub(crate) theme: ThemeCss,
 }
 
 impl Default for SiteHead {
@@ -627,13 +661,13 @@ impl Default for SiteHead {
 }
 
 #[derive(Debug, Clone)]
-struct ThemeCss {
-    accent: String,
-    accent_soft: String,
-    surface: String,
-    text: String,
-    muted: String,
-    border: String,
+pub(crate) struct ThemeCss {
+    pub(crate) accent: String,
+    pub(crate) accent_soft: String,
+    pub(crate) surface: String,
+    pub(crate) text: String,
+    pub(crate) muted: String,
+    pub(crate) border: String,
 }
 
 impl Default for ThemeCss {
@@ -717,7 +751,7 @@ fn load_web_toml_google_fonts(site_dir: &Path) -> Vec<String> {
     out
 }
 
-fn load_site_head(site_dir: &Path) -> SiteHead {
+pub(crate) fn load_site_head(site_dir: &Path) -> SiteHead {
     let mut head = SiteHead::default();
 
     let path = site_dir.join("site.json");
@@ -780,7 +814,7 @@ fn load_site_head(site_dir: &Path) -> SiteHead {
     head
 }
 
-fn render_index_html(head: &SiteHead, google_fonts: &[String]) -> String {
+pub(crate) fn render_index_html(head: &SiteHead, google_fonts: &[String]) -> String {
     let og = head
         .og_image
         .as_ref()
@@ -831,6 +865,40 @@ fn copy_unocss(vendor_dir: &Path) {
     }
 }
 
+/// Directory under a site root where `crepus web serve` caches UnoCSS, `app.js`, and wasm-bindgen output.
+pub(crate) const WEB_DEV_ARTIFACT_DIR: &str = ".crepus-dev";
+
+/// Build site `runtime/` to WASM once and populate `.crepus-dev/` with the same assets as a `crepus web build` dist folder.
+pub(crate) fn ensure_web_dev_artifacts(site_dir: &Path) -> Result<(), String> {
+    let runtime_dir = site_dir.join("runtime");
+    if !runtime_dir.join("Cargo.toml").is_file() {
+        return Err(format!(
+            "no runtime/Cargo.toml under {} — run `crepus web new <name>` or copy examples/web-site",
+            site_dir.display()
+        ));
+    }
+
+    let dev = site_dir.join(WEB_DEV_ARTIFACT_DIR);
+    let vendor_dir = dev.join("vendor");
+    let pkg_dir = dev.join("pkg");
+    std::fs::create_dir_all(&vendor_dir).map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(&pkg_dir).map_err(|e| e.to_string())?;
+
+    copy_unocss(&vendor_dir);
+    std::fs::write(dev.join("app.js"), WEB_APP_JS).map_err(|e| e.to_string())?;
+
+    cargo_build_wasm32(&runtime_dir)?;
+    let (workspace_target, local_target) = wasm_release_dirs(site_dir, &runtime_dir);
+    let wasm_path = find_wasm_file(&workspace_target)
+        .or_else(|| find_wasm_file(&local_target))
+        .ok_or_else(|| {
+            "built .wasm not found under target/wasm32-unknown-unknown/release/ (install wasm32 target and fix runtime errors)"
+                .to_string()
+        })?;
+    run_wasm_bindgen(&wasm_path, &pkg_dir, "runtime")?;
+    Ok(())
+}
+
 fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
     std::fs::create_dir_all(dst)?;
     for entry in std::fs::read_dir(src)? {
@@ -844,449 +912,6 @@ fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
         }
     }
     Ok(())
-}
-
-// ── Legacy site.json build ────────────────────────────────────────────────────
-
-fn build_site_legacy(cli: &WebBuildArgs) {
-    let t0 = Instant::now();
-    eprintln!(
-        "{} {}",
-        style("crepus web build").dim(),
-        style("--legacy-site-json").yellow()
-    );
-    eprintln!();
-
-    let json_str = if cli.positional.as_deref() == Some("-") {
-        use std::io::Read;
-        let mut buf = String::new();
-        std::io::stdin()
-            .read_to_string(&mut buf)
-            .unwrap_or_else(|e| ui::error(&format!("stdin: {e}")));
-        buf
-    } else if let Some(p) = &cli.json_path {
-        std::fs::read_to_string(p).unwrap_or_else(|e| {
-            ui::error(&format!("read {}: {e}", p.display()));
-        })
-    } else if let Some(pos) = &cli.positional {
-        std::fs::read_to_string(pos).unwrap_or_else(|e| {
-            ui::error(&format!("read {pos}: {e}"));
-        })
-    } else if let Some(dir) = &cli.site_dir {
-        let p = dir.join("site.json");
-        std::fs::read_to_string(&p).unwrap_or_else(|e| {
-            ui::error(&format!("read {}: {e}", p.display()));
-        })
-    } else if let Ok(cwd) = std::env::current_dir() {
-        let p = cwd.join("site.json");
-        if p.exists() {
-            std::fs::read_to_string(&p).unwrap_or_else(|e| {
-                ui::error(&format!("read {}: {e}", p.display()));
-            })
-        } else {
-            ui::error("legacy build: pass site.json, `-`, or --site with site.json");
-        }
-    } else {
-        ui::error("cannot resolve current directory");
-    };
-
-    let site: SiteRoot = serde_json::from_str(&json_str).unwrap_or_else(|e| {
-        ui::error(&format!("parse site.json: {e}"));
-    });
-
-    let html = render_site_html(&site);
-
-    let out_path = resolve_legacy_out(cli);
-    if let Some(out_path) = out_path {
-        let project_root = cli
-            .site_dir
-            .clone()
-            .or_else(|| std::env::current_dir().ok())
-            .unwrap_or_else(|| PathBuf::from("."));
-        let cache = DriverCache::open(&project_root);
-        let fp = Fingerprint::new(&json_str, None, "render");
-
-        if out_path.exists() && cache.is_up_to_date(&fp, &html) {
-            eprintln!(
-                "\n{} {} (no change — skipped write)",
-                ui::ok(),
-                style(out_path.display().to_string()).dim()
-            );
-            ui::done_in(t0.elapsed());
-            return;
-        }
-
-        if let Some(parent) = out_path.parent() {
-            if !parent.as_os_str().is_empty() {
-                std::fs::create_dir_all(parent).unwrap_or_else(|e| {
-                    ui::error(&format!("create {}: {e}", parent.display()));
-                });
-            }
-        }
-        std::fs::write(&out_path, &html).unwrap_or_else(|e| {
-            ui::error(&format!("write {}: {e}", out_path.display()));
-        });
-        cache.record(&fp, &html);
-        eprintln!(
-            "\n{} wrote {}",
-            ui::ok(),
-            style(out_path.display().to_string()).cyan()
-        );
-    } else {
-        print!("{html}");
-    }
-
-    ui::done_in(t0.elapsed());
-}
-
-fn resolve_legacy_out(cli: &WebBuildArgs) -> Option<PathBuf> {
-    cli.out.clone().or_else(|| cli.out_dir.clone())
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct SiteRoot {
-    business_name: String,
-    #[serde(default)]
-    title: Option<String>,
-    #[serde(default)]
-    domain: Option<String>,
-    seo: Seo,
-    theme: Theme,
-    elements: Vec<SiteElementRaw>,
-    #[serde(default)]
-    analytics: Option<serde_json::Value>,
-    #[serde(default)]
-    turnstile: Option<serde_json::Value>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct Seo {
-    title: String,
-    description: String,
-    #[serde(default)]
-    og_image: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct Theme {
-    accent: String,
-    accent_soft: String,
-    surface: String,
-    text: String,
-    muted: String,
-    border: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct SiteElementRaw {
-    #[serde(rename = "type")]
-    ty: String,
-    id: String,
-    props: serde_json::Value,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct HeroProps {
-    eyebrow: String,
-    headline: String,
-    subheadline: String,
-    primary: Cta,
-    #[serde(default)]
-    secondary: Option<Cta>,
-    #[serde(default)]
-    media: Option<serde_json::Value>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct Cta {
-    label: String,
-    href: String,
-    #[serde(default)]
-    external: Option<bool>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct FeatureGridProps {
-    eyebrow: String,
-    title: String,
-    items: Vec<FeatureItem>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct FeatureItem {
-    icon: String,
-    title: String,
-    description: String,
-}
-
-fn render_site_html(site: &SiteRoot) -> String {
-    let page_title = site.title.clone().unwrap_or_else(|| site.seo.title.clone());
-
-    let mut body = String::new();
-    for el in &site.elements {
-        body.push_str(&render_element(el));
-    }
-
-    let desc_escaped = escape_html_legacy(&site.seo.description);
-    let og = site
-        .seo
-        .og_image
-        .as_ref()
-        .map(|u| {
-            format!(
-                r#"  <meta property="og:image" content="{}">"#,
-                escape_html_legacy(u)
-            )
-        })
-        .unwrap_or_default();
-
-    let t = &site.theme;
-    format!(
-        r#"<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{page_title}</title>
-  <meta name="description" content="{desc_escaped}">
-{og}
-  <style>
-:root {{
-  --accent: {accent};
-  --accent-soft: {accent_soft};
-  --surface: {surface};
-  --text: {text};
-  --muted: {muted};
-  --border: {border};
-}}
-* {{ box-sizing: border-box; }}
-body {{
-  margin: 0;
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, sans-serif;
-  background: var(--surface);
-  color: var(--text);
-  line-height: 1.6;
-}}
-a {{ color: var(--accent-soft); text-decoration: none; }}
-a:hover {{ text-decoration: underline; }}
-.page {{
-  max-width: 72rem;
-  margin: 0 auto;
-  padding: 2rem 1.25rem 4rem;
-}}
-.hero {{
-  padding: 3rem 0 2rem;
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 3rem;
-}}
-.hero__eyebrow {{
-  text-transform: uppercase;
-  letter-spacing: .08em;
-  font-size: .75rem;
-  color: var(--muted);
-  margin: 0 0 .75rem;
-}}
-.hero__headline {{
-  font-size: clamp(2rem, 4vw, 3rem);
-  font-weight: 700;
-  margin: 0 0 .75rem;
-  line-height: 1.15;
-}}
-.hero__sub {{
-  font-size: 1.125rem;
-  color: var(--muted);
-  max-width: 42rem;
-  margin: 0 0 1.5rem;
-}}
-.hero__actions {{ display: flex; flex-wrap: wrap; gap: .75rem; }}
-.btn {{
-  display: inline-flex;
-  align-items: center;
-  padding: .6rem 1.1rem;
-  border-radius: .5rem;
-  font-weight: 600;
-  font-size: .95rem;
-  border: 1px solid var(--border);
-  background: transparent;
-  color: var(--text);
-}}
-.btn--primary {{
-  background: var(--accent);
-  color: #fff;
-  border-color: transparent;
-}}
-.btn--primary:hover {{ filter: brightness(1.08); }}
-.features {{ margin-top: 2rem; }}
-.features__eyebrow {{
-  text-transform: uppercase;
-  letter-spacing: .08em;
-  font-size: .75rem;
-  color: var(--muted);
-  margin: 0 0 .5rem;
-}}
-.features__title {{
-  font-size: clamp(1.5rem, 3vw, 2.25rem);
-  font-weight: 700;
-  margin: 0 0 2rem;
-}}
-.feature-grid {{
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
-  gap: 1.25rem;
-}}
-.feature-card {{
-  border: 1px solid var(--border);
-  border-radius: .75rem;
-  padding: 1.25rem;
-  background: color-mix(in srgb, var(--surface) 92%, var(--border));
-}}
-.feature-card__icon {{
-  font-size: 1.5rem;
-  margin-bottom: .5rem;
-  opacity: .9;
-}}
-.feature-card__title {{ font-weight: 600; margin: 0 0 .35rem; }}
-.feature-card__desc {{ margin: 0; font-size: .9rem; color: var(--muted); }}
-  </style>
-</head>
-<body>
-  <div class="page">
-{body}
-  </div>
-</body>
-</html>
-"#,
-        page_title = escape_html_legacy(&page_title),
-        accent = t.accent,
-        accent_soft = t.accent_soft,
-        surface = t.surface,
-        text = t.text,
-        muted = t.muted,
-        border = t.border,
-        desc_escaped = desc_escaped,
-        og = og,
-        body = body,
-    )
-}
-
-fn render_element(el: &SiteElementRaw) -> String {
-    match el.ty.as_str() {
-        "hero" => match serde_json::from_value::<HeroProps>(el.props.clone()) {
-            Ok(p) => render_hero(&p),
-            Err(_) => String::new(),
-        },
-        "feature_grid" => match serde_json::from_value::<FeatureGridProps>(el.props.clone()) {
-            Ok(p) => render_feature_grid(&p),
-            Err(_) => String::new(),
-        },
-        _ => String::new(),
-    }
-}
-
-fn render_hero(p: &HeroProps) -> String {
-    let primary_ext = p.primary.external.unwrap_or(false);
-    let primary_attrs = if primary_ext {
-        format!(
-            r#" class="btn btn--primary" href="{}" rel="noopener noreferrer" target="_blank""#,
-            escape_html_attr_legacy(&p.primary.href)
-        )
-    } else {
-        format!(
-            r#" class="btn btn--primary" href="{}""#,
-            escape_html_attr_legacy(&p.primary.href)
-        )
-    };
-
-    let secondary_block = if let Some(sec) = &p.secondary {
-        let ext = sec.external.unwrap_or(false);
-        let attrs = if ext {
-            format!(
-                r#" class="btn" href="{}" rel="noopener noreferrer" target="_blank""#,
-                escape_html_attr_legacy(&sec.href)
-            )
-        } else {
-            format!(
-                r#" class="btn" href="{}""#,
-                escape_html_attr_legacy(&sec.href)
-            )
-        };
-        format!(
-            r#"<a{attrs}>{label}</a>"#,
-            label = escape_html_legacy(&sec.label)
-        )
-    } else {
-        String::new()
-    };
-
-    format!(
-        r#"    <header class="hero">
-      <p class="hero__eyebrow">{eyebrow}</p>
-      <h1 class="hero__headline">{headline}</h1>
-      <p class="hero__sub">{sub}</p>
-      <div class="hero__actions">
-        <a{primary_attrs}>{primary_label}</a>
-        {secondary_block}
-      </div>
-    </header>
-"#,
-        eyebrow = escape_html_legacy(&p.eyebrow),
-        headline = escape_html_legacy(&p.headline),
-        sub = escape_html_legacy(&p.subheadline),
-        primary_attrs = primary_attrs,
-        primary_label = escape_html_legacy(&p.primary.label),
-        secondary_block = secondary_block,
-    )
-}
-
-fn render_feature_grid(p: &FeatureGridProps) -> String {
-    let mut cards = String::new();
-    for item in &p.items {
-        let icon = feature_icon_char(&item.icon);
-        cards.push_str(&format!(
-            r#"        <article class="feature-card">
-          <div class="feature-card__icon" aria-hidden="true">{icon}</div>
-          <h3 class="feature-card__title">{title}</h3>
-          <p class="feature-card__desc">{desc}</p>
-        </article>
-"#,
-            icon = escape_html_legacy(&icon),
-            title = escape_html_legacy(&item.title),
-            desc = escape_html_legacy(&item.description),
-        ));
-    }
-
-    format!(
-        r#"    <section class="features">
-      <p class="features__eyebrow">{eyebrow}</p>
-      <h2 class="features__title">{title}</h2>
-      <div class="feature-grid">
-{cards}
-      </div>
-    </section>
-"#,
-        eyebrow = escape_html_legacy(&p.eyebrow),
-        title = escape_html_legacy(&p.title),
-        cards = cards,
-    )
-}
-
-fn feature_icon_char(icon: &str) -> String {
-    match icon {
-        "terminal" => "⌘".to_string(),
-        "code" => "</>".to_string(),
-        "zap" => "⚡".to_string(),
-        "globe" => "🌐".to_string(),
-        "layout" => "▦".to_string(),
-        "browser" => "🧭".to_string(),
-        _ => "◆".to_string(),
-    }
 }
 
 // ── build-full ───────────────────────────────────────────────────────────────
@@ -1421,15 +1046,4 @@ fn run_build_full(args: &BuildFullArgs) {
 
     ui::success(&format!("{} files rendered", results.len()));
     ui::done_in(t0.elapsed());
-}
-
-fn escape_html_legacy(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-}
-
-fn escape_html_attr_legacy(s: &str) -> String {
-    escape_html_legacy(s)
 }

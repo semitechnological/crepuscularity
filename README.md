@@ -19,6 +19,10 @@ Write UI in a concise, indentation-based template DSL (`.crepus` files). Templat
 # Install the CLI
 cargo install --path crates/crepuscularity-cli
 
+# If `crepus` is not found, Cargo still installed the binary under ~/.cargo/bin — add it to PATH,
+# e.g. for zsh:  export PATH="$HOME/.cargo/bin:$PATH"
+# (Rustup normally prepends this for login shells; some terminals omit it.)
+
 # Create a new GPUI app
 crepus new my-app
 cd my-app
@@ -86,7 +90,7 @@ crepus webext manifest               # Print manifest.json
 ## Documentation
 
 - **Rendered site (GitHub Pages):** [semitechnological.github.io/crepuscularity](https://semitechnological.github.io/crepuscularity/) — WASM landing page plus HTML generated from the Markdown in [`docs/`](docs/). Built in CI with `crepus web build --site docs-site`.
-- **Sources:** [docs/README.md](docs/README.md) indexes [DSL](docs/dsl.md), [components](docs/components.md), [CLI](docs/cli.md), and [extensions](docs/webext.md). The implementation spec for agents and compilers is [CREPUS_WEB_IMPLEMENTATION_SPEC.md](docs/CREPUS_WEB_IMPLEMENTATION_SPEC.md).
+- **Sources:** [docs/README.md](docs/README.md) indexes [DSL](docs/dsl.md), [components](docs/components.md), [CLI](docs/cli.md), and [extensions](docs/webext.md). Compiler-focused detail stays in-repo as [CREPUS_WEB_IMPLEMENTATION_SPEC.md](docs/CREPUS_WEB_IMPLEMENTATION_SPEC.md) but is not shipped on the public docs site.
 - **Contributors & coding agents:** root [**`AGENTS.md`**](AGENTS.md) is the canonical instructions (macOS `SDKROOT`, `cargo fmt` / `clippy` / `test` before push, workspace layout, DSL notes). **`CLAUDE.md`** is a symlink to **`AGENTS.md`** so duplicate context files cannot drift.
 
 ## GPUI — Tailwind Class Support

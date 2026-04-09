@@ -9,10 +9,11 @@ Guides and references for the `.crepus` DSL, tooling, and browser extensions.
 | [CLI](cli.md) | `crepus` commands for apps, web, and extensions |
 | [Browser extensions](webext.md) | Manifest V3 apps with `crepus webext` |
 
-**Specs and migration**
+**Migration**
 
 - [Web build migration](WEB_BUILD_MIGRATION.md)
-- [Web / WASM / webext implementation spec](CREPUS_WEB_IMPLEMENTATION_SPEC.md) — canonical detail for compilers and agents
+
+Implementation details for compilers and agents live in-repo at [`CREPUS_WEB_IMPLEMENTATION_SPEC.md`](CREPUS_WEB_IMPLEMENTATION_SPEC.md) (not published on the docs site).
 
 **Published HTML**
 

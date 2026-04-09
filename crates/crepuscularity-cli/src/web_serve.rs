@@ -13,8 +13,15 @@
 //!    keeps the connection open; when the generation counter changes the
 //!    server sends `data: reload\n\n` and closes the connection. The browser's
 //!    `EventSource` auto-reconnects on the next page load.
-//! 5. Every served HTML page gets a small `<script>` injected before `</body>`
-//!    that opens the `/dev-reload` SSE stream.
+//! 5. On startup the server runs the same **wasm32 + wasm-bindgen** step as `crepus web build`,
+//!    writing UnoCSS, `app.js`, and `pkg/` under **`.crepus-dev/`** beside the site. Saving
+//!    **`runtime/**/*.rs`** (or `Cargo.toml` / `Cargo.lock` in that crate) repeats that build and
+//!    triggers a full page reload — same idea as `cargo-leptos` rebuilding the client WASM, except
+//!    the Rust compiler still recompiles the world (there is no incremental “hot swap” of native code).
+//! 6. **`GET /crepus-bundle.json`** returns the live virtual `.crepus` map (for the browser WASM renderer).
+//! 7. **`GET /**` for the configured entry serves the real HTML shell** (`vendor/unocss.js`, `app.js`, `#crepus-root`)
+//!    plus a dev-reload script. Subordinate `.html` routes get a static preview shell (no WASM) with UnoCSS.
+//! 8. Static assets **`/static/*`** continue to resolve under the site directory.
 
 use std::collections::HashMap;
 use std::io::{Read, Write};
@@ -26,11 +33,52 @@ use std::time::{Duration, Instant};
 
 use notify::{Event, EventKind, RecursiveMode, Watcher};
 
+use serde_json::json;
+
 use crepuscularity_core::context::TemplateContext;
-use crepuscularity_core::preprocess::google_fonts_head_markup;
 use crepuscularity_web::render_from_files;
 
-use crate::web::merged_site_google_fonts;
+use crate::web::{
+    ensure_web_dev_artifacts, load_site_head, merged_site_google_fonts, render_index_html,
+};
+use crate::web_docs::{emit_markdown_docs, DocsSiteTheme};
+
+/// Watcher event: template source or site `runtime/` (WASM crate).
+enum WatchEvent {
+    Crepus(PathBuf),
+    RuntimeDirty,
+}
+
+fn is_runtime_source_path(site_dir: &Path, path: &Path) -> bool {
+    let runtime_root = site_dir.join("runtime");
+    let root = std::fs::canonicalize(&runtime_root).unwrap_or_else(|_| runtime_root.clone());
+    let resolved = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
+    if !resolved.starts_with(&root) {
+        return false;
+    }
+    if resolved.components().any(|c| c.as_os_str() == "target") {
+        return false;
+    }
+    let ext = path.extension().and_then(|e| e.to_str());
+    matches!(ext, Some("rs" | "toml"))
+        || path.file_name().and_then(|n| n.to_str()) == Some("Cargo.lock")
+}
+
+fn runtime_rebuild_sse_message() -> String {
+    let ts = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis();
+    format!(
+        "event: crepus-reload\ndata: {{\"file\":\"runtime (WASM)\",\"ts\":{}}}\n\n",
+        ts
+    )
+}
+
+fn runtime_build_error_sse(message: &str) -> String {
+    let escaped = message.replace('\n', "\\n");
+    format!("event: crepus-error\ndata: {escaped}\n\n")
+}
 
 // ── Options ──────────────────────────────────────────────────────────────────
 
@@ -127,11 +175,62 @@ fn validate_templates(site_dir: &std::path::Path) {
 
 /// Run the dev server, blocking until the process is killed.
 pub fn run(opts: ServeOptions) {
-    let site_dir = opts.site_dir.clone();
+    let site_dir = std::fs::canonicalize(&opts.site_dir).unwrap_or_else(|_| opts.site_dir.clone());
 
     // Validate all templates at startup.
     eprintln!("\n  {} validating templates…", console::style("→").dim());
     validate_templates(&site_dir);
+
+    eprintln!(
+        "  {} compiling dev WASM → {}",
+        console::style("→").dim(),
+        console::style(format!("{}/", crate::web::WEB_DEV_ARTIFACT_DIR)).cyan()
+    );
+    if let Err(e) = ensure_web_dev_artifacts(&site_dir) {
+        eprintln!("  {} {}", console::style("✗").red().bold(), e);
+        std::process::exit(1);
+    }
+    eprintln!(
+        "  {} UnoCSS, app.js, and pkg/ ready",
+        console::style("✓").green()
+    );
+
+    let dev_root = site_dir.join(crate::web::WEB_DEV_ARTIFACT_DIR);
+
+    let head = load_site_head(&site_dir);
+    let docs_theme = DocsSiteTheme {
+        accent: head.theme.accent.clone(),
+        accent_soft: head.theme.accent_soft.clone(),
+        surface: head.theme.surface.clone(),
+        text: head.theme.text.clone(),
+        muted: head.theme.muted.clone(),
+        border: head.theme.border.clone(),
+    };
+    let docs_src = site_dir
+        .parent()
+        .map(|p| p.join("docs"))
+        .filter(|p| p.is_dir());
+    if let Some(ref src) = docs_src {
+        let docs_out = dev_root.join("docs");
+        match emit_markdown_docs(src, &docs_out, &docs_theme, &head.page_title) {
+            Ok(()) => eprintln!(
+                "  {} docs → {} (serve at /docs/)",
+                console::style("✓").green(),
+                docs_out.display()
+            ),
+            Err(e) => eprintln!(
+                "  {} could not mirror docs: {}",
+                console::style("⚠").yellow(),
+                e
+            ),
+        }
+        start_docs_markdown_watcher(
+            src.clone(),
+            docs_out,
+            docs_theme.clone(),
+            head.page_title.clone(),
+        );
+    }
 
     // Build initial virtual file map.
     let vfm: Arc<RwLock<HashMap<String, String>>> = Arc::new(RwLock::new(HashMap::new()));
@@ -159,7 +258,7 @@ pub fn run(opts: ServeOptions) {
     });
 
     eprintln!(
-        "\n  {} crepus web serve\n  {} http://localhost:{}\n  {} edit .crepus files for instant reload\n",
+        "\n  {} crepus web serve\n  {} http://localhost:{}\n  {} edit .crepus or runtime/ — templates hot-reload; Rust changes rebuild WASM\n",
         console::style("▶").green().bold(),
         console::style("→").dim(),
         opts.port,
@@ -176,8 +275,9 @@ pub fn run(opts: ServeOptions) {
                 let sse_msg = Arc::clone(&last_sse_msg);
                 let entry = entry.clone();
                 let site_dir = site_dir.clone();
+                let dev_root = dev_root.clone();
                 std::thread::spawn(move || {
-                    handle_connection(s, vfm, gen, sse_msg, &entry, &site_dir);
+                    handle_connection(s, vfm, gen, sse_msg, &entry, &site_dir, &dev_root);
                 });
             }
             Err(e) => {
@@ -202,6 +302,13 @@ fn load_dir_recursive(root: &Path, dir: &Path, map: &mut HashMap<String, String>
     for entry in entries.flatten() {
         let path = entry.path();
         if path.is_dir() {
+            let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+            if matches!(
+                name,
+                "dist" | "target" | ".git" | "node_modules" | ".crepus-dev"
+            ) {
+                continue;
+            }
             load_dir_recursive(root, &path, map);
         } else if path.extension().is_some_and(|e| e == "crepus") {
             if let Ok(content) = std::fs::read_to_string(&path) {
@@ -258,11 +365,13 @@ fn start_watcher(
     generation: Arc<AtomicU64>,
     last_sse_msg: Arc<RwLock<String>>,
 ) {
-    let (tx, rx) = mpsc::channel::<PathBuf>();
+    let (tx, rx) = mpsc::channel::<WatchEvent>();
 
     // notify watcher thread.
     let watch_dir = site_dir.clone();
+    let site_for_watcher = site_dir.clone();
     std::thread::spawn(move || {
+        let site_for_filter = site_for_watcher;
         let tx2 = tx.clone();
         let mut watcher = notify::recommended_watcher(move |res: notify::Result<Event>| {
             if let Ok(event) = res {
@@ -272,7 +381,9 @@ fn start_watcher(
                 ) {
                     for path in &event.paths {
                         if path.extension().is_some_and(|e| e == "crepus") {
-                            let _ = tx2.send(path.clone());
+                            let _ = tx2.send(WatchEvent::Crepus(path.clone()));
+                        } else if is_runtime_source_path(&site_for_filter, path) {
+                            let _ = tx2.send(WatchEvent::RuntimeDirty);
                         }
                     }
                 }
@@ -292,6 +403,129 @@ fn start_watcher(
 
     // Debounce thread: batch events within 50 ms then apply.
     std::thread::spawn(move || {
+        let mut pending_crepus: Vec<PathBuf> = Vec::new();
+        let mut runtime_dirty = false;
+        let mut last_event = Instant::now();
+
+        loop {
+            match rx.recv_timeout(Duration::from_millis(50)) {
+                Ok(WatchEvent::Crepus(p)) => {
+                    pending_crepus.push(p);
+                    last_event = Instant::now();
+                }
+                Ok(WatchEvent::RuntimeDirty) => {
+                    runtime_dirty = true;
+                    last_event = Instant::now();
+                }
+                Err(mpsc::RecvTimeoutError::Timeout) => {
+                    if pending_crepus.is_empty() && !runtime_dirty {
+                        continue;
+                    }
+                    if last_event.elapsed() < Duration::from_millis(50) {
+                        continue;
+                    }
+                    let mut changed = 0usize;
+                    let mut last_crepus_path: Option<PathBuf> = None;
+
+                    if !pending_crepus.is_empty() {
+                        let mut map = vfm.write().unwrap();
+                        for path in pending_crepus.drain(..) {
+                            let key = relative_key(&site_dir, &path);
+                            match std::fs::read_to_string(&path) {
+                                Ok(content) => {
+                                    map.insert(key, content);
+                                    changed += 1;
+                                    last_crepus_path = Some(path);
+                                }
+                                Err(_) => {
+                                    map.remove(&key);
+                                    changed += 1;
+                                    last_crepus_path = Some(path);
+                                }
+                            }
+                        }
+                        drop(map);
+                    }
+
+                    let mut runtime_rebuilt = false;
+                    let wasm_error: Option<String> = if runtime_dirty {
+                        runtime_dirty = false;
+                        match ensure_web_dev_artifacts(&site_dir) {
+                            Ok(()) => {
+                                runtime_rebuilt = true;
+                                None
+                            }
+                            Err(e) => Some(runtime_build_error_sse(&e)),
+                        }
+                    } else {
+                        None
+                    };
+
+                    let wasm_failed = wasm_error.is_some();
+                    let sse = if let Some(err) = wasm_error {
+                        err
+                    } else if let Some(ref path) = last_crepus_path {
+                        build_sse_message(path)
+                    } else if runtime_rebuilt {
+                        runtime_rebuild_sse_message()
+                    } else {
+                        continue;
+                    };
+
+                    let should_notify = changed > 0 || runtime_rebuilt || wasm_failed;
+                    if should_notify {
+                        if let Ok(mut msg) = last_sse_msg.write() {
+                            *msg = sse;
+                        }
+                        generation.fetch_add(1, Ordering::Release);
+                        let _span =
+                            tracing::info_span!("hot_reload", changed_files = changed).entered();
+                        tracing::info!(changed_files = changed, "hot reloaded");
+                    }
+                }
+                Err(mpsc::RecvTimeoutError::Disconnected) => break,
+            }
+        }
+    });
+}
+
+fn start_docs_markdown_watcher(
+    docs_src: PathBuf,
+    docs_out: PathBuf,
+    theme: DocsSiteTheme,
+    site_name: String,
+) {
+    let (tx, rx) = mpsc::channel::<PathBuf>();
+    let docs_src_watch = docs_src.clone();
+
+    std::thread::spawn(move || {
+        let tx2 = tx.clone();
+        let mut watcher = notify::recommended_watcher(move |res: notify::Result<Event>| {
+            if let Ok(event) = res {
+                if matches!(
+                    event.kind,
+                    EventKind::Modify(_) | EventKind::Create(_) | EventKind::Remove(_)
+                ) {
+                    for path in &event.paths {
+                        if path.extension().is_some_and(|e| e == "md") {
+                            let _ = tx2.send(path.clone());
+                        }
+                    }
+                }
+            }
+        })
+        .expect("crepus web serve: docs watcher");
+
+        watcher
+            .watch(&docs_src_watch, RecursiveMode::Recursive)
+            .expect("crepus web serve: watch docs/");
+
+        loop {
+            std::thread::sleep(Duration::from_secs(3600));
+        }
+    });
+
+    std::thread::spawn(move || {
         let mut pending: Vec<PathBuf> = Vec::new();
         let mut last_event = Instant::now();
 
@@ -302,42 +536,17 @@ fn start_watcher(
                     last_event = Instant::now();
                 }
                 Err(mpsc::RecvTimeoutError::Timeout) => {
-                    if !pending.is_empty() && last_event.elapsed() >= Duration::from_millis(50) {
-                        // Apply all pending changes.
-                        let mut map = vfm.write().unwrap();
-                        let mut changed = 0usize;
-                        // Track the last path for SSE message composition.
-                        let mut last_changed_path: Option<PathBuf> = None;
-                        for path in pending.drain(..) {
-                            let key = relative_key(&site_dir, &path);
-                            match std::fs::read_to_string(&path) {
-                                Ok(content) => {
-                                    map.insert(key, content);
-                                    changed += 1;
-                                    last_changed_path = Some(path);
-                                }
-                                Err(_) => {
-                                    // File may have been deleted.
-                                    map.remove(&key);
-                                    changed += 1;
-                                }
-                            }
-                        }
-                        drop(map);
-                        if changed > 0 {
-                            // Compose the SSE message for this reload event.
-                            let sse = if let Some(ref path) = last_changed_path {
-                                build_sse_message(path)
-                            } else {
-                                "data: reload\n\n".to_string()
-                            };
-                            if let Ok(mut msg) = last_sse_msg.write() {
-                                *msg = sse;
-                            }
-                            generation.fetch_add(1, Ordering::Release);
-                            let _span = tracing::info_span!("hot_reload", changed_files = changed)
-                                .entered();
-                            tracing::info!(changed_files = changed, "hot reloaded");
+                    if !pending.is_empty() && last_event.elapsed() >= Duration::from_millis(200) {
+                        pending.clear();
+                        if let Err(e) = emit_markdown_docs(&docs_src, &docs_out, &theme, &site_name)
+                        {
+                            eprintln!(
+                                "  {} docs rebuild failed: {}",
+                                console::style("⚠").yellow(),
+                                e
+                            );
+                        } else {
+                            tracing::info!("documentation markdown rebuilt");
                         }
                     }
                 }
@@ -345,6 +554,40 @@ fn start_watcher(
             }
         }
     });
+}
+
+fn serve_docs_path(stream: &mut TcpStream, url_path: &str, dev_root: &Path) {
+    let base = dev_root.join("docs");
+    if !base.is_dir() {
+        let msg = "No mirrored docs/ yet. Run crepus web serve from a site folder whose parent contains a docs/ directory (for example repo-root/docs-site with repo-root/docs), or open documentation after build.";
+        let body = format!(
+            "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>Docs</title></head>\
+             <body style=\"font-family:system-ui,sans-serif;padding:2rem;max-width:40rem;line-height:1.5\">\
+             <h1>Documentation</h1><p>{}</p></body></html>",
+            html_escape(msg)
+        );
+        let resp = format!(
+            "HTTP/1.1 404 Not Found\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\n\r\n{}",
+            body.len(),
+            body
+        );
+        let _ = stream.write_all(resp.as_bytes());
+        return;
+    }
+    let mut rel = url_path.trim_start_matches("/docs").trim_start_matches('/');
+    if rel.is_empty() {
+        rel = "index.html";
+    }
+    if rel.contains("..") {
+        write_simple_not_found(stream);
+        return;
+    }
+    let path = base.join(rel);
+    if !path.starts_with(&base) {
+        write_simple_not_found(stream);
+        return;
+    }
+    serve_dev_fs_file(stream, &path);
 }
 
 // ── HTTP connection handler ──────────────────────────────────────────────────
@@ -356,6 +599,7 @@ fn handle_connection(
     last_sse_msg: Arc<RwLock<String>>,
     entry: &str,
     site_dir: &Path,
+    dev_root: &Path,
 ) {
     let _ = stream.set_read_timeout(Some(Duration::from_secs(5)));
 
@@ -382,8 +626,28 @@ fn handle_connection(
             long_poll_sse(stream, generation, last_sse_msg);
         }
 
+        ("GET", "/crepus-bundle.json") => {
+            serve_crepus_bundle(&mut stream, &vfm, entry);
+        }
+
+        ("GET", "/app.js") => {
+            serve_dev_fs_file(&mut stream, &dev_root.join("app.js"));
+        }
+
+        ("GET", "/vendor/unocss.js") => {
+            serve_dev_fs_file(&mut stream, &dev_root.join("vendor/unocss.js"));
+        }
+
+        ("GET", p) if p.starts_with("/pkg/") => {
+            serve_pkg_path(&mut stream, p, dev_root);
+        }
+
+        ("GET", p) if p.starts_with("/docs") => {
+            serve_docs_path(&mut stream, p, dev_root);
+        }
+
         ("GET", "/" | "/index.html") => {
-            serve_template(&mut stream, &vfm, entry, site_dir);
+            serve_index_document(&mut stream, &vfm, entry, site_dir);
         }
 
         ("GET", p) if p.ends_with(".crepus") || p.ends_with(".html") => {
@@ -393,7 +657,11 @@ fn handle_connection(
             } else {
                 template_key.to_string()
             };
-            serve_template(&mut stream, &vfm, &template_key, site_dir);
+            if template_key == entry {
+                serve_index_document(&mut stream, &vfm, entry, site_dir);
+            } else {
+                serve_secondary_preview(&mut stream, &vfm, &template_key, site_dir);
+            }
         }
 
         ("GET", p) if p.starts_with("/static/") => {
@@ -412,45 +680,154 @@ fn handle_connection(
     }
 }
 
-fn serve_template(
+/// Full production-style document: UnoCSS + `app.js` + WASM bootstrap; `#crepus-root` filled client-side.
+fn serve_index_document(
     stream: &mut TcpStream,
     vfm: &Arc<RwLock<HashMap<String, String>>>,
     entry: &str,
     site_dir: &Path,
 ) {
     let files = vfm.read().unwrap().clone();
+    let head = load_site_head(site_dir);
+    let google_fonts = merged_site_google_fonts(site_dir, &files);
+    let mut html = render_index_html(&head, &google_fonts);
+
+    if !html_contains_entry(&files, entry) {
+        let msg = format!("file not found in virtual fs: {entry}");
+        html = error_document(&msg);
+    } else {
+        inject_reload_before_body_end(&mut html);
+    }
+
+    write_html_response(stream, &html);
+}
+
+fn html_contains_entry(files: &HashMap<String, String>, entry: &str) -> bool {
+    if files.contains_key(entry) {
+        return true;
+    }
+    entry
+        .split_once('#')
+        .is_some_and(|(file, _)| files.contains_key(file))
+}
+
+/// SSR-only preview for a non-entry template (same UnoCSS + theme, no WASM).
+fn serve_secondary_preview(
+    stream: &mut TcpStream,
+    vfm: &Arc<RwLock<HashMap<String, String>>>,
+    template_key: &str,
+    site_dir: &Path,
+) {
+    let files = vfm.read().unwrap().clone();
     let ctx = TemplateContext::new();
-
-    let result = render_from_files(&files, entry, &ctx);
-
-    let mut html = match result {
+    let inner = match render_from_files(&files, template_key, &ctx) {
         Ok(h) => h,
         Err(e) => format!(
-            "<html><body style='font-family:monospace;padding:2rem'>\
-             <h2 style='color:#ef4444'>Template error</h2><pre>{}</pre></body></html>",
+            "<div style=\"font-family:monospace;padding:2rem\">\
+             <h2 style=\"color:#ef4444\">Template error</h2><pre>{}</pre></div>",
             html_escape(&e)
         ),
     };
 
-    let fonts = merged_site_google_fonts(site_dir, &files);
-    let font_markup = google_fonts_head_markup(&fonts);
-    if !font_markup.is_empty() {
-        html = format!("{font_markup}\n{html}");
-    }
+    let head = load_site_head(site_dir);
+    let google_fonts = merged_site_google_fonts(site_dir, &files);
+    let mut html = render_index_html(&head, &google_fonts);
 
-    // Inject hot-reload script.
+    let needle = r#"<div id="crepus-root"></div>
+  <script type="module" src="./app.js"></script>"#;
+    if let Some(pos) = html.find(needle) {
+        let replacement = format!(
+            r#"<div id="crepus-root">{inner}</div>
+  <!-- crepus web serve: preview only (entry is WASM on /) -->"#
+        );
+        html.replace_range(pos..pos + needle.len(), &replacement);
+    } else {
+        html = error_document("dev server: could not patch index shell (internal)");
+    }
+    inject_reload_before_body_end(&mut html);
+    write_html_response(stream, &html);
+}
+
+fn inject_reload_before_body_end(html: &mut String) {
     if let Some(pos) = html.rfind("</body>") {
         html.insert_str(pos, RELOAD_SCRIPT);
     } else {
         html.push_str(RELOAD_SCRIPT);
     }
+}
 
+fn write_html_response(stream: &mut TcpStream, html: &str) {
     let resp = format!(
         "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nCache-Control: no-store\r\n\r\n{}",
         html.len(),
         html
     );
     let _ = stream.write_all(resp.as_bytes());
+}
+
+fn error_document(message: &str) -> String {
+    format!(
+        "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>Error</title></head>\
+         <body style=\"font-family:monospace;padding:2rem\"><pre>{}</pre></body></html>",
+        html_escape(message)
+    )
+}
+
+fn serve_crepus_bundle(
+    stream: &mut TcpStream,
+    vfm: &Arc<RwLock<HashMap<String, String>>>,
+    entry: &str,
+) {
+    let files = vfm.read().unwrap().clone();
+    let body = json!({ "entry": entry, "files": files }).to_string();
+    let resp = format!(
+        "HTTP/1.1 200 OK\r\nContent-Type: application/json; charset=utf-8\r\nContent-Length: {}\r\nCache-Control: no-store\r\n\r\n{}",
+        body.len(),
+        body
+    );
+    let _ = stream.write_all(resp.as_bytes());
+}
+
+fn serve_dev_fs_file(stream: &mut TcpStream, path: &Path) {
+    match std::fs::read(path) {
+        Ok(bytes) => {
+            let mime = guess_mime(path.extension().and_then(|e| e.to_str()).unwrap_or(""));
+            let header = format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: {mime}\r\nContent-Length: {}\r\nCache-Control: no-store\r\n\r\n",
+                bytes.len()
+            );
+            let _ = stream.write_all(header.as_bytes());
+            let _ = stream.write_all(&bytes);
+        }
+        Err(_) => write_simple_not_found(stream),
+    }
+}
+
+fn serve_pkg_path(stream: &mut TcpStream, url_path: &str, dev_root: &Path) {
+    let rel = url_path.trim_start_matches("/pkg/").trim_start_matches('/');
+    if rel.is_empty() || rel.contains("..") {
+        write_simple_not_found(stream);
+        return;
+    }
+    let base = dev_root.join("pkg");
+    let path = base.join(rel);
+    if !path.starts_with(&base) {
+        write_simple_not_found(stream);
+        return;
+    }
+    serve_dev_fs_file(stream, &path);
+}
+
+fn write_simple_not_found(stream: &mut TcpStream) {
+    let body = b"Not found";
+    let _ = stream.write_all(
+        format!(
+            "HTTP/1.1 404 Not Found\r\nContent-Length: {}\r\n\r\n",
+            body.len()
+        )
+        .as_bytes(),
+    );
+    let _ = stream.write_all(body);
 }
 
 fn serve_static_file(stream: &mut TcpStream, url_path: &str, site_dir: &Path) {
@@ -527,8 +904,10 @@ fn html_escape(s: &str) -> String {
 
 fn guess_mime(ext: &str) -> &'static str {
     match ext {
+        "html" | "htm" => "text/html; charset=utf-8",
         "css" => "text/css",
         "js" | "mjs" => "application/javascript",
+        "wasm" => "application/wasm",
         "json" => "application/json",
         "svg" => "image/svg+xml",
         "png" => "image/png",

@@ -1,0 +1,257 @@
+# Declarative compare harness for `crepus benchmark`.
+# External targets call npm/cargo/dotnet CLIs (need network on first run).
+# Built-in *crepus* rows time the checked-in fixtures under this folder.
+#
+# Run everything from repo root:
+#   crepus benchmark all
+#   ./examples/benchmarks/run-all.sh
+#   crepus benchmark --config examples/benchmarks/benchmark.toml
+#
+# Quick check (fixtures only, no npm):
+#   crepus benchmark --config examples/benchmarks/benchmark.toml --only crepus-web,crepus-webext
+
+version = 1
+
+[settings]
+# Resolved relative to the repo root when not absolute
+work_root = "examples/benchmarks/.work"
+
+# --- Crepuscularity (timed via this CLI) ------------------------------------
+
+[[targets]]
+suite = "web"
+id = "crepus-web"
+label = "Crepuscularity (.crepus + WASM)"
+optional = false
+builtin = "crepus-web"
+site = "examples/benchmarks/crepus-web"
+
+[[targets]]
+suite = "webext"
+id = "crepus-webext"
+label = "Crepuscularity webext"
+optional = false
+builtin = "crepus-webext"
+
+[[targets]]
+suite = "desktop"
+id = "crepus-desktop"
+label = "Crepuscularity (GPUI desktop)"
+optional = true
+builtin = "crepus-desktop"
+
+# --- Web: production / static builds ----------------------------------------
+
+[[targets]]
+suite = "web"
+id = "nextjs"
+label = "Next.js (App Router)"
+optional = true
+
+[[targets.steps]]
+name = "create-next-app"
+shell = "rm -rf next-app && CI=1 npx --yes create-next-app@15 next-app --typescript --eslint --tailwind --app --src-dir --import-alias \"@/*\" --use-npm --turbopack false"
+
+[[targets.steps]]
+name = "next-build"
+cwd = "next-app"
+shell = "npm run build"
+
+[[targets]]
+suite = "web"
+id = "svelte"
+label = "Svelte (Vite + TS)"
+optional = true
+
+[[targets.steps]]
+name = "vite-create-svelte"
+shell = "rm -rf svelte-app && npm create vite@latest svelte-app -- --template svelte-ts"
+
+[[targets.steps]]
+name = "svelte-build"
+cwd = "svelte-app"
+shell = "npm install && npm run build"
+
+[[targets]]
+suite = "web"
+id = "solid"
+label = "Solid (Vite + TS)"
+optional = true
+
+[[targets.steps]]
+name = "vite-create-solid"
+shell = "rm -rf solid-app && npm create vite@latest solid-app -- --template solid-ts"
+
+[[targets.steps]]
+name = "solid-build"
+cwd = "solid-app"
+shell = "npm install && npm run build"
+
+[[targets]]
+suite = "web"
+id = "vue"
+label = "Vue (Vite + TS)"
+optional = true
+
+[[targets.steps]]
+name = "vite-create-vue"
+shell = "rm -rf vue-app && npm create vite@latest vue-app -- --template vue-ts"
+
+[[targets.steps]]
+name = "vue-build"
+cwd = "vue-app"
+shell = "npm install && npm run build"
+
+[[targets]]
+suite = "web"
+id = "angular"
+label = "Angular (CLI defaults)"
+optional = true
+
+[[targets.steps]]
+name = "ng-new"
+shell = "rm -rf ng-app && npx --yes @angular/cli@19 new ng-app --defaults --skip-git --style=css --ssr=false --strict"
+
+[[targets.steps]]
+name = "ng-build"
+cwd = "ng-app"
+shell = "npm run build -- --configuration production"
+
+[[targets]]
+suite = "web"
+id = "vanilla"
+label = "Vanilla (Vite + TS)"
+optional = true
+
+[[targets.steps]]
+name = "vite-create-vanilla"
+shell = "rm -rf vanilla-app && npm create vite@latest vanilla-app -- --template vanilla-ts"
+
+[[targets.steps]]
+name = "vanilla-build"
+cwd = "vanilla-app"
+shell = "npm install && npm run build"
+
+[[targets]]
+suite = "web"
+id = "leptos"
+label = "Leptos (start-simple, cargo-leptos)"
+optional = true
+
+[[targets.steps]]
+name = "clone-start-simple"
+shell = "rm -rf leptos-app && git clone --depth 1 https://github.com/leptos-rs/start-simple leptos-app"
+
+[[targets.steps]]
+name = "leptos-build"
+cwd = "leptos-app"
+shell = "if command -v cargo-leptos >/dev/null 2>&1; then cargo leptos build --release; else echo 'install cargo-leptos: cargo install cargo-leptos --locked' && exit 1; fi"
+
+[[targets]]
+suite = "web"
+id = "dioxus"
+label = "Dioxus web (starter + dx build)"
+optional = true
+
+[[targets.steps]]
+name = "copy-starter"
+shell = "rm -rf dioxus-app && cp -R \"$REPO/examples/benchmarks/starters/dioxus-web\" dioxus-app"
+
+[[targets.steps]]
+name = "dx-build"
+cwd = "dioxus-app"
+shell = "if command -v dx >/dev/null 2>&1; then dx build --platform web --release; else echo 'install dioxus-cli: cargo install dioxus-cli --locked' && exit 1; fi"
+
+# --- Desktop GUIs -------------------------------------------------------------
+
+[[targets]]
+suite = "desktop"
+id = "electron"
+label = "Electron (electron-vite, vanilla-ts)"
+optional = true
+
+[[targets.steps]]
+name = "create-electron"
+shell = "rm -rf electron-app && npm create electron-vite@latest electron-app -- --template vanilla-ts"
+
+[[targets.steps]]
+name = "electron-build"
+cwd = "electron-app"
+shell = "npm install && npm run build"
+
+[[targets]]
+suite = "desktop"
+id = "tauri"
+label = "Tauri 2 (vanilla + TS, CI scaffold)"
+optional = true
+
+[[targets.steps]]
+name = "create-tauri"
+shell = "rm -rf tauri-app && npm create tauri-app@latest tauri-app -- --template vanilla-ts"
+
+[[targets.steps]]
+name = "tauri-build"
+cwd = "tauri-app"
+shell = "npm install && npm run tauri build"
+
+[[targets]]
+suite = "desktop"
+id = "dotnet-avalonia"
+label = ".NET Avalonia (desktop)"
+optional = true
+
+[[targets.steps]]
+name = "dotnet-new"
+shell = "rm -rf avalonia-app && dotnet new install Avalonia.Templates >/dev/null 2>&1; dotnet new avalonia.app -o avalonia-app"
+
+[[targets.steps]]
+name = "dotnet-build"
+cwd = "avalonia-app"
+shell = "dotnet build -c Release"
+
+[[targets]]
+suite = "desktop"
+id = "dotnet-maui"
+label = ".NET MAUI (workloads required)"
+optional = true
+
+[[targets.steps]]
+name = "dotnet-maui-new"
+shell = "rm -rf maui-app && dotnet new maui -n maui-app -f net9.0"
+
+[[targets.steps]]
+name = "dotnet-maui-build"
+cwd = "maui-app"
+shell = "dotnet build -c Release"
+
+# --- Web extensions -----------------------------------------------------------
+
+[[targets]]
+suite = "webext"
+id = "vanilla-vite"
+label = "Vanilla MV3 (Vite + crxjs)"
+optional = true
+
+[[targets.steps]]
+name = "copy-vanilla-starter"
+shell = "rm -rf vanilla-ext && cp -R \"$REPO/examples/benchmarks/starters/webext-vanilla\" vanilla-ext"
+
+[[targets.steps]]
+name = "vite-crx-build"
+cwd = "vanilla-ext"
+shell = "npm install && npm run build"
+
+[[targets]]
+suite = "webext"
+id = "plasmo"
+label = "Plasmo"
+optional = true
+
+[[targets.steps]]
+name = "create-plasmo"
+shell = "rm -rf plasmo-app && CI=1 npm create plasmo@latest plasmo-app"
+
+[[targets.steps]]
+name = "plasmo-build"
+cwd = "plasmo-app"
+shell = "npm install && npm run build"

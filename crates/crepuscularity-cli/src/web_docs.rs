@@ -4,9 +4,12 @@ use std::fs;
 use std::path::Path;
 
 use pulldown_cmark::{html, Options, Parser};
+use serde_json::json;
+
+const DOCS_SEARCH_JS: &str = include_str!("../assets/web/docs_search.js");
 
 /// Theme variables mirrored from `site.json` for doc shells.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct DocsSiteTheme {
     pub accent: String,
     pub accent_soft: String,
@@ -42,9 +45,9 @@ pub fn emit_markdown_docs(
         .collect();
     paths.sort();
     paths.retain(|p| {
-        !p.file_name()
-            .and_then(|n| n.to_str())
-            .is_some_and(|n| n.eq_ignore_ascii_case("README.md"))
+        let name = p.file_name().and_then(|n| n.to_str()).unwrap_or("");
+        !name.eq_ignore_ascii_case("README.md")
+            && !name.eq_ignore_ascii_case("CREPUS_WEB_IMPLEMENTATION_SPEC.md")
     });
 
     let mut items: Vec<DocNavItem> = Vec::with_capacity(paths.len());
@@ -77,8 +80,22 @@ pub fn emit_markdown_docs(
     );
     fs::write(out_docs_dir.join("index.html"), index_html)?;
 
+    let mut search_entries = vec![json!({
+        "title": "Documentation — overview",
+        "href": "index.html",
+        "text": "Guides and references for the .crepus DSL, crepus CLI, GPUI, WASM sites, and web extensions."
+    })];
+
     for (path, item) in paths.iter().zip(&items) {
         let raw = fs::read_to_string(path)?;
+        let plain = strip_markdown_plain(&raw);
+        let text: String = plain.chars().take(480).collect();
+        search_entries.push(json!({
+            "title": &item.title,
+            "href": &item.href,
+            "text": text,
+        }));
+
         let body_html = markdown_to_html(&raw);
         let nav = render_nav_list(&items, Some(&item.href));
         let doc_html = render_doc_shell(
@@ -92,7 +109,38 @@ pub fn emit_markdown_docs(
         fs::write(out_docs_dir.join(&item.href), doc_html)?;
     }
 
+    let search_json = json!({ "entries": search_entries }).to_string();
+    fs::write(
+        out_docs_dir.join("docs-search-index.json"),
+        search_json.as_bytes(),
+    )?;
+
     Ok(())
+}
+
+fn strip_markdown_plain(md: &str) -> String {
+    let mut out = String::new();
+    let mut in_fence = false;
+    for line in md.lines() {
+        let t = line.trim();
+        if t.starts_with("```") {
+            in_fence = !in_fence;
+            continue;
+        }
+        if in_fence || t.is_empty() {
+            continue;
+        }
+        let t = if let Some(rest) = t.strip_prefix('#') {
+            rest.trim()
+        } else {
+            t
+        };
+        if !t.is_empty() {
+            out.push_str(t);
+            out.push(' ');
+        }
+    }
+    out
 }
 
 fn render_docs_landing_body(site_name: &str, items: &[DocNavItem]) -> String {
@@ -122,9 +170,6 @@ fn doc_blurb(stem: &str) -> String {
         "cli" => "new, dev, build, web, webext, preview, and more.",
         "webext" => "Manifest V3 extensions from .crepus and Rust.",
         "WEB_BUILD_MIGRATION" => "Notes for migrating WASM static site builds.",
-        "CREPUS_WEB_IMPLEMENTATION_SPEC" => {
-            "Canonical web, WASM, and extension implementation spec."
-        }
         _ => "Documentation page.",
     })
 }
@@ -235,7 +280,7 @@ fn render_doc_shell(
     } else {
         "doc-main"
     };
-    format!(
+    let html = format!(
         r#"<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -264,11 +309,11 @@ fn render_doc_shell(
       -webkit-font-smoothing: antialiased;
       line-height: 1.6;
     }}
-    a {{ color: var(--accent-soft); text-decoration: none; }}
-    a:hover {{ text-decoration: underline; }}
+    a {{ color: color-mix(in srgb, var(--text) 88%, transparent); text-decoration: none; }}
+    a:hover {{ color: var(--text); text-decoration: underline; text-underline-offset: 3px; }}
     .doc-shell {{
       display: grid;
-      grid-template-columns: minmax(200px, 260px) 1fr;
+      grid-template-columns: minmax(220px, 280px) 1fr;
       min-height: 100vh;
     }}
     @media (max-width: 860px) {{
@@ -276,19 +321,51 @@ fn render_doc_shell(
       aside {{ border-bottom: 1px solid var(--border); border-right: none; }}
     }}
     aside {{
-      padding: 1.5rem 1.25rem;
+      padding: 1.75rem 1.35rem 3rem;
       border-right: 1px solid var(--border);
-      background: color-mix(in srgb, var(--surface) 92%, #1a1a1e);
+      background: color-mix(in srgb, var(--surface) 92%, white 8%);
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
     }}
     .brand {{
       font-weight: 700;
       font-size: 0.95rem;
       letter-spacing: -0.02em;
-      margin-bottom: 1rem;
+      margin-bottom: 0.25rem;
       display: block;
       color: var(--text);
     }}
-    .brand:hover {{ text-decoration: none; color: var(--accent-soft); }}
+    .brand:hover {{ text-decoration: none; color: var(--text); opacity: 0.85; }}
+    .doc-search-trigger {{
+      width: 100%;
+      text-align: left;
+      font: inherit;
+      font-size: 0.8125rem;
+      padding: 0.55rem 0.65rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: color-mix(in srgb, var(--surface) 75%, white 25%);
+      color: var(--muted);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+    }}
+    .doc-search-trigger:hover {{
+      border-color: color-mix(in srgb, var(--text) 25%, var(--border));
+      color: var(--text);
+    }}
+    .doc-search-trigger kbd {{
+      font-family: ui-monospace, monospace;
+      font-size: 0.7rem;
+      padding: 0.12rem 0.35rem;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--muted);
+    }}
     .doc-nav {{
       list-style: none;
       padding: 0;
@@ -298,10 +375,10 @@ fn render_doc_shell(
     .doc-nav li {{ margin: 0.35rem 0; }}
     .doc-nav a {{ color: var(--muted); display: inline-block; }}
     .doc-nav a:hover {{ color: var(--text); }}
-    .doc-nav a.active {{ color: var(--accent-soft); font-weight: 600; }}
+    .doc-nav a.active {{ color: var(--text); font-weight: 600; }}
     .doc-main {{
-      padding: 2rem 2.5rem 4rem;
-      max-width: 52rem;
+      padding: 2.5rem 2.75rem 5rem;
+      max-width: 50rem;
     }}
     .doc-main.doc-main--wide {{
       max-width: 72rem;
@@ -326,7 +403,7 @@ fn render_doc_shell(
       border-radius: 4px;
     }}
     .prose pre {{
-      background: #18181b;
+      background: #0a0a0a;
       border: 1px solid var(--border);
       border-radius: 10px;
       padding: 1rem 1.1rem;
@@ -355,7 +432,8 @@ fn render_doc_shell(
       font-weight: 600;
     }}
     .prose hr {{ border: none; border-top: 1px solid var(--border); margin: 2rem 0; }}
-    .prose a {{ color: var(--accent-soft); }}
+    .prose a {{ color: color-mix(in srgb, var(--text) 90%, var(--muted)); border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, var(--muted)); }}
+    .prose a:hover {{ color: var(--text); border-bottom-color: var(--text); }}
     .docs-landing .lede {{
       font-size: 1.05rem;
       max-width: 48rem;
@@ -365,6 +443,14 @@ fn render_doc_shell(
     .docs-landing .lede code {{
       font-family: "JetBrains Mono", monospace;
       font-size: 0.9em;
+    }}
+    .docs-landing .lede a {{
+      color: color-mix(in srgb, var(--text) 90%, var(--muted));
+      border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, var(--muted));
+    }}
+    .docs-landing .lede a:hover {{
+      color: var(--text);
+      border-bottom-color: var(--text);
     }}
     .doc-grid {{
       display: grid;
@@ -376,12 +462,12 @@ fn render_doc_shell(
       padding: 1.25rem 1.35rem;
       border: 1px solid var(--border);
       border-radius: 12px;
-      background: color-mix(in srgb, var(--surface) 88%, #1f1f23);
+      background: color-mix(in srgb, var(--surface) 92%, white 8%);
       transition: border-color 0.15s ease, background 0.15s ease;
     }}
     .doc-card:hover {{
-      border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
-      background: color-mix(in srgb, var(--surface) 82%, #252529);
+      border-color: color-mix(in srgb, var(--text) 35%, var(--border));
+      background: color-mix(in srgb, var(--surface) 88%, white 12%);
       text-decoration: none;
     }}
     .doc-card h2 {{
@@ -401,20 +487,109 @@ fn render_doc_shell(
       font-size: 0.875rem;
       color: var(--muted);
     }}
+    .doc-footer {{
+      margin-top: auto;
+      padding-top: 1.5rem;
+      font-size: 0.75rem;
+      color: var(--muted);
+      line-height: 1.45;
+    }}
+    .doc-footer strong {{ color: color-mix(in srgb, var(--text) 70%, var(--muted)); }}
+    .doc-search-overlay {{
+      position: fixed;
+      inset: 0;
+      z-index: 200;
+      background: rgba(0,0,0,0.55);
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 8vh 1rem;
+    }}
+    .doc-search-overlay--hidden {{
+      display: none !important;
+    }}
+    .doc-search-error,
+    .doc-search-empty {{
+      padding: 0.75rem 0.65rem;
+      font-size: 0.85rem;
+      color: var(--muted);
+      list-style: none;
+    }}
+    .doc-search-error {{ color: #f87171; }}
+    .doc-search-dialog {{
+      width: min(520px, 100%);
+      background: color-mix(in srgb, var(--surface) 94%, white 6%);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-shadow: 0 24px 80px rgba(0,0,0,0.45);
+      overflow: hidden;
+    }}
+    .doc-search-dialog input {{
+      width: 100%;
+      box-sizing: border-box;
+      border: none;
+      border-bottom: 1px solid var(--border);
+      padding: 1rem 1.1rem;
+      font: inherit;
+      font-size: 1rem;
+      background: transparent;
+      color: var(--text);
+    }}
+    .doc-search-dialog input:focus {{ outline: none; }}
+    .doc-search-dialog ul {{
+      list-style: none;
+      margin: 0;
+      padding: 0.5rem;
+      max-height: min(340px, 50vh);
+      overflow-y: auto;
+    }}
+    .doc-search-dialog li {{
+      border-radius: 8px;
+    }}
+    .doc-search-dialog li a {{
+      display: block;
+      padding: 0.55rem 0.65rem;
+      font-weight: 600;
+      font-size: 0.9rem;
+      color: var(--text);
+    }}
+    .doc-search-dialog li:hover {{ background: color-mix(in srgb, var(--surface) 80%, white 20%); }}
+    .doc-search-snippet {{
+      display: block;
+      padding: 0 0.65rem 0.55rem;
+      font-size: 0.75rem;
+      color: var(--muted);
+      line-height: 1.35;
+    }}
   </style>
 </head>
 <body>
   <div class="doc-shell">
     <aside>
       <a class="brand" href="../index.html">{esc_site}</a>
+      <button type="button" class="doc-search-trigger" id="doc-search-open" aria-label="Open documentation search">
+        <span>Search…</span>
+        <kbd>⌘K</kbd>
+      </button>
       <nav aria-label="Documentation">
         {nav}
       </nav>
+      <footer class="doc-footer">
+        <strong>crepuscularity-web</strong> renders these pages from Markdown.<br>
+        Press <kbd style="font-size:0.65rem;padding:0.1rem 0.3rem;border:1px solid var(--border);border-radius:3px;">⌘K</kbd> or <kbd style="font-size:0.65rem;padding:0.1rem 0.3rem;border:1px solid var(--border);border-radius:3px;">Ctrl+K</kbd> to search.
+      </footer>
     </aside>
     <main class="{main_cls}">
       {main_inner}
     </main>
   </div>
+  <div id="doc-search-overlay" class="doc-search-overlay doc-search-overlay--hidden" aria-hidden="true">
+    <div class="doc-search-dialog" role="dialog" aria-modal="true" aria-label="Search documentation">
+      <input type="search" id="doc-search-input" autocomplete="off" placeholder="Fuzzy search titles and body text…">
+      <ul id="doc-search-results"></ul>
+    </div>
+  </div>
+  <script>__CREPUS_DOCS_SEARCH__</script>
 </body>
 </html>"#,
         esc_site = esc_site,
@@ -428,7 +603,8 @@ fn render_doc_shell(
         t = theme.text,
         m = theme.muted,
         b = theme.border,
-    )
+    );
+    html.replace("__CREPUS_DOCS_SEARCH__", DOCS_SEARCH_JS)
 }
 
 fn escape_html(s: &str) -> String {

@@ -1,179 +1,197 @@
 google-fonts "Inter" "JetBrains Mono"
 
-div min-h-screen bg-zinc-950 text-zinc-100 antialiased relative overflow-x-hidden
- div absolute -top-48 right-[-10%] w-[min(560px,90vw)] h-[560px] rounded-full bg-violet-600/25 blur-3xl pointer-events-none
- div absolute top-[28%] left-[-15%] w-[420px] h-[420px] rounded-full bg-sky-500/20 blur-3xl pointer-events-none
- div absolute bottom-[-10%] right-[20%] w-[380px] h-[380px] rounded-full bg-amber-500/15 blur-3xl pointer-events-none
-
- header sticky top-0 z-20 border-b border-zinc-800/80 backdrop-blur-md bg-zinc-950/90
-  div max-w-6xl mx-auto px-6 h-16 flex items-center justify-between gap-6
-   a href="./index.html" flex items-center gap-2 group
-    span w-2 h-2 rounded-full bg-gradient-to-br from-amber-400 to-violet-500 shadow-lg shadow-violet-500/30
-    span text-sm font-semibold text-zinc-100 tracking-tight group-hover:text-white transition-colors
+div min-h-screen overflow-x-hidden antialiased crepus-twilight-page
+ main max-w-6xl mx-auto px-4 sm:px-6 relative z-10 w-full min-w-0
+  div flex items-center gap-3 pt-8 pb-2 crepus-entrance crepus-e1
+   a href="./index.html" flex items-center gap-3 group shrink-0 no-underline crepus-t-text hover:opacity-90
+    img src="./static/favicon.svg" alt="" w-9 h-9 sm:w-10 sm:h-10 shrink-0 rounded-lg
+    span text-sm sm:text-base font-semibold tracking-tight
      "Crepuscularity"
-   nav flex items-center gap-1 sm:gap-5 text-sm
-    a href="./docs/index.html" px-3 py-1.5 rounded-md text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/60 transition-colors
-     "Docs"
-    a href="https://crates.io/crates/crepuscularity" hover:text-zinc-100 transition-colors text-zinc-400 rel="noopener noreferrer" target="_blank"
-     "Crates"
-    a href="https://github.com/semitechnological/crepuscularity" px-3 py-1.5 rounded-md border border-zinc-700 text-zinc-200 hover:border-zinc-500 hover:bg-zinc-900/80 transition-colors font-medium rel="noopener noreferrer" target="_blank"
-     "GitHub"
-
- main max-w-6xl mx-auto px-6 relative z-10
-  section pt-16 pb-20 md:pt-24 md:pb-28
-   div inline-flex items-center gap-2 px-3 py-1 rounded-full border border-zinc-700/80 bg-zinc-900/60 text-xs font-medium text-zinc-400 mb-8
-    span text-amber-400/90
-     "●"
-    span
-     "GPUI · WASM · MV3 extensions · one syntax"
-   div md:flex md:items-end md:justify-between md:gap-12
-    div max-w-3xl
-     h1 text-4xl sm:text-5xl md:text-6xl font-bold text-white tracking-tight leading-[1.08] mb-6
-      span text-transparent bg-clip-text bg-gradient-to-r from-zinc-100 via-white to-zinc-400
-       "UI templates that compile "
-      span text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-violet-400
+  section pt-8 pb-16 sm:pt-10 sm:pb-20 md:pt-12 md:pb-24 crepus-entrance crepus-e2
+   div grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_min(100%,380px)] gap-10 lg:gap-12 items-start
+    div max-w-3xl min-w-0
+     h1 text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold crepus-t-text tracking-tight leading-[1.1] mb-5 sm:mb-6
+      "UI templates that compile "
+      span font-extrabold border-b-2 pb-0.5 crepus-t-icon border-[var(--cp-accent)]
        "everywhere"
-     p text-lg md:text-xl text-zinc-400 leading-relaxed max-w-2xl mb-10
+     p text-base sm:text-lg md:text-xl crepus-t-muted leading-relaxed max-w-2xl mb-8 sm:mb-10
       span
        "Describe interfaces in "
-      code text-sky-300/90 text-base
+      code text-sm sm:text-base crepus-t-text opacity-90
        ".crepus"
       span
        " — indentation or JSX-style input, same AST — and target native GPUI, static WASM sites, HTML, or Manifest V3 extensions from one CLI."
-     div flex flex-wrap gap-3
-      a href="./docs/index.html" inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-white text-zinc-950 text-sm font-semibold hover:bg-zinc-200 transition-colors
+     div flex flex-wrap gap-3 items-start flex-col sm:flex-row sm:items-center
+      a href="./docs/index.html" no-underline inline-flex items-center gap-2 px-5 py-2.5 rounded-lg crepus-t-btn-primary text-sm font-semibold
        "Browse documentation"
-       span opacity-70
+       span opacity-80
         "→"
-      a href="./docs/cli.html" inline-flex items-center px-5 py-2.5 rounded-lg border border-zinc-600 text-zinc-200 text-sm font-medium hover:border-zinc-400 hover:bg-zinc-900/50 transition-colors
+      a href="./docs/cli.html" no-underline inline-flex items-center px-5 py-2.5 rounded-lg crepus-t-btn-ghost text-sm font-medium transition-colors hover:bg-[var(--cp-elevated)]
        "CLI reference"
-    div mt-14 md:mt-0 shrink-0 w-full md:w-[380px]
-     div rounded-2xl border border-zinc-800 bg-zinc-900/50 backdrop-blur-sm overflow-hidden shadow-2xl shadow-black/40
-      div flex items-center gap-2 px-4 py-3 border-b border-zinc-800 bg-zinc-950/80
-       span flex gap-1.5
-        span w-3 h-3 rounded-full bg-red-500/80
-        span w-3 h-3 rounded-full bg-amber-500/80
-        span w-3 h-3 rounded-full bg-emerald-500/80
-       span text-xs font-mono text-zinc-500 ml-2
+     div mt-8 flex flex-col items-stretch w-full max-w-xl gap-5
+      p text-xs font-semibold uppercase tracking-widest crepus-t-muted m-0 text-center sm:text-left
+       "One toolchain"
+      div grid grid-cols-2 sm:grid-cols-4 gap-6 sm:gap-4 text-center
+       div flex flex-col items-center gap-2
+        span material-symbols-outlined crepus-toolchain-icon text-[var(--cp-accent)]
+         "computer"
+        span text-xs crepus-t-muted leading-snug
+         "Desktop"
+       div flex flex-col items-center gap-2
+        span material-symbols-outlined crepus-toolchain-icon text-[var(--cp-accent)]
+         "public"
+        span text-xs crepus-t-muted leading-snug
+         "Internet"
+       div flex flex-col items-center gap-2
+        span material-symbols-outlined crepus-toolchain-icon text-[var(--cp-accent)]
+         "web"
+        span text-xs crepus-t-muted leading-snug
+         "Chrome"
+       div flex flex-col items-center gap-2
+        span material-symbols-outlined crepus-toolchain-icon text-[var(--cp-accent)]
+         "smartphone"
+        span text-xs crepus-t-muted leading-snug
+         "Mobile"
+      p text-sm crepus-t-muted leading-relaxed m-0 text-center sm:text-left
+       "Crepuscularity Lite is a sibling project: a GPUI + V8 desktop shell with a Capacitor-shaped Rust bridge for embedding web UI in native apps — pair it with this CLI when you want a lighter native host than a full GPUI template tree."
+      a href="https://github.com/semitechnological/crepuscularity-lite" no-underline text-sm font-medium crepus-t-text hover:opacity-85 border-b crepus-t-border transition-colors inline-block self-center sm:self-start rel="noopener noreferrer" target="_blank"
+       "Crepuscularity Lite on GitHub →"
+    div w-full max-w-[380px] min-w-0 mx-auto lg:mx-0 lg:justify-self-end
+     div rounded-xl border overflow-hidden shadow-xl crepus-t-border crepus-t-card
+      div flex items-center gap-2 px-3 sm:px-4 py-2.5 sm:py-3 border-b crepus-t-border bg-[var(--cp-code)]
+       span flex gap-1.5 shrink-0
+        span w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full opacity-50 bg-[var(--cp-muted)]
+        span w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full opacity-40 bg-[var(--cp-muted)]
+        span w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full opacity-30 bg-[var(--cp-muted)]
+       span text-xs font-mono crepus-t-muted ml-1 truncate
         "terminal"
-      pre font-mono text-[13px] leading-relaxed p-4 m-0 text-zinc-300 bg-zinc-950 overflow-x-auto
-       span text-zinc-600
-        "# New desktop app\n"
-       span text-emerald-400
-        "crepus new"
-       span text-zinc-500
-        " my-app && "
-       span text-emerald-400
-        "cargo run\n"
-       span text-zinc-600
-        "# WASM site (this page)\n"
-       span text-sky-400
-        "crepus web build"
-       span text-zinc-500
-        " --site docs-site\n"
-       span text-zinc-600
-        "# Browser extension\n"
-       span text-violet-400
-        "crepus webext new"
-       span text-zinc-500
-        " ext"
+      pre font-mono text-[11px] sm:text-[13px] leading-relaxed p-3 sm:p-4 m-0 crepus-t-pre whitespace-pre-wrap overflow-x-auto
+       "# New desktop app\n$ crepus new my-app && cargo run\n\n# WASM site (this page)\n$ crepus web build --site docs-site\n\n# Browser extension\n$ crepus webext new ext"
 
-  section py-16 border-t border-zinc-800/80
+  section py-12 sm:py-14 border-t crepus-t-border crepus-entrance crepus-e3
+   div rounded-xl p-6 sm:p-8 max-w-4xl crepus-t-card
+    p text-xs font-semibold uppercase tracking-widest crepus-t-muted mb-3
+     "One workspace · surfaces that stay fast"
+    p text-sm sm:text-base crepus-t-muted leading-relaxed m-0 border-l-2 pl-4 border-[var(--cp-accent)]
+     "Ship Manifest V3 browser extensions without a separate front-end toolchain. The same templates power native GPUI windows, static WASM sites, and extension popups — small artifacts, instant dev reload, and a layout path that stays on the GPU instead of funneling every interaction through a JS runtime."
+
+  section py-14 sm:py-16 border-t crepus-t-border crepus-entrance crepus-e4
+   h2 text-lg font-semibold crepus-t-text mb-2
+    "Three ways to write the same tree"
+   p text-sm crepus-t-muted mb-2 max-w-2xl m-0
+    "Curly braces in snippets use Unicode ｛ ｝ where the real sources use ASCII so this page stays valid .crepus."
+   p text-sm crepus-t-muted mb-8 max-w-2xl m-0
+    "Indent DSL, TSX-shaped tags, or GPUI’s compile-time macro — one AST, your pick."
+   div grid gap-4 lg:grid-cols-3
+    div rounded-xl p-4 flex flex-col crepus-t-card
+     p text-xs font-semibold crepus-t-muted uppercase tracking-wide mb-2 m-0
+      "Indent · .crepus"
+     pre font-mono text-[10px] sm:text-xs m-0 flex-1 leading-relaxed crepus-t-pre p-3 rounded-lg whitespace-pre-wrap overflow-x-auto
+      "div flex flex-col gap-3\n  div text-xl font-bold\n  \"Hello ｛name｝\""
+    div rounded-xl p-4 flex flex-col crepus-t-card
+     p text-xs font-semibold crepus-t-muted uppercase tracking-wide mb-2 m-0
+      "JSX-style tags"
+     pre font-mono text-[10px] sm:text-xs m-0 flex-1 leading-relaxed crepus-t-pre p-3 rounded-lg whitespace-pre-wrap overflow-x-auto
+      "<div class=\"flex flex-col gap-3\">\n  <div class=\"text-xl font-bold\">\n    Hello ｛name｝\n  </div>\n</div>"
+    div rounded-xl p-4 flex flex-col crepus-t-card
+     p text-xs font-semibold crepus-t-muted uppercase tracking-wide mb-2 m-0
+      "GPUI · view!"
+     pre font-mono text-[10px] sm:text-xs m-0 flex-1 leading-relaxed crepus-t-pre p-3 rounded-lg whitespace-pre-wrap overflow-x-auto
+      "use crepuscularity::prelude::*;\n\nfn ui(cx: &mut ViewContext) -> impl IntoElement {\n    view!(cx,\n        div(class=\"flex items-center gap-2 p-4 font-bold\") ｛\n            \"Hello from GPUI and Rust\",\n        ｝\n    )\n}"
+
+  section py-14 sm:py-16 border-t crepus-t-border crepus-entrance crepus-e5
    div flex flex-col lg:flex-row lg:items-stretch gap-6 lg:gap-8
-    div flex-1 rounded-2xl border border-zinc-800 bg-gradient-to-b from-zinc-900/80 to-zinc-950 p-8
-     p text-xs font-semibold uppercase tracking-widest text-violet-400/90 mb-4
-      "Why it’s different"
-     p text-2xl md:text-3xl font-semibold text-zinc-100 leading-snug mb-6
+    div flex-1 rounded-xl p-6 sm:p-8 crepus-t-card
+     p text-xs font-semibold uppercase tracking-widest crepus-t-muted mb-3 sm:mb-4
+      "Why it's different"
+     p text-xl sm:text-2xl md:text-3xl font-semibold crepus-t-text leading-snug mb-5 sm:mb-6
       slot-rotate interval={3000} slot-lede
        "Hot-reloadable templates on GPUI."
        "No JS bundler for extensions."
        "Compile-time view! or full runtime parse."
        "Ship static dist/ to any CDN."
-     p text-sm text-zinc-500 m-0 leading-relaxed
+     p text-sm crepus-t-muted m-0 leading-relaxed
       "The same parser and evaluator back the macro, the WASM renderer, and the dev server — so what you author is what ships."
     div flex-1 grid gap-4 sm:grid-cols-2
-     div rounded-xl border border-zinc-800/90 bg-zinc-900/40 p-5
-      h3 text-sm font-semibold text-white mb-2
+     div rounded-xl p-5 crepus-t-card
+      h3 text-sm font-semibold crepus-t-text mb-2
        "One syntax"
-      p text-xs text-zinc-500 leading-relaxed m-0
+      p text-xs crepus-t-muted leading-relaxed m-0
        "Indent or JSX-style tags; control flow, slots, and includes behave the same across backends."
-     div rounded-xl border border-zinc-800/90 bg-zinc-900/40 p-5
-      h3 text-sm font-semibold text-white mb-2
+     div rounded-xl p-5 crepus-t-card
+      h3 text-sm font-semibold crepus-t-text mb-2
        "Rust + WASM"
-      p text-xs text-zinc-500 leading-relaxed m-0
+      p text-xs crepus-t-muted leading-relaxed m-0
        "Thin wasm32 runtimes, optional reactive layer, and HTML output for SSR and extensions."
-     div rounded-xl border border-zinc-800/90 bg-zinc-900/40 p-5
-      h3 text-sm font-semibold text-white mb-2
+     div rounded-xl p-5 crepus-t-card
+      h3 text-sm font-semibold crepus-t-text mb-2
        "Tailwind on GPUI"
-      p text-xs text-zinc-500 leading-relaxed m-0
+      p text-xs crepus-t-muted leading-relaxed m-0
        "Class strings map to native styles — layout, color, type, and more (see README)."
-     div rounded-xl border border-zinc-800/90 bg-zinc-900/40 p-5
-      h3 text-sm font-semibold text-white mb-2
+     div rounded-xl p-5 crepus-t-card
+      h3 text-sm font-semibold crepus-t-text mb-2
        "Documentation site"
-      p text-xs text-zinc-500 leading-relaxed m-0
+      p text-xs crepus-t-muted leading-relaxed m-0
        "Markdown in docs/ is rendered to styled HTML on every crepus web build."
 
-  section py-16 border-t border-zinc-800/80
-   div flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-10
+  section py-14 sm:py-16 border-t crepus-t-border
+   div flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-8 sm:mb-10
     div
-     h2 text-lg font-semibold text-white mb-1
+     h2 text-lg font-semibold crepus-t-text mb-1
       "Documentation"
-     p text-sm text-zinc-500 m-0 max-w-xl
+     p text-sm crepus-t-muted m-0 max-w-xl
       "Guides are edited as Markdown in the repo and published as HTML alongside this landing page."
-    a href="./docs/index.html" text-sm font-medium text-sky-400 hover:text-sky-300 transition-colors
+    a href="./docs/index.html" no-underline text-sm font-medium crepus-t-text hover:opacity-85 transition-colors border-b border-transparent hover:border-[var(--cp-accent)]
      "View all →"
    div grid gap-4 sm:grid-cols-2 lg:grid-cols-4
-    a href="./docs/dsl.html" doc-card
-     span text-xs font-mono text-zinc-500
+    a href="./docs/dsl.html" doc-card no-underline crepus-t-text hover:opacity-95
+     span text-xs font-mono crepus-t-muted
       "dsl.md"
-     span text-base font-semibold text-zinc-100 mt-2 block
+     span text-base font-semibold mt-2 block
       "DSL reference"
-     span text-xs text-zinc-500 mt-1 block
+     span text-xs crepus-t-muted mt-1 block
       "Syntax, flow, attributes"
-    a href="./docs/components.html" doc-card
-     span text-xs font-mono text-zinc-500
+    a href="./docs/components.html" doc-card no-underline crepus-t-text hover:opacity-95
+     span text-xs font-mono crepus-t-muted
       "components.md"
-     span text-base font-semibold text-zinc-100 mt-2 block
+     span text-base font-semibold mt-2 block
       "Components"
-     span text-xs text-zinc-500 mt-1 block
+     span text-xs crepus-t-muted mt-1 block
       "Includes & slots"
-    a href="./docs/cli.html" doc-card
-     span text-xs font-mono text-zinc-500
+    a href="./docs/cli.html" doc-card no-underline crepus-t-text hover:opacity-95
+     span text-xs font-mono crepus-t-muted
       "cli.md"
-     span text-base font-semibold text-zinc-100 mt-2 block
+     span text-base font-semibold mt-2 block
       "CLI"
-     span text-xs text-zinc-500 mt-1 block
+     span text-xs crepus-t-muted mt-1 block
       "Commands & flags"
-    a href="./docs/webext.html" doc-card
-     span text-xs font-mono text-zinc-500
+    a href="./docs/webext.html" doc-card no-underline crepus-t-text hover:opacity-95
+     span text-xs font-mono crepus-t-muted
       "webext.md"
-     span text-base font-semibold text-zinc-100 mt-2 block
+     span text-base font-semibold mt-2 block
       "Extensions"
-     span text-xs text-zinc-500 mt-1 block
+     span text-xs crepus-t-muted mt-1 block
       "MV3 toolchain"
 
-  section py-16 border-t border-zinc-800/80
-   div max-w-3xl
-    h2 text-lg font-semibold text-white mb-4
-     "Implementation spec"
-    p text-sm text-zinc-500 leading-relaxed mb-4
-     "Deep dive for compiler authors, agents, and anyone extending the web or extension pipeline."
-    a href="./docs/CREPUS_WEB_IMPLEMENTATION_SPEC.html" inline-flex text-sm font-medium text-violet-400 hover:text-violet-300 transition-colors
-     "Read CREPUS_WEB_IMPLEMENTATION_SPEC →"
-
- footer border-t border-zinc-800/80 py-12
-  div max-w-6xl mx-auto px-6 footer-row
+ footer border-t py-10 sm:py-12 crepus-t-border crepus-entrance crepus-e6
+  div max-w-6xl mx-auto px-4 sm:px-6 footer-row
    div flex flex-col gap-2
-    span text-sm font-medium text-zinc-300
-     "Crepuscularity"
-    span text-xs text-zinc-600
-     "MPL-2.0 — built with crepus web build"
-   div flex flex-wrap gap-4 text-xs text-zinc-500
-    a href="./docs/index.html" hover:text-zinc-300 transition-colors
+    a href="./index.html" flex items-center gap-2 no-underline crepus-t-text hover:opacity-90
+     img src="./static/favicon.svg" alt="" w-7 h-7 shrink-0 rounded-md
+     span text-sm font-medium
+      "Crepuscularity"
+    span text-xs crepus-t-muted
+     "MPL-2.0 — built with crepuscularity-web"
+   nav flex flex-wrap gap-x-5 gap-y-2 text-xs crepus-t-muted items-center justify-start sm:justify-end
+    a href="./docs/index.html" no-underline crepus-t-muted hover:text-[var(--cp-fg)] transition-colors
      "Docs"
-    a href="https://github.com/semitechnological/crepuscularity" hover:text-zinc-300 transition-colors rel="noopener noreferrer" target="_blank"
-     "Source"
+    a href="https://crates.io/crates/crepuscularity" no-underline crepus-t-muted hover:text-[var(--cp-fg)] transition-colors rel="noopener noreferrer" target="_blank"
+     "Crates"
+    a href="https://github.com/semitechnological/crepuscularity-lite" no-underline crepus-t-muted hover:text-[var(--cp-fg)] transition-colors rel="noopener noreferrer" target="_blank"
+     "Lite"
+    a href="https://github.com/semitechnological/crepuscularity" no-underline crepus-t-muted hover:text-[var(--cp-fg)] transition-colors rel="noopener noreferrer" target="_blank"
+     "GitHub"
 
-.slot-lede text-zinc-100 font-medium
+.slot-lede text-[var(--cp-fg)] font-medium
 .footer-row flex flex-col sm:flex-row justify-between gap-6 sm:items-center
-.doc-card group flex flex-col rounded-xl border border-zinc-800 bg-zinc-900/35 p-5 hover:border-zinc-600 hover:bg-zinc-900/55 transition-all
+.doc-card group flex flex-col rounded-xl p-5 transition-all crepus-t-card hover:border-[var(--cp-accent)]

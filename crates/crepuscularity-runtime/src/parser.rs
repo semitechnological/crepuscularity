@@ -2,7 +2,7 @@
 /// Mirrors the compile-time proc-macro parser but operates on strings at runtime.
 use std::collections::HashMap;
 
-use crepuscularity_core::parser::parse_when_attribute_suffix;
+use crepuscularity_core::parser::{parse_when_attribute_suffix, unescape_crepus_text_literal};
 
 use crate::ast::*;
 
@@ -769,7 +769,7 @@ fn parse_text_template(line: &str) -> Vec<TextPart> {
     while let Some(ch) = chars.next() {
         if ch == '{' {
             if !literal.is_empty() {
-                parts.push(TextPart::Literal(literal.clone()));
+                parts.push(TextPart::Literal(unescape_crepus_text_literal(&literal)));
                 literal.clear();
             }
             let mut expr = String::new();
@@ -797,7 +797,7 @@ fn parse_text_template(line: &str) -> Vec<TextPart> {
     }
 
     if !literal.is_empty() {
-        parts.push(TextPart::Literal(literal));
+        parts.push(TextPart::Literal(unescape_crepus_text_literal(&literal)));
     }
 
     parts

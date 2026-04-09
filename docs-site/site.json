@@ -8,12 +8,12 @@
     "ogImage": null
   },
   "theme": {
-    "accent": "#8b5cf6",
-    "accentSoft": "#38bdf8",
-    "surface": "#030712",
-    "text": "#f4f4f5",
-    "muted": "#94a3b8",
-    "border": "#27272a"
+    "accent": "#ffb070",
+    "accentSoft": "#e8c4ff",
+    "surface": "#0c0612",
+    "text": "#f4ebff",
+    "muted": "#9a8ab8",
+    "border": "#4c4168"
   },
   "elements": [],
   "analytics": null,

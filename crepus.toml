@@ -1,0 +1,9 @@
+# Monorepo manifest — `crepus web build --target <id>` / `crepus web serve --target <id>`
+# Paths are relative to this file. Add `[ios]` in an app directory for `crepus ios *`.
+
+[[targets]]
+type = "web"
+id = "docs"
+site = "docs-site"
+out = "docs-site/dist"
+entry = "index.crepus"

@@ -1,0 +1,8 @@
+[extension]
+name = "benchmark-crepus-webext"
+version = "0.1.0"
+description = "Minimal crepus webext for benchmark"
+
+[capabilities]
+storage = true
+background-script = true

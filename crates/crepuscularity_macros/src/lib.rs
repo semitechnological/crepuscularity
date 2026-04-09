@@ -1,3 +1,4 @@
+use crepuscularity_core::parser::unescape_crepus_text_literal;
 use proc_macro::TokenStream;
 use proc_macro2::{Span, TokenStream as TokenStream2};
 use quote::quote;
@@ -833,7 +834,7 @@ fn parse_text_template(line: &str) -> Vec<TextPart> {
     while let Some(ch) = chars.next() {
         if ch == '{' {
             if !literal.is_empty() {
-                parts.push(TextPart::Literal(literal.clone()));
+                parts.push(TextPart::Literal(unescape_crepus_text_literal(&literal)));
                 literal.clear();
             }
             let mut expr = String::new();
@@ -861,7 +862,7 @@ fn parse_text_template(line: &str) -> Vec<TextPart> {
     }
 
     if !literal.is_empty() {
-        parts.push(TextPart::Literal(literal));
+        parts.push(TextPart::Literal(unescape_crepus_text_literal(&literal)));
     }
 
     parts

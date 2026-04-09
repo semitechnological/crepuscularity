@@ -12,8 +12,8 @@ use std::process::Command;
 use std::time::Instant;
 
 use console::style;
-use serde::Deserialize;
 
+use crate::crepus_toml;
 use crate::ui;
 
 #[derive(Debug, Clone)]
@@ -21,29 +21,6 @@ struct IosSection {
     scheme: String,
     xcodegen_spec: String,
     ios_destination: String,
-}
-
-#[derive(Debug, Deserialize)]
-struct CrepusToml {
-    #[serde(default)]
-    ios: Option<IosTomlIos>,
-}
-
-#[derive(Debug, Deserialize)]
-struct IosTomlIos {
-    scheme: String,
-    #[serde(default = "default_xcodegen_spec")]
-    xcodegen_spec: String,
-    #[serde(default = "default_ios_destination")]
-    destination: String,
-}
-
-fn default_xcodegen_spec() -> String {
-    "project.yml".into()
-}
-
-fn default_ios_destination() -> String {
-    "platform=iOS Simulator,name=iPhone 16,OS=latest".into()
 }
 
 pub fn run(args: &[String]) {
@@ -136,9 +113,7 @@ fn walk_up_for_ios_config(start: &Path) -> Option<(PathBuf, IosSection)> {
 
 fn load_ios_config(root: &Path) -> Option<IosSection> {
     let p = root.join("crepus.toml");
-    let raw = fs::read_to_string(&p).ok()?;
-    let t: CrepusToml = toml::from_str(&raw).ok()?;
-    let i = t.ios?;
+    let i = crepus_toml::try_load_ios(&p)?;
     Some(IosSection {
         scheme: i.scheme,
         xcodegen_spec: i.xcodegen_spec,
@@ -157,8 +132,8 @@ fn legacy_config_from_project_yml(root: &Path) -> Option<IosSection> {
     let scheme = rest.split_whitespace().next()?.to_string();
     Some(IosSection {
         scheme,
-        xcodegen_spec: default_xcodegen_spec(),
-        ios_destination: default_ios_destination(),
+        xcodegen_spec: crepus_toml::default_xcodegen_spec(),
+        ios_destination: crepus_toml::default_ios_destination(),
     })
 }
 

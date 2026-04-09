@@ -923,6 +923,34 @@ fn tokenize_line(line: &str) -> Vec<String> {
     tokens
 }
 
+/// Unescape `\n`, `\r`, `\t`, `\\`, `\"`, and `\'` inside a `.crepus` quoted text segment.
+///
+/// Unknown escapes keep the backslash (e.g. `\x` → `\x`).
+pub fn unescape_crepus_text_literal(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    let mut chars = s.chars();
+    while let Some(c) = chars.next() {
+        if c != '\\' {
+            out.push(c);
+            continue;
+        }
+        match chars.next() {
+            Some('n') => out.push('\n'),
+            Some('r') => out.push('\r'),
+            Some('t') => out.push('\t'),
+            Some('\\') => out.push('\\'),
+            Some('"') => out.push('"'),
+            Some('\'') => out.push('\''),
+            Some(other) => {
+                out.push('\\');
+                out.push(other);
+            }
+            None => out.push('\\'),
+        }
+    }
+    out
+}
+
 fn parse_text_template(line: &str) -> Vec<TextPart> {
     let content = if line.starts_with('"') && line.ends_with('"') && line.len() >= 2 {
         &line[1..line.len() - 1]
@@ -937,7 +965,7 @@ fn parse_text_template(line: &str) -> Vec<TextPart> {
     while let Some(ch) = chars.next() {
         if ch == '{' {
             if !literal.is_empty() {
-                parts.push(TextPart::Literal(literal.clone()));
+                parts.push(TextPart::Literal(unescape_crepus_text_literal(&literal)));
                 literal.clear();
             }
             let mut expr = String::new();
@@ -965,7 +993,7 @@ fn parse_text_template(line: &str) -> Vec<TextPart> {
     }
 
     if !literal.is_empty() {
-        parts.push(TextPart::Literal(literal));
+        parts.push(TextPart::Literal(unescape_crepus_text_literal(&literal)));
     }
 
     parts
@@ -1697,6 +1725,24 @@ mod tests {
         assert!(
             text.contains("  extra"),
             "extra indent should be preserved, got: {text:?}"
+        );
+    }
+
+    #[test]
+    fn quoted_line_unescapes_backslash_sequences() {
+        let nodes = parse_template("pre\n  \"a\\nb\\tc\\\\d\"").unwrap();
+        let Node::Element(el) = &nodes[0] else {
+            panic!("expected element");
+        };
+        let text = text_from_node(&el.children[0]);
+        assert_eq!(text, "a\nb\tc\\d");
+    }
+
+    #[test]
+    fn unescape_crepus_text_literal_accepts_common_escapes() {
+        assert_eq!(
+            unescape_crepus_text_literal(r#"line\n\t\"quote\""#),
+            "line\n\t\"quote\""
         );
     }
 }

@@ -15,9 +15,12 @@
 //!   crepus ios new NAME                      XcodeGen + SwiftPM NativeShell host app
 //!   crepus ios generate [--dir PATH]         run xcodegen (brew install xcodegen)
 //!   crepus ios build [--dir] [--scheme] [...]  xcodegen + xcodebuild (simulator)
+//!   crepus benchmark [all|run] [flags…]        full benchmark.toml run (examples/benchmarks)
 
+mod benchmark;
 #[cfg(feature = "desktop")]
 mod builder;
+mod crepus_toml;
 #[cfg(feature = "desktop")]
 mod dev;
 #[cfg(feature = "desktop")]
@@ -143,6 +146,10 @@ fn main() {
             ios::run(&args[2..]);
         }
 
+        Some("benchmark") => {
+            benchmark::run(&args[2..]);
+        }
+
         _ => {
             print_usage();
             std::process::exit(1);
@@ -233,6 +240,11 @@ fn print_usage() {
         "  {}  {}",
         style("ios build [--dir] [--scheme] [...]     ").green(),
         style("xcodegen + xcodebuild; toml = defaults").dim()
+    );
+    eprintln!(
+        "  {}  {}",
+        style("benchmark [all|run] [flags…]         ").green(),
+        style("full benchmark.toml run (see examples/benchmarks/run-all.sh)").dim()
     );
     eprintln!();
     eprintln!("{}", style("OPTIONS").dim());
