@@ -5,6 +5,7 @@ edition = "2021"
 description = "Browser extension (MV3) support for Crepuscularity — UNSTABLE; in active development."
 license = "MPL-2.0"
 repository = "https://github.com/semitechnological/crepuscularity"
+documentation = "https://docs.rs/crepuscularity-webext"
 readme = "../../README.md"
 
 [dependencies]

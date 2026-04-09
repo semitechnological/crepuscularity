@@ -5,6 +5,7 @@ edition = "2021"
 license = "MPL-2.0"
 description = "Compile-time view! macro for Crepuscularity templates (UNSTABLE; in active development)."
 repository = "https://github.com/semitechnological/crepuscularity"
+documentation = "https://docs.rs/crepuscularity_macros"
 readme = "../../README.md"
 
 [features]

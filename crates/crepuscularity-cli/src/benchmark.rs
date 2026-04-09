@@ -3,8 +3,10 @@
 use console::style;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::thread;
 use std::time::{Duration, Instant};
 
 use crate::ui;
@@ -75,6 +77,7 @@ struct StepRunCtx<'a> {
     dry_run: bool,
     json_out: bool,
     verbose: bool,
+    measure_memory: bool,
     step_total: usize,
 }
 
@@ -83,6 +86,8 @@ struct JsonStepResult {
     name: String,
     duration_ms: u128,
     ok: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    max_rss_kb: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     stderr_tail: Option<String>,
 }
@@ -100,6 +105,7 @@ pub fn run(args: &[String]) {
     let mut work_override: Option<PathBuf> = None;
     // None: default verbose for human runs; Some: explicit --verbose / --quiet.
     let mut verbose_override: Option<bool> = None;
+    let mut measure_memory = true;
 
     let mut i = 0;
     while i < args.len() {
@@ -127,6 +133,8 @@ pub fn run(args: &[String]) {
             "--dry-run" | "-n" => dry_run = true,
             "--verbose" | "-v" => verbose_override = Some(true),
             "--quiet" | "-q" => verbose_override = Some(false),
+            "--memory" => measure_memory = true,
+            "--no-memory" => measure_memory = false,
             "--clean" => clean = true,
             "--repo" => {
                 i += 1;
@@ -214,6 +222,7 @@ pub fn run(args: &[String]) {
             &work_base,
             clean,
             dry_run,
+            measure_memory,
             total_targets,
             suite_keys.len(),
         );
@@ -287,10 +296,20 @@ pub fn run(args: &[String]) {
                 dry_run,
                 json_out,
                 verbose,
+                measure_memory,
                 step_total,
             };
             let (ok, err, step_results) = if let Some(ref b) = t.builtin {
-                run_builtin(b, t, &repo, &target_dir, dry_run, json_out, verbose)
+                run_builtin(
+                    b,
+                    t,
+                    &repo,
+                    &target_dir,
+                    dry_run,
+                    json_out,
+                    verbose,
+                    measure_memory,
+                )
             } else {
                 run_steps(&t.steps, ctx)
             };
@@ -366,12 +385,14 @@ fn normalize_benchmark_invocation_args(args: &[String]) -> Vec<String> {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn print_run_header(
     cfg_path: &Path,
     repo: &Path,
     work_base: &Path,
     clean: bool,
     dry_run: bool,
+    measure_memory: bool,
     total_targets: usize,
     suite_count: usize,
 ) {
@@ -394,8 +415,16 @@ fn print_run_header(
     );
     eprintln!(
         "  {}",
-        style("verbose: live command output (cargo, npm, …) — use --quiet to capture only").dim()
+        style("verbose: subprocess stdin/stdout/stderr inherited (live cargo/npm logs) — --quiet buffers output").dim()
     );
+    if measure_memory {
+        eprintln!(
+            "  {}",
+            style("memory: peak RSS per step via ps(1) sampled while child runs (Unix) — --no-memory to skip").dim()
+        );
+    } else {
+        eprintln!("  {}", style("memory: off (--no-memory)").dim());
+    }
     eprintln!();
 }
 
@@ -415,7 +444,7 @@ fn print_benchmark_usage() {
     eprintln!(
         "  crepus benchmark [all|run] [--config PATH] [--suite web|desktop|webext|all]\n\
                    [--only id,id] [--work-root DIR] [--repo DIR] [--clean] [--dry-run]\n\
-                   [--json] [--verbose|-v] [--quiet|-q]"
+                   [--json] [--verbose|-v] [--quiet|-q] [--memory] [--no-memory]"
     );
     eprintln!();
     eprintln!(
@@ -452,12 +481,13 @@ fn fmt_ms(ms: u128) -> String {
 }
 
 /// One line per step as it completes (or planned in `--dry-run`).
+/// `timed`: `(ms, ok, peak_rss_kb)` — RSS from sampled `ps` while child runs (Unix).
 fn print_step_line(
     json_out: bool,
     one_based: usize,
     total: usize,
     name: &str,
-    timed: Option<(u128, bool)>,
+    timed: Option<(u128, bool, Option<u64>)>,
 ) {
     if json_out || total == 0 {
         return;
@@ -468,14 +498,22 @@ fn print_step_line(
         None => {
             eprintln!("      {idx}  {nm}  {}", style("(planned)").dim());
         }
-        Some((ms, ok)) => {
+        Some((ms, ok, rss)) => {
             let tim = style(fmt_ms(ms)).cyan();
             let st = if ok {
                 style("ok").green()
             } else {
                 style("FAIL").red().bold()
             };
-            eprintln!("      {idx}  {nm}  {tim}  {st}");
+            if let Some(kb) = rss {
+                let mib = kb as f64 / 1024.0;
+                eprintln!(
+                    "      {idx}  {nm}  {tim}  {st}  {}",
+                    style(format!("peak {mib:.1} MiB RSS")).dim()
+                );
+            } else {
+                eprintln!("      {idx}  {nm}  {tim}  {st}");
+            }
         }
     }
 }
@@ -511,6 +549,13 @@ fn print_target_wall_footer(wall_ms: u128, steps: &[JsonStepResult]) {
         style(wall).white().bold(),
         style(steps_lbl).dim(),
     );
+    if let Some(peak_kb) = steps.iter().filter_map(|s| s.max_rss_kb).max() {
+        eprintln!(
+            "      {} peak RSS (max over steps) {:.1} MiB",
+            style("--").dim(),
+            peak_kb as f64 / 1024.0
+        );
+    }
     print_steps_share_footer(steps);
 }
 
@@ -564,7 +609,7 @@ fn check_requires(requires: &[String]) -> bool {
         return true;
     }
     for r in requires {
-        let (ok, _) = run_shell(Path::new("."), r, false);
+        let (ok, _, _) = run_shell(Path::new("."), r, false, false);
         if !ok {
             return false;
         }
@@ -572,44 +617,159 @@ fn check_requires(requires: &[String]) -> bool {
     true
 }
 
-fn run_shell(workdir: &Path, script: &str, inherit_io: bool) -> (bool, String) {
+#[cfg(unix)]
+fn sample_rss_kb(pid: u32) -> Option<u64> {
+    let out = Command::new("ps")
+        .args(["-p", &pid.to_string(), "-o", "rss="])
+        .output()
+        .ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    let s = String::from_utf8_lossy(&out.stdout);
+    s.split_whitespace().next()?.parse().ok()
+}
+
+#[cfg(not(unix))]
+fn sample_rss_kb(_pid: u32) -> Option<u64> {
+    None
+}
+
+fn wait_with_max_rss(
+    child: &mut std::process::Child,
+    measure_memory: bool,
+) -> std::io::Result<(std::process::ExitStatus, Option<u64>)> {
+    if !measure_memory {
+        let s = child.wait()?;
+        return Ok((s, None));
+    }
+    #[cfg(unix)]
+    {
+        let pid = child.id();
+        let mut max_kb = 0_u64;
+        loop {
+            match child.try_wait()? {
+                Some(status) => {
+                    return Ok((
+                        status,
+                        if max_kb > 0 {
+                            Some(max_kb)
+                        } else {
+                            sample_rss_kb(pid)
+                        },
+                    ));
+                }
+                None => {
+                    if let Some(kb) = sample_rss_kb(pid) {
+                        max_kb = max_kb.max(kb);
+                    }
+                    thread::sleep(Duration::from_millis(80));
+                }
+            }
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        let s = child.wait()?;
+        Ok((s, None))
+    }
+}
+
+/// Run a configured [`Command`]: capture I/O unless `inherit_io`, optionally sample child RSS (Unix).
+fn exec_tracked(
+    cmd: &mut Command,
+    inherit_io: bool,
+    measure_memory: bool,
+) -> Result<(bool, String, Option<u64>), String> {
+    use std::process::Stdio;
+    if inherit_io {
+        cmd.stdin(Stdio::inherit());
+        cmd.stdout(Stdio::inherit());
+        cmd.stderr(Stdio::inherit());
+    }
+    if !measure_memory {
+        if inherit_io {
+            return match cmd.status() {
+                Ok(s) if s.success() => Ok((true, String::new(), None)),
+                Ok(s) => Ok((false, format!("exited with {s}"), None)),
+                Err(e) => Err(e.to_string()),
+            };
+        }
+        let o = cmd.output().map_err(|e| e.to_string())?;
+        let mut err = String::from_utf8_lossy(&o.stderr).to_string();
+        if !o.stdout.is_empty() {
+            if !err.is_empty() {
+                err.push('\n');
+            }
+            err.push_str(&String::from_utf8_lossy(&o.stdout));
+        }
+        return Ok((o.status.success(), err, None));
+    }
+
+    if inherit_io {
+        let mut child = cmd.spawn().map_err(|e| e.to_string())?;
+        let (status, rss) = wait_with_max_rss(&mut child, true).map_err(|e| e.to_string())?;
+        let ok = status.success();
+        let msg = if ok {
+            String::new()
+        } else {
+            format!("exited with {status}")
+        };
+        return Ok((ok, msg, rss));
+    }
+
+    cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
+    let mut child = cmd.spawn().map_err(|e| e.to_string())?;
+    let stdout_pipe = child.stdout.take().unwrap();
+    let stderr_pipe = child.stderr.take().unwrap();
+    let t_out = thread::spawn(move || {
+        let mut s = String::new();
+        let _ = std::io::BufReader::new(stdout_pipe).read_to_string(&mut s);
+        s
+    });
+    let t_err = thread::spawn(move || {
+        let mut s = String::new();
+        let _ = std::io::BufReader::new(stderr_pipe).read_to_string(&mut s);
+        s
+    });
+    let (status, rss) = wait_with_max_rss(&mut child, true).map_err(|e| e.to_string())?;
+    let stdout = t_out.join().unwrap_or_default();
+    let mut err = t_err.join().unwrap_or_default();
+    if !stdout.is_empty() {
+        if !err.is_empty() {
+            err.push('\n');
+        }
+        err.push_str(&stdout);
+    }
+    Ok((status.success(), err, rss))
+}
+
+fn run_shell(
+    workdir: &Path,
+    script: &str,
+    inherit_io: bool,
+    measure_memory: bool,
+) -> (bool, String, Option<u64>) {
     #[cfg(unix)]
     {
         let mut cmd = Command::new("sh");
         cmd.arg("-c").arg(script).current_dir(workdir);
-        if inherit_io {
-            let st = cmd.status();
-            return match st {
-                Ok(s) if s.success() => (true, String::new()),
-                Ok(s) => (false, format!("`sh -c` exited with {s}")),
-                Err(e) => (false, e.to_string()),
-            };
-        }
-        let o = cmd.output();
-        match o {
-            Ok(out) => {
-                let mut err = String::from_utf8_lossy(&out.stderr).to_string();
-                if !out.stdout.is_empty() {
-                    if !err.is_empty() {
-                        err.push('\n');
-                    }
-                    err.push_str(&String::from_utf8_lossy(&out.stdout));
-                }
-                (out.status.success(), err)
-            }
-            Err(e) => (false, e.to_string()),
+        match exec_tracked(&mut cmd, inherit_io, measure_memory) {
+            Ok(x) => x,
+            Err(e) => (false, e, None),
         }
     }
     #[cfg(not(unix))]
     {
         let mut cmd = Command::new("cmd");
         cmd.args(["/C", script]).current_dir(workdir);
+        let _measure_memory = measure_memory; // RSS sampling not implemented on Windows
         if inherit_io {
             let st = cmd.status();
             return match st {
-                Ok(s) if s.success() => (true, String::new()),
-                Ok(s) => (false, format!("`cmd /C` exited with {s}")),
-                Err(e) => (false, e.to_string()),
+                Ok(s) if s.success() => (true, String::new(), None),
+                Ok(s) => (false, format!("`cmd /C` exited with {s}"), None),
+                Err(e) => (false, e.to_string(), None),
             };
         }
         let o = cmd.output();
@@ -622,9 +782,9 @@ fn run_shell(workdir: &Path, script: &str, inherit_io: bool) -> (bool, String) {
                     }
                     err.push_str(&String::from_utf8_lossy(&out.stdout));
                 }
-                (out.status.success(), err)
+                (out.status.success(), err, None)
             }
-            Err(e) => (false, e.to_string()),
+            Err(e) => (false, e.to_string(), None),
         }
     }
 }
@@ -663,6 +823,7 @@ fn run_steps(
                 name: step.name.clone(),
                 duration_ms: 0,
                 ok: true,
+                max_rss_kb: None,
                 stderr_tail: None,
             });
             continue;
@@ -688,7 +849,7 @@ fn run_steps(
         }
 
         let t0 = Instant::now();
-        let (ok, stderr) = run_shell(&cwd, &script, inherit_io);
+        let (ok, stderr, max_rss) = run_shell(&cwd, &script, inherit_io, ctx.measure_memory);
         let ms = t0.elapsed().as_millis();
 
         let tail = stderr_tail_opt(&stderr);
@@ -697,10 +858,11 @@ fn run_steps(
             name: step.name.clone(),
             duration_ms: ms,
             ok,
+            max_rss_kb: max_rss,
             stderr_tail: tail.clone(),
         });
 
-        print_step_line(ctx.json_out, one, n, &step.name, Some((ms, ok)));
+        print_step_line(ctx.json_out, one, n, &step.name, Some((ms, ok, max_rss)));
 
         if !ok {
             let detail = if inherit_io && stderr.is_empty() {
@@ -721,6 +883,7 @@ fn run_steps(
     (true, None, results)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn run_builtin(
     builtin: &str,
     target: &BenchTarget,
@@ -729,6 +892,7 @@ fn run_builtin(
     dry_run: bool,
     json_out: bool,
     verbose: bool,
+    measure_memory: bool,
 ) -> (bool, Option<String>, Vec<JsonStepResult>) {
     let exe = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("crepus"));
     let mut results = Vec::new();
@@ -768,6 +932,7 @@ fn run_builtin(
                         name: "crepus web build".into(),
                         duration_ms: 0,
                         ok: true,
+                        max_rss_kb: None,
                         stderr_tail: None,
                     }],
                 );
@@ -784,45 +949,29 @@ fn run_builtin(
                 eprintln!("          {}", style("— running —").dim());
             }
             let t0 = Instant::now();
-            let (ok, err) = if inherit_io {
-                match Command::new(&exe)
-                    .args(["web", "build", "--site"])
-                    .arg(&site_path)
-                    .arg("--out-dir")
-                    .arg(&out_dir)
-                    .status()
-                {
-                    Ok(s) if s.success() => (true, None),
-                    Ok(s) => (false, Some(format!("crepus exited with {s}"))),
-                    Err(e) => (false, Some(e.to_string())),
-                }
-            } else {
-                let out = Command::new(&exe)
-                    .args(["web", "build", "--site"])
-                    .arg(&site_path)
-                    .arg("--out-dir")
-                    .arg(&out_dir)
-                    .output();
-                match &out {
-                    Ok(o) => {
-                        let ok = o.status.success();
-                        let mut msg = String::from_utf8_lossy(&o.stderr).to_string();
-                        if !o.stdout.is_empty() {
-                            if !msg.is_empty() {
-                                msg.push('\n');
-                            }
-                            msg.push_str(&String::from_utf8_lossy(&o.stdout));
-                        }
-                        (ok, if ok { None } else { Some(msg) })
-                    }
-                    Err(e) => (false, Some(e.to_string())),
-                }
-            };
+            let mut cmd = Command::new(&exe);
+            cmd.args(["web", "build", "--site"])
+                .arg(&site_path)
+                .arg("--out-dir")
+                .arg(&out_dir);
+            let built = exec_tracked(&mut cmd, inherit_io, measure_memory);
             let ms = t0.elapsed().as_millis();
+            let (ok, combined, rss) = match built {
+                Ok(x) => x,
+                Err(e) => (false, e, None),
+            };
+            let err = if ok {
+                None
+            } else if combined.is_empty() {
+                Some("crepus web build failed".into())
+            } else {
+                Some(combined)
+            };
             results.push(JsonStepResult {
                 name: "crepus web build".into(),
                 duration_ms: ms,
                 ok,
+                max_rss_kb: rss,
                 stderr_tail: err.as_ref().map(|s| tail_str(s)),
             });
             print_step_line(
@@ -830,7 +979,7 @@ fn run_builtin(
                 1,
                 1,
                 "crepus web build (--site → --out-dir)",
-                Some((ms, ok)),
+                Some((ms, ok, rss)),
             );
             if !ok {
                 return (
@@ -854,12 +1003,14 @@ fn run_builtin(
                             name: "sync fixture".into(),
                             duration_ms: 0,
                             ok: true,
+                            max_rss_kb: None,
                             stderr_tail: None,
                         },
                         JsonStepResult {
                             name: "crepus webext build".into(),
                             duration_ms: 0,
                             ok: true,
+                            max_rss_kb: None,
                             stderr_tail: None,
                         },
                     ],
@@ -881,6 +1032,7 @@ fn run_builtin(
                     name: "sync fixture".into(),
                     duration_ms: ms,
                     ok: false,
+                    max_rss_kb: None,
                     stderr_tail: Some(e.to_string()),
                 });
                 print_step_line(
@@ -888,7 +1040,7 @@ fn run_builtin(
                     1,
                     2,
                     "sync fixture (copy to work dir)",
-                    Some((ms, false)),
+                    Some((ms, false, None)),
                 );
                 return (false, Some(format!("copy fixture: {e}")), results);
             }
@@ -897,6 +1049,7 @@ fn run_builtin(
                 name: "sync fixture".into(),
                 duration_ms: copy_ms,
                 ok: true,
+                max_rss_kb: None,
                 stderr_tail: None,
             });
             print_step_line(
@@ -904,7 +1057,7 @@ fn run_builtin(
                 1,
                 2,
                 "sync fixture (copy to work dir)",
-                Some((copy_ms, true)),
+                Some((copy_ms, true, None)),
             );
 
             if verbose && !json_out {
@@ -918,44 +1071,29 @@ fn run_builtin(
                 eprintln!("          {}", style("— running —").dim());
             }
             let t_build = Instant::now();
-            let (ok, err) = if inherit_io {
-                match Command::new(&exe)
-                    .args(["webext", "build", "--app"])
-                    .arg(&app_dir)
-                    .status()
-                {
-                    Ok(s) if s.success() => (true, None),
-                    Ok(s) => (false, Some(format!("crepus exited with {s}"))),
-                    Err(e) => (false, Some(e.to_string())),
-                }
-            } else {
-                let o = Command::new(&exe)
-                    .args(["webext", "build", "--app"])
-                    .arg(&app_dir)
-                    .output();
-                match &o {
-                    Ok(out) => {
-                        let ok = out.status.success();
-                        let mut msg = String::from_utf8_lossy(&out.stderr).to_string();
-                        if !out.stdout.is_empty() {
-                            if !msg.is_empty() {
-                                msg.push('\n');
-                            }
-                            msg.push_str(&String::from_utf8_lossy(&out.stdout));
-                        }
-                        (ok, if ok { None } else { Some(msg) })
-                    }
-                    Err(e) => (false, Some(e.to_string())),
-                }
-            };
+            let mut wcmd = Command::new(&exe);
+            wcmd.args(["webext", "build", "--app"]).arg(&app_dir);
+            let built = exec_tracked(&mut wcmd, inherit_io, measure_memory);
             let ms = t_build.elapsed().as_millis();
+            let (ok, combined, rss) = match built {
+                Ok(x) => x,
+                Err(e) => (false, e, None),
+            };
+            let err = if ok {
+                None
+            } else if combined.is_empty() {
+                Some("webext build failed".into())
+            } else {
+                Some(combined)
+            };
             results.push(JsonStepResult {
                 name: "crepus webext build".into(),
                 duration_ms: ms,
                 ok,
+                max_rss_kb: rss,
                 stderr_tail: err.as_ref().map(|s| tail_str(s)),
             });
-            print_step_line(json_out, 2, 2, "crepus webext build", Some((ms, ok)));
+            print_step_line(json_out, 2, 2, "crepus webext build", Some((ms, ok, rss)));
             if !ok {
                 return (
                     false,
@@ -989,6 +1127,7 @@ fn run_builtin(
                         name: "cargo build --release (GPUI fixture)".into(),
                         duration_ms: 0,
                         ok: true,
+                        max_rss_kb: None,
                         stderr_tail: None,
                     }],
                 );
@@ -1009,34 +1148,24 @@ fn run_builtin(
                 .current_dir(&crate_dir)
                 .env("CARGO_TARGET_DIR", &target_sub);
             inject_sdkroot_env(&mut cmd);
-            let (ok, err) = if inherit_io {
-                match cmd.status() {
-                    Ok(s) if s.success() => (true, None),
-                    Ok(s) => (false, Some(format!("cargo exited with {s}"))),
-                    Err(e) => (false, Some(e.to_string())),
-                }
-            } else {
-                let out = cmd.output();
-                match &out {
-                    Ok(o) => {
-                        let ok = o.status.success();
-                        let mut msg = String::from_utf8_lossy(&o.stderr).to_string();
-                        if !o.stdout.is_empty() {
-                            if !msg.is_empty() {
-                                msg.push('\n');
-                            }
-                            msg.push_str(&String::from_utf8_lossy(&o.stdout));
-                        }
-                        (ok, if ok { None } else { Some(msg) })
-                    }
-                    Err(e) => (false, Some(e.to_string())),
-                }
-            };
+            let built = exec_tracked(&mut cmd, inherit_io, measure_memory);
             let ms = t0.elapsed().as_millis();
+            let (ok, combined, rss) = match built {
+                Ok(x) => x,
+                Err(e) => (false, e, None),
+            };
+            let err = if ok {
+                None
+            } else if combined.is_empty() {
+                Some("desktop build failed".into())
+            } else {
+                Some(combined)
+            };
             results.push(JsonStepResult {
                 name: "cargo build --release (GPUI fixture)".into(),
                 duration_ms: ms,
                 ok,
+                max_rss_kb: rss,
                 stderr_tail: err.as_ref().map(|s| tail_str(s)),
             });
             print_step_line(
@@ -1044,7 +1173,7 @@ fn run_builtin(
                 1,
                 1,
                 "cargo build --release (GPUI fixture, CARGO_TARGET_DIR in work)",
-                Some((ms, ok)),
+                Some((ms, ok, rss)),
             );
             if !ok {
                 return (

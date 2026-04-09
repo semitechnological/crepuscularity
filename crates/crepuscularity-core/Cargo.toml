@@ -5,6 +5,7 @@ edition = "2021"
 license = "MPL-2.0"
 description = "Parser, AST, and expression evaluation for the Crepuscularity .crepus DSL (UNSTABLE; in active development)."
 repository = "https://github.com/semitechnological/crepuscularity"
+documentation = "https://docs.rs/crepuscularity-core"
 readme = "../../README.md"
 
 [dependencies]

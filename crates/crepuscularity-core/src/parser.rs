@@ -838,8 +838,9 @@ fn strip_optional_quotes(s: &str) -> &str {
 /// - `{expr}=quoted-or-bare-classes` — expression may contain `=` (e.g. `{a == b}="x y"`)
 /// - `ident=classes` — simple condition (variable name)
 ///
-/// Returns `(condition_source, raw_value)`; the caller should run [`strip_optional_quotes`] on
-/// `raw_value` and split on whitespace for Tailwind tokens.
+/// Returns `(condition_source, raw_value)`; the caller should strip optional surrounding
+/// quotes from `raw_value` (matching the parser’s `when:` value rules) and split on whitespace
+/// for Tailwind tokens.
 pub fn parse_when_attribute_suffix(src: &str) -> Option<(String, String)> {
     let s = src.trim();
     if s.is_empty() {

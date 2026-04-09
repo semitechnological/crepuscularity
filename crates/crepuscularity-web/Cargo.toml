@@ -5,7 +5,12 @@ edition = "2021"
 license = "MPL-2.0"
 description = "Web / SSR / DOM integration for Crepuscularity (UNSTABLE; in active development)."
 repository = "https://github.com/semitechnological/crepuscularity"
+documentation = "https://docs.rs/crepuscularity-web"
 readme = "../../README.md"
+
+[package.metadata.docs.rs]
+# Document APIs behind optional integrations (GPUI-free default still builds on docs.rs Linux).
+all-features = true
 
 [features]
 default = ["ssr"]

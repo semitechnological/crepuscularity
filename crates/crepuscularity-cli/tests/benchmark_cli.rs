@@ -67,3 +67,39 @@ fn benchmark_dry_run_parses_config() {
         "expected suite output: {stderr}"
     );
 }
+
+/// `crepus benchmark` desktop builtin builds this crate; keep it compiling (see `parse_when`-style `view!` needs `cx`).
+#[test]
+fn benchmark_desktop_fixture_cargo_check() {
+    let root = repo_root();
+    let manifest = root.join("examples/benchmarks/crepus-desktop/Cargo.toml");
+    assert!(manifest.is_file(), "missing {}", manifest.display());
+
+    let mut cmd = Command::new("cargo");
+    cmd.current_dir(&root).args([
+        "check",
+        "--manifest-path",
+        "examples/benchmarks/crepus-desktop/Cargo.toml",
+    ]);
+    #[cfg(target_os = "macos")]
+    {
+        if std::env::var_os("SDKROOT").is_none() {
+            if let Ok(out) = Command::new("xcrun").args(["--show-sdk-path"]).output() {
+                if out.status.success() {
+                    let p = String::from_utf8_lossy(&out.stdout).trim().to_string();
+                    if !p.is_empty() {
+                        cmd.env("SDKROOT", p);
+                    }
+                }
+            }
+        }
+    }
+
+    let st = cmd
+        .status()
+        .expect("spawn cargo check for bench desktop fixture");
+    assert!(
+        st.success(),
+        "examples/benchmarks/crepus-desktop must compile for `crepus benchmark` (set SDKROOT on macOS if needed)"
+    );
+}

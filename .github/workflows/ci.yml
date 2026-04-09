@@ -96,10 +96,7 @@ jobs:
     - name: Install Rust
       uses: dtolnay/rust-toolchain@stable
     
-    - name: Build docs
-      run: cargo doc --no-deps --workspace
-
-    - name: Check docs links
+    - name: Build docs (strict rustdoc)
       run: cargo doc --no-deps --workspace
       env:
         RUSTDOCFLAGS: -D warnings

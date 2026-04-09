@@ -17,7 +17,7 @@ impl BenchView {
 }
 
 impl Render for BenchView {
-    fn render(&mut self, _window: &mut gpui::Window, _cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, _window: &mut gpui::Window, cx: &mut Context<Self>) -> impl IntoElement {
         let count = self.count;
         view! {r#"
             div w-full h-full bg-zinc-950 text-white flex flex-col items-center justify-center gap-6
