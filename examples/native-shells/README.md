@@ -2,6 +2,10 @@
 
 Minimal apps that decode the same **View IR** JSON produced by the Rust crate `crepuscularity-native` (`render_template_to_ir` / `to_json`). Use this to prototype how `.crepus` templates map to real platform widgets before wiring a full embedding or FFI pipeline.
 
+**Rust on Android:** the [`android-activity`](https://docs.rs/android-activity) crate *does* let you ship **native Rust** as the process entrypoint (GameActivity / NativeActivity + `winit`/`wgpu`, etc.). It is not a UI framework—it replaces the Kotlin `Activity` shell while you draw or bridge UI yourself. A future path is: Rust (`crepuscularity-native` + parser) → IR → small Kotlin Compose **or** IR → GPU/text in Rust. The [AOSP Rust modules](https://source.android.com/docs/setup/build/rust/building-rust-modules/overview) doc is for **platform / Soong** builds, not typical Play Store Gradle apps—keep that separate from the sample here.
+
+**Coverage:** IR and shells track a **growing** subset of Tailwind (`style.rs`) and widgets (`button`, `img`, `scroll`, `slotRotate`, …). This is **not** 100% parity with `crepuscularity-gpui` `styler.rs`—extend `crates/crepuscularity-native/src/style.rs` for missing classes.
+
 ## Shared fixture
 
 [`fixture.json`](fixture.json) matches the golden output for:

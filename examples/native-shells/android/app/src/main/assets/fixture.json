@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "root": [
     {
       "kind": "stack",
@@ -7,14 +7,8 @@
       "spacing": 16,
       "children": [
         {
-          "kind": "stack",
-          "axis": "column",
-          "children": [
-            {
-              "kind": "text",
-              "content": "Hello Ada"
-            }
-          ]
+          "kind": "text",
+          "content": "Hello Ada"
         }
       ]
     }
