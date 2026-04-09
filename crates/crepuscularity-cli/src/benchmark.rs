@@ -2,7 +2,8 @@
 
 use console::style;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::io::IsTerminal;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -184,74 +185,6 @@ fn compute_run_summary(suites: &[JsonSuite]) -> JsonRunSummary {
     }
 }
 
-fn print_human_insights(summary: &JsonRunSummary, dry_run: bool) {
-    eprintln!();
-    if dry_run {
-        eprintln!(
-            "  {}",
-            style("insight: dry-run — re-run without --dry-run for wall times and RSS.").dim()
-        );
-        return;
-    }
-    if summary.completed_target_count == 0 {
-        eprintln!(
-            "  {}",
-            style("insight: no completed targets — check skips or failures above.").dim()
-        );
-        return;
-    }
-    eprintln!(
-        "{}",
-        style("insight — where time went (completed targets, slowest first)")
-            .cyan()
-            .bold()
-    );
-    eprintln!(
-        "  {}",
-        style("% of sum(wall) · suite · wall / Σ steps / overhead — overhead is shell/setup outside step clocks")
-            .dim()
-    );
-    let show = summary.by_wall_time.len().min(25);
-    for row in summary.by_wall_time.iter().take(show) {
-        let wall = fmt_ms(row.wall_ms);
-        let steps_lbl = fmt_ms(row.step_sum_ms);
-        let oh = fmt_ms(row.overhead_ms);
-        let rss = row.peak_rss_kb.map_or(String::new(), |k| {
-            format!("  peak {:.1} MiB", k as f64 / 1024.0)
-        });
-        eprintln!(
-            "  {:>5.1}%  {:<8}  wall {:>8}  Σ {:>8}  OH {:>8}{}",
-            row.share_of_completed_wall_pct,
-            style(&row.suite).dim(),
-            style(wall).white(),
-            style(steps_lbl).cyan(),
-            style(oh).yellow(),
-            style(rss).dim(),
-        );
-        eprintln!("          {}", style(&row.label).white().bold());
-    }
-    if summary.by_wall_time.len() > 25 {
-        eprintln!(
-            "  {}",
-            style(format!(
-                "… {} more rows in --json (summary.by_wall_time)",
-                summary.by_wall_time.len() - 25
-            ))
-            .dim()
-        );
-    }
-    eprintln!(
-        "  {}",
-        style("speed up Crepus: slimmer WASM graph, `cargo build --timings`, reuse CARGO_TARGET_DIR, or LTO settings in fixture crates.")
-            .dim()
-    );
-    eprintln!(
-        "  {}",
-        style("compare stacks: match cold/warm cache policy (--clean) so % shares are meaningful.")
-            .dim()
-    );
-}
-
 #[derive(Serialize, Clone)]
 struct JsonStepResult {
     name: String,
@@ -265,6 +198,10 @@ struct JsonStepResult {
 
 pub fn run(args: &[String]) {
     let args = normalize_benchmark_invocation_args(args);
+    if args.iter().any(|a| a == "--help" || a == "-h") || (args.len() == 1 && args[0] == "help") {
+        print_benchmark_usage();
+        return;
+    }
 
     let mut config_path: Option<PathBuf> = None;
     let mut suite_filter: Option<String> = None;
@@ -277,6 +214,7 @@ pub fn run(args: &[String]) {
     // None: default verbose for human runs; Some: explicit --verbose / --quiet.
     let mut verbose_override: Option<bool> = None;
     let mut measure_memory = true;
+    let mut no_tui = false;
 
     let mut i = 0;
     while i < args.len() {
@@ -319,15 +257,17 @@ pub fn run(args: &[String]) {
                 print_benchmark_usage();
                 return;
             }
+            "--no-tui" => no_tui = true,
             _ => {}
         }
         i += 1;
     }
 
+    // Default: compact (child output captured). Use -v / --verbose for live npm/cargo logs.
     let verbose = if json_out {
         false
     } else {
-        verbose_override.unwrap_or(true)
+        verbose_override.unwrap_or(false)
     };
 
     let cfg_path = resolve_config_path(config_path);
@@ -489,7 +429,7 @@ pub fn run(args: &[String]) {
             if !ok {
                 let msg = err.unwrap_or_else(|| "failed".into());
                 if t.optional {
-                    if !json_out && !dry_run {
+                    if !json_out && !dry_run && verbose {
                         print_target_wall_footer(total, &step_results);
                     }
                     if !json_out {
@@ -505,7 +445,7 @@ pub fn run(args: &[String]) {
                         total,
                     ));
                 } else {
-                    if !json_out && !dry_run {
+                    if !json_out && !dry_run && verbose {
                         print_target_wall_footer(total, &step_results);
                     }
                     if !json_out {
@@ -516,7 +456,7 @@ pub fn run(args: &[String]) {
                 continue;
             }
 
-            if !json_out && !dry_run {
+            if !json_out && !dry_run && verbose {
                 print_target_wall_footer(total, &step_results);
             }
 
@@ -545,9 +485,160 @@ pub fn run(args: &[String]) {
         };
         println!("{}", serde_json::to_string_pretty(&report).unwrap());
     } else {
-        print_human_insights(&summary, dry_run);
+        let outcomes = benchmark_outcomes_from_suites(&json_suites);
+        let top_completed: Vec<(String, f64, u128)> = summary
+            .by_wall_time
+            .iter()
+            .map(|r| (r.label.clone(), r.share_of_completed_wall_pct, r.wall_ms))
+            .collect();
+        let mut drew_tui = false;
+        if !no_tui && std::io::stderr().is_terminal() {
+            drew_tui = crate::benchmark_tui::try_show_dashboard(&outcomes, &top_completed, dry_run)
+                .unwrap_or(false);
+        }
+        if !drew_tui {
+            print_collapsed_plain_summary(&outcomes, &summary.by_wall_time, dry_run);
+        }
         eprintln!();
         ui::success("benchmark finished");
+    }
+}
+
+fn benchmark_outcomes_from_suites(
+    suites: &[JsonSuite],
+) -> Vec<crate::benchmark_tui::TargetOutcomeSummary> {
+    use crate::benchmark_tui::TargetOutcomeSummary;
+    let mut v = Vec::new();
+    for s in suites {
+        for t in &s.targets {
+            let (status, detail) = if t.skipped {
+                ("skip", t.error.clone().unwrap_or_else(|| "skipped".into()))
+            } else if t.error.is_some() {
+                ("fail", t.error.as_deref().unwrap_or("").to_string())
+            } else {
+                ("ok", String::new())
+            };
+            v.push(TargetOutcomeSummary {
+                suite: s.id.clone(),
+                id: t.id.clone(),
+                label: t.label.clone(),
+                wall_ms: t.total_ms,
+                status,
+                detail,
+            });
+        }
+    }
+    v
+}
+
+fn print_collapsed_plain_summary(
+    outcomes: &[crate::benchmark_tui::TargetOutcomeSummary],
+    insight_rows: &[JsonInsightRow],
+    dry_run: bool,
+) {
+    eprintln!();
+    eprintln!(
+        "{}",
+        style("benchmark — all targets (use -v for live step logs; --no-tui skips dashboard)")
+            .cyan()
+            .bold()
+    );
+    for o in outcomes {
+        let st = match o.status {
+            "ok" => style("ok").green(),
+            "skip" => style("skip").yellow(),
+            "fail" => style("fail").red(),
+            _ => style("?").dim(),
+        };
+        let note = if o.detail.is_empty() {
+            o.label.as_str()
+        } else {
+            o.detail.as_str()
+        };
+        eprintln!(
+            "  {:<10} {:<24} {}  {:>10}  {}",
+            style(&o.suite).dim(),
+            style(&o.id).cyan(),
+            st,
+            style(fmt_ms(o.wall_ms)).white(),
+            style(print_collapsed_elide(note, 72)).dim()
+        );
+    }
+    if dry_run {
+        eprintln!(
+            "  {}",
+            style("insight: dry-run — re-run without --dry-run for wall times and RSS.").dim()
+        );
+        return;
+    }
+    if insight_rows.is_empty() {
+        eprintln!(
+            "  {}",
+            style("insight: no completed targets — check skips or failures above.").dim()
+        );
+        return;
+    }
+    eprintln!();
+    eprintln!(
+        "{}",
+        style("insight — where time went (completed targets, slowest first)")
+            .cyan()
+            .bold()
+    );
+    eprintln!(
+        "  {}",
+        style("% of sum(wall) · suite · wall / Σ steps / overhead").dim()
+    );
+    let show = insight_rows.len().min(25);
+    for row in insight_rows.iter().take(show) {
+        let wall = fmt_ms(row.wall_ms);
+        let steps_lbl = fmt_ms(row.step_sum_ms);
+        let oh = fmt_ms(row.overhead_ms);
+        let rss = row.peak_rss_kb.map_or(String::new(), |k| {
+            format!("  peak {:.1} MiB", k as f64 / 1024.0)
+        });
+        eprintln!(
+            "  {:>5.1}%  {:<8}  wall {:>8}  Σ {:>8}  OH {:>8}{}",
+            row.share_of_completed_wall_pct,
+            style(&row.suite).dim(),
+            style(wall).white(),
+            style(steps_lbl).cyan(),
+            style(oh).yellow(),
+            style(rss).dim(),
+        );
+        eprintln!("          {}", style(&row.label).white().bold());
+    }
+    if insight_rows.len() > 25 {
+        eprintln!(
+            "  {}",
+            style(format!(
+                "… {} more rows in --json (summary.by_wall_time)",
+                insight_rows.len() - 25
+            ))
+            .dim()
+        );
+    }
+    eprintln!(
+        "  {}",
+        style("speed up Crepus: slimmer WASM graph, `cargo build --timings`, reuse CARGO_TARGET_DIR, or LTO settings in fixture crates.")
+            .dim()
+    );
+    eprintln!(
+        "  {}",
+        style("compare stacks: match cold/warm cache policy (--clean) so % shares are meaningful.")
+            .dim()
+    );
+}
+
+fn print_collapsed_elide(s: &str, max: usize) -> String {
+    let t = s.trim().replace('\n', " ");
+    if t.chars().count() <= max {
+        t
+    } else {
+        format!(
+            "{}…",
+            t.chars().take(max.saturating_sub(1)).collect::<String>()
+        )
     }
 }
 
@@ -589,7 +680,8 @@ fn print_run_header(
     );
     eprintln!(
         "  {}",
-        style("verbose: subprocess stdin/stdout/stderr inherited (live cargo/npm logs) — --quiet buffers output").dim()
+        style("default: compact logs + end summary (TTY: full-screen dashboard) — use -v to stream child output")
+            .dim()
     );
     if measure_memory {
         eprintln!(
@@ -618,12 +710,13 @@ fn print_benchmark_usage() {
     eprintln!(
         "  crepus benchmark [all|run] [--config PATH] [--suite web|desktop|webext|all]\n\
                    [--only id,id] [--work-root DIR] [--repo DIR] [--clean] [--dry-run]\n\
-                   [--json] [--verbose|-v] [--quiet|-q] [--memory] [--no-memory]"
+                   [--json] [-v|--verbose] [-q|--quiet] [--no-tui] [--memory] [--no-memory]"
     );
+    eprintln!("  crepus benchmark check [--config PATH] [--suite …] [--only id,id] [--json]");
     eprintln!();
     eprintln!(
         "{}",
-        style("Default: verbose (stream subprocess output). --json or --quiet reduces noise.")
+        style("Default: compact (child output buffered). -v streams live npm/cargo logs. TTY: end dashboard (q to close).")
             .dim()
     );
     eprintln!();
@@ -631,16 +724,48 @@ fn print_benchmark_usage() {
         "{}",
         style("With no --suite / --only, every target in benchmark.toml runs.").dim()
     );
+    eprintln!(
+        "{}",
+        style(
+            "check probes CLIs (git, cargo, node, npm, dotnet, …) needed by the selected targets."
+        )
+        .dim()
+    );
     eprintln!();
     eprintln!("{}", style("EXAMPLES").dim());
     eprintln!("  crepus benchmark all");
     eprintln!("  crepus benchmark --config examples/benchmarks/benchmark.toml");
+    eprintln!("  crepus benchmark check --config examples/benchmarks/benchmark.toml");
     eprintln!("  crepus benchmark --only crepus-web,crepus-webext --json > bench.json");
     eprintln!("  examples/benchmarks/run-all.sh --json   # same from repo root via shell");
     eprintln!(
         "{}",
         style("JSON includes summary.by_wall_time (ranked timings + % of total wall).").dim()
     );
+}
+
+fn print_benchmark_check_usage() {
+    eprintln!("{} benchmark check", style("crepus").cyan().bold());
+    eprintln!();
+    eprintln!("{}", style("USAGE").dim());
+    eprintln!(
+        "  crepus benchmark check [--config PATH] [--suite web|desktop|webext|all]\n\
+                   [--only id,id] [--repo DIR] [--json]"
+    );
+    eprintln!();
+    eprintln!(
+        "{}",
+        style(
+            "Walks the same target filters as `crepus benchmark`, runs quick version probes,\n\
+and lists install hints for anything missing. Exit 1 if a non-optional target lacks a tool."
+        )
+        .dim()
+    );
+    eprintln!();
+    eprintln!("{}", style("EXAMPLES").dim());
+    eprintln!("  crepus benchmark check");
+    eprintln!("  crepus benchmark check help");
+    eprintln!("  crepus benchmark check --only nextjs,dotnet-avalonia --json");
 }
 
 fn planned_step_count(t: &BenchTarget) -> usize {
@@ -662,12 +787,16 @@ fn fmt_ms(ms: u128) -> String {
 /// `timed`: `(ms, ok, peak_rss_kb)` — RSS from sampled `ps` while child runs (Unix).
 fn print_step_line(
     json_out: bool,
+    emit: bool,
     one_based: usize,
     total: usize,
     name: &str,
     timed: Option<(u128, bool, Option<u64>)>,
 ) {
     if json_out || total == 0 {
+        return;
+    }
+    if !emit {
         return;
     }
     let idx = style(format!("[{one_based}/{total}]")).dim();
@@ -996,8 +1125,8 @@ fn run_steps(
         let script = expand_vars(&step.shell, ctx.vars);
 
         if ctx.dry_run {
-            print_step_line(ctx.json_out, one, n, &step.name, None);
-            if !ctx.json_out {
+            print_step_line(ctx.json_out, ctx.verbose, one, n, &step.name, None);
+            if ctx.verbose && !ctx.json_out {
                 eprintln!("            {}", style(&script).dim());
             }
             results.push(JsonStepResult {
@@ -1043,7 +1172,14 @@ fn run_steps(
             stderr_tail: tail.clone(),
         });
 
-        print_step_line(ctx.json_out, one, n, &step.name, Some((ms, ok, max_rss)));
+        print_step_line(
+            ctx.json_out,
+            ctx.verbose,
+            one,
+            n,
+            &step.name,
+            Some((ms, ok, max_rss)),
+        );
 
         if !ok {
             let detail = if inherit_io && stderr.is_empty() {
@@ -1090,12 +1226,13 @@ fn run_builtin(
             if dry_run {
                 print_step_line(
                     json_out,
+                    verbose,
                     1,
                     1,
                     "crepus web build (--site → --out-dir)",
                     None,
                 );
-                if !json_out {
+                if verbose && !json_out {
                     eprintln!(
                         "            {}",
                         style(format!(
@@ -1157,6 +1294,7 @@ fn run_builtin(
             });
             print_step_line(
                 json_out,
+                verbose,
                 1,
                 1,
                 "crepus web build (--site → --out-dir)",
@@ -1174,8 +1312,15 @@ fn run_builtin(
             let fixture = repo.join("examples/benchmarks/crepus-webext");
             let app_dir = work_dir.join("app");
             if dry_run {
-                print_step_line(json_out, 1, 2, "sync fixture (copy to work dir)", None);
-                print_step_line(json_out, 2, 2, "crepus webext build", None);
+                print_step_line(
+                    json_out,
+                    verbose,
+                    1,
+                    2,
+                    "sync fixture (copy to work dir)",
+                    None,
+                );
+                print_step_line(json_out, verbose, 2, 2, "crepus webext build", None);
                 return (
                     true,
                     None,
@@ -1218,6 +1363,7 @@ fn run_builtin(
                 });
                 print_step_line(
                     json_out,
+                    verbose,
                     1,
                     2,
                     "sync fixture (copy to work dir)",
@@ -1235,11 +1381,20 @@ fn run_builtin(
             });
             print_step_line(
                 json_out,
+                verbose,
                 1,
                 2,
                 "sync fixture (copy to work dir)",
                 Some((copy_ms, true, None)),
             );
+
+            if let Err(e) = patch_webext_runtime_crepuscularity_path(repo, &app_dir) {
+                return (
+                    false,
+                    Some(format!("patch webext runtime path: {e}")),
+                    results,
+                );
+            }
 
             if verbose && !json_out {
                 eprintln!(
@@ -1274,7 +1429,14 @@ fn run_builtin(
                 max_rss_kb: rss,
                 stderr_tail: err.as_ref().map(|s| tail_str(s)),
             });
-            print_step_line(json_out, 2, 2, "crepus webext build", Some((ms, ok, rss)));
+            print_step_line(
+                json_out,
+                verbose,
+                2,
+                2,
+                "crepus webext build",
+                Some((ms, ok, rss)),
+            );
             if !ok {
                 return (
                     false,
@@ -1296,6 +1458,7 @@ fn run_builtin(
             if dry_run {
                 print_step_line(
                     json_out,
+                    verbose,
                     1,
                     1,
                     "cargo build --release (GPUI fixture, CARGO_TARGET_DIR in work)",
@@ -1351,6 +1514,7 @@ fn run_builtin(
             });
             print_step_line(
                 json_out,
+                verbose,
                 1,
                 1,
                 "cargo build --release (GPUI fixture, CARGO_TARGET_DIR in work)",
@@ -1423,4 +1587,511 @@ fn copy_rec(src: &Path, dst: &Path) -> std::io::Result<()> {
         fs::copy(src, dst)?;
     }
     Ok(())
+}
+
+/// After copying the benchmark fixture into `.work/.../app`, rewrite `runtime/Cargo.toml` so
+/// `crepuscularity-webext` points at the real workspace crate (relative `../../../../crates/...`
+/// only works from `examples/benchmarks/crepus-webext/runtime`).
+fn patch_webext_runtime_crepuscularity_path(repo: &Path, app_dir: &Path) -> std::io::Result<()> {
+    let toml_path = app_dir.join("runtime/Cargo.toml");
+    let crate_dir = repo.join("crates/crepuscularity-webext");
+    let canonical = crate_dir.canonicalize().map_err(|e| {
+        std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            format!("{}: {e}", crate_dir.display()),
+        )
+    })?;
+    let path_str = canonical.display().to_string().replace('\\', "/");
+    let content = std::fs::read_to_string(&toml_path)?;
+    let new_line = format!("crepuscularity-webext = {{ path = \"{path_str}\" }}");
+    let mut replaced = false;
+    let mut out_lines: Vec<String> = Vec::new();
+    for line in content.lines() {
+        if line.trim_start().starts_with("crepuscularity-webext") {
+            replaced = true;
+            out_lines.push(new_line.clone());
+        } else {
+            out_lines.push(line.to_string());
+        }
+    }
+    if !replaced {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            format!(
+                "no crepuscularity-webext dependency in {}",
+                toml_path.display()
+            ),
+        ));
+    }
+    let mut new_contents = out_lines.join("\n");
+    if content.ends_with('\n') {
+        new_contents.push('\n');
+    }
+    std::fs::write(&toml_path, new_contents)?;
+    Ok(())
+}
+
+// ── `crepus benchmark check` — prerequisite probes ---------------------------------
+
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+enum BenchTool {
+    Git,
+    Cargo,
+    Node,
+    Npm,
+    Bun,
+    Dotnet,
+    CargoLeptos,
+    DioxusCli,
+    MacosSdk,
+}
+
+impl BenchTool {
+    fn slug(self) -> &'static str {
+        match self {
+            BenchTool::Git => "git",
+            BenchTool::Cargo => "cargo",
+            BenchTool::Node => "node",
+            BenchTool::Npm => "npm",
+            BenchTool::Bun => "bun",
+            BenchTool::Dotnet => "dotnet",
+            BenchTool::CargoLeptos => "cargo_leptos",
+            BenchTool::DioxusCli => "dioxus_cli",
+            BenchTool::MacosSdk => "macos_sdk",
+        }
+    }
+
+    fn label(self) -> &'static str {
+        match self {
+            BenchTool::Git => "git",
+            BenchTool::Cargo => "cargo (Rust toolchain)",
+            BenchTool::Node => "node",
+            BenchTool::Npm => "npm",
+            BenchTool::Bun => "bun",
+            BenchTool::Dotnet => "dotnet SDK",
+            BenchTool::CargoLeptos => "cargo-leptos",
+            BenchTool::DioxusCli => "dx (dioxus-cli)",
+            BenchTool::MacosSdk => "Xcode CLT / macOS SDK",
+        }
+    }
+
+    fn install_hint(self) -> &'static str {
+        match self {
+            BenchTool::Git => "https://git-scm.com/downloads",
+            BenchTool::Cargo => "https://doc.rust-lang.org/cargo/getting-started/installation.html",
+            BenchTool::Node => "https://nodejs.org/ (install LTS; includes npm)",
+            BenchTool::Npm => "bundled with Node.js — https://nodejs.org/",
+            BenchTool::Bun => "https://bun.sh/",
+            BenchTool::Dotnet => {
+                "Wax: `wax install dotnet` — https://github.com/semitechnological/wax (avoid brew dotnet shim); or Microsoft install — https://dotnet.microsoft.com/download"
+            },
+            BenchTool::CargoLeptos => "cargo install cargo-leptos --locked",
+            BenchTool::DioxusCli => "cargo install dioxus-cli --locked",
+            BenchTool::MacosSdk => {
+                "xcode-select --install   (or export SDKROOT=$(xcrun --show-sdk-path))"
+            }
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct CheckToolRow {
+    id: &'static str,
+    label: &'static str,
+    ok: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    version: Option<String>,
+    install_hint: &'static str,
+}
+
+#[derive(Serialize)]
+struct CheckTargetRow {
+    id: String,
+    suite: String,
+    label: String,
+    optional: bool,
+    needs_tools: Vec<&'static str>,
+    missing_tools: Vec<&'static str>,
+    ok: bool,
+}
+
+#[derive(Serialize)]
+struct CheckReport {
+    config: String,
+    repo: String,
+    tools: Vec<CheckToolRow>,
+    targets: Vec<CheckTargetRow>,
+    /// False when any **non-optional** selected target is missing a tool.
+    required_targets_ok: bool,
+}
+
+fn bench_tools_for_target(t: &BenchTarget) -> BTreeSet<BenchTool> {
+    let mut out = BTreeSet::new();
+    if let Some(ref b) = t.builtin {
+        match b.as_str() {
+            "crepus-web" | "crepus-webext" => {
+                out.insert(BenchTool::Cargo);
+            }
+            "crepus-desktop" => {
+                out.insert(BenchTool::Cargo);
+                if cfg!(target_os = "macos") {
+                    out.insert(BenchTool::MacosSdk);
+                }
+            }
+            _ => {}
+        }
+    }
+    for step in &t.steps {
+        let s = step.shell.as_str();
+        if s.contains("bun ") || s.contains("bunx ") {
+            out.insert(BenchTool::Bun);
+        }
+        if s.contains("npm ")
+            || s.contains("npx ")
+            || s.contains("npm create")
+            || s.contains("npm install")
+            || s.contains("npm run")
+        {
+            out.insert(BenchTool::Node);
+            out.insert(BenchTool::Npm);
+        }
+        if s.contains("dotnet ") {
+            out.insert(BenchTool::Dotnet);
+        }
+        if s.contains("git clone") || (s.contains("git ") && s.contains("clone")) {
+            out.insert(BenchTool::Git);
+        }
+        if s.contains("cargo-leptos") || s.contains("cargo leptos") {
+            out.insert(BenchTool::Cargo);
+            out.insert(BenchTool::CargoLeptos);
+        }
+        if s.contains("command -v dx")
+            || s.contains(" dx ")
+            || s.contains("; dx ")
+            || s.starts_with("dx ")
+        {
+            out.insert(BenchTool::Cargo);
+            out.insert(BenchTool::DioxusCli);
+        }
+    }
+    out
+}
+
+fn probe_simple(cmd: &str, args: &[&str]) -> (bool, Option<String>) {
+    let out = match Command::new(cmd).args(args).output() {
+        Ok(o) => o,
+        Err(_) => return (false, None),
+    };
+    if !out.status.success() {
+        return (false, None);
+    }
+    let line = String::from_utf8_lossy(&out.stdout)
+        .lines()
+        .find(|l| !l.trim().is_empty())
+        .map(|l| l.trim().to_string());
+    if line.is_some() {
+        return (true, line);
+    }
+    let line = String::from_utf8_lossy(&out.stderr)
+        .lines()
+        .find(|l| !l.trim().is_empty())
+        .map(|l| l.trim().to_string());
+    (true, line)
+}
+
+fn probe_bench_tool(tool: BenchTool) -> (bool, Option<String>) {
+    match tool {
+        BenchTool::Git => probe_simple("git", &["--version"]),
+        BenchTool::Cargo => probe_simple("cargo", &["--version"]),
+        BenchTool::Node => probe_simple("node", &["--version"]),
+        BenchTool::Npm => probe_simple("npm", &["--version"]),
+        BenchTool::Bun => probe_simple("bun", &["--version"]),
+        BenchTool::Dotnet => probe_simple("dotnet", &["--version"]),
+        BenchTool::CargoLeptos => {
+            let a = probe_simple("cargo", &["leptos", "--version"]);
+            if a.0 {
+                return a;
+            }
+            probe_simple("cargo-leptos", &["--version"])
+        }
+        BenchTool::DioxusCli => probe_simple("dx", &["--version"]),
+        BenchTool::MacosSdk => {
+            #[cfg(target_os = "macos")]
+            {
+                if std::env::var_os("SDKROOT").is_some() {
+                    return (true, Some("SDKROOT set".into()));
+                }
+                probe_simple("xcrun", &["--show-sdk-path"])
+            }
+            #[cfg(not(target_os = "macos"))]
+            {
+                (true, None)
+            }
+        }
+    }
+}
+
+fn print_bench_stack_notes(selected: &[&BenchTarget], json_out: bool) {
+    if json_out {
+        return;
+    }
+    let ids: BTreeSet<&str> = selected.iter().map(|t| t.id.as_str()).collect();
+    if ids.contains("electron") {
+        eprintln!(
+            "  {}",
+            style("note: Electron benchmark uses Bun; native build deps may still apply.").dim()
+        );
+    }
+    if ids.contains("tauri") {
+        eprintln!(
+            "  {}",
+            style("note: Tauri needs Rust + Bun/OS prerequisites — see https://tauri.app/start/prerequisites/")
+                .dim()
+        );
+    }
+    if ids.contains("dotnet-maui") {
+        eprintln!(
+            "  {}",
+            style("note: .NET MAUI requires extra workloads (maui-ios / maui-android, etc.).")
+                .dim()
+        );
+    }
+}
+
+/// Probe CLIs required by benchmark.toml targets (respects `--suite` / `--only` like `benchmark run`).
+pub fn run_check(args: &[String]) {
+    if args.iter().any(|a| a == "--help" || a == "-h") || (args.len() == 1 && args[0] == "help") {
+        print_benchmark_check_usage();
+        return;
+    }
+
+    let mut config_path: Option<PathBuf> = None;
+    let mut suite_filter: Option<String> = None;
+    let mut only: Option<Vec<String>> = None;
+    let mut json_out = false;
+    let mut repo_override: Option<PathBuf> = None;
+
+    let mut i = 0;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--config" | "-c" => {
+                i += 1;
+                config_path = args.get(i).map(PathBuf::from);
+            }
+            "--suite" | "-s" => {
+                i += 1;
+                suite_filter = args.get(i).cloned();
+            }
+            "--only" => {
+                i += 1;
+                if let Some(s) = args.get(i) {
+                    only = Some(
+                        s.split(',')
+                            .map(|x| x.trim().to_string())
+                            .filter(|x| !x.is_empty())
+                            .collect(),
+                    );
+                }
+            }
+            "--json" => json_out = true,
+            "--repo" => {
+                i += 1;
+                repo_override = args.get(i).map(PathBuf::from);
+            }
+            "--help" | "-h" => {
+                print_benchmark_check_usage();
+                return;
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+
+    let cfg_path = resolve_config_path(config_path);
+    let raw = std::fs::read_to_string(&cfg_path).unwrap_or_else(|e| {
+        ui::error(&format!("cannot read {}: {e}", cfg_path.display()));
+    });
+
+    let file: BenchmarkFile = toml::from_str(&raw).unwrap_or_else(|e| {
+        ui::error(&format!("benchmark.toml parse error: {e}"));
+    });
+
+    if file.version != 1 {
+        ui::error(&format!(
+            "unsupported benchmark.toml version {}",
+            file.version
+        ));
+    }
+
+    let repo = repo_override.unwrap_or_else(|| find_repo_root(&cfg_path));
+
+    let mut selected: Vec<&BenchTarget> = Vec::new();
+    for t in &file.targets {
+        if let Some(ref f) = suite_filter {
+            if f != "all" && t.suite != *f {
+                continue;
+            }
+        }
+        if let Some(ref ids) = only {
+            if !ids.contains(&t.id) {
+                continue;
+            }
+        }
+        selected.push(t);
+    }
+
+    if selected.is_empty() {
+        if json_out {
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&serde_json::json!({
+                    "error": "no targets match --suite / --only filters"
+                }))
+                .unwrap_or_else(|_| "{\"error\":\"no match\"}".into())
+            );
+        } else {
+            ui::warning("no targets match --suite / --only filters");
+        }
+        std::process::exit(1);
+    }
+
+    let mut tool_union: BTreeSet<BenchTool> = BTreeSet::new();
+    for t in &selected {
+        tool_union.extend(bench_tools_for_target(t));
+    }
+
+    let mut probe_map: BTreeMap<BenchTool, (bool, Option<String>)> = BTreeMap::new();
+    for tool in &tool_union {
+        probe_map.insert(*tool, probe_bench_tool(*tool));
+    }
+
+    let mut target_rows: Vec<CheckTargetRow> = Vec::new();
+    let mut required_targets_ok = true;
+
+    for t in &selected {
+        let needs = bench_tools_for_target(t);
+        let need_slugs: Vec<&'static str> = needs.iter().map(|x| x.slug()).collect();
+        let missing: Vec<BenchTool> = needs
+            .iter()
+            .copied()
+            .filter(|tool| !probe_map.get(tool).is_some_and(|(ok, _)| *ok))
+            .collect();
+        let missing_slugs: Vec<&'static str> = missing.iter().map(|x| x.slug()).collect();
+        let ok = missing.is_empty();
+        if !ok && !t.optional {
+            required_targets_ok = false;
+        }
+        target_rows.push(CheckTargetRow {
+            id: t.id.clone(),
+            suite: t.suite.clone(),
+            label: t.label.clone(),
+            optional: t.optional,
+            needs_tools: need_slugs,
+            missing_tools: missing_slugs,
+            ok,
+        });
+    }
+
+    let tool_rows: Vec<CheckToolRow> = tool_union
+        .iter()
+        .map(|tool| {
+            let (ok, ver) = &probe_map[tool];
+            CheckToolRow {
+                id: tool.slug(),
+                label: tool.label(),
+                ok: *ok,
+                version: ver.clone(),
+                install_hint: tool.install_hint(),
+            }
+        })
+        .collect();
+
+    if json_out {
+        let report = CheckReport {
+            config: cfg_path.display().to_string(),
+            repo: repo.display().to_string(),
+            tools: tool_rows,
+            targets: target_rows,
+            required_targets_ok,
+        };
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&report).unwrap_or_else(|_| "{}".into())
+        );
+    } else {
+        eprintln!();
+        eprintln!("{}", style("crepus benchmark check").cyan().bold());
+        eprintln!("  {} {}", style("config").dim(), cfg_path.display());
+        eprintln!("  {} {}", style("repo").dim(), repo.display());
+        eprintln!();
+        eprintln!("{}", style("Tools").white().bold());
+        for tool in &tool_union {
+            let (ok, ver) = &probe_map[tool];
+            let name = style(tool.label()).white();
+            if *ok {
+                let detail = ver.as_ref().map(|s| format!(" — {s}")).unwrap_or_default();
+                eprintln!("  {} {name}{}", ui::ok(), style(detail).dim());
+            } else {
+                eprintln!(
+                    "  {} {name}  {}",
+                    ui::err(),
+                    style(format!("install: {}", tool.install_hint())).yellow()
+                );
+            }
+        }
+        eprintln!();
+        eprintln!("{}", style("Targets (filtered)").white().bold());
+        for row in &target_rows {
+            let opt = if row.optional {
+                style("optional").dim().to_string()
+            } else {
+                style("required").red().to_string()
+            };
+            if row.ok {
+                eprintln!(
+                    "  {} {}  {}",
+                    ui::ok(),
+                    style(&row.id).cyan().bold(),
+                    style(&row.label).white()
+                );
+            } else {
+                eprintln!(
+                    "  {} {}  {}",
+                    ui::err(),
+                    style(&row.id).cyan().bold(),
+                    style(&row.label).white()
+                );
+            }
+            eprintln!(
+                "      {}  needs: {}",
+                opt,
+                style(row.needs_tools.join(", ")).dim()
+            );
+            if !row.ok {
+                eprintln!(
+                    "      {} {}",
+                    ui::warn(),
+                    style(format!(
+                        "missing: {} — see hints above",
+                        row.missing_tools.join(", ")
+                    ))
+                    .yellow()
+                );
+            }
+        }
+        print_bench_stack_notes(&selected, false);
+        eprintln!();
+        if required_targets_ok {
+            ui::success("all non-optional targets have their CLI prerequisites");
+        } else {
+            eprintln!(
+                "{}",
+                style("install missing tools (or use --only to narrow targets)").yellow()
+            );
+        }
+    }
+
+    if !required_targets_ok {
+        std::process::exit(1);
+    }
 }

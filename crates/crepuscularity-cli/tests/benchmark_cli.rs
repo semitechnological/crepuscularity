@@ -4,15 +4,67 @@ use serde_json::Value;
 use std::path::PathBuf;
 use std::process::Command;
 
+#[test]
+fn benchmark_help_subcommand_prints_usage() {
+    let out = crepus()
+        .args(["benchmark", "help"])
+        .output()
+        .expect("spawn crepus benchmark help");
+    assert!(
+        out.status.success(),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("USAGE") && stderr.contains("benchmark"),
+        "{stderr}"
+    );
+}
+
 fn crepus() -> Command {
     Command::new(env!("CARGO_BIN_EXE_crepus"))
 }
 
 fn repo_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+    let p = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../..")
         .canonicalize()
-        .expect("repo root")
+        .expect("repo root");
+    // Windows `canonicalize` returns `\\?\` verbatim paths; those can break child `current_dir`
+    // and path handling in some tools. Strip the prefix for drive and UNC paths.
+    #[cfg(windows)]
+    {
+        strip_windows_verbatim_prefix(p)
+    }
+    #[cfg(not(windows))]
+    {
+        p
+    }
+}
+
+#[cfg(windows)]
+fn strip_windows_verbatim_prefix(path: PathBuf) -> PathBuf {
+    use std::ffi::OsString;
+    use std::os::windows::ffi::OsStrExt;
+    use std::os::windows::ffi::OsStringExt;
+
+    let wide: Vec<u16> = path.as_os_str().encode_wide().collect();
+    const PREFIX: &[u16] = &[b'\\' as u16, b'\\' as u16, b'?' as u16, b'\\' as u16];
+    if wide.len() < PREFIX.len() || !wide.starts_with(PREFIX) {
+        return path;
+    }
+    let rest = &wide[PREFIX.len()..];
+    if rest.len() >= 3 && rest[0] == b'U' as u16 && rest[1] == b'N' as u16 && rest[2] == b'C' as u16
+    {
+        let after_unc = &rest[3..];
+        if after_unc.first().copied() == Some(b'\\' as u16) {
+            let mut out = vec![b'\\' as u16, b'\\' as u16];
+            out.extend_from_slice(&after_unc[1..]);
+            return PathBuf::from(OsString::from_wide(&out));
+        }
+    }
+    PathBuf::from(OsString::from_wide(rest))
 }
 
 #[test]
@@ -34,8 +86,10 @@ fn benchmark_all_alias_runs() {
 
     assert!(
         out.status.success(),
-        "stderr:\n{}",
-        String::from_utf8_lossy(&out.stderr)
+        "status={:?} stderr:\n{}\nstdout:\n{}",
+        out.status.code(),
+        String::from_utf8_lossy(&out.stderr),
+        String::from_utf8_lossy(&out.stdout)
     );
 }
 
@@ -59,8 +113,10 @@ fn benchmark_dry_run_parses_config() {
 
     assert!(
         out.status.success(),
-        "stderr:\n{}",
-        String::from_utf8_lossy(&out.stderr)
+        "status={:?} stderr:\n{}\nstdout:\n{}",
+        out.status.code(),
+        String::from_utf8_lossy(&out.stderr),
+        String::from_utf8_lossy(&out.stdout)
     );
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(
@@ -69,7 +125,7 @@ fn benchmark_dry_run_parses_config() {
     );
 }
 
-/// `crepus benchmark` desktop builtin builds this crate; keep it compiling (see `parse_when`-style `view!` needs `cx`).
+/// `crepus benchmark` desktop builtin expects this GPUI fixture to keep compiling.
 #[test]
 fn benchmark_desktop_fixture_cargo_check() {
     let root = repo_root();
@@ -133,4 +189,64 @@ fn benchmark_json_includes_summary() {
     let summary = v.get("summary").unwrap();
     assert!(summary.get("by_wall_time").is_some());
     assert!(summary.get("total_wall_ms_completed").is_some());
+}
+
+#[test]
+fn benchmark_check_json_for_crepus_web() {
+    let config = repo_root().join("examples/benchmarks/benchmark.toml");
+    let out = crepus()
+        .current_dir(repo_root())
+        .args([
+            "benchmark",
+            "check",
+            "--config",
+            config.to_str().unwrap(),
+            "--only",
+            "crepus-web",
+            "--json",
+        ])
+        .output()
+        .expect("spawn crepus benchmark check");
+
+    assert!(
+        out.status.success(),
+        "status={:?} stderr:\n{}\nstdout:\n{}",
+        out.status.code(),
+        String::from_utf8_lossy(&out.stderr),
+        String::from_utf8_lossy(&out.stdout)
+    );
+    let v: Value = serde_json::from_slice(&out.stdout).expect("stdout is JSON");
+    assert_eq!(v["required_targets_ok"], true);
+    let tools = v["tools"].as_array().expect("tools array");
+    let ids: Vec<&str> = tools.iter().filter_map(|t| t["id"].as_str()).collect();
+    assert!(
+        ids.contains(&"cargo"),
+        "crepus-web should need cargo: {ids:?}"
+    );
+    let targets = v["targets"].as_array().expect("targets");
+    assert_eq!(targets.len(), 1);
+    assert_eq!(targets[0]["id"], "crepus-web");
+    assert_eq!(targets[0]["ok"], true);
+}
+
+#[test]
+fn benchmark_check_no_matching_targets_json() {
+    let config = repo_root().join("examples/benchmarks/benchmark.toml");
+    let out = crepus()
+        .current_dir(repo_root())
+        .args([
+            "benchmark",
+            "check",
+            "--config",
+            config.to_str().unwrap(),
+            "--only",
+            "__no_such_target__",
+            "--json",
+        ])
+        .output()
+        .expect("spawn crepus benchmark check");
+
+    assert!(!out.status.success());
+    let v: Value = serde_json::from_slice(&out.stdout).expect("stdout is JSON");
+    assert!(v.get("error").is_some(), "expected error field: {v}");
 }

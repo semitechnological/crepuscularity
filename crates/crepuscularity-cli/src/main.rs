@@ -15,9 +15,10 @@
 //!   crepus ios new NAME                      XcodeGen + SwiftPM NativeShell host app
 //!   crepus ios generate [--dir PATH]         run xcodegen (brew install xcodegen)
 //!   crepus ios build [--dir] [--scheme] [...]  xcodegen + xcodebuild (simulator)
-//!   crepus benchmark [all|run] [flags…]        full benchmark.toml run (examples/benchmarks)
+//!   crepus benchmark [all|run|check] [flags…]    benchmark.toml run or prereq check (examples/benchmarks)
 
 mod benchmark;
+mod benchmark_tui;
 #[cfg(feature = "desktop")]
 mod builder;
 mod crepus_toml;
@@ -146,9 +147,10 @@ fn main() {
             ios::run(&args[2..]);
         }
 
-        Some("benchmark") => {
-            benchmark::run(&args[2..]);
-        }
+        Some("benchmark") => match args.get(2).map(|s| s.as_str()) {
+            Some("check") => benchmark::run_check(args.get(3..).unwrap_or(&[])),
+            _ => benchmark::run(args.get(2..).unwrap_or(&[])),
+        },
 
         _ => {
             print_usage();
@@ -243,8 +245,8 @@ fn print_usage() {
     );
     eprintln!(
         "  {}  {}",
-        style("benchmark [all|run] [flags…]         ").green(),
-        style("full benchmark.toml run (see examples/benchmarks/run-all.sh)").dim()
+        style("benchmark [all|run|check] [flags…]   ").green(),
+        style("benchmark.toml run or prereq probe (see examples/benchmarks)").dim()
     );
     eprintln!();
     eprintln!("{}", style("OPTIONS").dim());

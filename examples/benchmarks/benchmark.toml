@@ -1,5 +1,7 @@
 # Declarative compare harness for `crepus benchmark`.
-# External targets call npm/cargo/dotnet CLIs (need network on first run).
+# JS/TS stacks use **Bun** (`bun`, `bunx`) for installs and scaffolds — not npm.
+# .NET SDK should come from **Wax** (`wax install dotnet`) or Microsoft (`~/.dotnet`),
+# not raw Homebrew `brew install dotnet` (wrapper can break with `@@HOMEBREW_CELLAR@@`).
 # Built-in *crepus* rows time the checked-in fixtures under this folder.
 #
 # Run everything from repo root:
@@ -7,19 +9,23 @@
 #   ./examples/benchmarks/run-all.sh
 #   crepus benchmark --config examples/benchmarks/benchmark.toml
 #
-# Quick check (fixtures only, no npm):
+# Quick check (fixtures only, no JS):
 #   crepus benchmark --config examples/benchmarks/benchmark.toml --only crepus-web,crepus-webext
 #
+# Probe system CLIs (including `bun`) for selected targets — no builds:
+#   crepus benchmark check --config examples/benchmarks/benchmark.toml
+#
 # Reading results:
-#   Human runs end with an "insight" table: % of total wall time per completed target (slowest first),
-#   plus per-target overhead (wall clock minus summed step times — shell/fs outside the child timer).
-#   `crepus benchmark --json` emits `summary.by_wall_time` with the same ranking for charts/spreadsheets.
+#   Human runs end with a consolidated summary (ratatui dashboard on TTY).
+#   `crepus benchmark --json` emits `summary.by_wall_time` for charts/spreadsheets.
 
 version = 1
 
 [settings]
 # Resolved relative to the repo root when not absolute
 work_root = "examples/benchmarks/.work"
+
+# .NET steps prepend Wax + ~/.local/bin to PATH and prefer ~/.dotnet/dotnet (set DOTNET_BIN to override).
 
 # --- Crepuscularity (timed via this CLI) ------------------------------------
 
@@ -55,12 +61,12 @@ optional = true
 
 [[targets.steps]]
 name = "create-next-app"
-shell = "rm -rf next-app && CI=1 npx --yes create-next-app@15 next-app --typescript --eslint --tailwind --app --src-dir --import-alias \"@/*\" --use-npm --turbopack false"
+shell = "rm -rf next-app && CI=1 bunx --bun create-next-app@15 next-app --typescript --eslint --tailwind --app --src-dir --import-alias \"@/*\" --turbopack false --use-bun"
 
 [[targets.steps]]
 name = "next-build"
 cwd = "next-app"
-shell = "npm run build"
+shell = "bun install && bun run build"
 
 [[targets]]
 suite = "web"
@@ -70,12 +76,12 @@ optional = true
 
 [[targets.steps]]
 name = "vite-create-svelte"
-shell = "rm -rf svelte-app && npm create vite@latest svelte-app -- --template svelte-ts"
+shell = "rm -rf svelte-app && bun create vite svelte-app --template svelte-ts"
 
 [[targets.steps]]
 name = "svelte-build"
 cwd = "svelte-app"
-shell = "npm install && npm run build"
+shell = "bun install && bun run build"
 
 [[targets]]
 suite = "web"
@@ -85,12 +91,12 @@ optional = true
 
 [[targets.steps]]
 name = "vite-create-solid"
-shell = "rm -rf solid-app && npm create vite@latest solid-app -- --template solid-ts"
+shell = "rm -rf solid-app && bun create vite solid-app --template solid-ts"
 
 [[targets.steps]]
 name = "solid-build"
 cwd = "solid-app"
-shell = "npm install && npm run build"
+shell = "bun install && bun run build"
 
 [[targets]]
 suite = "web"
@@ -100,12 +106,12 @@ optional = true
 
 [[targets.steps]]
 name = "vite-create-vue"
-shell = "rm -rf vue-app && npm create vite@latest vue-app -- --template vue-ts"
+shell = "rm -rf vue-app && bun create vite vue-app --template vue-ts"
 
 [[targets.steps]]
 name = "vue-build"
 cwd = "vue-app"
-shell = "npm install && npm run build"
+shell = "bun install && bun run build"
 
 [[targets]]
 suite = "web"
@@ -115,12 +121,12 @@ optional = true
 
 [[targets.steps]]
 name = "ng-new"
-shell = "rm -rf ng-app && npx --yes @angular/cli@19 new ng-app --defaults --skip-git --style=css --ssr=false --strict"
+shell = "rm -rf ng-app && CI=1 NG_CLI_ANALYTICS=false bunx --bun @angular/cli@19 new ng-app --defaults --skip-git --style=css --ssr=false --strict --package-manager=bun"
 
 [[targets.steps]]
 name = "ng-build"
 cwd = "ng-app"
-shell = "npm run build -- --configuration production"
+shell = "bun install && bun run build -- --configuration production"
 
 [[targets]]
 suite = "web"
@@ -130,22 +136,22 @@ optional = true
 
 [[targets.steps]]
 name = "vite-create-vanilla"
-shell = "rm -rf vanilla-app && npm create vite@latest vanilla-app -- --template vanilla-ts"
+shell = "rm -rf vanilla-app && bun create vite vanilla-app --template vanilla-ts"
 
 [[targets.steps]]
 name = "vanilla-build"
 cwd = "vanilla-app"
-shell = "npm install && npm run build"
+shell = "bun install && bun run build"
 
 [[targets]]
 suite = "web"
 id = "leptos"
-label = "Leptos (start-simple, cargo-leptos)"
+label = "Leptos (start-axum, cargo-leptos)"
 optional = true
 
 [[targets.steps]]
-name = "clone-start-simple"
-shell = "rm -rf leptos-app && git clone --depth 1 https://github.com/leptos-rs/start-simple leptos-app"
+name = "clone-start-axum"
+shell = "rm -rf leptos-app && git clone --depth 1 https://github.com/leptos-rs/start-axum leptos-app"
 
 [[targets.steps]]
 name = "leptos-build"
@@ -167,7 +173,7 @@ name = "dx-build"
 cwd = "dioxus-app"
 shell = "if command -v dx >/dev/null 2>&1; then dx build --platform web --release; else echo 'install dioxus-cli: cargo install dioxus-cli --locked' && exit 1; fi"
 
-# --- Desktop GUIs -------------------------------------------------------------
+# --- Desktop GUIs -----------------------------------------------------------
 
 [[targets]]
 suite = "desktop"
@@ -177,12 +183,12 @@ optional = true
 
 [[targets.steps]]
 name = "create-electron"
-shell = "rm -rf electron-app && npm create electron-vite@latest electron-app -- --template vanilla-ts"
+shell = "rm -rf electron-app && bun create electron-vite@latest electron-app -- --template vanilla-ts"
 
 [[targets.steps]]
 name = "electron-build"
 cwd = "electron-app"
-shell = "npm install && npm run build"
+shell = "bun install && bun run build"
 
 [[targets]]
 suite = "desktop"
@@ -192,12 +198,12 @@ optional = true
 
 [[targets.steps]]
 name = "create-tauri"
-shell = "rm -rf tauri-app && npm create tauri-app@latest tauri-app -- --template vanilla-ts"
+shell = "rm -rf tauri-app && bun create tauri-app@latest tauri-app -- --template vanilla-ts"
 
 [[targets.steps]]
 name = "tauri-build"
 cwd = "tauri-app"
-shell = "npm install && npm run tauri build"
+shell = "bun install && bun run tauri build"
 
 [[targets]]
 suite = "desktop"
@@ -207,12 +213,12 @@ optional = true
 
 [[targets.steps]]
 name = "dotnet-new"
-shell = "rm -rf avalonia-app && dotnet new install Avalonia.Templates >/dev/null 2>&1; dotnet new avalonia.app -o avalonia-app"
+shell = "rm -rf avalonia-app && export PATH=\"${HOME}/.local/wax/bin:${HOME}/.local/bin:${PATH}\" && DOTNET_BIN=\"${DOTNET_BIN:-}\" && if [ -z \"$DOTNET_BIN\" ]; then if [ -x \"${HOME}/.dotnet/dotnet\" ]; then DOTNET_BIN=\"${HOME}/.dotnet/dotnet\"; elif [ -x /usr/local/share/dotnet/dotnet ]; then DOTNET_BIN=/usr/local/share/dotnet/dotnet; else DOTNET_BIN=dotnet; fi; fi && \"$DOTNET_BIN\" new install Avalonia.Templates >/dev/null 2>&1; \"$DOTNET_BIN\" new avalonia.app -o avalonia-app"
 
 [[targets.steps]]
 name = "dotnet-build"
 cwd = "avalonia-app"
-shell = "dotnet build -c Release"
+shell = "export PATH=\"${HOME}/.local/wax/bin:${HOME}/.local/bin:${PATH}\" && DOTNET_BIN=\"${DOTNET_BIN:-}\" && if [ -z \"$DOTNET_BIN\" ]; then if [ -x \"${HOME}/.dotnet/dotnet\" ]; then DOTNET_BIN=\"${HOME}/.dotnet/dotnet\"; elif [ -x /usr/local/share/dotnet/dotnet ]; then DOTNET_BIN=/usr/local/share/dotnet/dotnet; else DOTNET_BIN=dotnet; fi; fi && \"$DOTNET_BIN\" build -c Release"
 
 [[targets]]
 suite = "desktop"
@@ -222,12 +228,12 @@ optional = true
 
 [[targets.steps]]
 name = "dotnet-maui-new"
-shell = "rm -rf maui-app && dotnet new maui -n maui-app -f net9.0"
+shell = "rm -rf maui-app && export PATH=\"${HOME}/.local/wax/bin:${HOME}/.local/bin:${PATH}\" && DOTNET_BIN=\"${DOTNET_BIN:-}\" && if [ -z \"$DOTNET_BIN\" ]; then if [ -x \"${HOME}/.dotnet/dotnet\" ]; then DOTNET_BIN=\"${HOME}/.dotnet/dotnet\"; elif [ -x /usr/local/share/dotnet/dotnet ]; then DOTNET_BIN=/usr/local/share/dotnet/dotnet; else DOTNET_BIN=dotnet; fi; fi && \"$DOTNET_BIN\" new maui -n maui-app -f net9.0"
 
 [[targets.steps]]
 name = "dotnet-maui-build"
 cwd = "maui-app"
-shell = "dotnet build -c Release"
+shell = "export PATH=\"${HOME}/.local/wax/bin:${HOME}/.local/bin:${PATH}\" && DOTNET_BIN=\"${DOTNET_BIN:-}\" && if [ -z \"$DOTNET_BIN\" ]; then if [ -x \"${HOME}/.dotnet/dotnet\" ]; then DOTNET_BIN=\"${HOME}/.dotnet/dotnet\"; elif [ -x /usr/local/share/dotnet/dotnet ]; then DOTNET_BIN=/usr/local/share/dotnet/dotnet; else DOTNET_BIN=dotnet; fi; fi && \"$DOTNET_BIN\" build -c Release"
 
 # --- Web extensions -----------------------------------------------------------
 
@@ -244,7 +250,7 @@ shell = "rm -rf vanilla-ext && cp -R \"$REPO/examples/benchmarks/starters/webext
 [[targets.steps]]
 name = "vite-crx-build"
 cwd = "vanilla-ext"
-shell = "npm install && npm run build"
+shell = "bun install && bun run build"
 
 [[targets]]
 suite = "webext"
@@ -254,9 +260,9 @@ optional = true
 
 [[targets.steps]]
 name = "create-plasmo"
-shell = "rm -rf plasmo-app && CI=1 npm create plasmo@latest plasmo-app"
+shell = "rm -rf plasmo-app && CI=1 bunx create-plasmo@latest plasmo-app"
 
 [[targets.steps]]
 name = "plasmo-build"
 cwd = "plasmo-app"
-shell = "npm install && npm run build"
+shell = "bun install && bun run build"
