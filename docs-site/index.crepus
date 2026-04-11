@@ -56,7 +56,7 @@ div min-h-screen overflow-x-hidden antialiased crepus-twilight-page
        "Crepuscularity Lite is a sibling project: a GPUI + V8 desktop shell with a Capacitor-shaped Rust bridge for embedding web UI in native apps — pair it with this CLI when you want a lighter native host than a full GPUI template tree."
       a href="https://github.com/semitechnological/crepuscularity-lite" no-underline text-sm font-medium crepus-t-text hover:opacity-85 border-b crepus-t-border transition-colors inline-block self-center sm:self-start rel="noopener noreferrer" target="_blank"
        "Crepuscularity Lite on GitHub →"
-    div hidden sm:block w-full max-w-[380px] min-w-0 mx-auto lg:mx-0 lg:justify-self-end order-last lg:order-none
+    div w-full max-w-[380px] min-w-0 mx-auto lg:mx-0 lg:justify-self-end order-last lg:order-none
      div rounded-xl border overflow-hidden shadow-xl crepus-t-border crepus-t-card
       div flex items-center gap-2 px-3 sm:px-4 py-2.5 sm:py-3 border-b crepus-t-border bg-[var(--cp-code)]
        span flex gap-1.5 shrink-0

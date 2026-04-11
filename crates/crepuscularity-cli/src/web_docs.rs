@@ -434,7 +434,6 @@ fn render_doc_shell(
     body {{
       margin: 0;
       min-height: 100vh;
-      overflow-x: hidden;
       background: var(--surface);
       color: var(--text);
       font-family: Inter, system-ui, sans-serif;
@@ -454,13 +453,12 @@ fn render_doc_shell(
       aside {{
         position: relative;
         top: auto;
-        width: 100%;
         max-height: none;
         overflow: visible;
         border-bottom: 1px solid var(--border);
         border-right: none;
-        padding: 0.9rem 0.9rem 0.8rem;
-        gap: 0.7rem;
+        padding: 1rem 1rem 1.1rem;
+        gap: 0.85rem;
       }}
       .doc-main {{
         padding: 1.25rem 1rem 3rem;
@@ -750,11 +748,11 @@ fn render_doc_shell(
         min-height: auto;
       }}
       aside {{
-        padding: 0.85rem 0.85rem 0.75rem;
-        gap: 0.6rem;
+        padding: 0.95rem 0.9rem 1rem;
+        gap: 0.75rem;
       }}
       .brand {{
-        font-size: 0.88rem;
+        font-size: 0.9rem;
       }}
       .doc-search-trigger {{
         padding: 0.6rem 0.7rem;
@@ -764,44 +762,33 @@ fn render_doc_shell(
         display: none;
       }}
       .doc-nav {{
-        display: flex;
-        flex-wrap: nowrap;
-        gap: 0.45rem;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.35rem 0.75rem;
         font-size: 0.82rem;
-        overflow-x: auto;
-        padding-bottom: 0.2rem;
-        -webkit-overflow-scrolling: touch;
       }}
       .doc-nav li {{
         margin: 0;
-        flex: 0 0 auto;
-      }}
-      .doc-nav a {{
-        padding: 0.45rem 0.7rem;
-        border: 1px solid var(--border);
-        border-radius: 999px;
-        background: color-mix(in srgb, var(--surface) 86%, white 14%);
-        white-space: nowrap;
       }}
       .doc-toc {{
-        display: none;
+        padding-top: 0.65rem;
       }}
       .doc-toc ul {{
         font-size: 0.78rem;
       }}
       .doc-main {{
-        padding: 1rem 0.85rem 2.25rem;
+        padding: 1.1rem 0.9rem 2.5rem;
       }}
       .prose h1 {{
-        font-size: 1.55rem;
-        margin-bottom: 0.8rem;
+        font-size: 1.65rem;
+        margin-bottom: 0.85rem;
       }}
       .prose h2 {{
-        font-size: 1.08rem;
-        margin-top: 1.35rem;
+        font-size: 1.15rem;
+        margin-top: 1.5rem;
       }}
       .prose h3 {{
-        font-size: 0.95rem;
+        font-size: 0.98rem;
       }}
       .prose p,
       .prose ul,
@@ -822,26 +809,26 @@ fn render_doc_shell(
         -webkit-overflow-scrolling: touch;
       }}
       .docs-landing .lede {{
-        font-size: 0.94rem;
-        margin-bottom: 1.25rem;
+        font-size: 0.95rem;
+        margin-bottom: 1.5rem;
       }}
       .doc-grid {{
         grid-template-columns: 1fr;
       }}
       .doc-card {{
-        padding: 0.95rem 1rem;
+        padding: 1rem 1.05rem;
       }}
       .footnote {{
-        margin-top: 1.25rem;
+        margin-top: 1.5rem;
       }}
       .doc-search-overlay {{
-        padding-top: 0.6rem;
+        padding-top: 0.75rem;
       }}
       .doc-search-dialog {{
         width: 100%;
       }}
       .doc-search-dialog input {{
-        padding: 0.85rem 0.95rem;
+        padding: 0.9rem 1rem;
       }}
     }}
   </style>
