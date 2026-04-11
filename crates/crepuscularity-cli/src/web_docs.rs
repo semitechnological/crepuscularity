@@ -434,6 +434,7 @@ fn render_doc_shell(
     body {{
       margin: 0;
       min-height: 100vh;
+      overflow-x: hidden;
       background: var(--surface);
       color: var(--text);
       font-family: Inter, system-ui, sans-serif;
@@ -448,11 +449,15 @@ fn render_doc_shell(
       min-height: 100vh;
       align-items: stretch;
     }}
+    .doc-shell > * {{
+      min-width: 0;
+    }}
     @media (max-width: 860px) {{
       .doc-shell {{ grid-template-columns: 1fr; }}
       aside {{
         position: relative;
         top: auto;
+        height: auto;
         max-height: none;
         overflow: visible;
         border-bottom: 1px solid var(--border);
@@ -477,6 +482,7 @@ fn render_doc_shell(
       display: flex;
       flex-direction: column;
       gap: 1rem;
+      min-width: 0;
     }}
     .brand {{
       font-weight: 700;
@@ -523,7 +529,13 @@ fn render_doc_shell(
       font-size: 0.875rem;
     }}
     .doc-nav li {{ margin: 0.35rem 0; }}
-    .doc-nav a {{ color: var(--muted); display: inline-block; }}
+    .doc-nav a {{
+      color: var(--muted);
+      display: block;
+      width: 100%;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }}
     .doc-nav a:hover {{ color: var(--text); }}
     .doc-nav a.active {{ color: var(--text); font-weight: 600; }}
     .doc-toc {{
@@ -549,8 +561,11 @@ fn render_doc_shell(
     .doc-toc li {{ margin: 0.3rem 0; }}
     .doc-toc a {{
       color: var(--muted);
-      display: inline-block;
+      display: block;
+      width: 100%;
       text-decoration: none;
+      overflow-wrap: anywhere;
+      word-break: break-word;
     }}
     .doc-toc a:hover {{ color: var(--text); text-decoration: underline; text-underline-offset: 2px; }}
     .doc-toc li.doc-toc-h3 {{
@@ -561,6 +576,7 @@ fn render_doc_shell(
     .doc-main {{
       padding: clamp(1.5rem, 3vw, 2.5rem) clamp(1rem, 3vw, 2.75rem) clamp(3.25rem, 5vw, 5rem);
       max-width: 52rem;
+      min-width: 0;
     }}
     .doc-main.doc-main--wide {{
       max-width: 74rem;
