@@ -453,27 +453,75 @@ fn render_doc_shell(
       min-width: 0;
     }}
     @media (max-width: 860px) {{
-      .doc-shell {{ grid-template-columns: 1fr; }}
+      .doc-shell {{ grid-template-columns: auto 1fr; }}
       aside {{
+        display: block;
+        width: 60px;
         position: relative;
-        top: auto;
-        height: auto;
-        max-height: none;
-        overflow: visible;
-        border-bottom: 1px solid var(--border);
-        border-right: none;
-        padding: 1rem 1rem 1.1rem;
-        gap: 0.85rem;
+        height: 100vh;
+        padding: 1rem 0.5rem;
+      }}
+      aside .doc-nav, aside .doc-toc, aside .doc-search-trigger, aside .doc-footer {{
+        display: none;
+      }}
+      aside.mobile-expanded {{
+        width: 280px;
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 100vh;
+        z-index: 100;
+        background: var(--surface);
+        padding: 1.5rem 1.25rem;
+      }}
+      aside.mobile-expanded .doc-nav, aside.mobile-expanded .doc-toc, aside.mobile-expanded .doc-search-trigger, aside.mobile-expanded .doc-footer {{
+        display: block;
+      }}
+      aside.mobile-expanded .doc-nav-close {{
+        display: block;
       }}
       .doc-main {{
         padding: 1.25rem 1rem 3rem;
       }}
     }}
+      .doc-main {{
+        padding: 1.25rem 1rem 3rem;
+      }}
+    }}
+    @media (max-width: 860px) {{
+      aside {{
+        display: none;
+      }}
+      aside.doc-nav-open {{
+        display: block;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 280px;
+        height: 100vh;
+        z-index: 100;
+        background: var(--surface);
+        box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+      }}
+    .doc-nav-close {{
+      display: none;
+    }}
+      aside.doc-nav-open ~ main .doc-nav-toggle {{
+        display: none;
+      }}
+    }}
+    @media (max-width: 860px) {{
+      aside.doc-nav-open .doc-nav-close {{
+        display: block;
+      }}
+    }}
+    }}
     aside {{
       position: sticky;
       top: 0;
       align-self: start;
-      height: 100vh;
+      height: 100%;
+      min-height: 100vh;
       max-height: 100vh;
       overflow-y: auto;
       padding: 1.5rem 1.25rem 1.35rem;
@@ -483,6 +531,12 @@ fn render_doc_shell(
       flex-direction: column;
       gap: 1rem;
       min-width: 0;
+    }}
+    aside.desktop-collapsed {{
+      width: 60px;
+    }}
+    aside.desktop-collapsed .doc-nav, aside.desktop-collapsed .doc-toc, aside.desktop-collapsed .doc-search-trigger, aside.desktop-collapsed .doc-footer {{
+      display: none;
     }}
     .brand {{
       font-weight: 700;
@@ -853,6 +907,7 @@ fn render_doc_shell(
   <div class="doc-shell">
     <aside>
       <a class="brand" href="../index.html">{esc_site}</a>
+      <button class="doc-nav-toggle" onclick="toggleDocNav()">☰</button>
       <button type="button" class="doc-search-trigger" id="doc-search-open" aria-label="Open documentation search">
         <span>Search…</span>
         <kbd>⌘K</kbd>
@@ -867,6 +922,7 @@ fn render_doc_shell(
       </footer>
     </aside>
     <main class="{main_cls}">
+      <button class="doc-nav-toggle" id="doc-nav-toggle" aria-label="Toggle navigation" onclick="toggleDocNav()">☰</button>
       {main_inner}
     </main>
   </div>
@@ -877,6 +933,16 @@ fn render_doc_shell(
     </div>
   </div>
   <script>__CREPUS_DOCS_SEARCH__</script>
+  <script>
+    function toggleDocNav() {{
+      var aside = document.querySelector('aside');
+      if (window.innerWidth <= 860) {{
+        aside.classList.toggle('mobile-expanded');
+      }} else {{
+        aside.classList.toggle('desktop-collapsed');
+      }}
+    }}
+  </script>
 </body>
 </html>"#,
         esc_site = esc_site,

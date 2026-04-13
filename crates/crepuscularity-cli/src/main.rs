@@ -14,7 +14,15 @@
 //!   crepus webext manifest [--app PATH]          print manifest.json
 //!   crepus ios new NAME                      XcodeGen + SwiftPM NativeShell host app
 //!   crepus ios generate [--dir PATH]         run xcodegen (brew install xcodegen)
-//!   crepus ios build [--dir] [--scheme] [...]  xcodegen + xcodebuild (simulator)
+//!   crepus ios build [--dir] [--scheme] [...]  xcodegen + xcodebuild; toml = defaults
+//!   crepus tui new NAME                         scaffold TUI app with Ratatui
+//!   crepus tui build [--release]                 build TUI app
+//!   crepus tui run                               run TUI app
+//!   crepus native new NAME                       scaffold cross-platform native app
+//!   crepus native build ios [--scheme S]         build iOS app
+//!   crepus native build android [--flavor F]     build Android app
+//!   crepus native run ios                        run iOS app (Xcode)
+//!   crepus native run android                    install Android app
 //!   crepus benchmark [all|run|check] [flags…]    benchmark.toml run or prereq check (examples/benchmarks)
 
 mod benchmark;
@@ -29,9 +37,11 @@ pub mod events;
 #[cfg(feature = "desktop")]
 mod hud;
 mod ios;
+mod native;
 mod new;
 mod render;
 pub mod ui;
+mod tui;
 mod wasm_bundle;
 mod web;
 mod web_docs;
@@ -147,6 +157,14 @@ fn main() {
             ios::run(&args[2..]);
         }
 
+        Some("tui") => {
+            tui::run(&args[2..]);
+        }
+
+        Some("native") => {
+            native::run(&args[2..]);
+        }
+
         Some("benchmark") => match args.get(2).map(|s| s.as_str()) {
             Some("check") => benchmark::run_check(args.get(3..).unwrap_or(&[])),
             _ => benchmark::run(args.get(2..).unwrap_or(&[])),
@@ -242,6 +260,31 @@ fn print_usage() {
         "  {}  {}",
         style("ios build [--dir] [--scheme] [...]     ").green(),
         style("xcodegen + xcodebuild; toml = defaults").dim()
+    );
+    eprintln!(
+        "  {}  {}",
+        style("tui new <name>                         ").green(),
+        style("scaffold TUI app with Ratatui").dim()
+    );
+    eprintln!(
+        "  {}  {}",
+        style("tui build [--release]                   ").green(),
+        style("build TUI app").dim()
+    );
+    eprintln!(
+        "  {}  {}",
+        style("native new <name>                       ").green(),
+        style("scaffold native iOS/Android app").dim()
+    );
+    eprintln!(
+        "  {}  {}",
+        style("native build ios [--scheme]             ").green(),
+        style("build native iOS app").dim()
+    );
+    eprintln!(
+        "  {}  {}",
+        style("native build android [--flavor]         ").green(),
+        style("build native Android app").dim()
     );
     eprintln!(
         "  {}  {}",

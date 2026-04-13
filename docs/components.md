@@ -23,12 +23,49 @@ div rounded-lg border border-zinc-700 p-4
       "No content provided"
 ```
 
+Or in JSX syntax:
+
+```jsx
+// components/card.crepus
+let-default subtitle = ""
+
+<div class="rounded-lg border border-zinc-700 p-4">
+  <div class="font-bold">{title}</div>
+  <if condition={subtitle}>
+    <div class="text-sm text-zinc-400">{subtitle}</div>
+  </if>
+  <slot>
+    <div class="text-zinc-500 italic">No content provided</div>
+  </slot>
+</div>
+```
+
 Include from another template:
 
 ```text
 include components/card.crepus title="Dashboard" subtitle="Overview"
   div p-4
     "Card body content"
+```
+
+Or using fragment syntax for multi-component files:
+
+```text
+include ui.crepus#Card title="Settings"
+  div
+    "Settings content"
+```
+
+In JSX syntax:
+
+```jsx
+<include src="components/card.crepus" title="Dashboard" subtitle="Overview">
+  <div class="p-4">Card body content</div>
+</include>
+
+<include src="ui.crepus#Card" title="Settings">
+  <div>Settings content</div>
+</include>
 ```
 
 ## Multi-Component Files

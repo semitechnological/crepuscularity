@@ -6,6 +6,8 @@
 //! - [`style`] — Tailwind-like class → style hints (extend here for GPUI parity).
 //! - [`include_expand`] — `include` → `(Vec<Node>, TemplateContext)` without IR cycles.
 //! - [`render`] — AST lowering and public `render_*` entry points.
+//! - [`mutations`] — renderer-agnostic, path-based IR mutations and diffing.
+//! - [`hot_reload`] — structured hot-reload protocol + conservative AST gate.
 //!
 //! ## Sharing / codegen (bindgen, other repos)
 //! - **[`bindgen`](https://docs.rs/bindgen)** generates **Rust FFI** from **C/C++ headers**. It does
@@ -19,12 +21,16 @@
 //! ## Coverage vs GPUI / web
 //! Not 100% parity with GPUI `styler.rs`—expand [`style`].
 
+pub mod hot_reload;
 mod include_expand;
 pub mod ir;
+pub mod mutations;
 mod render;
 pub mod style;
 
+pub use hot_reload::{ast_shape_compatible, plan_hot_reload, HotReloadEnvelope, HotReloadMessage};
 pub use ir::{StackAxis, ViewIr, ViewNode, ViewStyle, IR_VERSION};
+pub use mutations::{apply_mutations, diff_ir, IrMutation};
 pub use render::{
     render_component_file_to_ir, render_from_files, render_nodes_to_ir, render_template_to_ir,
 };

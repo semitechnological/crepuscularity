@@ -33,6 +33,9 @@ use std::time::{Duration, Instant};
 
 use notify::{Event, EventKind, RecursiveMode, Watcher};
 
+use rayon::iter::IntoParallelRefIterator;
+use rayon::iter::ParallelIterator;
+
 use serde_json::json;
 
 use crepuscularity_core::context::TemplateContext;
@@ -128,8 +131,18 @@ const RELOAD_SCRIPT: &str = "<script>
   es.addEventListener('crepus-reload',function(e){
     dismissErrorOverlay();
     var info={};try{info=JSON.parse(e.data);}catch(_){}
-    showToast('\u{21bb} '+(info.file||'template')+' updated');
-    setTimeout(function(){location.reload();},150);
+    if (info.file && info.file.includes('runtime')) {
+      showToast('\u{21bb} '+(info.file||'template')+' updated');
+      setTimeout(function(){location.reload();},150);
+    } else {
+      fetch('./crepus-bundle.json', {cache: 'no-store'}).then(r => r.json()).then(function(bundle) {
+        currentBundle = bundle;
+        rerender();
+        showToast('\u{21bb} '+(info.file||'template')+' updated');
+      }).catch(function(){
+        location.reload();
+      });
+    }
   });
   es.addEventListener('crepus-error',function(e){
     showErrorOverlay(e.data.replace(/\\\\n/g,'\\n'));
@@ -178,9 +191,17 @@ pub fn run(opts: ServeOptions) {
     let site_dir = std::fs::canonicalize(&opts.site_dir).unwrap_or_else(|_| opts.site_dir.clone());
 
     // Validate all templates at startup.
+    let validate_start = Instant::now();
     eprintln!("\n  {} validating templates…", console::style("→").dim());
     validate_templates(&site_dir);
+    let validate_elapsed = validate_start.elapsed();
+    eprintln!(
+        "  {} templates validated in {:.2}s",
+        console::style("✓").green(),
+        validate_elapsed.as_secs_f64()
+    );
 
+    let wasm_start = Instant::now();
     eprintln!(
         "  {} compiling dev WASM → {}",
         console::style("→").dim(),
@@ -190,9 +211,11 @@ pub fn run(opts: ServeOptions) {
         eprintln!("  {} {}", console::style("✗").red().bold(), e);
         std::process::exit(1);
     }
+    let wasm_elapsed = wasm_start.elapsed();
     eprintln!(
-        "  {} UnoCSS, app.js, and pkg/ ready",
-        console::style("✓").green()
+        "  {} UnoCSS, app.js, and pkg/ ready in {:.2}s",
+        console::style("✓").green(),
+        wasm_elapsed.as_secs_f64()
     );
 
     let dev_root = site_dir.join(crate::web::WEB_DEV_ARTIFACT_DIR);
@@ -291,11 +314,24 @@ pub fn run(opts: ServeOptions) {
 
 /// Walk `site_dir` recursively and load every `*.crepus` file into `vfm`.
 fn load_all_crepus(site_dir: &Path, vfm: &Arc<RwLock<HashMap<String, String>>>) {
+    let mut paths = vec![];
+    load_dir_recursive_collect(site_dir, site_dir, &mut paths);
+    let results: Vec<(String, String)> = paths
+        .par_iter()
+        .filter_map(|path| {
+            std::fs::read_to_string(path).ok().map(|content| {
+                let key = relative_key(site_dir, path);
+                (key, content)
+            })
+        })
+        .collect();
     let mut map = vfm.write().unwrap();
-    load_dir_recursive(site_dir, site_dir, &mut map);
+    for (key, content) in results {
+        map.insert(key, content);
+    }
 }
 
-fn load_dir_recursive(root: &Path, dir: &Path, map: &mut HashMap<String, String>) {
+fn load_dir_recursive_collect(root: &Path, dir: &Path, paths: &mut Vec<PathBuf>) {
     let Ok(entries) = std::fs::read_dir(dir) else {
         return;
     };
@@ -309,12 +345,9 @@ fn load_dir_recursive(root: &Path, dir: &Path, map: &mut HashMap<String, String>
             ) {
                 continue;
             }
-            load_dir_recursive(root, &path, map);
+            load_dir_recursive_collect(root, &path, paths);
         } else if path.extension().is_some_and(|e| e == "crepus") {
-            if let Ok(content) = std::fs::read_to_string(&path) {
-                let key = relative_key(root, &path);
-                map.insert(key, content);
-            }
+            paths.push(path);
         }
     }
 }
@@ -380,7 +413,7 @@ fn start_watcher(
                     EventKind::Modify(_) | EventKind::Create(_) | EventKind::Remove(_)
                 ) {
                     for path in &event.paths {
-                        if path.extension().is_some_and(|e| e == "crepus") {
+                        if path.extension().and_then(|e| e.to_str()) == Some("crepus") {
                             let _ = tx2.send(WatchEvent::Crepus(path.clone()));
                         } else if is_runtime_source_path(&site_for_filter, path) {
                             let _ = tx2.send(WatchEvent::RuntimeDirty);
@@ -424,6 +457,7 @@ fn start_watcher(
                     if last_event.elapsed() < Duration::from_millis(50) {
                         continue;
                     }
+                    let apply_start = Instant::now();
                     let mut changed = 0usize;
                     let mut last_crepus_path: Option<PathBuf> = None;
 
@@ -478,9 +512,24 @@ fn start_watcher(
                             *msg = sse;
                         }
                         generation.fetch_add(1, Ordering::Release);
-                        let _span =
-                            tracing::info_span!("hot_reload", changed_files = changed).entered();
-                        tracing::info!(changed_files = changed, "hot reloaded");
+                        let elapsed = apply_start.elapsed();
+                        let _span = tracing::info_span!(
+                            "hot_reload",
+                            changed_files = changed,
+                            duration_ms = elapsed.as_millis()
+                        )
+                        .entered();
+                        tracing::info!(
+                            changed_files = changed,
+                            duration_ms = elapsed.as_millis(),
+                            "hot reloaded"
+                        );
+                        eprintln!(
+                            "  {} hot reloaded {} files in {:.2}s",
+                            console::style("✓").green(),
+                            changed,
+                            elapsed.as_secs_f64()
+                        );
                     }
                 }
                 Err(mpsc::RecvTimeoutError::Disconnected) => break,
@@ -507,7 +556,7 @@ fn start_docs_markdown_watcher(
                     EventKind::Modify(_) | EventKind::Create(_) | EventKind::Remove(_)
                 ) {
                     for path in &event.paths {
-                        if path.extension().is_some_and(|e| e == "md") {
+                        if path.extension().and_then(|e| e.to_str()) == Some("md") {
                             let _ = tx2.send(path.clone());
                         }
                     }

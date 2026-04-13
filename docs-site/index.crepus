@@ -1,7 +1,7 @@
 google-fonts "Inter" "JetBrains Mono"
 
 div min-h-screen overflow-x-hidden antialiased crepus-twilight-page
- main max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 w-full min-w-0
+ main max-w-[896px] sm:max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 min-w-0
   div flex items-center gap-3 pt-6 sm:pt-8 pb-2 crepus-entrance crepus-e1
    a href="./index.html" flex items-center gap-3 group shrink-0 no-underline crepus-t-text hover:opacity-90
     img src="./static/favicon.svg" alt="" w-9 h-9 sm:w-10 sm:h-10 shrink-0 rounded-lg
@@ -56,7 +56,7 @@ div min-h-screen overflow-x-hidden antialiased crepus-twilight-page
        "Crepuscularity Lite is a sibling project: a GPUI + V8 desktop shell with a Capacitor-shaped Rust bridge for embedding web UI in native apps — pair it with this CLI when you want a lighter native host than a full GPUI template tree."
       a href="https://github.com/semitechnological/crepuscularity-lite" no-underline text-sm font-medium crepus-t-text hover:opacity-85 border-b crepus-t-border transition-colors inline-block self-center sm:self-start rel="noopener noreferrer" target="_blank"
        "Crepuscularity Lite on GitHub →"
-    div w-full max-w-[380px] min-w-0 mx-auto lg:mx-0 lg:justify-self-end order-last lg:order-none
+    div w-full min-w-0 mx-auto lg:mx-0 lg:justify-self-end order-last lg:order-none
      div rounded-xl border overflow-hidden shadow-xl crepus-t-border crepus-t-card
       div flex items-center gap-2 px-3 sm:px-4 py-2.5 sm:py-3 border-b crepus-t-border bg-[var(--cp-code)]
        span flex gap-1.5 shrink-0
@@ -65,15 +65,15 @@ div min-h-screen overflow-x-hidden antialiased crepus-twilight-page
         span w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full opacity-30 bg-[var(--cp-muted)]
        span text-xs font-mono crepus-t-muted ml-1 truncate
         "terminal"
-      pre font-mono text-[11px] sm:text-[13px] leading-relaxed p-3 sm:p-4 m-0 crepus-t-pre whitespace-pre-wrap overflow-x-auto
-       "# New desktop app\n$ crepus new my-app && cargo run\n\n# WASM site (this page)\n$ crepus web build --site docs-site\n\n# Browser extension\n$ crepus webext new ext"
+       pre font-mono text-[11px] sm:text-[13px] leading-relaxed p-3 sm:p-4 m-0 crepus-t-pre whitespace-pre overflow-x-visible
+         "# New desktop app\n$ crepus new my-app && cargo run\n\n# WASM site (this page)\n$ crepus web build --site docs-site\n\n# Browser extension\n$ crepus webext new ext"
 
   section py-10 sm:py-14 border-t crepus-t-border crepus-entrance crepus-e3
    div flex flex-col lg:flex-row lg:items-stretch gap-5 sm:gap-6 lg:gap-8
     div flex-1 rounded-xl p-5 sm:p-8 crepus-t-card
      p text-xs font-semibold uppercase tracking-widest crepus-t-muted mb-3 sm:mb-4
       "Why it's different"
-     p text-xl sm:text-2xl md:text-3xl font-semibold crepus-t-text leading-snug mb-4 sm:mb-5
+      p text-xl sm:text-2xl md:text-3xl font-semibold crepus-t-text leading-snug mb-4 sm:mb-5 transition-all duration-300 ease-in-out
       slot-rotate interval={3000} slot-lede
        "Hot-reloadable templates on GPUI."
        "No JS bundler for extensions."
@@ -115,7 +115,7 @@ div min-h-screen overflow-x-hidden antialiased crepus-twilight-page
     "Curly braces in snippets use Unicode ｛ ｝ where the real sources use ASCII so this page stays valid .crepus."
    p text-sm crepus-t-muted mb-8 max-w-2xl m-0
     "Indent DSL, TSX-shaped tags, or GPUI’s compile-time macro — one AST, your pick."
-   div grid gap-4 lg:grid-cols-3
+   div grid gap-4 grid-cols-1 lg:grid-cols-3
     div rounded-xl p-4 flex flex-col crepus-t-card
      p text-xs font-semibold crepus-t-muted uppercase tracking-wide mb-2 m-0
       "Indent · .crepus"
@@ -172,7 +172,7 @@ div min-h-screen overflow-x-hidden antialiased crepus-twilight-page
       "MV3 toolchain"
 
  footer border-t py-8 sm:py-10 crepus-t-border crepus-entrance crepus-e6
-  div max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 footer-row
+  div max-w-full sm:max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 footer-row
    div flex flex-col gap-2
     a href="./index.html" flex items-center gap-2 no-underline crepus-t-text hover:opacity-90
      img src="./static/favicon.svg" alt="" w-7 h-7 shrink-0 rounded-md

@@ -12,6 +12,9 @@ const delegatedEvents = [
   "scroll",
 ];
 
+let currentBundle = null;
+let currentRoot = null;
+
 function setRootHtml(root, html) {
   const doc = new DOMParser().parseFromString(html, "text/html");
   root.replaceChildren(...doc.body.childNodes);
@@ -55,6 +58,10 @@ function initSlotRotate(root) {
   inner.textContent = words[0];
   el.appendChild(inner);
 
+  el.style.display = 'inline-block';
+  el.style.width = el.offsetWidth + 'px';
+  el.style.transition = 'width 0.3s ease-in-out';
+
   let i = 0;
   const intervalAttr = el.getAttribute("data-slot-interval");
   const duration = intervalAttr ? Number(intervalAttr) || 3200 : 3200;
@@ -62,17 +69,14 @@ function initSlotRotate(root) {
   const tick = () => {
     i = (i + 1) % words.length;
     inner.style.transition =
-      "transform 0.38s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.32s ease, filter 0.32s ease";
-    inner.style.transform = "translateY(0.35em)";
+      "opacity 0.32s ease, filter 0.32s ease";
     inner.style.opacity = "0";
     inner.style.filter = "blur(6px)";
 
     window.setTimeout(() => {
       inner.textContent = words[i];
-      inner.style.transform = "translateY(-0.35em)";
-      inner.style.opacity = "0";
+      el.style.width = el.offsetWidth + 'px';
       requestAnimationFrame(() => {
-        inner.style.transform = "translateY(0)";
         inner.style.opacity = "1";
         inner.style.filter = "blur(0)";
       });
@@ -116,11 +120,19 @@ function initDelegatedEvents(root) {
 
       Promise.resolve()
         .then(() => handler())
+        .then(() => rerender())
         .catch((error) => {
           console.error(`crepus event handler failed: ${handlerName}`, error);
         });
     });
   }
+}
+
+function rerender() {
+  if (!currentRoot || !currentBundle) return;
+  setRootHtml(currentRoot, runtime.crepus_render(JSON.stringify(currentBundle)));
+  initDelegatedEvents(currentRoot);
+  initInteractive(currentRoot);
 }
 
 async function main() {
@@ -130,10 +142,11 @@ async function main() {
     throw new Error(`crepus-bundle.json: HTTP ${res.status}`);
   }
   const bundle = await res.json();
-  const html = runtime.crepus_render(JSON.stringify(bundle));
+  currentBundle = bundle;
   const root = document.getElementById("crepus-root");
   if (root) {
-    setRootHtml(root, html);
+    currentRoot = root;
+    setRootHtml(root, runtime.crepus_render(JSON.stringify(bundle)));
     initDelegatedEvents(root);
     initInteractive(root);
   }

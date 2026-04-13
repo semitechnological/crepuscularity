@@ -33,6 +33,7 @@ crepuscularity-core    = { path = "../crepuscularity-core", version = "0.3.1" }
 crepuscularity-runtime = { path = "../crepuscularity-runtime", version = "0.3.1", optional = true }
 crepuscularity-web     = { path = "../crepuscularity-web", version = "0.3.2" }
 crepuscularity-webext  = { path = "../crepuscularity-webext", version = "0.1.2" }
+crepuscularity-native  = { path = "../crepuscularity-native", version = "0.3.1" }
 notify                 = { workspace = true }
 walkdir                = { workspace = true }
 serde                  = { workspace = true }
@@ -42,9 +43,9 @@ console                = { workspace = true }
 indicatif              = { workspace = true }
 tracing                = { workspace = true }
 tracing-subscriber     = { workspace = true }
-pulldown-cmark         = "0.13"
+ rayon                  = { workspace = true }
 ratatui = { version = "0.29", default-features = false, features = ["crossterm"] }
-crossterm = "0.28"
+pulldown-cmark = "0.11"
 
 [dev-dependencies]
 tempfile = { workspace = true }
