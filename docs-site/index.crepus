@@ -120,7 +120,7 @@ div min-h-screen overflow-x-hidden antialiased crepus-twilight-page
      p text-xs font-semibold crepus-t-muted uppercase tracking-wide mb-2 m-0
       "Indent · .crepus"
      pre font-mono text-[10px] sm:text-xs m-0 flex-1 leading-relaxed crepus-t-pre p-3 rounded-lg whitespace-pre-wrap overflow-x-auto
-      "div flex flex-col gap-3\n  div text-xl font-bold\n  \"Hello ｛name｝\""
+      "div flex flex-col gap-3\n  div text-xl font-bold\n   \"Hello ｛name｝\""
     div rounded-xl p-4 flex flex-col crepus-t-card
      p text-xs font-semibold crepus-t-muted uppercase tracking-wide mb-2 m-0
       "JSX-style tags"
