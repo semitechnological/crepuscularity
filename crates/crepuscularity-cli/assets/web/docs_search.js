@@ -11,11 +11,13 @@
 
   // Resolve against the docs *directory* (not the HTML filename) so GitHub Pages
   // paths like /repo/docs/cli.html load /repo/docs/docs-search-index.json.
-  var INDEX_URL = (function () {
+  var INDEX_URLS = (function () {
     try {
       var page = new URL(window.location.href);
       var path = page.pathname;
       var dir;
+      var urls = [];
+      var inDocs = path.indexOf("/docs/") >= 0;
       if (path === "" || path.endsWith("/")) {
         dir = path;
       } else if (/\.html?$/i.test(path)) {
@@ -24,9 +26,18 @@
         dir = path.endsWith("/") ? path : path + "/";
       }
       var base = new URL(dir || "/", page.origin);
-      return new URL("docs-search-index.json", base).href;
+      if (inDocs) {
+        urls.push(new URL("docs-search-index.json", base).href);
+        urls.push(new URL("../docs-search-index.json", base).href);
+        urls.push(new URL("/docs/docs-search-index.json", page.origin).href);
+      } else {
+        urls.push(new URL("docs/docs-search-index.json", base).href);
+        urls.push(new URL("/docs/docs-search-index.json", page.origin).href);
+        urls.push(new URL("docs-search-index.json", base).href);
+      }
+      return urls;
     } catch (err) {
-      return "docs-search-index.json";
+      return ["docs-search-index.json", "docs/docs-search-index.json"];
     }
   })();
 
@@ -45,23 +56,33 @@
   function load() {
     if (loaded) return Promise.resolve();
     loadError = "";
-    return fetch(INDEX_URL, { cache: "no-store" })
-      .then(function (r) {
-        if (!r.ok) {
-          throw new Error("HTTP " + r.status);
-        }
-        return r.json();
-      })
-      .then(function (d) {
-        index = Array.isArray(d.entries) ? d.entries : [];
-        loaded = true;
-      })
-      .catch(function (e) {
-        loadError = e.message || "fetch failed";
-        index = [];
-        loaded = true;
-        console.warn("[crepus docs] search index:", loadError, INDEX_URL);
-      });
+    function tryNext(i) {
+      if (i >= INDEX_URLS.length) {
+        return Promise.reject(new Error("search index not found"));
+      }
+      return fetch(INDEX_URLS[i], { cache: "no-store" })
+        .then(function (r) {
+          if (!r.ok) {
+            throw new Error("HTTP " + r.status);
+          }
+          return r.json();
+        })
+        .then(function (d) {
+          index = Array.isArray(d.entries) ? d.entries : [];
+          loaded = true;
+        })
+        .catch(function (e) {
+          if (i + 1 < INDEX_URLS.length) {
+            return tryNext(i + 1);
+          }
+          loadError = e.message || "fetch failed";
+          index = [];
+          loaded = true;
+          console.warn("[crepus docs] search index:", loadError, INDEX_URLS[0]);
+        });
+    }
+
+    return tryNext(0);
   }
 
   function score(q, s) {
@@ -209,7 +230,3 @@
 
   setOverlayVisible(false);
 })();
-
-function toggleDocNav() {
-  document.querySelector('.doc-shell').classList.toggle('doc-shell--nav-hidden');
-}
