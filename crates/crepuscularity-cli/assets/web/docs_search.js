@@ -209,3 +209,7 @@
 
   setOverlayVisible(false);
 })();
+
+function toggleDocNav() {
+  document.querySelector('.doc-shell').classList.toggle('doc-shell--nav-hidden');
+}

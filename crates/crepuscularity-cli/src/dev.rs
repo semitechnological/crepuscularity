@@ -150,6 +150,9 @@ fn background_loop(
                                 s.status = DevStatus::Exited { code };
                             }
                             child = None;
+                            if code.is_some() {
+                                break;
+                            }
                         }
                         Ok(None) => {}
                         Err(_) => child = None,

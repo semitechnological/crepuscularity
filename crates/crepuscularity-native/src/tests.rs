@@ -3,7 +3,10 @@ use std::collections::HashMap;
 use crepuscularity_core::TemplateContext;
 use serde_json::json;
 
-use crate::{render_from_files, render_template_to_ir, to_json, ViewIr, IR_VERSION};
+use crate::{
+    apply_mutations, ast_shape_compatible, diff_ir, plan_hot_reload, render_from_files,
+    render_template_to_ir, to_json, HotReloadMessage, ViewIr, IR_VERSION,
+};
 
 #[test]
 fn plain_text_stack() {
@@ -116,4 +119,52 @@ fn render_from_files_entry() {
     files.insert("main.crepus".into(), "div\n  \"ok\"".into());
     let ir = render_from_files(&files, "main.crepus", &TemplateContext::new()).unwrap();
     assert_eq!(ir.root.len(), 1);
+}
+
+#[test]
+fn ir_patch_round_trip_text_update() {
+    let old = render_template_to_ir("div\n  \"Hello\"", &TemplateContext::new()).unwrap();
+    let new = render_template_to_ir("div\n  \"Hello world\"", &TemplateContext::new()).unwrap();
+
+    let patch = diff_ir(&old, &new);
+    assert!(!patch.is_empty());
+
+    let mut applied = old.clone();
+    apply_mutations(&mut applied, &patch).unwrap();
+    assert_eq!(applied, new);
+}
+
+#[test]
+fn ast_gate_rejects_control_flow_condition_changes() {
+    let old = crepuscularity_core::parse_template("if {a}\n  \"x\"\nelse\n  \"y\"").unwrap();
+    let new = crepuscularity_core::parse_template("if {b}\n  \"x\"\nelse\n  \"y\"").unwrap();
+    assert!(!ast_shape_compatible(&old, &new));
+}
+
+#[test]
+fn plan_hot_reload_returns_patch_for_literal_changes() {
+    let msg = plan_hot_reload(
+        "div\n  \"Hello\"",
+        "div\n  \"Hello world\"",
+        &TemplateContext::new(),
+    );
+    match msg {
+        HotReloadMessage::Patch { mutations } => assert!(!mutations.is_empty()),
+        other => panic!("expected Patch, got {other:?}"),
+    }
+}
+
+#[test]
+fn plan_hot_reload_falls_back_to_full_reload_for_semantic_changes() {
+    let msg = plan_hot_reload(
+        "if {a}\n  div\n    \"x\"",
+        "if {b}\n  div\n    \"x\"",
+        &TemplateContext::new(),
+    );
+    match msg {
+        HotReloadMessage::FullReload { reason, .. } => {
+            assert!(reason.contains("semantics"));
+        }
+        other => panic!("expected FullReload, got {other:?}"),
+    }
 }
