@@ -485,9 +485,9 @@ impl Platform for MacPlatform {
         unsafe {
             let app: id = msg_send![APP_CLASS, sharedApplication];
             let app_delegate: id = msg_send![APP_DELEGATE_CLASS, new];
-            app.setDelegate_(app_delegate);
 
             PLATFORM = Some(self as *const _);
+            app.setDelegate_(app_delegate);
             let pool = NSAutoreleasePool::new(nil);
             app.run();
             pool.drain();
