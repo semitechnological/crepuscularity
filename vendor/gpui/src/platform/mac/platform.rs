@@ -487,16 +487,9 @@ impl Platform for MacPlatform {
             let app_delegate: id = msg_send![APP_DELEGATE_CLASS, new];
             app.setDelegate_(app_delegate);
 
-            let self_ptr = self as *const Self as *const c_void;
-            (*app).set_ivar(MAC_PLATFORM_IVAR, self_ptr);
-            (*app_delegate).set_ivar(MAC_PLATFORM_IVAR, self_ptr);
-
             let pool = NSAutoreleasePool::new(nil);
             app.run();
             pool.drain();
-
-            (*app).set_ivar(MAC_PLATFORM_IVAR, null_mut::<c_void>());
-            (*app_delegate).set_ivar(MAC_PLATFORM_IVAR, null_mut::<c_void>());
         }
     }
 

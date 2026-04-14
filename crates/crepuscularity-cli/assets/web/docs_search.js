@@ -11,35 +11,7 @@
 
   // Resolve against the docs *directory* (not the HTML filename) so GitHub Pages
   // paths like /repo/docs/cli.html load /repo/docs/docs-search-index.json.
-  var INDEX_URLS = (function () {
-    try {
-      var page = new URL(window.location.href);
-      var path = page.pathname;
-      var dir;
-      var urls = [];
-      var inDocs = path.indexOf("/docs/") >= 0;
-      if (path === "" || path.endsWith("/")) {
-        dir = path;
-      } else if (/\.html?$/i.test(path)) {
-        dir = path.replace(/[^/]+$/, "");
-      } else {
-        dir = path.endsWith("/") ? path : path + "/";
-      }
-      var base = new URL(dir || "/", page.origin);
-      if (inDocs) {
-        urls.push(new URL("docs-search-index.json", base).href);
-        urls.push(new URL("../docs-search-index.json", base).href);
-        urls.push(new URL("/docs/docs-search-index.json", page.origin).href);
-      } else {
-        urls.push(new URL("docs/docs-search-index.json", base).href);
-        urls.push(new URL("/docs/docs-search-index.json", page.origin).href);
-        urls.push(new URL("docs-search-index.json", base).href);
-      }
-      return urls;
-    } catch (err) {
-      return ["docs-search-index.json", "docs/docs-search-index.json"];
-    }
-  })();
+  var INDEX_URLS = ["./docs-search-index.json", "/docs/docs-search-index.json", "../docs-search-index.json"];
 
   var HIDDEN_CLASS = "doc-search-overlay--hidden";
 

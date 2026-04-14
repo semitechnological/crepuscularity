@@ -78,9 +78,14 @@ mod macos {
 
     fn generate_dispatch_bindings() {
         println!("cargo:rustc-link-lib=framework=System");
+        println!("cargo:rerun-if-env-changed=SDKROOT");
+
+        let sdk_path = macos_sdk_path();
 
         let bindings = bindgen::Builder::default()
             .header("src/platform/mac/dispatch.h")
+            .clang_arg("-isysroot")
+            .clang_arg(&sdk_path)
             .allowlist_var("_dispatch_main_q")
             .allowlist_var("_dispatch_source_type_data_add")
             .allowlist_var("DISPATCH_QUEUE_PRIORITY_HIGH")
@@ -105,6 +110,33 @@ mod macos {
         bindings
             .write_to_file(out_path.join("dispatch_sys.rs"))
             .expect("couldn't write dispatch bindings");
+    }
+
+    fn macos_sdk_path() -> String {
+        use std::process::Command;
+
+        if let Ok(sdkroot) = env::var("SDKROOT") {
+            if !sdkroot.is_empty() {
+                return sdkroot;
+            }
+        }
+
+        let output = Command::new("xcrun")
+            .args(["-sdk", "macosx", "--show-sdk-path"])
+            .output()
+            .expect("failed to invoke xcrun to locate the macOS SDK");
+
+        if !output.status.success() {
+            panic!(
+                "xcrun failed to locate the macOS SDK:\n{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+        }
+
+        String::from_utf8(output.stdout)
+            .expect("macOS SDK path was not valid UTF-8")
+            .trim()
+            .to_owned()
     }
 
     fn generate_shader_bindings() -> PathBuf {

@@ -901,7 +901,6 @@ fn render_doc_shell(
         padding: 0.9rem 1rem;
       }}
     }}
-    /* Navigation + search overrides for responsive docs shells. */
     .doc-sidebar-header {{
       display: flex;
       align-items: center;
@@ -927,12 +926,8 @@ fn render_doc_shell(
     .doc-nav-toggle:hover {{
       border-color: color-mix(in srgb, var(--text) 25%, var(--border));
     }}
-    .doc-nav-toggle--main {{
-      display: none;
-    }}
-    .doc-nav-toggle--sidebar {{
-      display: inline-flex;
-    }}
+    .doc-nav-toggle--main {{ display: none; }}
+    .doc-nav-toggle--sidebar {{ display: inline-flex; }}
     aside.desktop-collapsed {{
       width: 72px;
       padding-inline: 0.75rem;
@@ -946,53 +941,48 @@ fn render_doc_shell(
     aside.desktop-collapsed .doc-sidebar-header {{
       justify-content: center;
     }}
+    aside {{
+      position: sticky;
+      top: 0;
+      align-self: stretch;
+      height: 100vh;
+      min-height: 100vh;
+      overflow-y: auto;
+    }}
+    .doc-main {{ min-width: 0; }}
+    .doc-search-trigger {{ min-width: 0; }}
     @media (max-width: 860px) {{
-      .doc-shell {{
-        grid-template-columns: 1fr;
-      }}
-      aside {{
-        position: fixed;
-        inset: 0 auto 0 0;
-        width: min(82vw, 320px);
-        transform: translateX(-105%);
-        transition: transform 0.2s ease;
-        z-index: 100;
-        box-shadow: 2px 0 16px rgba(0, 0, 0, 0.18);
-      }}
-      aside.mobile-expanded {{
-        transform: translateX(0);
-      }}
-      aside .doc-nav,
-      aside .doc-toc,
-      aside .doc-search-trigger,
-      aside .doc-footer {{
-        display: none;
-      }}
-      aside.mobile-expanded .doc-nav,
-      aside.mobile-expanded .doc-toc,
-      aside.mobile-expanded .doc-search-trigger,
-      aside.mobile-expanded .doc-footer {{
-        display: block;
-      }}
-      aside.mobile-expanded .doc-search-trigger {{
-        display: flex;
-      }}
+      .doc-shell {{ grid-template-columns: 1fr; }}
       .doc-nav-toggle--main {{
+        display: inline-flex;
         position: fixed;
         top: 0.9rem;
         left: 0.9rem;
         z-index: 101;
-        display: inline-flex;
       }}
-      .doc-nav-toggle--sidebar {{
-        display: inline-flex;
+      aside {{
+        position: fixed;
+        inset: 0 auto 0 0;
+        width: min(84vw, 320px);
+        transform: translateX(-105%);
+        transition: transform 0.2s ease;
+        z-index: 100;
+        box-shadow: 2px 0 16px rgba(0, 0, 0, 0.18);
+        height: 100vh;
       }}
-      .doc-main {{
-        padding: 1.25rem 1rem 3rem;
-      }}
-      .doc-search-trigger {{
-        width: 100%;
-      }}
+      aside.mobile-expanded {{ transform: translateX(0); }}
+      aside .doc-nav,
+      aside .doc-toc,
+      aside .doc-search-trigger,
+      aside .doc-footer {{ display: none; }}
+      aside.mobile-expanded .doc-nav,
+      aside.mobile-expanded .doc-toc,
+      aside.mobile-expanded .doc-search-trigger,
+      aside.mobile-expanded .doc-footer {{ display: block; }}
+      aside.mobile-expanded .doc-search-trigger {{ display: flex; }}
+      .doc-nav-toggle--sidebar {{ display: inline-flex; }}
+      .doc-search-trigger {{ width: 100%; }}
+      .doc-main {{ padding: 1.25rem 1rem 3rem; }}
     }}
   </style>
 </head>
@@ -1017,7 +1007,7 @@ fn render_doc_shell(
       </footer>
     </aside>
     <main class="{main_cls}">
-      <button class="doc-nav-toggle doc-nav-toggle--main" id="doc-nav-toggle" type="button" aria-label="Toggle navigation" onclick="toggleDocNav()">☰</button>
+      <button class="doc-nav-toggle doc-nav-toggle--main" id="doc-nav-toggle" type="button" aria-label="Open navigation" onclick="toggleDocNav()">☰</button>
       {main_inner}
     </main>
   </div>
