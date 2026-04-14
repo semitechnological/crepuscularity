@@ -487,9 +487,11 @@ impl Platform for MacPlatform {
             let app_delegate: id = msg_send![APP_DELEGATE_CLASS, new];
             app.setDelegate_(app_delegate);
 
+            PLATFORM = Some(self as *const _);
             let pool = NSAutoreleasePool::new(nil);
             app.run();
             pool.drain();
+            PLATFORM = None;
         }
     }
 
@@ -1352,11 +1354,11 @@ unsafe fn path_from_objc(path: id) -> PathBuf {
     PathBuf::from(path)
 }
 
-unsafe fn get_mac_platform(object: &mut Object) -> &MacPlatform {
+static mut PLATFORM: Option<*const MacPlatform> = None;
+
+unsafe fn get_mac_platform(_object: &mut Object) -> &'static MacPlatform {
     unsafe {
-        let platform_ptr: *mut c_void = *object.get_ivar(MAC_PLATFORM_IVAR);
-        assert!(!platform_ptr.is_null());
-        &*(platform_ptr as *const MacPlatform)
+        &*(PLATFORM.unwrap_or_else(|| panic!("platform not initialized")) as *const MacPlatform)
     }
 }
 
