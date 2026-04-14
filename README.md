@@ -94,7 +94,7 @@ crepus ios build [--dir] [...]       # Simulator build via xcodebuild
 
 ## Documentation
 
-- **Rendered site (GitHub Pages):** [semitechnological.github.io/crepuscularity](https://semitechnological.github.io/crepuscularity/) — WASM landing page plus HTML generated from the Markdown in [`docs/`](docs/). Built in CI with `crepus web build --site docs-site`.
+- **Rendered site (GitHub Pages):** [here](https://crepuscularity.undivisible.dev) — WASM landing page plus HTML generated from the Markdown in [`docs/`](docs/). Built in CI with `crepus web build --site docs-site`.
 - **Sources:** [docs/README.md](docs/README.md) indexes [DSL](docs/dsl.md), [components](docs/components.md), [CLI](docs/cli.md), and [extensions](docs/webext.md). Compiler-focused detail stays in-repo as [CREPUS_WEB_IMPLEMENTATION_SPEC.md](docs/CREPUS_WEB_IMPLEMENTATION_SPEC.md) but is not shipped on the public docs site.
 - **Native shells:** [examples/native-shells](examples/native-shells/README.md) — SwiftPM (**`ios/`**), Gradle (**`android/`**), and shared **View IR** `fixture.json` next to **`crepuscularity-native`** (replaces the old separate **`crepuscularity-native-ui`** checkout).
 - **Contributors & coding agents:** root [**`AGENTS.md`**](AGENTS.md) is the canonical instructions (macOS `SDKROOT`, `cargo fmt` / `clippy` / `test` before push, workspace layout, DSL notes). **`CLAUDE.md`** is a symlink to **`AGENTS.md`** so duplicate context files cannot drift.
