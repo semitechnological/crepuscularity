@@ -1,14 +1,14 @@
 google-fonts "Inter" "JetBrains Mono"
 
 div min-h-screen overflow-x-hidden antialiased crepus-twilight-page
-	main w-full mx-auto px-4 sm:px-6 lg:px-8 relative z-10 min-w-0
+	main max-w-[896px] sm:max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 min-w-0
 		div flex items-center gap-3 pt-6 sm:pt-8 pb-2 crepus-entrance crepus-e1
 			a href="./index.html" flex items-center gap-3 group shrink-0 no-underline crepus-t-text hover:opacity-90
 				img src="./static/favicon.svg" alt="" w-9 h-9 sm:w-10 sm:h-10 shrink-0 rounded-lg
 				span text-sm sm:text-base font-semibold tracking-tight
 					"Crepuscularity"
 		section pt-6 pb-12 sm:pt-10 sm:pb-20 md:pt-12 md:pb-24 crepus-entrance crepus-e2 bg-gradient-to-br from-zinc-950 via-zinc-900 to-black rounded-2xl p-6 sm:p-8 lg:p-12 mx-4 sm:mx-6 lg:mx-8
-			div grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_min(100%,380px)] gap-6 sm:gap-8 lg:gap-12 items-start
+			div grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_min(100%,500px)] gap-6 sm:gap-8 lg:gap-12 items-start
 				div max-w-3xl min-w-0
 					h1 text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold crepus-t-text tracking-tight leading-[1.08] mb-4 sm:mb-6
 						"UI templates that compile "
@@ -56,7 +56,7 @@ div min-h-screen overflow-x-hidden antialiased crepus-twilight-page
 							"Crepuscularity Lite is a sibling project: a GPUI + V8 desktop shell with a Capacitor-shaped Rust bridge for embedding web UI in native apps — pair it with this CLI when you want a lighter native host than a full GPUI template tree."
 						a href="https://github.com/semitechnological/crepuscularity-lite" no-underline text-sm font-medium crepus-t-text hover:opacity-85 border-b crepus-t-border transition-colors inline-block self-center sm:self-start rel="noopener noreferrer" target="_blank"
 							"Crepuscularity Lite on GitHub →"
-				div w-full min-w-0 mx-auto lg:mx-0 lg:justify-self-end order-last lg:order-none
+				div w-full min-w-0 mx-auto lg:mx-0 lg:place-self-center order-last lg:order-none
 					div rounded-xl border overflow-hidden shadow-xl crepus-t-border crepus-t-card
 						div flex items-center gap-2 px-3 sm:px-4 py-2.5 sm:py-3 border-b crepus-t-border bg-[var(--cp-code)]
 							span flex gap-1.5 shrink-0
@@ -75,7 +75,7 @@ $ crepus web build --site docs-site
 # Browser extension
 $ crepus webext new ext"
 
-		section py-16 sm:py-20 border-t crepus-t-border crepus-entrance crepus-e3
+		section py-10 sm:py-14 border-t crepus-t-border crepus-entrance crepus-e3
 			div flex flex-col lg:flex-row lg:items-stretch gap-5 sm:gap-6 lg:gap-8
 				div flex-1 rounded-xl p-5 sm:p-8 crepus-t-card
 					p text-xs font-semibold uppercase tracking-widest crepus-t-muted mb-3 sm:mb-4
@@ -115,59 +115,7 @@ $ crepus webext new ext"
 						p text-xs crepus-t-muted leading-relaxed m-0
 							"Markdown in docs/ is rendered to styled HTML on every crepus web build."
 
-		section py-16 sm:py-20 border-t crepus-t-border crepus-entrance crepus-e5
-			div max-w-7xl mx-auto
-				h2 text-2xl sm:text-3xl font-bold crepus-t-text mb-8 text-center
-					"Key Features"
-				div grid gap-6 sm:gap-8 grid-cols-1 md:grid-cols-2 lg:grid-cols-3
-					div rounded-2xl p-6 crepus-t-card hover:shadow-2xl hover:scale-105 transition-all duration-300 ease-in-out border border-transparent hover:border-[var(--cp-accent)]
-						div w-12 h-12 rounded-full bg-gradient-to-br from-[var(--cp-accent)] to-purple-600 flex items-center justify-center mb-4
-							span material-symbols-outlined text-white text-xl
-								"flash_on"
-						h3 text-lg font-semibold crepus-t-text mb-2
-							"Hot Reload"
-						p text-sm crepus-t-muted leading-relaxed
-							"Instant updates during development across all platforms without rebuilding."
-					div rounded-2xl p-6 crepus-t-card hover:shadow-2xl hover:scale-105 transition-all duration-300 ease-in-out border border-transparent hover:border-[var(--cp-accent)]
-						div w-12 h-12 rounded-full bg-gradient-to-br from-green-500 to-[var(--cp-accent)] flex items-center justify-center mb-4
-							span material-symbols-outlined text-white text-xl
-								"code"
-						h3 text-lg font-semibold crepus-t-text mb-2
-							"Unified Syntax"
-						p text-sm crepus-t-muted leading-relaxed
-							"Write once, compile everywhere — indentation, JSX, or macro style."
-					div rounded-2xl p-6 crepus-t-card hover:shadow-2xl hover:scale-105 transition-all duration-300 ease-in-out border border-transparent hover:border-[var(--cp-accent)]
-						div w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-[var(--cp-accent)] flex items-center justify-center mb-4
-							span material-symbols-outlined text-white text-xl
-								"web"
-						h3 text-lg font-semibold crepus-t-text mb-2
-							"Multi-Platform"
-						p text-sm crepus-t-muted leading-relaxed
-							"GPUI desktop, WASM web, browser extensions, and more from one codebase."
-					div rounded-2xl p-6 crepus-t-card hover:shadow-2xl hover:scale-105 transition-all duration-300 ease-in-out border border-transparent hover:border-[var(--cp-accent)]
-						div w-12 h-12 rounded-full bg-gradient-to-br from-orange-500 to-[var(--cp-accent)] flex items-center justify-center mb-4
-							span material-symbols-outlined text-white text-xl
-								"palette"
-						h3 text-lg font-semibold crepus-t-text mb-2
-							"Tailwind Integration"
-						p text-sm crepus-t-muted leading-relaxed
-							"Use familiar CSS classes for styling across native and web targets."
-					div rounded-2xl p-6 crepus-t-card hover:shadow-2xl hover:scale-105 transition-all duration-300 ease-in-out border border-transparent hover:border-[var(--cp-accent)]
-						div w-12 h-12 rounded-full bg-gradient-to-br from-pink-500 to-[var(--cp-accent)] flex items-center justify-center mb-4
-							span material-symbols-outlined text-white text-xl
-								"bolt"
-						h3 text-lg font-semibold crepus-t-text mb-2
-							"Performance"
-						p text-sm crepus-t-muted leading-relaxed
-							"Zero-cost abstractions and GPU-accelerated rendering where possible."
-					div rounded-2xl p-6 crepus-t-card hover:shadow-2xl hover:scale-105 transition-all duration-300 ease-in-out border border-transparent hover:border-[var(--cp-accent)]
-						div w-12 h-12 rounded-full bg-gradient-to-br from-teal-500 to-[var(--cp-accent)] flex items-center justify-center mb-4
-							span material-symbols-outlined text-white text-xl
-								"library_books"
-						h3 text-lg font-semibold crepus-t-text mb-2
-							"Documentation"
-						p text-sm crepus-t-muted leading-relaxed
-							"Comprehensive guides and CLI reference for all features."
+
 
 		section py-16 sm:py-20 border-t crepus-t-border
 			div flex flex-col md:flex-row md:items-end md:justify-between gap-5 sm:gap-6 mb-7 sm:mb-10
