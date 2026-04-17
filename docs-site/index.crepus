@@ -199,6 +199,8 @@ $ crepus webext new ext"
 				a href="https://github.com/semitechnological/crepuscularity" no-underline crepus-t-muted hover:text-[var(--cp-fg)] transition-colors rel="noopener noreferrer" target="_blank"
 					"GitHub"
 
+	<script src="./static/sunset-animation.js"></script>
+
 .slot-lede text-[var(--cp-fg)] font-medium
 .footer-row flex flex-col sm:flex-row justify-between gap-4 sm:gap-6 sm:items-center
 .doc-card group flex flex-col rounded-xl p-4 sm:p-5 transition-all crepus-t-card hover:border-[var(--cp-accent)]
