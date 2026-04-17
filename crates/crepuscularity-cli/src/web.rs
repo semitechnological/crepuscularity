@@ -628,10 +628,15 @@ fn load_all_crepus(root: &Path, dir: &Path, map: &mut HashMap<String, String>) {
         } else if path.extension().is_some_and(|e| e == "crepus") {
             if let Ok(content) = std::fs::read_to_string(&path) {
                 let key = relative_key(root, &path);
-                map.insert(key, content);
+                let normalized = normalize_fullwidth_braces(&content);
+                map.insert(key, normalized);
             }
         }
     }
+}
+
+fn normalize_fullwidth_braces(s: &str) -> String {
+    s.replace('\u{FF5B}', "{").replace('\u{FF5D}', "}")
 }
 
 fn relative_key(root: &Path, abs: &Path) -> String {
@@ -971,7 +976,7 @@ fn run_build_full(args: &BuildFullArgs) {
                         .to_string();
                     if let Ok(content) = std::fs::read_to_string(&path) {
                         entries.push(key.clone());
-                        crepus_files.insert(key, content);
+                        crepus_files.insert(key, normalize_fullwidth_braces(&content));
                     }
                 }
             }

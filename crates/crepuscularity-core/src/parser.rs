@@ -874,6 +874,7 @@ pub fn parse_when_attribute_suffix(src: &str) -> Option<(String, String)> {
 }
 
 fn tokenize_line(line: &str) -> Vec<String> {
+    let line = normalize_fullwidth_braces(line);
     let mut tokens = Vec::new();
     let mut current = String::new();
     let mut bracket_depth: usize = 0;
@@ -1059,7 +1060,8 @@ impl JsxAttr {
 // ── Entry point ───────────────────────────────────────────────────────────────
 
 fn parse_jsx_template(src: &str) -> Result<Vec<Node>, String> {
-    let (nodes, _) = parse_jsx_nodes(src)?;
+    let normalized = normalize_fullwidth_braces(src);
+    let (nodes, _) = parse_jsx_nodes(&normalized)?;
     Ok(nodes)
 }
 
@@ -1742,8 +1744,12 @@ mod tests {
     #[test]
     fn unescape_crepus_text_literal_accepts_common_escapes() {
         assert_eq!(
-            unescape_crepus_text_literal(r#"line\n\t\"quote\""#),
+            unescape_crepus_text_literal(r#"line\n\t\"quote""#),
             "line\n\t\"quote\""
         );
     }
+}
+
+fn normalize_fullwidth_braces(s: &str) -> String {
+    s.replace('\u{FF5B}', "{").replace('\u{FF5D}', "}")
 }
