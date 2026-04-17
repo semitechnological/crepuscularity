@@ -7,8 +7,7 @@ div min-h-screen overflow-x-hidden antialiased crepus-twilight-page
 				img src="./static/favicon.svg" alt="" w-9 h-9 sm:w-10 sm:h-10 shrink-0 rounded-lg
 				span text-sm sm:text-base font-semibold tracking-tight
 					"Crepuscularity"
-		section pt-6 pb-12 sm:pt-10 sm:pb-20 md:pt-12 md:pb-24 crepus-entrance crepus-e2 bg-gradient-to-br from-zinc-950 via-zinc-900 to-black rounded-2xl p-6 sm:p-8 lg:p-12 mx-4 sm:mx-6 lg:mx-8
-			<canvas id="sunset-canvas" class="absolute inset-0 pointer-events-none -z-10"></canvas>
+		section pt-6 pb-12 sm:pt-10 sm:pb-20 md:pt-12 md:pb-24 crepus-entrance crepus-e2 bg-gradient-to-br from-zinc-950 via-zinc-900 to-black rounded-2xl p-6 sm:p-8 lg:p-12 mx-4 sm:mx-6 lg:mx-8 animate-sunset
 			div grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_min(100%,600px)] gap-6 sm:gap-8 lg:gap-12 items-start
 				div max-w-3xl min-w-0
 					h1 text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold crepus-t-text tracking-tight leading-[1.08] mb-4 sm:mb-6
@@ -199,7 +198,16 @@ $ crepus webext new ext"
 				a href="https://github.com/semitechnological/crepuscularity" no-underline crepus-t-muted hover:text-[var(--cp-fg)] transition-colors rel="noopener noreferrer" target="_blank"
 					"GitHub"
 
-	<script src="./static/sunset-animation.js"></script>
+	<style>
+		@keyframes sunset {
+			0% { background: linear-gradient(to bottom right, #1f1f23, #0f0f13, #000); }
+			50% { background: linear-gradient(to bottom right, #ff4500, #ffa500, #8b0000); }
+			100% { background: linear-gradient(to bottom right, #4b0082, #2e003e, #1a001a); }
+		}
+		.animate-sunset {
+			animation: sunset 10s infinite;
+		}
+	</style>
 
 .slot-lede text-[var(--cp-fg)] font-medium
 .footer-row flex flex-col sm:flex-row justify-between gap-4 sm:gap-6 sm:items-center
