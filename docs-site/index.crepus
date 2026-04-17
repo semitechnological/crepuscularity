@@ -122,36 +122,22 @@ $ crepus webext new ext"
 				"Curly braces in snippets use Unicode ｛ ｝ where the real sources use ASCII so this page stays valid .crepus."
 			p text-sm crepus-t-muted mb-8 max-w-2xl m-0
 				"Indent DSL, TSX-shaped tags, or GPUI's compile-time macro — one AST, your pick."
-			div grid gap-4 grid-cols-1 lg:grid-cols-3
-				div rounded-xl p-4 flex flex-col crepus-t-card
-					p text-xs font-semibold crepus-t-muted uppercase tracking-wide mb-2 m-0
-						"Indent · .crepus"
-					pre font-mono text-[10px] sm:text-xs m-0 flex-1 leading-relaxed crepus-t-pre p-3 rounded-lg whitespace-pre-wrap overflow-x-auto
-						"div flex flex-col gap-3
-  div text-xl font-bold
-   "Hello ｛name｝""
-				div rounded-xl p-4 flex flex-col crepus-t-card
-					p text-xs font-semibold crepus-t-muted uppercase tracking-wide mb-2 m-0
-						"JSX-style tags"
-					pre font-mono text-[10px] sm:text-xs m-0 flex-1 leading-relaxed crepus-t-pre p-3 rounded-lg whitespace-pre-wrap overflow-x-auto
-						"<div class="flex flex-col gap-3">
-  <div class="text-xl font-bold">
-    Hello ｛name｝
-  </div>
-</div>"
-				div rounded-xl p-4 flex flex-col crepus-t-card
-					p text-xs font-semibold crepus-t-muted uppercase tracking-wide mb-2 m-0
-						"GPUI · view!"
-					pre font-mono text-[10px] sm:text-xs m-0 flex-1 leading-relaxed crepus-t-pre p-3 rounded-lg whitespace-pre-wrap overflow-x-auto
-						"use crepuscularity::prelude::*;
-
-fn ui(cx: &mut ViewContext) -> impl IntoElement {
-    view!(cx,
-        div(class="flex items-center gap-2 p-4 font-bold") ｛
-            "Hello from GPUI and Rust",
-        ｝
-    )
-}"
+div grid gap-4 grid-cols-1 lg:grid-cols-3
+			div rounded-xl p-4 flex flex-col crepus-t-card
+				p text-xs font-semibold crepus-t-muted uppercase tracking-wide mb-2 m-0
+					"Indent · .crepus"
+				pre font-mono text-[10px] sm:text-xs m-0 flex-1 leading-relaxed crepus-t-pre p-3 rounded-lg whitespace-pre-wrap overflow-x-auto
+					"div flex gap-3"
+			div rounded-xl p-4 flex flex-col crepus-t-card
+				p text-xs font-semibold crepus-t-muted uppercase tracking-wide mb-2 m-0
+					"JSX-style tags"
+				pre font-mono text-[10px] sm:text-xs m-0 flex-1 leading-relaxed crepus-t-pre p-3 rounded-lg whitespace-pre-wrap overflow-x-auto
+					"<div class=flex>"
+			div rounded-xl p-4 flex flex-col crepus-t-card
+				p text-xs font-semibold crepus-t-muted uppercase tracking-wide mb-2 m-0
+					"GPUI · view!"
+				pre font-mono text-[10px] sm:text-xs m-0 flex-1 leading-relaxed crepus-t-pre p-3 rounded-lg whitespace-pre-wrap overflow-x-auto
+					"view!(cx, div)"
 
 		section py-10 sm:py-14 border-t crepus-t-border
 			div flex flex-col md:flex-row md:items-end md:justify-between gap-5 sm:gap-6 mb-7 sm:mb-10
