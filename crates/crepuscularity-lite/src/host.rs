@@ -1,0 +1,329 @@
+//! Host-side state for the GPUI-backed guest runtime.
+
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
+
+use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
+
+use crate::bridge::BridgeError;
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+pub struct HostSnapshot {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tree: Option<HostNode>,
+    #[serde(default)]
+    pub navigation: Vec<HostRoute>,
+    #[serde(default)]
+    pub storage_keys: Vec<String>,
+    #[serde(default)]
+    pub render_count: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_event: Option<HostEventRecord>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+pub struct HostRoute {
+    pub name: String,
+    #[serde(default)]
+    pub params: Value,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+pub struct HostEventRecord {
+    pub kind: String,
+    #[serde(default)]
+    pub handler_id: String,
+    #[serde(default)]
+    pub payload: Value,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+pub struct HostNode {
+    #[serde(rename = "type")]
+    pub node_type: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub text: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub value: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub placeholder: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub route: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub on_press: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub on_key_down: Option<String>,
+    #[serde(default)]
+    pub props: Value,
+    #[serde(default)]
+    pub style: HostStyle,
+    #[serde(default)]
+    pub children: Vec<HostNode>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct HostStyle {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub display: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub direction: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub align_items: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub justify_content: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub width: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub height: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub min_width: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub min_height: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_width: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_height: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub opacity: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub padding: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub padding_x: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub padding_y: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gap: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub flex_grow: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub background: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub color: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub border_color: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub border_width: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub radius: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub font_size: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub font_weight: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub font_family: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub text_align: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub italic: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub underline: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub strikethrough: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub overflow: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub overflow_x: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub overflow_y: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub shadow: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub grid_cols: Option<u16>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub grid_rows: Option<u16>,
+}
+
+#[derive(Debug, Default)]
+struct HostStateInner {
+    tree: Option<HostNode>,
+    navigation: Vec<HostRoute>,
+    storage: HashMap<String, Value>,
+    channels: HashMap<String, Vec<Value>>,
+    render_count: u64,
+    last_event: Option<HostEventRecord>,
+}
+
+#[derive(Debug, Default)]
+pub struct HostState {
+    inner: Mutex<HostStateInner>,
+}
+
+impl HostState {
+    pub fn shared() -> Arc<Self> {
+        Arc::new(Self::default())
+    }
+
+    pub fn render_tree(&self, tree: HostNode) -> HostSnapshot {
+        let mut inner = self.inner.lock().expect("host state mutex poisoned");
+        inner.tree = Some(tree);
+        inner.render_count += 1;
+        if inner.navigation.is_empty() {
+            inner.navigation.push(HostRoute {
+                name: "root".to_string(),
+                params: json!({}),
+            });
+        }
+        snapshot_from_inner(&inner)
+    }
+
+    pub fn snapshot(&self) -> HostSnapshot {
+        let inner = self.inner.lock().expect("host state mutex poisoned");
+        snapshot_from_inner(&inner)
+    }
+
+    pub fn navigation_push(&self, route: HostRoute) -> HostSnapshot {
+        let mut inner = self.inner.lock().expect("host state mutex poisoned");
+        ensure_root_route(&mut inner);
+        inner.navigation.push(route);
+        snapshot_from_inner(&inner)
+    }
+
+    pub fn navigation_replace(&self, route: HostRoute) -> HostSnapshot {
+        let mut inner = self.inner.lock().expect("host state mutex poisoned");
+        ensure_root_route(&mut inner);
+        if inner.navigation.is_empty() {
+            inner.navigation.push(route);
+        } else if let Some(last) = inner.navigation.last_mut() {
+            *last = route;
+        }
+        snapshot_from_inner(&inner)
+    }
+
+    pub fn navigation_pop(&self) -> HostSnapshot {
+        let mut inner = self.inner.lock().expect("host state mutex poisoned");
+        ensure_root_route(&mut inner);
+        if inner.navigation.len() > 1 {
+            inner.navigation.pop();
+        }
+        snapshot_from_inner(&inner)
+    }
+
+    pub fn storage_get(&self, key: &str) -> Option<Value> {
+        let inner = self.inner.lock().expect("host state mutex poisoned");
+        inner.storage.get(key).cloned()
+    }
+
+    pub fn storage_set(&self, key: impl Into<String>, value: Value) -> HostSnapshot {
+        let mut inner = self.inner.lock().expect("host state mutex poisoned");
+        inner.storage.insert(key.into(), value);
+        snapshot_from_inner(&inner)
+    }
+
+    pub fn storage_remove(&self, key: &str) -> HostSnapshot {
+        let mut inner = self.inner.lock().expect("host state mutex poisoned");
+        inner.storage.remove(key);
+        snapshot_from_inner(&inner)
+    }
+
+    pub fn record_event(&self, event: HostEventRecord) {
+        let mut inner = self.inner.lock().expect("host state mutex poisoned");
+        inner.last_event = Some(event);
+    }
+
+    pub fn channel_send(&self, channel: impl Into<String>, message: Value) -> HostSnapshot {
+        let mut inner = self.inner.lock().expect("host state mutex poisoned");
+        inner
+            .channels
+            .entry(channel.into())
+            .or_default()
+            .push(message);
+        snapshot_from_inner(&inner)
+    }
+
+    pub fn channel_poll(&self, channel: &str) -> Option<Value> {
+        let mut inner = self.inner.lock().expect("host state mutex poisoned");
+        let queue = inner.channels.get_mut(channel)?;
+        if queue.is_empty() {
+            None
+        } else {
+            Some(queue.remove(0))
+        }
+    }
+}
+
+fn snapshot_from_inner(inner: &HostStateInner) -> HostSnapshot {
+    let mut storage_keys = inner.storage.keys().cloned().collect::<Vec<_>>();
+    storage_keys.sort();
+    HostSnapshot {
+        tree: inner.tree.clone(),
+        navigation: inner.navigation.clone(),
+        storage_keys,
+        render_count: inner.render_count,
+        last_event: inner.last_event.clone(),
+    }
+}
+
+fn ensure_root_route(inner: &mut HostStateInner) {
+    if inner.navigation.is_empty() {
+        inner.navigation.push(HostRoute {
+            name: "root".to_string(),
+            params: json!({}),
+        });
+    }
+}
+
+pub fn require_string_field<'a>(payload: &'a Value, key: &str) -> Result<&'a str, BridgeError> {
+    payload.get(key).and_then(Value::as_str).ok_or_else(|| {
+        BridgeError::with_details(
+            "invalid_payload",
+            format!("expected string field {key:?}"),
+            payload.clone(),
+        )
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn storage_roundtrip_and_snapshot_keys() {
+        let host = HostState::default();
+        host.storage_set("alpha", json!("one"));
+        host.storage_set("beta", json!({ "n": 2 }));
+        assert_eq!(host.storage_get("alpha"), Some(json!("one")));
+        let snap = host.snapshot();
+        assert_eq!(
+            snap.storage_keys,
+            vec!["alpha".to_string(), "beta".to_string()]
+        );
+    }
+
+    #[test]
+    fn navigation_replace_and_pop_preserve_root() {
+        let host = HostState::default();
+        host.navigation_push(HostRoute {
+            name: "inbox".to_string(),
+            params: json!({ "guild": "123" }),
+        });
+        host.navigation_replace(HostRoute {
+            name: "channel".to_string(),
+            params: json!({ "id": "999" }),
+        });
+        let snap = host.navigation_pop();
+        assert_eq!(snap.navigation.len(), 1);
+        assert_eq!(snap.navigation[0].name, "root");
+    }
+
+    #[test]
+    fn render_tree_increments_render_count() {
+        let host = HostState::default();
+        let snap = host.render_tree(HostNode {
+            node_type: "View".to_string(),
+            children: vec![HostNode {
+                node_type: "Text".to_string(),
+                text: Some("Hello".to_string()),
+                ..Default::default()
+            }],
+            ..Default::default()
+        });
+        assert_eq!(snap.render_count, 1);
+        assert_eq!(snap.tree.expect("tree").children.len(), 1);
+    }
+}

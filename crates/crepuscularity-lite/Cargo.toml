@@ -1,0 +1,48 @@
+[package]
+name = "crepuscularity-lite"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "GPUI desktop shell with an embedded V8 runtime and a Capacitor-shaped native bridge."
+repository = "https://github.com/semitechnological/crepuscularity"
+
+[features]
+default = []
+# Optional Rayon: parallel `guest_prelude` reads and `Bridge::invoke_envelope_batch`.
+parallel = ["dep:rayon"]
+# CLI helpers (`cl` binary).
+cli = ["dep:clap"]
+# Terminal benchmark UI + parallel headless V8 matrix (`crepus-bench` binary).
+bench-tui = ["cli", "dep:crossterm", "dep:ratatui", "parallel"]
+
+[dependencies]
+crepuscularity-lite-macros = { path = "../crepuscularity-lite-macros" }
+arboard = "3.6"
+dirs = "6"
+gpui = { workspace = true }
+open = "5.3"
+notify-debouncer-mini = "0.7"
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml = { workspace = true }
+# V8 147+ requires ICU 2.1.x; pins below unify the transitive ICU tree.
+v8 = "147"
+icu_calendar = "=2.1.1"
+icu_calendar_data = "=2.1.1"
+icu_locale = "=2.1.1"
+icu_locale_data = "=2.1.2"
+clap = { version = "4.5", optional = true, features = ["derive"] }
+crossterm = { version = "0.28", optional = true }
+ratatui = { version = "0.29", optional = true }
+rayon = { version = "1", optional = true }
+
+[[bin]]
+name = "crepus-bench"
+path = "src/bin/crepus-bench.rs"
+required-features = ["bench-tui"]
+
+[[bin]]
+name = "cl"
+path = "src/bin/cl.rs"
+required-features = ["cli"]
