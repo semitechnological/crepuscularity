@@ -16,12 +16,14 @@ fn plain_text_stack() {
     let ir = render_template_to_ir(tpl, &ctx).unwrap();
     assert_eq!(ir.version, IR_VERSION);
 
+    // flex-col explicitly sets flexDirection so web consumers see it alongside axis.
     let expected = json!({
         "version": IR_VERSION,
         "root": [{
             "kind": "stack",
             "axis": "column",
             "spacing": 16.0,
+            "style": { "flexDirection": "column" },
             "children": [{
                 "kind": "text",
                 "content": "Hello Ada"

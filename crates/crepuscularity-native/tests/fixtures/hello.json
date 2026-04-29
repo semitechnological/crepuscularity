@@ -5,6 +5,9 @@
       "kind": "stack",
       "axis": "column",
       "spacing": 8.0,
+      "style": {
+        "flexDirection": "column"
+      },
       "children": [
         {
           "kind": "text",

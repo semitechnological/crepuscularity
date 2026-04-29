@@ -21,6 +21,7 @@
 //! ## Coverage vs GPUI / web
 //! Not 100% parity with GPUI `styler.rs`—expand [`style`].
 
+pub mod colors;
 pub mod hot_reload;
 mod include_expand;
 pub mod ir;
@@ -28,6 +29,7 @@ pub mod mutations;
 mod render;
 pub mod style;
 
+pub use colors::resolve_rgba;
 pub use hot_reload::{ast_shape_compatible, plan_hot_reload, HotReloadEnvelope, HotReloadMessage};
 pub use ir::{StackAxis, ViewIr, ViewNode, ViewStyle, IR_VERSION};
 pub use mutations::{apply_mutations, diff_ir, IrMutation};
