@@ -1,5 +1,5 @@
-pub mod hot_reload;
 pub mod frontend_bridge;
+pub mod hot_reload;
 pub mod renderer;
 pub mod styler;
 pub mod watcher;
