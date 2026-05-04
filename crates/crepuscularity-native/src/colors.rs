@@ -7,7 +7,7 @@
 pub fn lookup_named_color(name: &str) -> Option<&'static str> {
     Some(match name {
         // ── Slate ────────────────────────────────────────────────────────
-        "slate-50"  => "#f8fafc",
+        "slate-50" => "#f8fafc",
         "slate-100" => "#f1f5f9",
         "slate-200" => "#e2e8f0",
         "slate-300" => "#cbd5e1",
@@ -19,31 +19,31 @@ pub fn lookup_named_color(name: &str) -> Option<&'static str> {
         "slate-900" => "#0f172a",
         "slate-950" => "#020617",
         // ── Gray ─────────────────────────────────────────────────────────
-        "gray-50"   => "#f9fafb",
-        "gray-100"  => "#f3f4f6",
-        "gray-200"  => "#e5e7eb",
-        "gray-300"  => "#d1d5db",
-        "gray-400"  => "#9ca3af",
-        "gray-500"  => "#6b7280",
-        "gray-600"  => "#4b5563",
-        "gray-700"  => "#374151",
-        "gray-800"  => "#1f2937",
-        "gray-900"  => "#111827",
-        "gray-950"  => "#030712",
+        "gray-50" => "#f9fafb",
+        "gray-100" => "#f3f4f6",
+        "gray-200" => "#e5e7eb",
+        "gray-300" => "#d1d5db",
+        "gray-400" => "#9ca3af",
+        "gray-500" => "#6b7280",
+        "gray-600" => "#4b5563",
+        "gray-700" => "#374151",
+        "gray-800" => "#1f2937",
+        "gray-900" => "#111827",
+        "gray-950" => "#030712",
         // ── Zinc ─────────────────────────────────────────────────────────
-        "zinc-50"   => "#fafafa",
-        "zinc-100"  => "#f4f4f5",
-        "zinc-200"  => "#e4e4e7",
-        "zinc-300"  => "#d4d4d8",
-        "zinc-400"  => "#a1a1aa",
-        "zinc-500"  => "#71717a",
-        "zinc-600"  => "#52525b",
-        "zinc-700"  => "#3f3f46",
-        "zinc-800"  => "#27272a",
-        "zinc-900"  => "#18181b",
-        "zinc-950"  => "#09090b",
+        "zinc-50" => "#fafafa",
+        "zinc-100" => "#f4f4f5",
+        "zinc-200" => "#e4e4e7",
+        "zinc-300" => "#d4d4d8",
+        "zinc-400" => "#a1a1aa",
+        "zinc-500" => "#71717a",
+        "zinc-600" => "#52525b",
+        "zinc-700" => "#3f3f46",
+        "zinc-800" => "#27272a",
+        "zinc-900" => "#18181b",
+        "zinc-950" => "#09090b",
         // ── Neutral ──────────────────────────────────────────────────────
-        "neutral-50"  => "#fafafa",
+        "neutral-50" => "#fafafa",
         "neutral-100" => "#f5f5f5",
         "neutral-200" => "#e5e5e5",
         "neutral-300" => "#d4d4d4",
@@ -55,7 +55,7 @@ pub fn lookup_named_color(name: &str) -> Option<&'static str> {
         "neutral-900" => "#171717",
         "neutral-950" => "#0a0a0a",
         // ── Stone ────────────────────────────────────────────────────────
-        "stone-50"  => "#fafaf9",
+        "stone-50" => "#fafaf9",
         "stone-100" => "#f5f5f4",
         "stone-200" => "#e7e5e4",
         "stone-300" => "#d6d3d1",
@@ -67,7 +67,7 @@ pub fn lookup_named_color(name: &str) -> Option<&'static str> {
         "stone-900" => "#1c1917",
         "stone-950" => "#0c0a09",
         // ── Red ──────────────────────────────────────────────────────────
-        "red-50"  => "#fef2f2",
+        "red-50" => "#fef2f2",
         "red-100" => "#fee2e2",
         "red-200" => "#fecaca",
         "red-300" => "#fca5a5",
@@ -79,7 +79,7 @@ pub fn lookup_named_color(name: &str) -> Option<&'static str> {
         "red-900" => "#7f1d1d",
         "red-950" => "#450a0a",
         // ── Orange ───────────────────────────────────────────────────────
-        "orange-50"  => "#fff7ed",
+        "orange-50" => "#fff7ed",
         "orange-100" => "#ffedd5",
         "orange-200" => "#fed7aa",
         "orange-300" => "#fdba74",
@@ -91,7 +91,7 @@ pub fn lookup_named_color(name: &str) -> Option<&'static str> {
         "orange-900" => "#7c2d12",
         "orange-950" => "#431407",
         // ── Amber ────────────────────────────────────────────────────────
-        "amber-50"  => "#fffbeb",
+        "amber-50" => "#fffbeb",
         "amber-100" => "#fef3c7",
         "amber-200" => "#fde68a",
         "amber-300" => "#fcd34d",
@@ -103,7 +103,7 @@ pub fn lookup_named_color(name: &str) -> Option<&'static str> {
         "amber-900" => "#78350f",
         "amber-950" => "#451a03",
         // ── Yellow ───────────────────────────────────────────────────────
-        "yellow-50"  => "#fefce8",
+        "yellow-50" => "#fefce8",
         "yellow-100" => "#fef9c3",
         "yellow-200" => "#fef08a",
         "yellow-300" => "#fde047",
@@ -115,7 +115,7 @@ pub fn lookup_named_color(name: &str) -> Option<&'static str> {
         "yellow-900" => "#713f12",
         "yellow-950" => "#422006",
         // ── Lime ─────────────────────────────────────────────────────────
-        "lime-50"  => "#f7fee7",
+        "lime-50" => "#f7fee7",
         "lime-100" => "#ecfccb",
         "lime-200" => "#d9f99d",
         "lime-300" => "#bef264",
@@ -127,7 +127,7 @@ pub fn lookup_named_color(name: &str) -> Option<&'static str> {
         "lime-900" => "#365314",
         "lime-950" => "#1a2e05",
         // ── Green ────────────────────────────────────────────────────────
-        "green-50"  => "#f0fdf4",
+        "green-50" => "#f0fdf4",
         "green-100" => "#dcfce7",
         "green-200" => "#bbf7d0",
         "green-300" => "#86efac",
@@ -139,7 +139,7 @@ pub fn lookup_named_color(name: &str) -> Option<&'static str> {
         "green-900" => "#14532d",
         "green-950" => "#052e16",
         // ── Emerald ──────────────────────────────────────────────────────
-        "emerald-50"  => "#ecfdf5",
+        "emerald-50" => "#ecfdf5",
         "emerald-100" => "#d1fae5",
         "emerald-200" => "#a7f3d0",
         "emerald-300" => "#6ee7b7",
@@ -151,7 +151,7 @@ pub fn lookup_named_color(name: &str) -> Option<&'static str> {
         "emerald-900" => "#064e3b",
         "emerald-950" => "#022c22",
         // ── Teal ─────────────────────────────────────────────────────────
-        "teal-50"  => "#f0fdfa",
+        "teal-50" => "#f0fdfa",
         "teal-100" => "#ccfbf1",
         "teal-200" => "#99f6e4",
         "teal-300" => "#5eead4",
@@ -163,7 +163,7 @@ pub fn lookup_named_color(name: &str) -> Option<&'static str> {
         "teal-900" => "#134e4a",
         "teal-950" => "#042f2e",
         // ── Cyan ─────────────────────────────────────────────────────────
-        "cyan-50"  => "#ecfeff",
+        "cyan-50" => "#ecfeff",
         "cyan-100" => "#cffafe",
         "cyan-200" => "#a5f3fc",
         "cyan-300" => "#67e8f9",
@@ -175,7 +175,7 @@ pub fn lookup_named_color(name: &str) -> Option<&'static str> {
         "cyan-900" => "#164e63",
         "cyan-950" => "#083344",
         // ── Sky ──────────────────────────────────────────────────────────
-        "sky-50"  => "#f0f9ff",
+        "sky-50" => "#f0f9ff",
         "sky-100" => "#e0f2fe",
         "sky-200" => "#bae6fd",
         "sky-300" => "#7dd3fc",
@@ -187,7 +187,7 @@ pub fn lookup_named_color(name: &str) -> Option<&'static str> {
         "sky-900" => "#0c4a6e",
         "sky-950" => "#082f49",
         // ── Blue ─────────────────────────────────────────────────────────
-        "blue-50"  => "#eff6ff",
+        "blue-50" => "#eff6ff",
         "blue-100" => "#dbeafe",
         "blue-200" => "#bfdbfe",
         "blue-300" => "#93c5fd",
@@ -199,7 +199,7 @@ pub fn lookup_named_color(name: &str) -> Option<&'static str> {
         "blue-900" => "#1e3a8a",
         "blue-950" => "#172554",
         // ── Indigo ───────────────────────────────────────────────────────
-        "indigo-50"  => "#eef2ff",
+        "indigo-50" => "#eef2ff",
         "indigo-100" => "#e0e7ff",
         "indigo-200" => "#c7d2fe",
         "indigo-300" => "#a5b4fc",
@@ -211,7 +211,7 @@ pub fn lookup_named_color(name: &str) -> Option<&'static str> {
         "indigo-900" => "#312e81",
         "indigo-950" => "#1e1b4b",
         // ── Violet ───────────────────────────────────────────────────────
-        "violet-50"  => "#f5f3ff",
+        "violet-50" => "#f5f3ff",
         "violet-100" => "#ede9fe",
         "violet-200" => "#ddd6fe",
         "violet-300" => "#c4b5fd",
@@ -223,7 +223,7 @@ pub fn lookup_named_color(name: &str) -> Option<&'static str> {
         "violet-900" => "#4c1d95",
         "violet-950" => "#2e1065",
         // ── Purple ───────────────────────────────────────────────────────
-        "purple-50"  => "#faf5ff",
+        "purple-50" => "#faf5ff",
         "purple-100" => "#f3e8ff",
         "purple-200" => "#e9d5ff",
         "purple-300" => "#d8b4fe",
@@ -235,7 +235,7 @@ pub fn lookup_named_color(name: &str) -> Option<&'static str> {
         "purple-900" => "#581c87",
         "purple-950" => "#3b0764",
         // ── Fuchsia ──────────────────────────────────────────────────────
-        "fuchsia-50"  => "#fdf4ff",
+        "fuchsia-50" => "#fdf4ff",
         "fuchsia-100" => "#fae8ff",
         "fuchsia-200" => "#f5d0fe",
         "fuchsia-300" => "#f0abfc",
@@ -247,7 +247,7 @@ pub fn lookup_named_color(name: &str) -> Option<&'static str> {
         "fuchsia-900" => "#701a75",
         "fuchsia-950" => "#4a044e",
         // ── Pink ─────────────────────────────────────────────────────────
-        "pink-50"  => "#fdf2f8",
+        "pink-50" => "#fdf2f8",
         "pink-100" => "#fce7f3",
         "pink-200" => "#fbcfe8",
         "pink-300" => "#f9a8d4",
@@ -259,7 +259,7 @@ pub fn lookup_named_color(name: &str) -> Option<&'static str> {
         "pink-900" => "#831843",
         "pink-950" => "#500724",
         // ── Rose ─────────────────────────────────────────────────────────
-        "rose-50"  => "#fff1f2",
+        "rose-50" => "#fff1f2",
         "rose-100" => "#ffe4e6",
         "rose-200" => "#fecdd3",
         "rose-300" => "#fda4af",
@@ -278,7 +278,9 @@ pub fn lookup_named_color(name: &str) -> Option<&'static str> {
 /// Returns `None` if not present or invalid.
 pub fn parse_opacity_suffix(s: &str) -> Option<f32> {
     let n: u8 = s.parse().ok()?;
-    if n > 100 { return None; }
+    if n > 100 {
+        return None;
+    }
     Some(n as f32 / 100.0)
 }
 
@@ -295,17 +297,17 @@ pub fn parse_opacity_suffix(s: &str) -> Option<f32> {
 pub fn resolve_rgba(css: &str) -> Option<[f32; 4]> {
     let lower = css.trim().to_lowercase();
     match lower.as_str() {
-        "red"                   => return Some([1.0, 0.0, 0.0, 1.0]),
-        "blue"                  => return Some([0.0, 0.0, 1.0, 1.0]),
-        "green"                 => return Some([0.0, 0.502, 0.0, 1.0]),
-        "white"                 => return Some([1.0, 1.0, 1.0, 1.0]),
-        "black"                 => return Some([0.0, 0.0, 0.0, 1.0]),
-        "gray" | "grey"         => return Some([0.502, 0.502, 0.502, 1.0]),
+        "red" => return Some([1.0, 0.0, 0.0, 1.0]),
+        "blue" => return Some([0.0, 0.0, 1.0, 1.0]),
+        "green" => return Some([0.0, 0.502, 0.0, 1.0]),
+        "white" => return Some([1.0, 1.0, 1.0, 1.0]),
+        "black" => return Some([0.0, 0.0, 0.0, 1.0]),
+        "gray" | "grey" => return Some([0.502, 0.502, 0.502, 1.0]),
         "clear" | "transparent" => return Some([0.0, 0.0, 0.0, 0.0]),
-        "orange"                => return Some([1.0, 0.647, 0.0, 1.0]),
-        "yellow"                => return Some([1.0, 1.0, 0.0, 1.0]),
-        "purple"                => return Some([0.502, 0.0, 0.502, 1.0]),
-        "pink"                  => return Some([1.0, 0.753, 0.796, 1.0]),
+        "orange" => return Some([1.0, 0.647, 0.0, 1.0]),
+        "yellow" => return Some([1.0, 1.0, 0.0, 1.0]),
+        "purple" => return Some([0.502, 0.0, 0.502, 1.0]),
+        "pink" => return Some([1.0, 0.753, 0.796, 1.0]),
         _ => {}
     }
 
@@ -329,8 +331,8 @@ fn parse_hex_rgba(s: &str) -> Option<[f32; 4]> {
             let n = u32::from_str_radix(hex, 16).ok()?;
             Some([
                 ((n >> 16) & 0xFF) as f32 / 255.0,
-                ((n >> 8)  & 0xFF) as f32 / 255.0,
-                (n         & 0xFF) as f32 / 255.0,
+                ((n >> 8) & 0xFF) as f32 / 255.0,
+                (n & 0xFF) as f32 / 255.0,
                 1.0,
             ])
         }
@@ -339,8 +341,8 @@ fn parse_hex_rgba(s: &str) -> Option<[f32; 4]> {
             Some([
                 ((n >> 24) & 0xFF) as f32 / 255.0,
                 ((n >> 16) & 0xFF) as f32 / 255.0,
-                ((n >> 8)  & 0xFF) as f32 / 255.0,
-                (n         & 0xFF) as f32 / 255.0,
+                ((n >> 8) & 0xFF) as f32 / 255.0,
+                (n & 0xFF) as f32 / 255.0,
             ])
         }
         _ => None,
@@ -377,6 +379,8 @@ mod tests {
     fn hex8_alpha() {
         let [r, g, b, a] = resolve_rgba("#ff000080").unwrap();
         assert!((r - 1.0).abs() < 0.01);
+        assert!(g.abs() < 0.01);
+        assert!(b.abs() < 0.01);
         assert!((a - 0.502).abs() < 0.01);
     }
 
