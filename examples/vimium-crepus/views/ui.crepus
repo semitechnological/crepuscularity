@@ -1,0 +1,26 @@
++++
+[Popup.defaults]
+title = "vimium-crepus"
+status = "Enabled"
++++
+
+--- Popup
+div vc-popup
+  div vc-header
+    h1 vc-title
+      "{title}"
+    div vc-status
+      "{status}"
+  div vc-grid
+    for group in {groups}
+      div vc-group
+        div vc-group-title
+          "{group.name}"
+        for item in {group.items}
+          div vc-row
+            span vc-keys
+              "{item.keys}"
+            span vc-label
+              "{item.label}"
+  div vc-footer
+    "Press ? on a page for the in-page help overlay. This example implements the small command set shown here."

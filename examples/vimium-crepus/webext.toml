@@ -1,0 +1,29 @@
+[extension]
+name = "vimium-crepus"
+version = "0.1.0"
+description = "A Vimium-style keyboard navigation example built with crepuscularity webext."
+
+[capabilities]
+storage = true
+background-script = true
+content-script = true
+tabs = true
+history = true
+clipboard = true
+host-permissions = ["<all_urls>"]
+
+[[content_scripts]]
+matches = ["<all_urls>"]
+js = ["src/content.js"]
+css = ["src/content.css"]
+run_at = "document_idle"
+
+[options]
+content_css = ["src/content.css"]
+
+[commands._execute_action]
+description = "Open vimium-crepus"
+
+[commands._execute_action.suggested_key]
+default = "Alt+Shift+V"
+mac = "Alt+Shift+V"
