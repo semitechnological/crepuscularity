@@ -32,7 +32,7 @@ gpui                   = { version = "=0.2.2", default-features = false, feature
 crepuscularity-core    = { path = "../crepuscularity-core", version = "0.3.1" }
 crepuscularity-runtime = { path = "../crepuscularity-runtime", version = "0.3.1", optional = true }
 crepuscularity-web     = { path = "../crepuscularity-web", version = "0.3.2" }
-crepuscularity-webext  = { path = "../crepuscularity-webext", version = "0.1.2" }
+crepuscularity-webext  = { path = "../crepuscularity-webext", version = "0.1.3" }
 crepuscularity-native  = { path = "../crepuscularity-native", version = "0.3.1" }
 notify                 = { workspace = true }
 walkdir                = { workspace = true }
