@@ -1,50 +1,56 @@
+mod background;
+pub mod commands;
+pub mod key_handler;
+pub mod settings;
+pub mod vomnibar;
+
+use commands::KeyMapRegistry;
 use crepuscularity_core::context::{TemplateContext, TemplateValue};
 use crepuscularity_web::render_component_file_to_html;
-use crepuscularity_webext::wasm::{runtime as browser_runtime, storage, tabs};
+use crepuscularity_webext::wasm::storage;
+use once_cell::sync::Lazy;
 use serde_json::{json, Value};
+use settings::UserSettings;
+use std::sync::Mutex;
 use wasm_bindgen::prelude::*;
 
 const UI_CREPUS: &str = include_str!("../../views/ui.crepus");
 
+static COMMAND_REGISTRY: Lazy<KeyMapRegistry> = Lazy::new(KeyMapRegistry::from_defaults);
+static USER_SETTINGS: Lazy<Mutex<UserSettings>> = Lazy::new(|| Mutex::new(UserSettings::new()));
+static USER_MAPPINGS: Lazy<Mutex<std::collections::HashMap<String, String>>> =
+    Lazy::new(|| Mutex::new(std::collections::HashMap::new()));
+
 fn json_to_template(value: Value) -> TemplateValue {
     match value {
-        Value::Bool(value) => TemplateValue::Bool(value),
-        Value::Number(value) => {
-            if let Some(value) = value.as_i64() {
-                TemplateValue::Int(value)
+        Value::Bool(v) => TemplateValue::Bool(v),
+        Value::Number(v) => {
+            if let Some(i) = v.as_i64() {
+                TemplateValue::Int(i)
             } else {
-                TemplateValue::Float(value.as_f64().unwrap_or(0.0))
+                TemplateValue::Float(v.as_f64().unwrap_or(0.0))
             }
         }
-        Value::String(value) => TemplateValue::Str(value),
-        Value::Array(values) => TemplateValue::List(
-            values
-                .into_iter()
-                .map(|item| {
-                    let mut ctx = TemplateContext::new();
-                    if let Value::Object(fields) = item {
-                        for (key, value) in fields {
-                            ctx.set(key, json_to_template(value));
-                        }
-                    }
-                    ctx
-                })
-                .collect(),
-        ),
+        Value::String(v) => TemplateValue::Str(v),
+        Value::Array(vals) => {
+            TemplateValue::List(vals.into_iter().map(|item| {
+                let mut ctx = TemplateContext::new();
+                if let Value::Object(fields) = item {
+                    for (k, v) in fields { ctx.set(k, json_to_template(v)); }
+                }
+                ctx
+            }).collect())
+        }
         _ => TemplateValue::Null,
     }
 }
 
 fn to_js(value: Value) -> Result<JsValue, JsValue> {
-    serde_wasm_bindgen::to_value(&value).map_err(|error| JsValue::from_str(&error.to_string()))
+    serde_wasm_bindgen::to_value(&value).map_err(|e| JsValue::from_str(&e.to_string()))
 }
 
 fn from_js(value: JsValue) -> Value {
     serde_wasm_bindgen::from_value(value).unwrap_or(Value::Null)
-}
-
-fn wasm_error(error: impl std::fmt::Display) -> JsValue {
-    JsValue::from_str(&error.to_string())
 }
 
 #[wasm_bindgen]
@@ -56,232 +62,144 @@ pub fn runtime_version() -> String {
 pub fn render_popup(_state: JsValue) -> Result<JsValue, JsValue> {
     let mut ctx = TemplateContext::new();
     ctx.set("title", "vimium-crepus");
-    ctx.set("status", "Enabled on normal web pages");
-    ctx.set("groups", json_to_template(shortcut_groups()));
-
+    ctx.set("status", "Enabled");
+    ctx.set("groups", json_to_template(shortcut_groups_json_val()));
     let html = render_component_file_to_html(UI_CREPUS, "Popup", &ctx)
-        .map_err(|error| JsValue::from_str(&error))?;
-    let out = json!({ "html": html, "css": POPUP_CSS });
-    to_js(out)
-}
-
-#[wasm_bindgen]
-pub async fn settings_get() -> Result<JsValue, JsValue> {
-    let mut settings = storage::sync()
-        .get_json(json!({ "enabled": true }))
-        .await
-        .map_err(wasm_error)?;
-    if let Value::Object(fields) = &mut settings {
-        fields.entry("enabled".to_string()).or_insert(Value::Bool(true));
-    }
-    to_js(json!({ "ok": true, "settings": settings }))
-}
-
-#[wasm_bindgen]
-pub async fn settings_seed() -> Result<JsValue, JsValue> {
-    let settings = storage::sync()
-        .get_json(json!({ "enabled": true }))
-        .await
-        .map_err(wasm_error)?;
-    storage::sync().set(&settings).await.map_err(wasm_error)?;
-    to_js(json!({ "ok": true, "settings": settings }))
-}
-
-#[wasm_bindgen]
-pub async fn send_runtime_message(message: JsValue) -> Result<JsValue, JsValue> {
-    browser_runtime::send_message_value(message)
-        .await
-        .map_err(wasm_error)
-}
-
-#[wasm_bindgen]
-pub async fn handle_background_message(message: JsValue) -> Result<JsValue, JsValue> {
-    let message_value = from_js(message);
-    match message_value.get("type").and_then(Value::as_str) {
-        Some("settings:get") => settings_get().await,
-        Some("vimium-crepus") => {
-            execute_background_command(&message_value)
-                .await
-                .map_err(wasm_error)?;
-            to_js(json!({ "ok": true }))
-        }
-        _ => to_js(json!({ "ok": false, "error": "unknown message" })),
-    }
-}
-
-fn shortcut_groups() -> Value {
-    json!([
-        {
-            "name": "Page",
-            "items": [
-                { "keys": "j / k", "label": "Scroll down or up" },
-                { "keys": "h / l", "label": "Scroll left or right" },
-                { "keys": "gg / G", "label": "Jump to top or bottom" },
-                { "keys": "d / u", "label": "Half-page scroll" }
-            ]
-        },
-        {
-            "name": "Links and find",
-            "items": [
-                { "keys": "f / F", "label": "Open link hints here or in a new tab" },
-                { "keys": "/", "label": "Find text on the page" },
-                { "keys": "n / N", "label": "Next or previous find match" },
-                { "keys": "gi", "label": "Focus the first text field" }
-            ]
-        },
-        {
-            "name": "Tabs",
-            "items": [
-                { "keys": "t", "label": "Open a new tab" },
-                { "keys": "x / X", "label": "Close tab or restore the last closed URL" },
-                { "keys": "J / K", "label": "Move to the left or right tab" },
-                { "keys": "yt", "label": "Duplicate the current tab" }
-            ]
-        }
-    ])
-}
-
-async fn execute_background_command(message: &Value) -> crepuscularity_webext::wasm::Result<()> {
-    let command = message.get("command").and_then(Value::as_str).unwrap_or("");
-    match command {
-        "new-tab" => {
-            tabs::create(&tabs::CreateProperties::default()).await?;
-        }
-        "open-url" => {
-            tabs::create(&tabs::CreateProperties {
-                url: message.get("url").and_then(Value::as_str).map(ToOwned::to_owned),
-                active: Some(message.get("active").and_then(Value::as_bool).unwrap_or(true)),
-                ..Default::default()
-            })
-            .await?;
-        }
-        "duplicate-tab" => {
-            if let Some(tab) = active_tab().await?.and_then(|tab| tab.id) {
-                tabs::duplicate(tab).await?;
-            }
-        }
-        "close-tab" => {
-            if let Some(tab) = active_tab().await? {
-                if let Some(url) = tab.url {
-                    storage::sync().set(&json!({ "lastClosedUrl": url })).await?;
-                }
-                if let Some(id) = tab.id {
-                    tabs::remove(id).await?;
-                }
-            }
-        }
-        "restore-tab" => {
-            let storage = storage::sync()
-                .get_json(json!({ "lastClosedUrl": "" }))
-                .await?;
-            if let Some(url) = storage.get("lastClosedUrl").and_then(Value::as_str) {
-                if !url.is_empty() {
-                    tabs::create(&tabs::CreateProperties {
-                        url: Some(url.to_string()),
-                        active: Some(true),
-                        ..Default::default()
-                    })
-                    .await?;
-                }
-            }
-        }
-        "left-tab" => activate_relative_tab(-1).await?,
-        "right-tab" => activate_relative_tab(1).await?,
-        "first-tab" => activate_edge_tab(false).await?,
-        "last-tab" => activate_edge_tab(true).await?,
-        _ => {}
-    }
-    Ok(())
-}
-
-async fn active_tab() -> crepuscularity_webext::wasm::Result<Option<tabs::Tab>> {
-    let tabs = tabs::query(&tabs::QueryInfo {
-        active: Some(true),
-        current_window: Some(true),
-        ..Default::default()
-    })
-    .await?;
-    Ok(tabs.into_iter().next())
-}
-
-async fn activate_relative_tab(delta: i64) -> crepuscularity_webext::wasm::Result<()> {
-    let all = tabs::query(&tabs::QueryInfo {
-        current_window: Some(true),
-        ..Default::default()
-    })
-    .await?;
-    if all.is_empty() {
-        return Ok(());
-    }
-    let current = all
-        .iter()
-        .find(|tab| tab.active.unwrap_or(false))
-        .and_then(|tab| tab.index)
-        .unwrap_or(0);
-    let next_index = (current + delta).rem_euclid(all.len() as i64);
-    if let Some(tab_id) = all
-        .iter()
-        .find(|tab| tab.index == Some(next_index))
-        .and_then(|tab| tab.id)
-    {
-        tabs::update(
-            tab_id,
-            &tabs::UpdateProperties {
-                active: Some(true),
-                ..Default::default()
-            },
-        )
-        .await?;
-    }
-    Ok(())
-}
-
-async fn activate_edge_tab(last: bool) -> crepuscularity_webext::wasm::Result<()> {
-    let all = tabs::query(&tabs::QueryInfo {
-        current_window: Some(true),
-        ..Default::default()
-    })
-    .await?;
-    let tab_id = if last {
-        all.last().and_then(|tab| tab.id)
-    } else {
-        all.first().and_then(|tab| tab.id)
-    };
-    if let Some(tab_id) = tab_id {
-        tabs::update(
-            tab_id,
-            &tabs::UpdateProperties {
-                active: Some(true),
-                ..Default::default()
-            },
-        )
-        .await?;
-    }
-    Ok(())
+        .map_err(|e| JsValue::from_str(&e))?;
+    to_js(json!({"html": html, "css": POPUP_CSS}))
 }
 
 #[wasm_bindgen]
 pub fn shortcut_groups_json() -> Result<JsValue, JsValue> {
-    to_js(shortcut_groups())
+    to_js(shortcut_groups_json_val())
 }
 
-#[wasm_bindgen]
-pub fn render_help_overlay() -> String {
-    let mut rows = String::new();
-    for group in shortcut_groups().as_array().into_iter().flatten() {
-        if let Some(items) = group.get("items").and_then(Value::as_array) {
-            for item in items {
-                let keys = item.get("keys").and_then(Value::as_str).unwrap_or("");
-                let label = item.get("label").and_then(Value::as_str).unwrap_or("");
-                rows.push_str(&format!(
-                    r#"<div class="vc-overlay-row"><span class="vc-overlay-key">{keys}</span><span class="vc-overlay-label">{label}</span></div>"#
-                ));
+fn shortcut_groups_json_val() -> Value {
+    let commands = commands::all_commands();
+    let mut groups: Value = json!([
+        {"name": "Navigation", "items": []},
+        {"name": "Vomnibar", "items": []},
+        {"name": "Find", "items": []},
+        {"name": "History", "items": []},
+        {"name": "Tabs", "items": []},
+        {"name": "Misc", "items": []},
+    ]);
+
+    let group_map: std::collections::HashMap<_, _> = [
+        ("navigation", 0), ("vomnibar", 1), ("find", 2),
+        ("history", 3), ("tabs", 4), ("misc", 5),
+    ].into_iter().collect();
+
+    for cmd in &commands {
+        if let Some(&idx) = group_map.get(cmd.group.as_str()) {
+            let item = json!({
+                "keys": command_keys_for_name(&cmd.name),
+                "label": cmd.desc,
+                "command": cmd.name,
+                "advanced": cmd.advanced
+            });
+            if let Some(arr) = groups[idx].get_mut("items").and_then(Value::as_array_mut) {
+                arr.push(item);
             }
         }
     }
-    format!(
-        r#"<div class="vc-overlay-header"><span>vimium-crepus shortcuts</span><button class="vc-overlay-close" type="button">Esc</button></div><div class="vc-overlay-grid">{rows}</div>"#
-    )
+    groups
+}
+
+fn command_keys_for_name(cmd_name: &str) -> String {
+    let registry = &*COMMAND_REGISTRY;
+    let mut keys: Vec<String> = registry.key_to_command.iter()
+        .filter(|(_, v)| *v == cmd_name)
+        .map(|(k, _)| k.clone())
+        .collect();
+    keys.sort_by_key(|k| k.len());
+    if keys.is_empty() { "—".to_string() } else { keys.join(" / ") }
+}
+
+#[wasm_bindgen]
+pub async fn settings_get() -> Result<JsValue, JsValue> {
+    let stored = storage::sync()
+        .get_json(json!({"enabled": true}))
+        .await
+        .map_err(|e| JsValue::from_str(&e.to_string()))?;
+    if let Ok(mut s) = USER_SETTINGS.lock() {
+        s.merge(stored);
+    }
+    let settings = USER_SETTINGS.lock().map(|s| s.settings.clone()).unwrap_or_default();
+    to_js(json!({"ok": true, "settings": settings}))
+}
+
+#[wasm_bindgen]
+pub async fn settings_seed() -> Result<JsValue, JsValue> {
+    let stored = storage::sync()
+        .get_json(json!({"enabled": true}))
+        .await
+        .map_err(|e| JsValue::from_str(&e.to_string()))?;
+    if let Ok(mut s) = USER_SETTINGS.lock() {
+        s.merge(stored);
+
+        {
+            let mut mappings = USER_MAPPINGS.lock().unwrap();
+            *mappings = COMMAND_REGISTRY.parse_user_mappings(&s.get_str("keyMappings"));
+        }
+
+        let pruned = settings::prune_defaults(&s.settings);
+        storage::sync().set(&pruned).await.map_err(|e| JsValue::from_str(&e.to_string()))?;
+    }
+    to_js(json!({"ok": true}))
+}
+
+#[wasm_bindgen]
+pub fn content_key(state_val: JsValue, key: &str, editable: bool) -> Result<JsValue, JsValue> {
+    let incoming = from_js(state_val);
+    let state = key_handler::KeyState {
+        mode: incoming.get("mode").and_then(Value::as_str).unwrap_or("normal").to_string(),
+        sequence: incoming.get("sequence").and_then(Value::as_str).unwrap_or("").to_string(),
+        count_text: incoming.get("countText").and_then(Value::as_str).unwrap_or("").to_string(),
+        input: incoming.get("input").and_then(Value::as_str).unwrap_or("").to_string(),
+    };
+
+    let mappings = USER_MAPPINGS.lock().unwrap();
+    let result = key_handler::handle_key(
+        &state, key, editable, &COMMAND_REGISTRY, &mappings,
+    );
+    to_js(result)
+}
+
+#[wasm_bindgen]
+pub fn render_help_overlay(show_advanced: bool) -> String {
+    let groups = shortcut_groups_json_val();
+    let mut html = String::from(
+        r#"<div class="vc-overlay-header"><span>vimium-crepus shortcuts</span><button class="vc-overlay-close" type="button">Esc</button></div><div class="vc-overlay-grid">"#
+    );
+    for group in groups.as_array().into_iter().flatten() {
+        let name = group.get("name").and_then(Value::as_str).unwrap_or("");
+        let items = group.get("items").and_then(Value::as_array);
+        if let Some(items) = items {
+            let visible: Vec<_> = items.iter().filter(|item| {
+                show_advanced || !item.get("advanced").and_then(Value::as_bool).unwrap_or(false)
+            }).collect();
+            if visible.is_empty() { continue; }
+            html.push_str(&format!(
+                r#"<div class="vc-group"><div class="vc-group-title">{name}</div>"#
+            ));
+            for item in &visible {
+                let keys = item.get("keys").and_then(Value::as_str).unwrap_or("");
+                let label = item.get("label").and_then(Value::as_str).unwrap_or("");
+                html.push_str(&format!(
+                    r#"<div class="vc-overlay-row"><span class="vc-overlay-key">{keys}</span><span class="vc-overlay-label">{label}</span></div>"#
+                ));
+            }
+            html.push_str("</div>");
+        }
+    }
+    html.push_str("</div>");
+    html
+}
+
+#[wasm_bindgen]
+pub fn command_list() -> Result<JsValue, JsValue> {
+    to_js(shortcut_groups_json_val())
 }
 
 #[wasm_bindgen]
@@ -291,9 +209,7 @@ pub fn hint_label(index: usize) -> String {
     let mut value = index;
     loop {
         label.insert(0, CHARS[value % CHARS.len()] as char);
-        if value < CHARS.len() {
-            break;
-        }
+        if value < CHARS.len() { break; }
         value = value / CHARS.len() - 1;
     }
     label
@@ -303,263 +219,87 @@ pub fn hint_label(index: usize) -> String {
 pub fn update_hint_state(labels: JsValue, current: &str, key: &str) -> Result<JsValue, JsValue> {
     let labels = from_js(labels);
     let next_input = format!("{}{}", current, key.to_lowercase());
-    let labels = labels.as_array().cloned().unwrap_or_default();
+    let labels_arr = labels.as_array().cloned().unwrap_or_default();
     let mut exact = None;
     let mut remaining = Vec::new();
     let mut dim = Vec::new();
 
-    for (index, label) in labels.iter().enumerate() {
+    for (i, label) in labels_arr.iter().enumerate() {
         let label = label.as_str().unwrap_or("");
         let matched = label.starts_with(&next_input);
         dim.push(!matched);
-        if matched {
-            remaining.push(index);
-        }
-        if label == next_input {
-            exact = Some(index);
-        }
+        if matched { remaining.push(i); }
+        if label == next_input { exact = Some(i); }
     }
 
-    let selected = exact.or_else(|| {
-        if remaining.len() == 1 {
-            remaining.first().copied()
-        } else {
-            None
-        }
-    });
-
-    to_js(json!({
-        "input": next_input,
-        "dim": dim,
-        "selected": selected
-    }))
+    let selected = exact.or_else(|| if remaining.len() == 1 { remaining.first().copied() } else { None });
+    to_js(json!({"input": next_input, "dim": dim, "selected": selected}))
 }
 
 #[wasm_bindgen]
-pub fn content_key(state: JsValue, key: &str, editable: bool) -> Result<JsValue, JsValue> {
-    let state = from_js(state);
-    let mode = state
-        .get("mode")
-        .and_then(Value::as_str)
-        .unwrap_or("normal");
-    let mut sequence = state
-        .get("sequence")
-        .and_then(Value::as_str)
-        .unwrap_or("")
-        .to_string();
-    let mut count_text = state
-        .get("countText")
-        .and_then(Value::as_str)
-        .unwrap_or("")
-        .to_string();
-
-    if key == "Esc" {
-        return to_js(json!({
-            "state": { "mode": "normal", "sequence": "", "countText": "" },
-            "effect": { "kind": "clear-overlays" },
-            "prevent": false
-        }));
-    }
-
-    if mode == "insert" || editable {
-        return to_js(json!({ "state": state, "effect": null, "prevent": false }));
-    }
-
-    if key.len() == 1
-        && key.as_bytes()[0].is_ascii_digit()
-        && sequence.is_empty()
-        && (key != "0" || !count_text.is_empty())
-    {
-        count_text.push_str(key);
-        return to_js(json!({
-            "state": { "mode": "normal", "sequence": "", "countText": count_text },
-            "effect": null,
-            "prevent": true
-        }));
-    }
-
-    sequence.push_str(key);
-    let complete = is_complete_command(&sequence);
-    let prefix = matches!(sequence.as_str(), "g" | "y");
-
-    if complete {
-        let count = parse_count(&count_text);
-        let effect = command_effect(&sequence, count);
-        return to_js(json!({
-            "state": { "mode": effect_mode(&effect), "sequence": "", "countText": "" },
-            "effect": effect,
-            "prevent": true
-        }));
-    }
-
-    if prefix {
-        return to_js(json!({
-            "state": { "mode": "normal", "sequence": sequence, "countText": count_text },
-            "effect": null,
-            "prevent": true
-        }));
-    }
-
-    to_js(json!({
-        "state": { "mode": "normal", "sequence": "", "countText": "" },
-        "effect": null,
-        "prevent": false
-    }))
+pub fn resolve_navigable(query: &str) -> Result<JsValue, JsValue> {
+    let settings = USER_SETTINGS.lock().unwrap();
+    let engines = vomnibar::SearchEngines::from_settings(&settings);
+    to_js(vomnibar::resolve_navigable(query, &engines))
 }
 
 #[wasm_bindgen]
-pub fn background_plan(message: JsValue, context: JsValue) -> Result<JsValue, JsValue> {
-    let message = from_js(message);
-    let context = from_js(context);
-    let command = message.get("command").and_then(Value::as_str).unwrap_or("");
-    let tab = context.get("tab").cloned().unwrap_or(Value::Null);
-    let storage = context.get("storage").cloned().unwrap_or(Value::Null);
+pub fn key_name(event_key: &str) -> String {
+    key_handler::key_name(event_key)
+}
 
-    let plan = match command {
-        "new-tab" => json!({ "op": "create-tab" }),
-        "open-url" => json!({
-            "op": "create-tab",
-            "url": message.get("url").and_then(Value::as_str).unwrap_or("about:blank"),
-            "active": message.get("active").and_then(Value::as_bool).unwrap_or(true)
-        }),
-        "duplicate-tab" => tab_id(&tab)
-            .map(|id| json!({ "op": "duplicate-tab", "tabId": id }))
-            .unwrap_or_else(|| json!({ "op": "none" })),
-        "close-tab" => {
-            if let Some(id) = tab_id(&tab) {
-                json!({
-                    "op": "close-tab",
-                    "tabId": id,
-                    "lastClosedUrl": tab.get("url").and_then(Value::as_str).unwrap_or("")
-                })
-            } else {
-                json!({ "op": "none" })
-            }
+#[wasm_bindgen]
+pub fn is_search_query(query: &str) -> bool {
+    vomnibar::SearchEngines::is_search_query(query)
+}
+
+#[wasm_bindgen]
+pub async fn handle_background_message(message: JsValue) -> Result<JsValue, JsValue> {
+    let msg = from_js(message);
+    let msg_type = msg.get("type").and_then(Value::as_str).unwrap_or("");
+
+    match msg_type {
+        "settings:get" => return settings_get().await,
+        "vimium-crepus" | "" => {
+            let command = msg.get("command").and_then(Value::as_str).unwrap_or("");
+            background::execute_background_command(command, &msg)
+                .await
+                .map_err(|e| JsValue::from_str(&e))?;
+            return to_js(json!({"ok": true}));
         }
-        "restore-tab" => {
-            let url = storage
-                .get("lastClosedUrl")
-                .and_then(Value::as_str)
-                .unwrap_or("");
-            if url.is_empty() {
-                json!({ "op": "none" })
-            } else {
-                json!({ "op": "create-tab", "url": url })
+        _ => {
+            let command = msg.get("handler").and_then(Value::as_str).unwrap_or("");
+            if !command.is_empty() {
+                match command {
+                    "runBackgroundCommand" => {
+                        let empty = json!({});
+                        let registry_entry = msg.get("registryEntry").unwrap_or(&empty);
+                        let cmd_name = registry_entry.get("command").and_then(Value::as_str).unwrap_or("");
+                        background::execute_background_command(cmd_name, &msg)
+                            .await
+                            .map_err(|e| JsValue::from_str(&e))?;
+                        return to_js(json!({"ok": true}));
+                    }
+                    _ => {}
+                }
             }
+            return to_js(json!({"ok": false, "error": format!("unknown message: {}", msg_type)}));
         }
-        "left-tab" => json!({ "op": "move-tab", "delta": -1 }),
-        "right-tab" => json!({ "op": "move-tab", "delta": 1 }),
-        "first-tab" => json!({ "op": "edge-tab", "edge": "first" }),
-        "last-tab" => json!({ "op": "edge-tab", "edge": "last" }),
-        _ => json!({ "op": "none" }),
-    };
-
-    to_js(plan)
-}
-
-fn parse_count(count_text: &str) -> i64 {
-    count_text
-        .parse::<i64>()
-        .ok()
-        .filter(|value| *value > 0)
-        .unwrap_or(1)
-}
-
-fn is_complete_command(command: &str) -> bool {
-    matches!(
-        command,
-        "j" | "k"
-            | "h"
-            | "l"
-            | "d"
-            | "u"
-            | "G"
-            | "r"
-            | "H"
-            | "L"
-            | "?"
-            | "f"
-            | "F"
-            | "/"
-            | "n"
-            | "N"
-            | "i"
-            | "t"
-            | "x"
-            | "X"
-            | "J"
-            | "K"
-            | "p"
-            | "P"
-            | "gg"
-            | "gi"
-            | "yt"
-            | "yy"
-            | "g0"
-            | "g$"
-    )
-}
-
-fn command_effect(command: &str, count: i64) -> Value {
-    match command {
-        "j" => json!({ "kind": "scroll", "x": 0, "y": 80 * count }),
-        "k" => json!({ "kind": "scroll", "x": 0, "y": -80 * count }),
-        "h" => json!({ "kind": "scroll", "x": -120 * count, "y": 0 }),
-        "l" => json!({ "kind": "scroll", "x": 120 * count, "y": 0 }),
-        "d" => json!({ "kind": "half-scroll", "direction": 1, "count": count }),
-        "u" => json!({ "kind": "half-scroll", "direction": -1, "count": count }),
-        "gg" => json!({ "kind": "scroll-top" }),
-        "G" => json!({ "kind": "scroll-bottom" }),
-        "r" => json!({ "kind": "reload" }),
-        "H" => json!({ "kind": "history-back" }),
-        "L" => json!({ "kind": "history-forward" }),
-        "?" => json!({ "kind": "help" }),
-        "f" => json!({ "kind": "hints", "newTab": false }),
-        "F" => json!({ "kind": "hints", "newTab": true }),
-        "/" => json!({ "kind": "find" }),
-        "n" => json!({ "kind": "find-next", "reverse": false }),
-        "N" => json!({ "kind": "find-next", "reverse": true }),
-        "gi" => json!({ "kind": "focus-input" }),
-        "i" => json!({ "kind": "insert-mode" }),
-        "t" => json!({ "kind": "background", "command": "new-tab" }),
-        "x" => json!({ "kind": "background", "command": "close-tab" }),
-        "X" => json!({ "kind": "background", "command": "restore-tab" }),
-        "yt" => json!({ "kind": "background", "command": "duplicate-tab" }),
-        "J" => json!({ "kind": "background", "command": "left-tab" }),
-        "K" => json!({ "kind": "background", "command": "right-tab" }),
-        "g0" => json!({ "kind": "background", "command": "first-tab" }),
-        "g$" => json!({ "kind": "background", "command": "last-tab" }),
-        "yy" => json!({ "kind": "copy-url" }),
-        "p" => json!({ "kind": "open-clipboard", "newTab": false }),
-        "P" => json!({ "kind": "open-clipboard", "newTab": true }),
-        _ => json!({ "kind": "none" }),
     }
 }
 
-fn effect_mode(effect: &Value) -> &'static str {
-    match effect.get("kind").and_then(Value::as_str).unwrap_or("") {
-        "hints" => "hints",
-        "insert-mode" => "insert",
-        _ => "normal",
-    }
-}
-
-fn tab_id(tab: &Value) -> Option<i64> {
-    tab.get("id").and_then(Value::as_i64)
-}
-
-const POPUP_CSS: &str = r#"
-body{margin:0;min-width:360px;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#111315;color:#f5f0e6}
-.vc-popup{display:flex;flex-direction:column;gap:18px;padding:18px;background:linear-gradient(180deg,#16191d 0%,#101214 100%)}
-.vc-header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
-.vc-title{margin:0;font-size:22px;line-height:1;font-weight:800;letter-spacing:0}
+pub const POPUP_CSS: &str = r#"
+body{margin:0;min-width:400px;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#111315;color:#f5f0e6}
+.vc-popup{display:flex;flex-direction:column;gap:16px;padding:16px;background:linear-gradient(180deg,#16191d 0%,#101214 100%)}
+.vc-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.vc-title{margin:0;font-size:20px;line-height:1;font-weight:800;letter-spacing:0}
 .vc-status{font-size:12px;color:#9ca58d;white-space:nowrap}
-.vc-grid{display:grid;grid-template-columns:1fr;gap:12px}
+.vc-grid{display:grid;grid-template-columns:1fr;gap:10px}
 .vc-group{border:1px solid rgba(245,240,230,.11);border-radius:8px;background:rgba(255,255,255,.035);overflow:hidden}
-.vc-group-title{padding:9px 11px;font-size:12px;font-weight:700;text-transform:uppercase;color:#c7b46a;border-bottom:1px solid rgba(245,240,230,.09)}
-.vc-row{display:grid;grid-template-columns:78px 1fr;gap:12px;align-items:center;padding:9px 11px;border-bottom:1px solid rgba(245,240,230,.06)}
+.vc-group-title{padding:8px 10px;font-size:11px;font-weight:700;text-transform:uppercase;color:#c7b46a;border-bottom:1px solid rgba(245,240,230,.09)}
+.vc-row{display:grid;grid-template-columns:72px 1fr;gap:10px;align-items:center;padding:8px 10px;border-bottom:1px solid rgba(245,240,230,.06)}
 .vc-row:last-child{border-bottom:0}
-.vc-keys{font-family:"SFMono-Regular",Consolas,monospace;font-size:12px;color:#141414;background:#d8c66f;border-radius:5px;padding:4px 6px;text-align:center}
-.vc-label{font-size:13px;color:#ddd7c9;line-height:1.35}
-.vc-footer{font-size:12px;line-height:1.45;color:#8d9483}
+.vc-keys{font-family:"SFMono-Regular",Consolas,monospace;font-size:11px;color:#141414;background:#d8c66f;border-radius:4px;padding:3px 5px;text-align:center}
+.vc-label{font-size:12px;color:#ddd7c9;line-height:1.35}
+.vc-footer{font-size:11px;line-height:1.4;color:#8d9483}
 "#;
