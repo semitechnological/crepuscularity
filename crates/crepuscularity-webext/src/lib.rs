@@ -25,8 +25,13 @@ mod api;
 mod capabilities;
 mod manifest;
 mod scanner;
+#[cfg(any(feature = "wasm", test))]
+mod wasm_schema;
 mod watcher;
 pub mod widgets;
+
+#[cfg(feature = "wasm")]
+pub mod wasm;
 
 pub use api::{
     BrowserProgram, BrowserSource, BrowserStatement, JsExpr, MessagePayload, StorageArea,
