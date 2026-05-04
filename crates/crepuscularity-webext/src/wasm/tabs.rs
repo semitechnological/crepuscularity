@@ -147,3 +147,54 @@ where
     let value = send_message_value(tab_id, core::to_js(message)?).await?;
     core::from_js(value)
 }
+
+pub async fn move_tab(tab_id: i64, index: i64) -> Result<Tab> {
+    let tabs = namespace()?;
+    let value = core::call_method(
+        &tabs,
+        "tabs.move",
+        "move",
+        &[
+            JsValue::from_f64(tab_id as f64),
+            core::to_js(&serde_json::json!({"index": index}))?,
+        ],
+    )
+    .await?;
+    core::from_js(value)
+}
+
+pub async fn get_zoom(tab_id: i64) -> Result<f64> {
+    let tabs = namespace()?;
+    let value = core::call_method(
+        &tabs,
+        "tabs.getZoom",
+        "getZoom",
+        &[JsValue::from_f64(tab_id as f64)],
+    )
+    .await?;
+    Ok(value.as_f64().unwrap_or(1.0))
+}
+
+pub async fn set_zoom(tab_id: i64, zoom_factor: f64) -> Result<()> {
+    let tabs = namespace()?;
+    core::call_method(
+        &tabs,
+        "tabs.setZoom",
+        "setZoom",
+        &[JsValue::from_f64(tab_id as f64), JsValue::from_f64(zoom_factor)],
+    )
+    .await?;
+    Ok(())
+}
+
+pub async fn reload(tab_id: i64) -> Result<()> {
+    let tabs = namespace()?;
+    core::call_method(
+        &tabs,
+        "tabs.reload",
+        "reload",
+        &[JsValue::from_f64(tab_id as f64)],
+    )
+    .await?;
+    Ok(())
+}
