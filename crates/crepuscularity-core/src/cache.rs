@@ -10,11 +10,15 @@
 //! The cache is purely additive and safe to delete at any time — a cold cache
 //! just means one extra write per entry on the next run.
 
+#[cfg(not(target_arch = "wasm32"))]
 use std::path::{Path, PathBuf};
 
+#[cfg(not(target_arch = "wasm32"))]
 use sha2::{Digest, Sha256};
 
+#[cfg(not(target_arch = "wasm32"))]
 use crate::analysis::Fingerprint;
+#[cfg(not(target_arch = "wasm32"))]
 use crate::util::bytes_to_hex;
 
 /// An on-disk content-addressed cache for driver pipeline outputs.
