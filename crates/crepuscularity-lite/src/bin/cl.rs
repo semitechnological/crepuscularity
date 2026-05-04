@@ -185,12 +185,15 @@ fn resolve_config_path(dir: &Path) -> Result<PathBuf, String> {
     ))
 }
 
-fn guest_entry_path(config_path: &Path) -> Result<PathBuf, String> {
+fn guest_entry_path(config_path: &Path, dev: bool) -> Result<PathBuf, String> {
     let cfg = CrepusLiteConfig::load_from_path(config_path)
         .map_err(|e| format!("load {}: {e}", config_path.display()))?;
-    let entry = cfg
-        .guest_entry
-        .ok_or_else(|| format!("guest_entry missing in {}", config_path.display()))?;
+    let entry = if dev {
+        cfg.dev_guest_entry.or(cfg.guest_entry)
+    } else {
+        cfg.guest_entry
+    }
+    .ok_or_else(|| format!("guest_entry missing in {}", config_path.display()))?;
     let base = config_path
         .parent()
         .map(Path::to_path_buf)
@@ -202,7 +205,7 @@ fn modified(path: &Path) -> Option<SystemTime> {
     std::fs::metadata(path).ok()?.modified().ok()
 }
 
-fn spawn_gui(config_path: &Path, verbose: bool) -> Result<Child, String> {
+fn spawn_gui(config_path: &Path, verbose: bool, dev: bool) -> Result<Child, String> {
     let root = repo_root()?;
     let abs_config = if config_path.is_absolute() {
         config_path.to_path_buf()
@@ -228,6 +231,7 @@ fn spawn_gui(config_path: &Path, verbose: bool) -> Result<Child, String> {
         .env("SDKROOT", sdkroot())
         .env("CREPUS_LITE_CONFIG", abs_config_canon)
         .env("CREPUS_LITE_BASE", config_base)
+        .env("CREPUS_LITE_MODE", if dev { "dev" } else { "serve" })
         .env("CREPUS_LITE_VERBOSE", if verbose { "1" } else { "0" })
         .stdin(Stdio::inherit())
         .stdout(Stdio::inherit())
@@ -237,7 +241,7 @@ fn spawn_gui(config_path: &Path, verbose: bool) -> Result<Child, String> {
 }
 
 fn run_gui_once(config_path: &Path, verbose: bool) -> Result<(), String> {
-    let status = spawn_gui(config_path, verbose)?
+    let status = spawn_gui(config_path, verbose, false)?
         .wait()
         .map_err(|e| format!("wait cargo run: {e}"))?;
     if status.success() {
@@ -251,33 +255,44 @@ fn run_dev_loop(target: &str, verbose: bool) -> Result<(), String> {
     let dir = resolve_target_dir(target)?;
     detect_project_type(&dir)?;
     let config_path = resolve_config_path(&dir)?;
-    let guest_path = guest_entry_path(&config_path)?;
+    let guest_path = guest_entry_path(&config_path, true)?;
+    let dev_native = CrepusLiteConfig::load_from_path(&config_path)
+        .map(|cfg| cfg.dev_guest_entry.is_some())
+        .unwrap_or(false);
 
-    let mut watch = spawn_bun_watch(&dir)?;
+    let mut watch = if dev_native {
+        None
+    } else {
+        Some(spawn_bun_watch(&dir)?)
+    };
     let mut gui: Child;
     let mut last_seen = modified(&guest_path);
 
-    for _ in 0..120 {
-        if guest_path.exists() {
-            break;
+    if !dev_native {
+        for _ in 0..120 {
+            if guest_path.exists() {
+                break;
+            }
+            thread::sleep(Duration::from_millis(250));
         }
-        thread::sleep(Duration::from_millis(250));
     }
     if !guest_path.exists() {
         return Err(format!(
-            "guest bundle was not created by watch build: {}",
+            "guest entry does not exist: {}",
             guest_path.display()
         ));
     }
 
-    gui = spawn_gui(&config_path, verbose)?;
+    gui = spawn_gui(&config_path, verbose, true)?;
 
     loop {
-        if let Some(status) = watch.try_wait().map_err(|e| format!("watch status: {e}"))? {
-            if !status.success() {
-                return Err("build watch process exited with failure".to_string());
+        if let Some(watch) = watch.as_mut() {
+            if let Some(status) = watch.try_wait().map_err(|e| format!("watch status: {e}"))? {
+                if !status.success() {
+                    return Err("build watch process exited with failure".to_string());
+                }
+                return Ok(());
             }
-            return Ok(());
         }
 
         let current = modified(&guest_path);
@@ -285,11 +300,11 @@ fn run_dev_loop(target: &str, verbose: bool) -> Result<(), String> {
             last_seen = current;
             let _ = gui.kill();
             let _ = gui.wait();
-            gui = spawn_gui(&config_path, verbose)?;
+            gui = spawn_gui(&config_path, verbose, true)?;
         }
 
         if let Some(_status) = gui.try_wait().map_err(|e| format!("gui status: {e}"))? {
-            gui = spawn_gui(&config_path, verbose)?;
+            gui = spawn_gui(&config_path, verbose, true)?;
         }
 
         thread::sleep(Duration::from_millis(300));
@@ -317,12 +332,12 @@ fn scaffold_new(name: &str) -> Result<(), String> {
     .map_err(|e| format!("write build.mjs: {e}"))?;
     std::fs::write(
         dir.join("src/main.ts"),
-        "import { createDomRoot } from \"../../npm/crepus-gpui-runtime/index.js\";\n\nconst root = createDomRoot();\n\nfunction App() {\n  return {\n    type: \"div\",\n    props: {\n      className: \"w-full h-full flex flex-col items-center justify-center gap-3 p-6 bg-zinc-950 text-zinc-100\",\n      children: [\n        { type: \"h1\", props: { className: \"text-2xl font-bold\", children: \"hello crepus\" } },\n        { type: \"p\", props: { className: \"text-sm text-zinc-400\", children: \"DOM-first guest scaffold\" } },\n      ],\n    },\n  };\n}\n\nexport function run() {\n  Crepus.invoke(\"window\", \"setTitle\", JSON.stringify({ title: \"crepus-lite\" }));\n  return root.render(App);\n}\n",
+        "type HostNode = {\n  type: string;\n  text?: string;\n  style?: Record<string, unknown>;\n  children?: HostNode[];\n};\n\nfunction invoke(plugin: string, method: string, payload: unknown) {\n  return JSON.parse(Crepus.invoke(plugin, method, JSON.stringify(payload)));\n}\n\nexport function run() {\n  Crepus.invoke(\"window\", \"setTitle\", JSON.stringify({ title: \"crepus-lite\" }));\n  const tree: HostNode = {\n    type: \"column\",\n    style: {\n      width: 720,\n      height: 480,\n      padding: 24,\n      gap: 12,\n      background: \"#09090b\",\n      color: \"#f4f4f5\",\n    },\n    children: [\n      { type: \"text\", text: \"hello crepus\", style: { fontSize: 24, fontWeight: \"bold\" } },\n      { type: \"text\", text: \"runtime-native TypeScript in dev\" },\n    ],\n  };\n  return invoke(\"host\", \"renderTree\", { tree });\n}\n",
     )
     .map_err(|e| format!("write src/main.ts: {e}"))?;
     std::fs::write(
         dir.join("crepus-lite.example.toml"),
-        "guest_entry = \"dist/guest.js\"\n",
+        "guest_entry = \"dist/guest.js\"\ndev_guest_entry = \"src/main.ts\"\nwatch_guest = true\n",
     )
     .map_err(|e| format!("write toml: {e}"))?;
     println!("created {}", dir.display());
@@ -379,6 +394,25 @@ fn parse_entry_stem(entry: &str) -> String {
         .and_then(|s| s.to_str())
         .unwrap_or("main");
     stem.to_string()
+}
+
+fn supports_native_dev_entry(project_dir: &Path, entry: &str) -> bool {
+    if !(entry.ends_with(".ts")
+        || entry.ends_with(".tsx")
+        || entry.ends_with(".js")
+        || entry.ends_with(".jsx"))
+    {
+        return false;
+    }
+    let Ok(source) = std::fs::read_to_string(project_dir.join(entry)) else {
+        return false;
+    };
+    !source.lines().any(|line| {
+        let trimmed = line.trim_start();
+        trimmed.starts_with("import ")
+            || trimmed.starts_with("export *")
+            || trimmed.contains(" from ")
+    })
 }
 
 fn build_alias_lines() -> &'static str {
@@ -518,9 +552,14 @@ fn init_project(path: &str) -> Result<(), String> {
 
     let config_path = project_dir.join("crepus-lite.toml");
     if !config_path.exists() {
+        let dev_entry = if supports_native_dev_entry(&project_dir, entry) {
+            format!("dev_guest_entry = \"{entry}\"\n")
+        } else {
+            String::new()
+        };
         std::fs::write(
             &config_path,
-            "guest_entry = \"dist/guest.js\"\nwatch_guest = true\n\n[capabilities]\n",
+            format!("guest_entry = \"dist/guest.js\"\n{dev_entry}watch_guest = true\n\n[capabilities]\n"),
         )
         .map_err(|e| format!("write {}: {e}", config_path.display()))?;
     }

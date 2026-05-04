@@ -16,16 +16,22 @@ cli = ["dep:clap"]
 bench-tui = ["cli", "dep:crossterm", "dep:ratatui", "parallel"]
 
 [dependencies]
-crepuscularity-lite-macros = { path = "../crepuscularity-lite-macros" }
+crepuscularity-lite-macros = { path = "../crepuscularity-lite-macros", version = "0.3.2" }
 arboard = "3.6"
 dirs = "6"
-gpui = { workspace = true }
+gpui = { workspace = true, features = ["runtime_shaders"] }
 open = "5.3"
 notify-debouncer-mini = "0.7"
 reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 toml = { workspace = true }
+oxc_allocator = "0.127"
+oxc_codegen = "0.127"
+oxc_parser = "0.127"
+oxc_semantic = "0.127"
+oxc_span = "0.127"
+oxc_transformer = "0.127"
 # V8 147+ requires ICU 2.1.x; pins below unify the transitive ICU tree.
 v8 = "147"
 icu_calendar = "=2.1.1"

@@ -258,7 +258,8 @@ fn expand_view_class_aliases(
                 expand_class_list_in_place(&mut el.classes, aliases);
                 let mut out_cc = Vec::new();
                 for cc in std::mem::take(&mut el.conditional_classes) {
-                    for c in crepuscularity_core::preprocess::expand_class_token(&cc.class, aliases) {
+                    for c in crepuscularity_core::preprocess::expand_class_token(&cc.class, aliases)
+                    {
                         out_cc.push(ConditionalClass {
                             class: c,
                             condition: cc.condition.clone(),

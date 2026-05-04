@@ -55,6 +55,10 @@ pub struct CrepusLiteConfig {
     pub guest_prelude: Vec<String>,
     /// Relative path (from config base dir) to a UTF-8 script executed with [`V8Host::eval`](crate::v8_host::V8Host).
     pub guest_entry: Option<String>,
+    /// Optional development entry. When `CREPUS_LITE_MODE=dev`, this path is preferred over
+    /// [`Self::guest_entry`] and may point at TypeScript / TSX that is transpiled in-process by Oxc.
+    #[serde(default)]
+    pub dev_guest_entry: Option<String>,
     #[serde(default)]
     pub watch_guest: bool,
     /// Optional auto-rerender interval for apps that need native background progress updates.
@@ -161,7 +165,7 @@ impl CrepusLiteConfig {
         base: &Path,
         merged_prelude: &str,
     ) -> Option<String> {
-        let rel = self.guest_entry.as_ref()?;
+        let rel = self.active_guest_entry()?;
         let body = std::fs::read_to_string(base.join(rel)).ok()?;
         let mut out = merged_prelude.to_string();
         out.push_str(&body);
@@ -172,7 +176,7 @@ impl CrepusLiteConfig {
     /// files in order. Returns `None` if `guest_entry` is unset, any prelude path is missing, or the entry file
     /// is unreadable.
     pub fn guest_source(&self, base: &Path) -> Option<String> {
-        let rel = self.guest_entry.as_ref()?;
+        let rel = self.active_guest_entry()?;
         let prelude = self.guest_prelude_merged(base)?;
         let body = std::fs::read_to_string(base.join(rel)).ok()?;
         let mut out = prelude;
@@ -180,9 +184,22 @@ impl CrepusLiteConfig {
         Some(out)
     }
 
+    /// Active guest entry path for the current mode. `dev_guest_entry` is only selected when the
+    /// process explicitly sets `CREPUS_LITE_MODE=dev`; normal `serve` and packaged builds use
+    /// `guest_entry`.
+    pub fn active_guest_entry(&self) -> Option<&str> {
+        if std::env::var("CREPUS_LITE_MODE").ok().as_deref() == Some("dev") {
+            self.dev_guest_entry
+                .as_deref()
+                .or(self.guest_entry.as_deref())
+        } else {
+            self.guest_entry.as_deref()
+        }
+    }
+
     /// Absolute path to the guest script when it exists on disk (`base` + `guest_entry`, then canonicalize).
     pub fn resolved_guest_path(&self, base: &Path) -> Option<PathBuf> {
-        let rel = self.guest_entry.as_ref()?;
+        let rel = self.active_guest_entry()?;
         let p = base.join(rel);
         p.canonicalize().ok()
     }
@@ -193,7 +210,7 @@ impl CrepusLiteConfig {
     pub fn guest_watch_paths(&self, base: &Path) -> Vec<PathBuf> {
         let mut paths = Vec::new();
         let mut seen = HashSet::new();
-        if let Some(rel) = self.guest_entry.as_ref() {
+        if let Some(rel) = self.active_guest_entry() {
             let path = base.join(rel);
             if path.exists() {
                 let path = path.canonicalize().unwrap_or(path);
