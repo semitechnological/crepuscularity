@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+body{margin:0;background:#111315;color:#f5f0e6;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+#root{min-width:400px}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="../vendor/runtime.js"></script>
+<script>
+(async () => {
+  const wasmBytes = await fetch("../vendor/runtime_bg.wasm").then((r) => r.arrayBuffer());
+  await wasm_bindgen(wasmBytes);
+  const resp = await wasm_bindgen.render_popup({});
+  document.getElementById("root").innerHTML = resp.html;
+  const style = document.createElement("style");
+  style.textContent = resp.css;
+  document.head.append(style);
+})();
+</script>
+</body>
+</html>
