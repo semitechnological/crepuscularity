@@ -5,6 +5,7 @@ use std::sync::Arc;
 
 use crate::bridge::Bridge;
 use crate::config::CrepusLiteConfig;
+use crate::guest_compiler::prepare_guest_source;
 use crate::v8_host::V8Host;
 
 /// Shared merged prelude text for a benchmark matrix when every config lists the same [`CrepusLiteConfig::guest_prelude`] paths.
@@ -43,6 +44,10 @@ pub fn eval_guest_from_config(base: &Path, config: &CrepusLiteConfig) -> Result<
     let script = config
         .guest_source(base)
         .ok_or_else(|| "guest_entry, prelude, or file read failed".to_string())?;
+    let path = config
+        .resolved_guest_path(base)
+        .unwrap_or_else(|| base.join(config.active_guest_entry().unwrap_or("guest.js")));
+    let script = prepare_guest_source(&path, &script)?;
     eval_guest_from_script(config.build_bridge(), &script)
 }
 
@@ -55,6 +60,10 @@ pub fn eval_guest_from_config_with_shared(
     let script = config
         .guest_source_with_merged_prelude(base, &shared.prelude_merged)
         .ok_or_else(|| "guest_entry or file read failed".to_string())?;
+    let path = config
+        .resolved_guest_path(base)
+        .unwrap_or_else(|| base.join(config.active_guest_entry().unwrap_or("guest.js")));
+    let script = prepare_guest_source(&path, &script)?;
     eval_guest_from_script(config.build_bridge(), &script)
 }
 

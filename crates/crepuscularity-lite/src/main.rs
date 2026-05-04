@@ -9,7 +9,7 @@ use std::{
 use crepuscularity_lite::config::CrepusLiteConfig;
 use crepuscularity_lite::host::{HostNode, HostSnapshot, HostStyle};
 use crepuscularity_lite::integration::{apply_window_deferred, take_app_exit_request};
-use crepuscularity_lite::{Bridge, V8ThreadRuntime};
+use crepuscularity_lite::{prepare_guest_source, Bridge, V8ThreadRuntime};
 use gpui::AnyElement;
 use gpui::ClickEvent;
 use gpui::{
@@ -288,9 +288,24 @@ impl LiteRoot {
             .unwrap_or_else(|_| std::env::current_dir().unwrap_or_default());
         let verbose = std::env::var("CREPUS_LITE_VERBOSE").ok().as_deref() == Some("1");
         if let Some(script) = self.config.guest_source(&base) {
+            let guest_path = self.config.resolved_guest_path(&base).unwrap_or_else(|| {
+                base.join(self.config.active_guest_entry().unwrap_or("guest.js"))
+            });
+            let script = match prepare_guest_source(&guest_path, &script) {
+                Ok(script) => script,
+                Err(e) => {
+                    eprintln!("crepus-lite: guest compile error: {e}");
+                    apply_window_deferred(&self.bridge, window);
+                    cx.notify();
+                    return;
+                }
+            };
             if verbose {
                 eprintln!("crepus-lite: loading guest from {}", base.display());
-                eprintln!("crepus-lite: config guest_entry={:?}", self.config.guest_entry);
+                eprintln!(
+                    "crepus-lite: active guest_entry={:?}",
+                    self.config.active_guest_entry()
+                );
                 eprintln!("crepus-lite: guest source bytes={}", script.len());
             }
             let entrypoint = r#"
@@ -363,9 +378,14 @@ impl LiteRoot {
                         entity.update(app, |root, cx| {
                             match result {
                                 Ok(Ok(s)) => {
-                                    if std::env::var("CREPUS_LITE_VERBOSE").ok().as_deref() == Some("1") {
+                                    if std::env::var("CREPUS_LITE_VERBOSE").ok().as_deref()
+                                        == Some("1")
+                                    {
                                         eprintln!("crepus-lite: guest returned {} bytes", s.len());
-                                        eprintln!("crepus-lite: guest result preview={}", s.lines().next().unwrap_or("<empty>"));
+                                        eprintln!(
+                                            "crepus-lite: guest result preview={}",
+                                            s.lines().next().unwrap_or("<empty>")
+                                        );
                                     }
                                     if bench_log_result_enabled() {
                                         let line: String =
@@ -424,7 +444,8 @@ fn example_name_from_config() -> Option<(&'static str, &'static str)> {
     let config_path = std::env::var("CREPUS_LITE_CONFIG").ok()?;
     let config_dir = std::path::Path::new(&config_path).parent()?;
     let example_name = config_dir.file_name()?.to_str()?;
-    EXAMPLES.iter()
+    EXAMPLES
+        .iter()
         .find(|(n, _)| *n == example_name)
         .map(|&(n, d)| (n, d))
 }
@@ -447,7 +468,10 @@ fn main() {
                 example_idx = n - 1;
             }
         }
-        (EXAMPLES[example_idx].0.to_string(), EXAMPLES[example_idx].1.to_string())
+        (
+            EXAMPLES[example_idx].0.to_string(),
+            EXAMPLES[example_idx].1.to_string(),
+        )
     };
 
     let example_dir = base.join("examples").join(&example_name);

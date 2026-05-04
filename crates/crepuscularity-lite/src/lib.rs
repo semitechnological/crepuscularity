@@ -1,9 +1,9 @@
 //! **crepuscularity-lite** — embed a V8 guest + Capacitor-shaped Rust bridge inside a GPUI (or other) host.
 //!
-//! There is **no built-in JavaScript compiler** in this crate: guests are UTF-8 sources (often
-//! concatenated prelude + entry) passed to [`V8Host::eval`]. Bundling, chunking, and code
-//! splitting are the embedder’s or a separate toolchain’s job; use multiple sources with
-//! [`config::CrepusLiteConfig::guest_prelude`] or separate worker scripts (see `docs/THREADING.md`).
+//! Development can run TypeScript / TSX guest entries through the built-in Oxc transpiler. Production
+//! bundling, chunking, and code splitting are still the embedder’s or CLI toolchain’s job; use the
+//! `cl build` esbuild path for bundled output, or multiple sources with
+//! [`config::CrepusLiteConfig::guest_prelude`] / separate worker scripts (see `docs/THREADING.md`).
 //!
 //! ## How this relates to GPUI and Rust
 //!
@@ -22,6 +22,7 @@ pub mod bridge;
 pub mod clipboard;
 pub mod download_plugin;
 mod fs_paths;
+pub mod guest_compiler;
 pub mod host;
 pub mod host_queue;
 pub mod integration;
@@ -39,6 +40,7 @@ pub use bench_eval::{
 pub use bench_plugin::BenchPlugin;
 pub use bridge::{Bridge, BridgeError, Capability, NativePlugin};
 pub use download_plugin::DownloadPlugin;
+pub use guest_compiler::prepare_guest_source;
 pub use host::{HostEventRecord, HostNode, HostRoute, HostSnapshot, HostState, HostStyle};
 pub use host_queue::{DeferredWindowDecorations, HostCommandQueue, HostDeferred};
 pub use plugins::{AppPlugin, ClipboardPlugin, CorePlugin, FsPlugin, HostPlugin, WindowPlugin};
