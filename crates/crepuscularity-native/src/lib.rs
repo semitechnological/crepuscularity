@@ -4,8 +4,8 @@
 //! ## Crate layout
 //! - [`ir`] — serializable `ViewIr` / `ViewNode` / `ViewStyle` (the **contract** with shells).
 //! - [`style`] — Tailwind-like class → style hints (extend here for GPUI parity).
-//! - [`include_expand`] — `include` → `(Vec<Node>, TemplateContext)` without IR cycles.
-//! - [`render`] — AST lowering and public `render_*` entry points.
+//! - `include_expand` — `include` → `(Vec<Node>, TemplateContext)` without IR cycles.
+//! - `render` — AST lowering and public `render_*` entry points.
 //! - [`mutations`] — renderer-agnostic, path-based IR mutations and diffing.
 //! - [`hot_reload`] — structured hot-reload protocol + conservative AST gate.
 //!
