@@ -315,7 +315,7 @@ pub fn run(opts: ServeOptions) {
 /// Walk `site_dir` recursively and load every `*.crepus` file into `vfm`.
 fn load_all_crepus(site_dir: &Path, vfm: &Arc<RwLock<HashMap<String, String>>>) {
     let mut paths = vec![];
-    load_dir_recursive_collect(site_dir, site_dir, &mut paths);
+    load_dir_recursive_collect(site_dir, &mut paths);
     let results: Vec<(String, String)> = paths
         .par_iter()
         .filter_map(|path| {
@@ -331,7 +331,7 @@ fn load_all_crepus(site_dir: &Path, vfm: &Arc<RwLock<HashMap<String, String>>>) 
     }
 }
 
-fn load_dir_recursive_collect(root: &Path, dir: &Path, paths: &mut Vec<PathBuf>) {
+fn load_dir_recursive_collect(dir: &Path, paths: &mut Vec<PathBuf>) {
     let Ok(entries) = std::fs::read_dir(dir) else {
         return;
     };
@@ -345,7 +345,7 @@ fn load_dir_recursive_collect(root: &Path, dir: &Path, paths: &mut Vec<PathBuf>)
             ) {
                 continue;
             }
-            load_dir_recursive_collect(root, &path, paths);
+            load_dir_recursive_collect(&path, paths);
         } else if path.extension().is_some_and(|e| e == "crepus") {
             paths.push(path);
         }

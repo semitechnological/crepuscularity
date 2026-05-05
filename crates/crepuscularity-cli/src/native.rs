@@ -3,10 +3,6 @@
 //! Scaffold and build native iOS (SwiftUI) and Android (Jetpack Compose) apps
 //! that use View IR to render .crepus templates.
 
-use std::fs;
-use std::path::Path;
-use std::process::Command;
-
 use console::style;
 
 use crate::ui;
@@ -47,7 +43,7 @@ pub fn run(args: &[String]) {
     }
 }
 
-fn scaffold_native_app(name: &str) {
+fn scaffold_native_app(_name: &str) {
     ui::error("Native app scaffolding not implemented yet - coming soon!");
 }
 

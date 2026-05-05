@@ -5,7 +5,6 @@
 
 use std::fs;
 use std::path::Path;
-use std::process::Command;
 
 use console::style;
 
@@ -34,7 +33,7 @@ fn scaffold_tui_app(name: &str) {
     let dir = Path::new(name);
 
     // Create directory structure
-    fs::create_dir_all(&dir).unwrap_or_else(|e| {
+    fs::create_dir_all(dir).unwrap_or_else(|e| {
         ui::error(&format!("failed to create directory: {}", e));
     });
 

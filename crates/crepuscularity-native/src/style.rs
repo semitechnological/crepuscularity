@@ -269,12 +269,9 @@ fn apply_layout_class(hints: &mut StackLayoutHints, class: &str, ctx: Option<&Te
         }
     }
     if let Some(rest) = class.strip_prefix("max-w-") {
-        match rest {
-            "none" => {
-                s.max_width = Some(-2.0);
-                return;
-            }
-            _ => {}
+        if rest == "none" {
+            s.max_width = Some(-2.0);
+            return;
         }
         if let Some(v) = parse_size(rest) {
             s.max_width = Some(v);
@@ -804,7 +801,6 @@ fn apply_text_class(s: &mut ViewStyle, class: &str, ctx: Option<&TemplateContext
         let stripped = inner.strip_suffix("px").unwrap_or(inner);
         if let Ok(v) = stripped.parse::<f32>() {
             s.corner_radius = Some(v);
-            return;
         }
     }
 }
@@ -872,7 +868,6 @@ fn apply_position_class(s: &mut ViewStyle, class: &str) {
     if let Some(rest) = class.strip_prefix("left-") {
         if let Some(v) = parse_spacing(rest) {
             s.left = Some(v);
-            return;
         }
     }
 }
@@ -913,7 +908,6 @@ fn apply_transform_class(s: &mut ViewStyle, class: &str) {
     if let Some(rest) = class.strip_prefix("rotate-") {
         if let Ok(v) = rest.parse::<f32>() {
             s.rotate = Some(v);
-            return;
         }
     }
 }
@@ -961,7 +955,6 @@ fn apply_shadow_class(s: &mut ViewStyle, class: &str) {
         if let Some(inner) = rest.strip_suffix(']') {
             if let Some(hex) = resolve_arbitrary_color(inner) {
                 s.shadow_color = Some(hex);
-                return;
             }
         }
     }
@@ -1003,7 +996,6 @@ fn apply_text_layout_class(s: &mut ViewStyle, class: &str) {
     if let Some(rest) = class.strip_prefix("line-clamp-") {
         if let Ok(n) = rest.parse::<i32>() {
             s.line_clamp = Some(n);
-            return;
         }
     }
 }
@@ -1013,27 +1005,21 @@ fn apply_cursor_class(s: &mut ViewStyle, class: &str) {
     match class {
         "cursor-auto" => {
             s.cursor = Some("auto".into());
-            return;
         }
         "cursor-default" => {
             s.cursor = Some("default".into());
-            return;
         }
         "cursor-pointer" => {
             s.cursor = Some("pointer".into());
-            return;
         }
         "cursor-text" => {
             s.cursor = Some("text".into());
-            return;
         }
         "cursor-move" => {
             s.cursor = Some("move".into());
-            return;
         }
         "cursor-wait" => {
             s.cursor = Some("wait".into());
-            return;
         }
         _ => {}
     }
@@ -1044,19 +1030,15 @@ fn apply_user_select_class(s: &mut ViewStyle, class: &str) {
     match class {
         "select-none" => {
             s.user_select = Some("none".into());
-            return;
         }
         "select-text" => {
             s.user_select = Some("text".into());
-            return;
         }
         "select-all" => {
             s.user_select = Some("all".into());
-            return;
         }
         "select-auto" => {
             s.user_select = Some("auto".into());
-            return;
         }
         _ => {}
     }
