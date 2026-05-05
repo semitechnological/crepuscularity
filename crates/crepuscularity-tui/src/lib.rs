@@ -108,7 +108,8 @@ mod tests;
 pub use crepuscularity_core::{
     parse_component_file, parse_template, TemplateContext, TemplateValue,
 };
+pub use crepuscularity_macros::template_refs;
 pub use ratatui;
 pub use render::{paint_node, render_component, render_nodes, render_template};
 pub use style::parse_classes;
-pub use template::{draw, template, Template};
+pub use template::{draw, template, ElementRef, Template};
