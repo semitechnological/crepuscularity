@@ -79,6 +79,79 @@ pub(crate) fn alloc_id() -> NodeId {
     })
 }
 
+pub(crate) struct ObserverGuard {
+    previous: Option<NodeId>,
+}
+
+impl Drop for ObserverGuard {
+    fn drop(&mut self) {
+        RUNTIME.with(|rt| rt.borrow_mut().current_observer = self.previous);
+    }
+}
+
+pub(crate) fn enter_observer(id: NodeId) -> ObserverGuard {
+    let previous = RUNTIME.with(|rt| {
+        let mut rt = rt.borrow_mut();
+        let previous = rt.current_observer;
+        rt.current_observer = Some(id);
+        previous
+    });
+    ObserverGuard { previous }
+}
+
+pub(crate) fn clear_observer_sources(id: NodeId) {
+    let old_sources = NODES.with(|nodes| {
+        let nodes = nodes.borrow();
+        match nodes.get(&id) {
+            Some(AnyNode::Memo(m)) => m.sources.clone(),
+            Some(AnyNode::Effect(e)) => e.sources.clone(),
+            _ => vec![],
+        }
+    });
+
+    for source_id in &old_sources {
+        NODES.with(|nodes| {
+            let mut nodes = nodes.borrow_mut();
+            match nodes.get_mut(source_id) {
+                Some(AnyNode::Signal(s)) => s.subscribers.retain(|&x| x != id),
+                Some(AnyNode::Memo(m)) => m.subscribers.retain(|&x| x != id),
+                _ => {}
+            }
+        });
+    }
+
+    NODES.with(|nodes| {
+        let mut nodes = nodes.borrow_mut();
+        match nodes.get_mut(&id) {
+            Some(AnyNode::Memo(m)) => m.sources.clear(),
+            Some(AnyNode::Effect(e)) => e.sources.clear(),
+            _ => {}
+        }
+    });
+}
+
+pub(crate) fn remove_node(id: NodeId) {
+    clear_observer_sources(id);
+    RUNTIME.with(|rt| {
+        let mut rt = rt.borrow_mut();
+        rt.pending_effects.retain(|&effect_id| effect_id != id);
+        if rt.current_observer == Some(id) {
+            rt.current_observer = None;
+        }
+    });
+    NODES.with(|nodes| {
+        let mut nodes = nodes.borrow_mut();
+        nodes.remove(&id);
+        for node in nodes.values_mut() {
+            match node {
+                AnyNode::Signal(signal) => signal.subscribers.retain(|&x| x != id),
+                AnyNode::Memo(memo) => memo.subscribers.retain(|&x| x != id),
+                AnyNode::Effect(_) => {}
+            }
+        }
+    });
+}
+
 /// Record that `source_id` was read by the current observer.
 pub(crate) fn track_read(source_id: NodeId) {
     let observer = RUNTIME.with(|rt| rt.borrow().current_observer);
@@ -150,7 +223,6 @@ pub(crate) fn mark_subscribers_dirty(source_id: NodeId) {
                 }
             });
         } else {
-            // It's a memo: mark as Check and propagate
             NODES.with(|nodes| {
                 if let Some(AnyNode::Memo(m)) = nodes.borrow_mut().get_mut(&sub_id) {
                     if m.state == State::Clean {
@@ -158,8 +230,7 @@ pub(crate) fn mark_subscribers_dirty(source_id: NodeId) {
                     }
                 }
             });
-            // Propagate Check to memo's subscribers
-            mark_subscribers_dirty(sub_id);
+            crate::memo::run_memo_if_needed(sub_id);
         }
     }
 }

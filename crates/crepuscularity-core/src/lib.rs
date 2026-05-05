@@ -1,3 +1,8 @@
+//! Shared parser, evaluator, preprocessing, and analysis primitives for Crepuscularity.
+//!
+//! Backend crates use this crate as the source of truth for `.crepus` syntax. Keep changes here
+//! mirrored into macro-facing code when the same syntax should work at compile time and runtime.
+
 pub mod analysis;
 pub mod ast;
 pub mod cache;

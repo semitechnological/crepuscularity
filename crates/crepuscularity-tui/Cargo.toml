@@ -1,6 +1,6 @@
 [package]
 name = "crepuscularity-tui"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 license = "MPL-2.0"
 description = "Ratatui backend for the Crepuscularity .crepus DSL — write full-screen terminal UIs with nested div layouts."
@@ -8,8 +8,8 @@ repository = "https://github.com/semitechnological/crepuscularity"
 readme = "../../README.md"
 
 [dependencies]
-crepuscularity-core = { path = "../crepuscularity-core", version = "0.3.1" }
-crepuscularity_macros = { path = "../crepuscularity_macros", version = "0.4.0" }
+crepuscularity-core = { path = "../crepuscularity-core", version = "0.3.2" }
+crepuscularity_macros = { path = "../crepuscularity_macros", version = "0.4.1" }
 ratatui = { workspace = true }
 
 [dev-dependencies]

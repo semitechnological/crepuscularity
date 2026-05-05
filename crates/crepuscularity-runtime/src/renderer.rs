@@ -312,7 +312,15 @@ fn render_include(inc: &IncludeNode, ctx: &TemplateContext) -> AnyElement {
     }
 
     // Single-component file: resolve path relative to the current file's directory.
-    let file_path = resolve_include_path(ctx.base_dir.as_deref(), &inc.path);
+    let file_path = match resolve_include_path(ctx.base_dir.as_deref(), &inc.path) {
+        Ok(path) => path,
+        Err(msg) => {
+            return div()
+                .text_color(rgb(0xff4444))
+                .child(SharedString::from(msg))
+                .into_any_element();
+        }
+    };
 
     let content = match std::fs::read_to_string(&file_path) {
         Ok(c) => c,
@@ -352,14 +360,34 @@ fn render_include(inc: &IncludeNode, ctx: &TemplateContext) -> AnyElement {
     render_nodes(&nodes, &child_ctx)
 }
 
-fn resolve_include_path(base_dir: Option<&std::path::Path>, path: &str) -> std::path::PathBuf {
+fn resolve_include_path(
+    base_dir: Option<&std::path::Path>,
+    path: &str,
+) -> Result<std::path::PathBuf, String> {
+    let requested = std::path::Path::new(path);
+    if requested.is_absolute()
+        || requested
+            .components()
+            .any(|component| matches!(component, std::path::Component::ParentDir))
+    {
+        return Err(format!("include path outside base dir: {path}"));
+    }
+
     let candidate = if let Some(base) = base_dir {
-        base.join(path)
+        base.join(requested)
     } else {
-        std::path::PathBuf::from(path)
+        requested.to_path_buf()
     };
 
-    std::fs::canonicalize(&candidate).unwrap_or(candidate)
+    let resolved = std::fs::canonicalize(&candidate).unwrap_or(candidate);
+    if let Some(base) = base_dir {
+        if let Ok(base) = std::fs::canonicalize(base) {
+            if !resolved.starts_with(&base) {
+                return Err(format!("include path outside base dir: {path}"));
+            }
+        }
+    }
+    Ok(resolved)
 }
 
 /// Render a named component from a multi-component file (`path#Name` syntax).
@@ -369,7 +397,15 @@ fn render_named_component(
     file_part: &str,
     comp_name: &str,
 ) -> AnyElement {
-    let file_path = resolve_include_path(ctx.base_dir.as_deref(), file_part);
+    let file_path = match resolve_include_path(ctx.base_dir.as_deref(), file_part) {
+        Ok(path) => path,
+        Err(msg) => {
+            return div()
+                .text_color(rgb(0xff4444))
+                .child(SharedString::from(msg))
+                .into_any_element();
+        }
+    };
 
     let content = match std::fs::read_to_string(&file_path) {
         Ok(c) => c,
@@ -431,4 +467,21 @@ fn render_named_component(
     }
 
     render_nodes(&comp.nodes, &child_ctx)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::resolve_include_path;
+
+    #[test]
+    fn include_path_rejects_parent_dir() {
+        let err = resolve_include_path(None, "../secret.crepus").unwrap_err();
+        assert!(err.contains("include path outside base dir"));
+    }
+
+    #[test]
+    fn include_path_rejects_absolute_path() {
+        let err = resolve_include_path(None, "/tmp/secret.crepus").unwrap_err();
+        assert!(err.contains("include path outside base dir"));
+    }
 }

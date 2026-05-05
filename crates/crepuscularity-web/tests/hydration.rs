@@ -1,8 +1,19 @@
 //! Tests for the `hydration` feature flag.
 #![cfg(feature = "hydration")]
 
+use base64::{engine::general_purpose::STANDARD, Engine as _};
 use crepuscularity_core::TemplateContext;
 use crepuscularity_web::render_template_to_html_with_hydration;
+
+fn hydration_context_json(html: &str) -> String {
+    let needle = "id=\"__crepus_ctx__\"";
+    let start = html.find(needle).expect("hydration context script");
+    let after = &html[start..];
+    let b64_start = after.find('>').expect("script open") + 1;
+    let b64_end = after[b64_start..].find("</script>").expect("script close") + b64_start;
+    let b64 = &after[b64_start..b64_end];
+    String::from_utf8(STANDARD.decode(b64).expect("base64 context")).expect("utf-8 context")
+}
 
 #[test]
 fn hydration_injects_root_marker() {
@@ -16,8 +27,12 @@ fn hydration_injects_root_marker() {
         "expected data-crepus-root, got: {html}"
     );
     assert!(
-        html.contains("__crepus_ctx__"),
+        html.contains("id=\"__crepus_ctx__\""),
         "expected __crepus_ctx__, got: {html}"
+    );
+    assert!(
+        html.contains("type=\"application/json\""),
+        "expected non-executable hydration script, got: {html}"
     );
 }
 
@@ -43,12 +58,32 @@ fn hydration_ctx_json_contains_vars() {
     ctx.set("city", "London");
     ctx.set("temp", 14i64);
     let html = render_template_to_html_with_hydration(tpl, &ctx).unwrap();
+    let json = hydration_context_json(&html);
     assert!(
-        html.contains("\"city\""),
-        "expected city key in ctx JSON, got: {html}"
+        json.contains("\"city\""),
+        "expected city key in ctx JSON, got: {json}"
     );
     assert!(
-        html.contains("\"London\""),
-        "expected London value in ctx JSON, got: {html}"
+        json.contains("\"London\""),
+        "expected London value in ctx JSON, got: {json}"
     );
+}
+
+#[test]
+fn hydration_context_does_not_allow_script_breakout() {
+    let tpl = r#"div
+  "Hello""#;
+    let mut ctx = TemplateContext::new();
+    ctx.set("payload", "</script><script>alert(1)</script>\u{2028}<>&");
+    let html = render_template_to_html_with_hydration(tpl, &ctx).unwrap();
+    assert!(
+        !html.contains("</script><script>"),
+        "raw script breakout sequence leaked into hydration HTML: {html}"
+    );
+    assert!(
+        !html.contains("window.__crepus_ctx__"),
+        "hydration context must not be emitted as executable JavaScript: {html}"
+    );
+    let json = hydration_context_json(&html);
+    assert!(json.contains("</script><script>alert(1)</script>"));
 }

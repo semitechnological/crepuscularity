@@ -1,8 +1,7 @@
-/// Crepuscularity — general syntax/runtime crate.
-///
-/// Separate backends live in dedicated crates:
-/// - `crepuscularity-web` for HTML and JSX/TSX rendering
-/// - `crepuscularity-gpui` for GPUI rendering
+//! Convenience facade for Crepuscularity applications.
+//!
+//! The backend crates remain independently usable. This crate re-exports the shared core syntax
+//! APIs plus the HTML/WASM renderer for applications that want one dependency.
 pub use crepuscularity_core as core;
 pub use crepuscularity_web as html;
 pub use crepuscularity_web as web;

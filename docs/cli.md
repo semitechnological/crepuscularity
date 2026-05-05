@@ -261,10 +261,12 @@ Example output:
 
 ## Environment
 
-On macOS, GPUI requires the Xcode SDK path:
+On macOS, GPUI requires the Xcode SDK path and, on Xcode installs with a separate Metal Toolchain component, the matching toolchain selector:
 
 ```bash
 export SDKROOT=$(xcrun --show-sdk-path)
+export DEVELOPER_DIR=$(xcode-select -p)
+export TOOLCHAINS=Metal
 ```
 
-Add this to your shell profile to avoid repeating it.
+From the repository checkout, use `eval "$(scripts/metal-env.sh)"` to export those values and prepend the downloaded `Metal.xctoolchain/usr/bin` to `PATH` for direct `metal` / `metallib` checks. `TOOLCHAINS` is the environment variable `xcrun` reads when GPUI's build script runs `xcrun -sdk macosx metal`; on current Xcode installs the working selector is the short value `Metal`. Use `scripts/metal-env.sh --check` to verify local state without network access.

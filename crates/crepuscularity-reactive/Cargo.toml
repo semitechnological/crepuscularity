@@ -1,6 +1,6 @@
 [package]
 name = "crepuscularity-reactive"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 license = "MPL-2.0"
 description = "Reactive signals for Crepuscularity WASM clients (UNSTABLE; in active development)."
@@ -19,6 +19,7 @@ default = []
 dom = ["dep:web-sys", "dep:wasm-bindgen", "dep:js-sys"]
 
 [dependencies]
+base64 = { workspace = true }
 serde_json = { workspace = true }
 web-sys = { workspace = true, optional = true, features = [
     "Document",

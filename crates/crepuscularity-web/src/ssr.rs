@@ -82,13 +82,44 @@ pub fn render_from_files_with_ssr(
         let content = files
             .get(file_part)
             .ok_or_else(|| format!("file not found in virtual fs: {file_part}"))?;
-        return crate::render_component_file_to_html(content, comp_name, &ctx);
+        return render_component_file_to_html_with_ssr(content, comp_name, &ctx, markers);
     }
 
     let content = files
         .get(entry)
         .ok_or_else(|| format!("file not found in virtual fs: {entry}"))?;
     render_template_to_html_with_ssr(content, &ctx, markers)
+}
+
+fn render_component_file_to_html_with_ssr(
+    content: &str,
+    component_name: &str,
+    ctx: &TemplateContext,
+    markers: bool,
+) -> Result<String, String> {
+    if !markers {
+        return crate::render_component_file_to_html(content, component_name, ctx);
+    }
+
+    let file = parse_component_file(content)?;
+    let component = file
+        .components
+        .get(component_name)
+        .ok_or_else(|| format!("component not found: {component_name}"))?;
+
+    let mut child_ctx = ctx.clone();
+    for (key, expr) in &component.meta.defaults {
+        child_ctx
+            .vars
+            .entry(key.clone())
+            .or_insert_with(|| eval_expr(expr, &TemplateContext::new()));
+    }
+
+    let counter = Cell::new(0u32);
+    let mut bind = BindMap::new();
+    let mut html = render_nodes_ssr(&component.nodes, &child_ctx, &counter, &mut bind, true)?;
+    append_hydration_payload(&mut html, &child_ctx, &bind)?;
+    Ok(html)
 }
 
 /// Parse `crepus-bundle.json` and render with optional SSR markers.
@@ -618,7 +649,7 @@ fn render_include_ssr(
     let inner = if let Some((file_part, comp_name)) = inc.path.split_once('#') {
         render_named_component_ssr(inc, ctx, file_part, comp_name, counter, bind)?
     } else {
-        let file_path = crate::resolve_include_path(ctx.base_dir.as_deref(), &inc.path);
+        let file_path = crate::resolve_include_path(ctx.base_dir.as_deref(), &inc.path)?;
         let content = crate::read_file(ctx, &file_path)?;
         let nodes = parse_template(&content).map_err(|e| format!("include parse error: {e}"))?;
         let mut child_ctx = TemplateContext::new();
@@ -645,7 +676,7 @@ fn render_named_component_ssr(
     counter: &Cell<u32>,
     bind: &mut BindMap,
 ) -> Result<String, String> {
-    let file_path = crate::resolve_include_path(ctx.base_dir.as_deref(), file_part);
+    let file_path = crate::resolve_include_path(ctx.base_dir.as_deref(), file_part)?;
     let content = crate::read_file(ctx, &file_path)?;
     let comp_file =
         parse_component_file(&content).map_err(|e| format!("component file parse error: {e}"))?;

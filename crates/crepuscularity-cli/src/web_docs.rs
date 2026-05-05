@@ -181,7 +181,12 @@ fn doc_blurb(stem: &str) -> String {
         "dsl" => "Indent and JSX-style syntax, control flow, attributes, animations.",
         "components" => "include, slots, defaults, and multi-component files.",
         "cli" => "new, dev, build, web, webext, preview, and more.",
+        "production" => "release gates, security boundaries, and performance checks.",
+        "runtime" => "state model, update lifecycle, hydration, and Metal setup.",
         "webext" => "Manifest V3 extensions from .crepus and Rust.",
+        "gpui" => "native desktop rendering with GPUI.",
+        "native" => "SwiftUI and Jetpack Compose shells from View IR.",
+        "tui" => "terminal UI rendering from .crepus templates.",
         _ => "Documentation page.",
     })
 }
@@ -452,77 +457,12 @@ fn render_doc_shell(
     .doc-shell > * {{
       min-width: 0;
     }}
-    @media (max-width: 860px) {{
-      .doc-shell {{ grid-template-columns: auto 1fr; }}
-      aside {{
-        display: block;
-        width: 60px;
-        position: relative;
-        height: 100vh;
-        padding: 1rem 0.5rem;
-      }}
-      aside .doc-nav, aside .doc-toc, aside .doc-search-trigger, aside .doc-footer {{
-        display: none;
-      }}
-      aside.mobile-expanded {{
-        width: 280px;
-        position: fixed;
-        top: 0;
-        left: 0;
-        height: 100vh;
-        z-index: 100;
-        background: var(--surface);
-        padding: 1.5rem 1.25rem;
-      }}
-      aside.mobile-expanded .doc-nav, aside.mobile-expanded .doc-toc, aside.mobile-expanded .doc-search-trigger, aside.mobile-expanded .doc-footer {{
-        display: block;
-      }}
-      aside.mobile-expanded .doc-nav-close {{
-        display: block;
-      }}
-      .doc-main {{
-        padding: 1.25rem 1rem 3rem;
-      }}
-    }}
-      .doc-main {{
-        padding: 1.25rem 1rem 3rem;
-      }}
-    }}
-    @media (max-width: 860px) {{
-      aside {{
-        display: none;
-      }}
-      aside.doc-nav-open {{
-        display: block;
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 280px;
-        height: 100vh;
-        z-index: 100;
-        background: var(--surface);
-        box-shadow: 2px 0 10px rgba(0,0,0,0.1);
-      }}
-    .doc-nav-close {{
-      display: none;
-    }}
-      aside.doc-nav-open ~ main .doc-nav-toggle {{
-        display: none;
-      }}
-    }}
-    @media (max-width: 860px) {{
-      aside.doc-nav-open .doc-nav-close {{
-        display: block;
-      }}
-    }}
-    }}
     aside {{
       position: sticky;
       top: 0;
-      align-self: start;
-      height: 100%;
+      align-self: stretch;
+      height: 100vh;
       min-height: 100vh;
-      max-height: 100vh;
       overflow-y: auto;
       padding: 1.5rem 1.25rem 1.35rem;
       border-right: 1px solid var(--border);
@@ -531,12 +471,6 @@ fn render_doc_shell(
       flex-direction: column;
       gap: 1rem;
       min-width: 0;
-    }}
-    aside.desktop-collapsed {{
-      width: 60px;
-    }}
-    aside.desktop-collapsed .doc-nav, aside.desktop-collapsed .doc-toc, aside.desktop-collapsed .doc-search-trigger, aside.desktop-collapsed .doc-footer {{
-      display: none;
     }}
     .brand {{
       font-weight: 700;
@@ -940,14 +874,6 @@ fn render_doc_shell(
     }}
     aside.desktop-collapsed .doc-sidebar-header {{
       justify-content: center;
-    }}
-    aside {{
-      position: sticky;
-      top: 0;
-      align-self: stretch;
-      height: 100vh;
-      min-height: 100vh;
-      overflow-y: auto;
     }}
     .doc-main {{ min-width: 0; }}
     .doc-search-trigger {{ min-width: 0; }}

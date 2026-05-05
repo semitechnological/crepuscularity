@@ -1,16 +1,18 @@
 use std::rc::Rc;
 
 use crate::runtime::{
-    alloc_id, mark_subscribers_dirty, track_read, AnyNode, MemoEqFn, MemoNode, MemoRunFn, NodeId,
-    State, NODES, RUNTIME,
+    alloc_id, clear_observer_sources, enter_observer, mark_subscribers_dirty, remove_node,
+    track_read, AnyNode, MemoEqFn, MemoNode, MemoRunFn, NodeId, State, NODES,
 };
 
+/// Cached reactive computation that notifies dependents only when its value changes.
 pub struct Memo<T: Clone + PartialEq + 'static> {
     pub(crate) id: NodeId,
     _marker: std::marker::PhantomData<T>,
 }
 
 impl<T: Clone + PartialEq + 'static> Memo<T> {
+    /// Create a lazy memo. The closure runs on the first [`Memo::get`] call.
     pub fn new(f: impl Fn() -> T + 'static) -> Self {
         let id = alloc_id();
         let run: MemoRunFn = Rc::new(move || Box::new(f()) as Box<dyn std::any::Any>);
@@ -39,6 +41,7 @@ impl<T: Clone + PartialEq + 'static> Memo<T> {
         }
     }
 
+    /// Return the current value, recomputing if an upstream dependency changed.
     pub fn get(&self) -> T {
         track_read(self.id);
         run_memo_if_needed(self.id);
@@ -54,6 +57,13 @@ impl<T: Clone + PartialEq + 'static> Memo<T> {
                 _ => panic!("memo node not found"),
             }
         })
+    }
+
+    /// Remove this memo from the reactive graph.
+    ///
+    /// All clones share the same graph node. Disposing one clone invalidates the others.
+    pub fn dispose(self) {
+        remove_node(self.id);
     }
 }
 
@@ -91,37 +101,8 @@ pub(crate) fn run_memo_if_needed(id: NodeId) {
 
 /// Run the memo computation, update cached value, and notify subscribers if the value changed.
 pub(crate) fn run_memo(id: NodeId) {
-    // Clear old subscriptions
-    let old_sources = NODES.with(|nodes| {
-        let nodes = nodes.borrow();
-        match nodes.get(&id) {
-            Some(AnyNode::Memo(m)) => m.sources.clone(),
-            _ => vec![],
-        }
-    });
+    clear_observer_sources(id);
 
-    for source_id in &old_sources {
-        NODES.with(|nodes| {
-            let mut nodes = nodes.borrow_mut();
-            match nodes.get_mut(source_id) {
-                Some(AnyNode::Signal(s)) => s.subscribers.retain(|&x| x != id),
-                Some(AnyNode::Memo(m)) => m.subscribers.retain(|&x| x != id),
-                _ => {}
-            }
-        });
-    }
-
-    // Clear sources
-    NODES.with(|nodes| {
-        if let Some(AnyNode::Memo(m)) = nodes.borrow_mut().get_mut(&id) {
-            m.sources.clear();
-        }
-    });
-
-    // Set as current observer
-    RUNTIME.with(|rt| rt.borrow_mut().current_observer = Some(id));
-
-    // Extract and run the closure (outside the borrow)
     let run = NODES.with(|nodes| {
         let nodes = nodes.borrow();
         match nodes.get(&id) {
@@ -130,25 +111,23 @@ pub(crate) fn run_memo(id: NodeId) {
         }
     });
 
-    let new_value = run.map(|f| f());
-
-    // Restore observer
-    RUNTIME.with(|rt| rt.borrow_mut().current_observer = None);
+    let new_value = run.map(|f| {
+        let _observer = enter_observer(id);
+        f()
+    });
 
     if let Some(new_val) = new_value {
-        // Compare with old cached value using the stored eq_fn
-        let changed = NODES.with(|nodes| {
+        let (had_cached, changed) = NODES.with(|nodes| {
             let nodes = nodes.borrow();
             match nodes.get(&id) {
                 Some(AnyNode::Memo(m)) => match &m.cached {
-                    Some(old) => !(m.eq_fn)(old.as_ref(), new_val.as_ref()),
-                    None => true,
+                    Some(old) => (true, !(m.eq_fn)(old.as_ref(), new_val.as_ref())),
+                    None => (false, true),
                 },
-                _ => true,
+                _ => (false, true),
             }
         });
 
-        // Store new cached value
         NODES.with(|nodes| {
             if let Some(AnyNode::Memo(m)) = nodes.borrow_mut().get_mut(&id) {
                 m.cached = Some(new_val);
@@ -156,7 +135,7 @@ pub(crate) fn run_memo(id: NodeId) {
             }
         });
 
-        if changed {
+        if had_cached && changed {
             mark_subscribers_dirty(id);
         }
     }

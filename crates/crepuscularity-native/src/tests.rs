@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fs;
 
 use crepuscularity_core::TemplateContext;
 use serde_json::json;
@@ -90,6 +91,39 @@ fn include_virtual_file() {
     let s = serde_json::to_string(&ir).unwrap();
     assert!(s.contains("In child"));
     assert!(s.contains("#4ade80") || s.contains("green"));
+}
+
+#[test]
+fn file_include_rejects_parent_dir() {
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path().join("templates");
+    fs::create_dir(&root).unwrap();
+    fs::write(temp.path().join("secret.crepus"), "div\n  \"secret\"").unwrap();
+
+    let mut ctx = TemplateContext::new();
+    ctx.base_dir = Some(root);
+    let err = render_template_to_ir("include ../secret.crepus", &ctx).unwrap_err();
+    assert!(
+        err.contains("include path outside base dir"),
+        "expected base-dir rejection, got: {err}"
+    );
+}
+
+#[test]
+fn file_include_rejects_absolute_path() {
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path().join("templates");
+    fs::create_dir(&root).unwrap();
+    let secret = temp.path().join("secret.crepus");
+    fs::write(&secret, "div\n  \"secret\"").unwrap();
+
+    let mut ctx = TemplateContext::new();
+    ctx.base_dir = Some(root);
+    let err = render_template_to_ir(&format!("include {}", secret.display()), &ctx).unwrap_err();
+    assert!(
+        err.contains("include path outside base dir"),
+        "expected absolute-path rejection, got: {err}"
+    );
 }
 
 #[test]

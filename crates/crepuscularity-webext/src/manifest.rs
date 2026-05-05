@@ -299,11 +299,7 @@ impl ManifestV3 {
         permissions.dedup();
 
         // Build host permissions
-        let host_permissions = if manifest.capabilities.host_permissions.is_empty() {
-            vec!["<all_urls>".to_string()]
-        } else {
-            manifest.capabilities.host_permissions.clone()
-        };
+        let host_permissions = manifest.capabilities.host_permissions.clone();
 
         // Content scripts — use explicit [[content_scripts]] entries when present;
         // fall back to a default entry when content-script = true is declared but
@@ -330,18 +326,16 @@ impl ManifestV3 {
                     }
                 })
                 .collect()
-        } else if manifest.capabilities.content_script {
+        } else if manifest.capabilities.content_script
+            && !manifest.capabilities.host_permissions.is_empty()
+        {
             // Default: inject src/content.js (+ content.css if no custom css list).
             let mut css = opts.content_css.clone();
             if css.is_empty() {
                 css.push("src/content.css".to_string());
             }
             vec![ContentScriptSpec {
-                matches: if manifest.capabilities.host_permissions.is_empty() {
-                    vec!["<all_urls>".to_string()]
-                } else {
-                    manifest.capabilities.host_permissions.clone()
-                },
+                matches: manifest.capabilities.host_permissions.clone(),
                 js: vec!["src/content.js".to_string()],
                 css,
                 run_at: "document_idle".to_string(),
@@ -358,10 +352,19 @@ impl ManifestV3 {
         ];
         resources.extend(opts.extra_resources.iter().cloned());
 
-        let web_accessible_resources = if !resources.is_empty() {
+        let mut resource_matches = host_permissions.clone();
+        for content_script in &content_scripts {
+            for pattern in &content_script.matches {
+                if !resource_matches.contains(pattern) {
+                    resource_matches.push(pattern.clone());
+                }
+            }
+        }
+
+        let web_accessible_resources = if !resources.is_empty() && !resource_matches.is_empty() {
             vec![WebAccessibleResources {
                 resources,
-                matches: host_permissions.clone(),
+                matches: resource_matches,
             }]
         } else {
             vec![]
@@ -672,10 +675,48 @@ host-permissions = ["https://example.com/*"]
         );
         assert!(mv3.permissions.contains(&"storage".to_string()));
         assert!(mv3.background.is_some());
-        // content-script=true with no explicit entries → default entry generated
+        assert!(mv3.host_permissions.is_empty());
+        assert!(mv3.content_scripts.is_empty());
+        assert!(mv3.web_accessible_resources.is_empty());
+        assert!(!mv3.to_json().contains("<all_urls>"));
+    }
+
+    #[test]
+    fn content_script_default_uses_declared_hosts_only() {
+        let manifest = ExtensionManifest {
+            extension: ExtensionInfo {
+                name: "Test".to_string(),
+                version: "1.0.0".to_string(),
+                description: None,
+                author: None,
+                homepage: None,
+            },
+            capabilities: CapabilitiesSection {
+                content_script: true,
+                host_permissions: vec!["https://example.com/*".to_string()],
+                ..Default::default()
+            },
+            content_scripts: vec![],
+            plugins: HashMap::new(),
+            options: ManifestOptions::default(),
+            commands: BTreeMap::new(),
+        };
+
+        let mv3 = manifest.to_manifest_v3();
+        assert_eq!(mv3.host_permissions, vec!["https://example.com/*"]);
         assert_eq!(mv3.content_scripts.len(), 1);
+        assert_eq!(
+            mv3.content_scripts[0].matches,
+            vec!["https://example.com/*"]
+        );
         assert_eq!(mv3.content_scripts[0].js, vec!["src/content.js"]);
         assert_eq!(mv3.content_scripts[0].css, vec!["src/content.css"]);
+        assert_eq!(mv3.web_accessible_resources.len(), 1);
+        assert_eq!(
+            mv3.web_accessible_resources[0].matches,
+            vec!["https://example.com/*"]
+        );
+        assert!(!mv3.to_json().contains("<all_urls>"));
     }
 
     #[test]

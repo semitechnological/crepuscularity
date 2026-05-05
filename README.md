@@ -184,7 +184,16 @@ On macOS, GPUI requires the Xcode SDK path:
 SDKROOT=$(xcrun --show-sdk-path) cargo build
 ```
 
-Add `export SDKROOT=$(xcrun --show-sdk-path)` to your shell profile to avoid repeating it.
+When Xcode uses the downloadable Metal Toolchain component, let Cargo inherit the exact Xcode environment GPUI's build script needs:
+
+```bash
+eval "$(scripts/metal-env.sh)"
+cargo build
+scripts/metal-env.sh -- cargo check -p crepuscularity-gpui
+scripts/metal-env.sh --check
+```
+
+The required variables are `SDKROOT` for SDK headers, `DEVELOPER_DIR` for the active Xcode, and `TOOLCHAINS=Metal` for `xcrun` toolchain selection. `scripts/metal-env.sh` reads the downloaded Metal toolchain search path from `xcodebuild -showComponent MetalToolchain -json`, exports the short selector that `xcrun -sdk macosx metal` accepts, and prepends `Metal.xctoolchain/usr/bin` to `PATH` for direct `metal` / `metallib` probes. If `--check` reports `xcrun_metal=failed`, run `xcodebuild -downloadComponent MetalToolchain` or install the component from Xcode Settings > Components before debugging Cargo code.
 
 ## License
 

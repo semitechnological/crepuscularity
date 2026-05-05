@@ -107,6 +107,18 @@ fn web_build_docs_site_emits_wasm() {
         "docs sidebar should be sticky with in-page TOC"
     );
     assert!(
+        dsl.contains("aside.mobile-expanded { transform: translateX(0); }"),
+        "mobile sidebar should use the canonical slide-in state"
+    );
+    assert!(
+        !dsl.contains("aside.doc-nav-open"),
+        "generated docs should not include obsolete sidebar state selectors"
+    );
+    assert!(
+        !dsl.contains("}\n    }\n    aside {"),
+        "generated docs CSS should not contain stray closing braces before sidebar rules"
+    );
+    assert!(
         dsl.contains("<h2 id=\""),
         "prose headings should get anchor ids for TOC links"
     );

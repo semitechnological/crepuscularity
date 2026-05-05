@@ -14,6 +14,16 @@ SDKROOT=$(xcrun --show-sdk-path) cargo build
 
 `dispatch.h` lives inside the Xcode SDK, not `/usr/include`, so the explicit `SDKROOT` is always required on macOS without the extra command-line tools package. You can also add `SDKROOT=$(xcrun --show-sdk-path)` to your shell profile to avoid repeating it.
 
+For GPUI builds that compile Metal shaders, Cargo inherits the same Xcode environment as the shell. Use the helper when Xcode reports a separate Metal Toolchain component:
+
+```bash
+eval "$(scripts/metal-env.sh)"
+cargo build
+scripts/metal-env.sh -- cargo check -p crepuscularity-gpui
+```
+
+The helper exports `SDKROOT`, `DEVELOPER_DIR`, and `TOOLCHAINS=Metal`; `TOOLCHAINS` is the `xcrun` variable that selects the downloaded Metal toolchain for GPUI's `xcrun -sdk macosx metal` build step. It also prepends the downloaded `Metal.xctoolchain/usr/bin` to `PATH` so direct `metal` / `metallib` checks use the same compiler. If `scripts/metal-env.sh --check` still prints `xcrun_metal=failed`, install or re-register the component with `xcodebuild -downloadComponent MetalToolchain` or Xcode Settings > Components before treating a Cargo failure as a code regression.
+
 **Vendored GPUI (optional):** CI and `cargo publish` use **crates.io `gpui` 0.2.2** (the latest published release). The tree under `vendor/gpui` adds `letter_spacing` / `text_transform` on `Div`; to use it locally, copy `.cargo/config.toml.example` to `.cargo/config.toml` and enable `crepuscularity-gpui`’s `gpui-text-extras` feature (see `examples/text-features`’s `vendor-gpui-text`).
 
 ## Before pushing / CI requirements
@@ -252,3 +262,4 @@ See `examples/ui.crepus` for the format and `examples/ui-demo.crepus` for usage.
 - Keep DSL changes mirrored between `crepuscularity_macros` and `crepuscularity-runtime` when both paths should support the feature.
 - Error messages from the renderer use a red `div` with the message text — no panics.
 - Multi-component files live alongside single-component ones; the `#Name` fragment in the include path is the only disambiguation.
+- Rust API documentation is encouraged for public items, invariants, security boundaries, and non-obvious performance contracts. Prefer `//!` / `///` docs over ordinary comments; keep implementation comments rare and limited to places where the code would otherwise hide a correctness or safety requirement.

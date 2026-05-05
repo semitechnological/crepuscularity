@@ -1,7 +1,8 @@
 use base64::Engine;
 use crepuscularity_core::context::TemplateContext;
 use crepuscularity_web::{
-    render_bundle_with_ssr, render_ssr_document, render_template_to_html_with_ssr, SsrDocument,
+    render_bundle_with_ssr, render_from_files_with_ssr, render_ssr_document,
+    render_template_to_html_with_ssr, SsrDocument,
 };
 use serde_json::Value;
 
@@ -39,7 +40,7 @@ fn dynamic_text_emits_span_and_bind() {
     assert!(html.contains("data-crepus-id="));
     let v = decode_hydration(&html);
     assert_eq!(v["v"], 1);
-    assert!(v["bind"].as_object().unwrap().len() >= 1);
+    assert!(!v["bind"].as_object().unwrap().is_empty());
 }
 
 #[test]
@@ -104,6 +105,24 @@ fn bundle_with_ssr() {
     ctx.set("y", "!");
     // Bundle path uses empty ctx from API — use dynamic-free for smoke
     let html = render_bundle_with_ssr(&bundle, true).unwrap();
+    assert!(html.contains("__crepus_hydration__"));
+}
+
+#[test]
+fn named_virtual_component_keeps_ssr_markers() {
+    let files = std::collections::HashMap::from([(
+        "ui.crepus".to_string(),
+        r#"--- App
+div
+  "Hello {name}"
+"#
+        .to_string(),
+    )]);
+    let mut ctx = TemplateContext::new();
+    ctx.set("name", "Ada");
+    let html = render_from_files_with_ssr(&files, "ui.crepus#App", &ctx, true).unwrap();
+    assert!(html.contains("data-crepus-root=\"1\""));
+    assert!(html.contains("data-crepus-kind=\"text\""));
     assert!(html.contains("__crepus_hydration__"));
 }
 

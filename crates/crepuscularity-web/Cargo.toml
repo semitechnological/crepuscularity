@@ -1,6 +1,6 @@
 [package]
 name = "crepuscularity-web"
-version = "0.3.3"
+version = "0.3.4"
 edition = "2021"
 license = "MPL-2.0"
 description = "Web / SSR / DOM integration for Crepuscularity (UNSTABLE; in active development)."
@@ -20,19 +20,22 @@ htmx = []
 alpine = []
 full-web = ["dom", "event-router", "htmx", "alpine"]
 parallel = ["dep:rayon"]
-hydration = []
+hydration = ["dep:base64"]
 ssr = ["dep:base64"]
 
 [dependencies]
 base64 = { workspace = true, optional = true }
-crepuscularity-core = { path = "../crepuscularity-core", version = "0.3.1" }
-crepuscularity_macros = { path = "../crepuscularity_macros", version = "0.4.0" }
+crepuscularity-core = { path = "../crepuscularity-core", version = "0.3.2" }
+crepuscularity_macros = { path = "../crepuscularity_macros", version = "0.4.1" }
 js-sys = { workspace = true, optional = true }
 rayon = { workspace = true, optional = true }
 serde_json = { workspace = true }
 tracing = { workspace = true }
 wasm-bindgen = { workspace = true, optional = true }
 web-sys = { workspace = true, optional = true, features = ["Document", "Element", "HtmlElement", "Node", "Window"] }
+
+[dev-dependencies]
+tempfile = { workspace = true }
 
 [[test]]
 name = "ssr"
