@@ -1,11 +1,7 @@
+use crepuscularity_webext::wasm::{bookmarks, history, tabs};
 use serde_json::{json, Value};
 
-#[derive(Debug, Clone)]
-pub enum VomnibarMode {
-    Full,
-    Bookmarks,
-    Tabs,
-}
+use crate::settings::UserSettings;
 
 pub struct SearchEngines {
     pub google: String,
@@ -13,8 +9,9 @@ pub struct SearchEngines {
 }
 
 impl SearchEngines {
-    pub fn from_settings(settings: &crate::settings::UserSettings) -> Self {
-        let custom = settings.parse_search_engines()
+    pub fn from_settings(settings: &UserSettings) -> Self {
+        let custom = settings
+            .parse_search_engines()
             .into_iter()
             .map(|(k, (url, name))| (k, url, name))
             .collect();
@@ -24,7 +21,7 @@ impl SearchEngines {
         }
     }
 
-pub fn resolve(&self, query: &str) -> (String, String) {
+    pub fn resolve(&self, query: &str) -> (String, String) {
         if let Some(colon_pos) = query.find(':') {
             let keyword = &query[..colon_pos];
             if let Some((_kw, url, _name)) = self.custom.iter().find(|(k, _, _)| k == keyword) {
@@ -54,39 +51,113 @@ fn urlencode(s: &str) -> String {
         .collect()
 }
 
+#[derive(Debug, Clone)]
+pub enum VomnibarMode {
+    Full,
+    Bookmarks,
+    Tabs,
+}
+
 pub struct CompletionResult {
     pub items: Vec<CompletionItem>,
     pub prompt: String,
 }
 
 #[derive(Debug, Clone)]
-pub enum CompletionItemKind {
-    Url,
-    Bookmark,
-    History,
-    Tab,
-    Search,
-}
-
-#[derive(Debug, Clone)]
 pub struct CompletionItem {
     pub title: String,
     pub url: String,
-    pub kind: CompletionItemKind,
+    pub kind: String,
     pub relevance: f64,
 }
 
-pub fn completion_for_query(query: &str, _mode: VomnibarMode) -> CompletionResult {
-    CompletionResult {
-        items: vec![],
-        prompt: query.to_string(),
+pub async fn query_vomnibar(query: &str, mode: VomnibarMode) -> Result<CompletionResult, String> {
+    let mut items = Vec::new();
+
+    match mode {
+        VomnibarMode::Full => {
+            let bm = query_bookmarks(query).await?;
+            items.extend(bm);
+            let hist = query_history(query).await?;
+            items.extend(hist);
+            let tabs_items = query_tabs(query).await?;
+            items.extend(tabs_items);
+        }
+        VomnibarMode::Bookmarks => {
+            items = query_bookmarks(query).await?;
+        }
+        VomnibarMode::Tabs => {
+            items = query_tabs(query).await?;
+        }
     }
+
+    items = scored_items(items, query);
+
+    Ok(CompletionResult {
+        items,
+        prompt: query.to_string(),
+    })
 }
 
-pub fn scored_items(
-    items: Vec<CompletionItem>,
-    query: &str,
-) -> Vec<CompletionItem> {
+async fn query_bookmarks(query: &str) -> Result<Vec<CompletionItem>, String> {
+    let results = bookmarks::get_recent(200)
+        .await
+        .map_err(|e| format!("bookmarks: {}", e))?;
+    let flat = bookmarks::flatten_tree(&results);
+    Ok(flat
+        .into_iter()
+        .filter_map(|node| {
+            Some(CompletionItem {
+                title: node.title,
+                url: node.url?,
+                kind: "bookmark".to_string(),
+                relevance: 0.0,
+            })
+        })
+        .collect())
+}
+
+async fn query_history(query: &str) -> Result<Vec<CompletionItem>, String> {
+    let results = history::search(&history::HistorySearchQuery {
+        text: query.to_string(),
+        max_results: Some(200),
+        ..Default::default()
+    })
+    .await
+    .map_err(|e| format!("history: {}", e))?;
+    Ok(results
+        .into_iter()
+        .filter_map(|item| {
+            Some(CompletionItem {
+                title: item.title.unwrap_or_default(),
+                url: item.url?,
+                kind: "history".to_string(),
+                relevance: 0.0,
+            })
+        })
+        .collect())
+}
+
+async fn query_tabs(_query: &str) -> Result<Vec<CompletionItem>, String> {
+    let all = tabs::query(&tabs::QueryInfo {
+        ..Default::default()
+    })
+    .await
+    .map_err(|e| format!("tabs: {}", e))?;
+    Ok(all
+        .into_iter()
+        .filter_map(|tab| {
+            Some(CompletionItem {
+                title: tab.title.unwrap_or_default(),
+                url: tab.url?,
+                kind: "tab".to_string(),
+                relevance: 0.0,
+            })
+        })
+        .collect())
+}
+
+pub fn scored_items(items: Vec<CompletionItem>, query: &str) -> Vec<CompletionItem> {
     let query_lower = query.to_lowercase();
     let mut scored: Vec<CompletionItem> = items
         .into_iter()
@@ -95,15 +166,18 @@ pub fn scored_items(
             let url_lower = item.url.to_lowercase();
             let mut score = 0.0;
 
-            if title_lower.starts_with(&query_lower) {
-                score += 2.0;
-            } else if title_lower.contains(&query_lower) {
-                score += 1.0;
-            }
-            if url_lower.starts_with(&query_lower) {
-                score += 1.5;
-            } else if url_lower.contains(&query_lower) {
-                score += 0.5;
+            let terms: Vec<&str> = query_lower.split_whitespace().collect();
+            for term in &terms {
+                if title_lower.starts_with(term) {
+                    score += 2.0;
+                } else if title_lower.contains(term) {
+                    score += 1.0;
+                }
+                if url_lower.starts_with(term) {
+                    score += 1.5;
+                } else if url_lower.contains(term) {
+                    score += 0.5;
+                }
             }
             if title_lower == query_lower {
                 score += 3.0;
@@ -111,9 +185,12 @@ pub fn scored_items(
             item.relevance = score;
             item
         })
-        .filter(|item| item.relevance > 0.0)
         .collect();
-    scored.sort_by(|a, b| b.relevance.partial_cmp(&a.relevance).unwrap_or(std::cmp::Ordering::Equal));
+    scored.sort_by(|a, b| {
+        b.relevance
+            .partial_cmp(&a.relevance)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     scored.truncate(15);
     scored
 }

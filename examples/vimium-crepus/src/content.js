@@ -12,6 +12,7 @@
   let visualMode = null;
   let settings = null;
   let lastUsedTabId = null;
+  let vomnibarDebounceTimer = null;
 
   async function loadSettings() {
     try {
@@ -20,11 +21,39 @@
     } catch (_) { settings = {}; }
   }
 
-  runtime.settings_seed().then(() => loadSettings()).catch(() => {});
+  runtime.settings_seed().then(async () => {
+    await loadSettings();
+    checkExclusion();
+  }).catch(() => {});
 
   function setting(key, fallback) {
     if (settings && settings[key] !== undefined) return settings[key];
     return fallback;
+  }
+
+  function checkExclusion() {
+    if (!settings) return;
+    const rules = settings.exclusionRules || [];
+    for (const rule of rules) {
+      try {
+        const re = new RegExp(
+          "^" + rule.pattern.replace(/\*/g, ".*").replace(/\?/g, ".") + "$", "i"
+        );
+        if (re.test(location.href)) {
+          enabled = false;
+          return;
+        }
+      } catch (_) {}
+    }
+    enabled = true;
+  }
+
+  if (setting("grabBackFocus", false)) {
+    document.addEventListener("focusin", (ev) => {
+      if (enabled && ev.target && isEditable(ev.target) && state.mode !== "insert") {
+        ev.target.blur();
+      }
+    }, true);
   }
 
   function send(command, extra = {}) {
@@ -346,20 +375,37 @@
   let vomnibarSelectedIdx = -1;
   let vomnibarResults = [];
 
-  function updateVomnibar() {
+  async function updateVomnibar() {
     const query = vomnibarInput.value.trim();
     if (!query) { vomnibarResults = []; renderVomnibarList(); return; }
 
-    const resolvable = runtime.resolve_navigable(query);
-    let items = [];
+    if (vomnibarDebounceTimer) clearTimeout(vomnibarDebounceTimer);
+    vomnibarDebounceTimer = setTimeout(async () => {
+      const currentQuery = vomnibarInput?.value?.trim();
+      if (!currentQuery || currentQuery !== query) return;
 
-    if (resolvable.kind === "url") {
-      items.push({ title: resolvable.display || resolvable.url, url: resolvable.url, kind: "navigate" });
-    }
+      const resolvable = runtime.resolve_navigable(currentQuery);
+      let items = [];
 
-    vomnibarResults = items;
-    vomnibarSelectedIdx = -1;
-    renderVomnibarList();
+      if (resolvable.kind === "url") {
+        items.push({ title: resolvable.display || resolvable.url, url: resolvable.url, kind: "navigate" });
+      }
+
+      try {
+        const mode = (vomnibarMode || {}).bookmarksOnly ? "bookmarks" :
+                     (vomnibarMode || {}).tabsOnly ? "tabs" : "full";
+        const result = await runtime.query_vomnibar(currentQuery, mode);
+        for (const item of (result.items || [])) {
+          items.push(item);
+        }
+      } catch (_) {}
+
+      if (vomnibarInput?.value?.trim() !== currentQuery) return;
+      vomnibarResults = items;
+      vomnibarSelectedIdx = -1;
+      renderVomnibarList();
+      vomnibarDebounceTimer = null;
+    }, 150);
   }
 
   function renderVomnibarList() {

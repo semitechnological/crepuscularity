@@ -244,6 +244,27 @@ pub fn resolve_navigable(query: &str) -> Result<JsValue, JsValue> {
 }
 
 #[wasm_bindgen]
+pub async fn query_vomnibar(query: &str, mode: &str) -> Result<JsValue, JsValue> {
+    let mode = match mode {
+        "bookmarks" => vomnibar::VomnibarMode::Bookmarks,
+        "tabs" => vomnibar::VomnibarMode::Tabs,
+        _ => vomnibar::VomnibarMode::Full,
+    };
+    let result = vomnibar::query_vomnibar(query, mode)
+        .await
+        .map_err(|e| JsValue::from_str(&e))?;
+    let items: Vec<Value> = result.items.into_iter().map(|item| {
+        json!({
+            "title": item.title,
+            "url": item.url,
+            "kind": item.kind,
+            "relevance": item.relevance,
+        })
+    }).collect();
+    to_js(json!({"items": items}))
+}
+
+#[wasm_bindgen]
 pub fn key_name(event_key: &str) -> String {
     key_handler::key_name(event_key)
 }
