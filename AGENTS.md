@@ -4,7 +4,7 @@
 
 ## What this project is
 
-A UI framework that lets you write GPUI interfaces in a concise, indentation-based template DSL (`.crepus` files) instead of raw Rust. Templates can either be compiled at build time via the `view!` macro or rendered at runtime with full hot-reload support.
+A UI framework that lets you write GPUI, Ratatui TUI, web, browser-extension, and native-shell interfaces in a concise, indentation-based template DSL (`.crepus` files) instead of duplicating UI structure across frameworks. Templates can either be compiled at build time via the `view!` macro or rendered at runtime with full hot-reload support.
 
 ## Build
 
@@ -51,19 +51,27 @@ Use **semver `0.y.z`**. Until `1.0`:
 | Crate | Purpose |
 |---|---|
 | `crates/crepuscularity` | Main library re-exporting `view!` macro + prelude |
+| `crates/crepuscularity-core` | Shared AST, parser, evaluator, component-file model, class aliases, and template context |
 | `crates/crepuscularity_macros` | Proc-macro: compiles `.crepus` DSL strings at build time |
+| `crates/crepuscularity-gpui` | GPUI facade/prelude and primary native desktop renderer integration |
+| `crates/crepuscularity-web` | HTML/SSR/WASM-oriented renderer, hydration payloads, and web include handling |
+| `crates/crepuscularity-webext` | Manifest V3 extension scaffolding, assets, capability scanning, and WASM browser APIs |
 | `crates/crepuscularity-runtime` | Runtime parser, renderer, and hot-reload engine |
 | `crates/crepuscularity-reactive` | Reactive signal/memo/effect graph for WASM client |
+| `crates/crepuscularity-ssr` | Server-side rendering helpers and hydration bootstrap support |
 | `crates/crepuscularity-dev` | `crepus-dev` binary — hot-reload dev server |
 | `crates/crepuscularity-cli` | `crepus` CLI for scaffolding and builds |
 | `crates/crepuscularity-native` | View IR (JSON) for SwiftUI / Jetpack Compose shells — `render_template_to_ir`, schema export |
+| `crates/crepuscularity-tui` | Ratatui backend for `.crepus` terminal UIs, file-backed templates, includes, slots, and `template_refs!` handles |
+| `crates/crepuscularity-lite` | GPUI desktop shell with embedded V8, TypeScript/TSX guest transpilation, native plugin bridge, workers, and host command queue |
+| `crates/crepuscularity-lite-macros` | Proc-macros for lite bridge/plugin bindings |
 | `examples/text-features` | GPUI demo for letter-spacing and text-transform (vendored gpui) |
 | `examples/weather` | Full weather-app example using the runtime |
 | `examples/native-shells` | SwiftPM (**`ios/`**) + Gradle (**`android/`**) apps decoding View IR; shared [`fixture.json`](examples/native-shells/fixture.json) |
 
 **Web / compiler / hot-reload implementation spec (single doc for agents):** [docs/CREPUS_WEB_IMPLEMENTATION_SPEC.md](docs/CREPUS_WEB_IMPLEMENTATION_SPEC.md)
 
-**Documentation hub (Markdown):** [docs/README.md](docs/README.md). **`crepus web build --site docs-site`** also emits **`dist/docs/*.html`** (styled HTML from the same Markdown) for the GitHub Pages site.
+**Documentation hub (Markdown):** [docs/README.md](docs/README.md). It includes the public guides for DSL, components, CLI, runtime/reactivity, GPUI, TUI, Lite, native shells, browser extensions, and production readiness. **`crepus web build --site docs-site`** also emits **`dist/docs/*.html`** (styled HTML from the same Markdown) for the GitHub Pages site.
 
 ## DSL quick reference
 
@@ -256,6 +264,8 @@ See `examples/ui.crepus` for the format and `examples/ui-demo.crepus` for usage.
 - **`$: default name = value`**: sets a variable only when it isn't already in the context — the canonical way to declare optional props with defaults inside a single-file component.
 - **TOML defaults** in multi-component files: `[ComponentName.defaults]` section — evaluated before passed props so props always win.
 - **Evaluator** (`eval.rs`): arithmetic, comparison, logical operators, property access (`obj.prop`). No function calls.
+- **TUI backend** (`crepuscularity-tui`): app owns the terminal event loop and input handling. The crate renders templates into Ratatui frames, supports file-backed includes and slots, and offers `template_refs!` for typed `#id` handles.
+- **Lite shell** (`crepuscularity-lite`): GPUI owns native windows, V8 runs guest code, and Rust plugins are reached through the `Bridge`. Keep plugin capabilities explicit, route UI-thread work through `HostDeferred` / `HostCommandQueue`, and use `scripts/metal-env.sh` when GPUI shader builds need the downloaded Metal toolchain.
 
 ## Conventions
 

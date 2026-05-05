@@ -1,6 +1,6 @@
 # TUI Mode
 
-**Also:** [Documentation home](README.md) · [DSL](dsl.md) · [Components](components.md) · [CLI](cli.md)
+**Also:** [Documentation home](README.md) · [DSL](dsl.md) · [Components](components.md) · [CLI](cli.md) · [Lite shell](lite.md)
 
 The TUI backend renders `.crepus` templates into [Ratatui](https://ratatui.rs) frames. It is Ratatui-backed, but the UI surface can live in `.crepus` files so terminal apps can share the same indentation/JSX-like template language as the rest of Crepuscularity.
 
@@ -11,6 +11,8 @@ The TUI backend renders `.crepus` templates into [Ratatui](https://ratatui.rs) f
 crepuscularity-tui = "0.2"
 ratatui = "0.29"
 ```
+
+Use TUI when the terminal is the real app surface. Use [Crepuscularity Lite](lite.md) when the app is a GPUI desktop shell that embeds guest JavaScript/TypeScript and Rust-native plugins.
 
 ## Template Files
 

@@ -11,6 +11,7 @@ Guides and references for the `.crepus` DSL, tooling, and browser extensions.
 | [Runtime and reactivity](runtime.md) | state model, update lifecycle, hydration, and Metal setup |
 | [Browser extensions](webext.md) | Manifest V3 apps with `crepus webext` |
 | [GPUI integration](gpui.md) | Desktop apps with GPUI |
+| [Lite shell](lite.md) | GPUI + V8 desktop shell and Rust plugin bridge |
 | [Native shells](native.md) | iOS/Android apps via native UI frameworks |
 | [TUI mode](tui.md) | Terminal user interfaces |
 
