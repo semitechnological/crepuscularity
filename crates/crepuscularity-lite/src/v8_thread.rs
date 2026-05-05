@@ -47,7 +47,7 @@ impl V8ThreadRuntime {
 
 /// Commands processed sequentially on the V8 thread.
 pub enum V8ThreadRequest {
-    /// Run `eval(script)`. If `recreate_isolate`, replace the isolate with [`V8Host::new`](`bridge`) first.
+    /// Run `eval(script)`. If `recreate_isolate`, replace the isolate with [`V8Host::new`] using `bridge` first.
     Eval {
         script: String,
         recreate_isolate: bool,

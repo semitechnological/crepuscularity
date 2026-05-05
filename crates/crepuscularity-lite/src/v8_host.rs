@@ -1,7 +1,7 @@
 //! Embedded JavaScript via the official `v8` crate (the Rust bindings project is often called rusty_v8).
 //! See `docs/THREADING.md` for thread constraints.
 //!
-//! The active [`Bridge`](crate::bridge::Bridge) is stored in a V8 context embedder slot ([`CrepusBridgeSlot`]).
+//! The active [`Bridge`] is stored in a V8 context embedder slot (`CrepusBridgeSlot`).
 
 use std::ops::Deref;
 use std::pin::pin;
