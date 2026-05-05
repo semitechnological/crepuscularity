@@ -1,4 +1,4 @@
-use crepuscularity_webext::wasm::{storage, tabs};
+use crepuscularity_webext::wasm::{storage, tabs, windows};
 use serde_json::{json, Value};
 
 pub async fn active_tab() -> Result<Option<tabs::Tab>, String> {
@@ -78,15 +78,35 @@ pub async fn execute_background_command(command: &str, _args: &Value) -> Result<
         "toggle-mute" => {
             if let Some(tab) = active_tab().await? {
                 if let Some(id) = tab.id {
+                    let session = storage::session();
+                    let stored = session
+                        .get_json(json!({"mutedTabIds": []}))
+                        .await
+                        .map_err(|e| format!("get session: {}", e))?;
+                    let mut muted_ids: Vec<i64> = stored
+                        .get("mutedTabIds")
+                        .and_then(Value::as_array)
+                        .map(|a| a.iter().filter_map(Value::as_i64).collect())
+                        .unwrap_or_default();
+                    let currently_muted = muted_ids.contains(&id);
                     tabs::update(
                         id,
                         &tabs::UpdateProperties {
-                            muted: Some(true),
+                            muted: Some(!currently_muted),
                             ..Default::default()
                         },
                     )
                     .await
                     .map_err(|e| e.to_string())?;
+                    if currently_muted {
+                        muted_ids.retain(|m| *m != id);
+                    } else {
+                        muted_ids.push(id);
+                    }
+                    session
+                        .set(&json!({"mutedTabIds": muted_ids}))
+                        .await
+                        .map_err(|e| format!("save muted: {}", e))?;
                 }
             }
         }
@@ -123,15 +143,13 @@ pub async fn execute_background_command(command: &str, _args: &Value) -> Result<
         "move-to-new-window" => {
             if let Some(tab) = active_tab().await? {
                 if let Some(id) = tab.id {
-                    tabs::update(
-                        id,
-                        &tabs::UpdateProperties {
-                            active: Some(true),
-                            ..Default::default()
-                        },
-                    )
+                    let win = windows::create(&windows::CreateData {
+                        tab_id: Some(id),
+                        ..Default::default()
+                    })
                     .await
                     .map_err(|e| e.to_string())?;
+                    let _ = win;
                 }
             }
         }
