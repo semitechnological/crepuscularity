@@ -2,15 +2,17 @@
 
 > **Stability:** This project is **unstable** and in active development. APIs, CLI flags, and template semantics may change without a semver-major release until **1.0**. Pin exact dependency versions and expect occasional breakage.
 
-The first GPUI component and runtime system with hot reloading, and the first non-web-language, plug-and-play browser extension framework.
+The first GPUI component and runtime system with hot reloading, and the first non-web-language, plug-and-play browser extension framework. It also ships a Ratatui terminal backend and a GPUI desktop shell with an embedded V8 bridge for Capacitor-shaped native plugins.
 
-Write UI in a concise, indentation-based template DSL (`.crepus` files). Templates compile at build time via the `view!` macro or render at runtime with full hot-reload support. The same `.crepus` syntax drives native desktop (GPUI), browser extensions (MV3), HTML output, and React/JSX — and is the foundation for native mobile backends targeting SwiftUI and Jetpack Compose.
+Write UI in a concise, indentation-based template DSL (`.crepus` files). Templates compile at build time via the `view!` macro or render at runtime with full hot-reload support. The same `.crepus` syntax drives native desktop (GPUI), terminal UIs (Ratatui), browser extensions (MV3), HTML output, and React/JSX — and is the foundation for native mobile backends targeting SwiftUI and Jetpack Compose.
 
 ## Why Crepuscularity
 
 - **First GPUI component system with hot reload** — live template updates without recompiling; no other GPUI framework offers this
 - **First plug-and-play browser extension framework in Rust** — write your popup/background/content scripts in `.crepus`, get a MV3-compliant extension bundle out; no JavaScript framework or bundler required
 - **One syntax, multiple backends** — the same template works across GPUI (native desktop), HTML, React/JSX, and browser extensions today; **`crepuscularity-native`** lowers `.crepus` to JSON **View IR** for SwiftUI / Jetpack Compose shells (see [`examples/native-shells`](examples/native-shells/README.md))
+- **Terminal UIs without a second UI language** — **`crepuscularity-tui`** maps `.crepus` elements, includes, slots, control flow, and Tailwind-style terminal classes onto Ratatui frames
+- **Desktop shell for embedded guest apps** — **`crepuscularity-lite`** embeds V8 in a GPUI host with a Capacitor-shaped Rust bridge, optional file watching, workers, plugin capabilities, and TypeScript/TSX guest transpilation
 - **Compile-time and runtime paths** — `view!` macro for zero-overhead AOT compilation; `parse_template` / `render_nodes` for full runtime flexibility and hot reload
 
 ## Quick Start
@@ -68,6 +70,8 @@ The `.crepus` DSL is the primary language. Each output target is a renderer that
 | Crate                   | Output                                                         |
 | ----------------------- | -------------------------------------------------------------- |
 | `crepuscularity-gpui`   | Native desktop (GPUI elements) — primary target                |
+| `crepuscularity-tui`    | Ratatui terminal frames with `.crepus` templates and typed handles |
+| `crepuscularity-lite`   | GPUI desktop shell with embedded V8, Rust plugins, and guest workers |
 | `crepuscularity-native` | View IR JSON for SwiftUI / Compose host apps (not an on-screen renderer) |
 | `crepuscularity-web`    | HTML strings — server rendering, WASM, browser extensions      |
 | `crepuscularity-webext` | MV3 browser extensions — manifest, assets, capability scanning |
@@ -95,7 +99,7 @@ crepus ios build [--dir] [...]       # Simulator build via xcodebuild
 ## Documentation
 
 - **Rendered site (GitHub Pages):** [here](https://crepuscularity.undivisible.dev) — WASM landing page plus HTML generated from the Markdown in [`docs/`](docs/). Built in CI with `crepus web build --site docs-site`.
-- **Sources:** [docs/README.md](docs/README.md) indexes [DSL](docs/dsl.md), [components](docs/components.md), [CLI](docs/cli.md), and [extensions](docs/webext.md). Compiler-focused detail stays in-repo as [CREPUS_WEB_IMPLEMENTATION_SPEC.md](docs/CREPUS_WEB_IMPLEMENTATION_SPEC.md) but is not shipped on the public docs site.
+- **Sources:** [docs/README.md](docs/README.md) indexes [DSL](docs/dsl.md), [components](docs/components.md), [CLI](docs/cli.md), [runtime/reactivity](docs/runtime.md), [GPUI](docs/gpui.md), [TUI](docs/tui.md), [Lite](docs/lite.md), [native shells](docs/native.md), and [extensions](docs/webext.md). Compiler-focused detail stays in-repo as [CREPUS_WEB_IMPLEMENTATION_SPEC.md](docs/CREPUS_WEB_IMPLEMENTATION_SPEC.md) but is not shipped on the public docs site.
 - **Native shells:** [examples/native-shells](examples/native-shells/README.md) — SwiftPM (**`ios/`**), Gradle (**`android/`**), and shared **View IR** `fixture.json` next to **`crepuscularity-native`** (replaces the old separate **`crepuscularity-native-ui`** checkout).
 - **Contributors & coding agents:** root [**`AGENTS.md`**](AGENTS.md) is the canonical instructions (macOS `SDKROOT`, `cargo fmt` / `clippy` / `test` before push, workspace layout, DSL notes). **`CLAUDE.md`** is a symlink to **`AGENTS.md`** so duplicate context files cannot drift.
 
@@ -157,15 +161,23 @@ These cannot be added without forking GPUI itself:
 crates/
   crepuscularity/           Facade re-exporting prelude
   crepuscularity-core/      AST, parser, evaluator
-  crepuscularity-web/       HTML backend
-  crepuscularity-gpui/      GPUI prelude + view! macro
   crepuscularity_macros/    Compile-time view! proc-macro
   crepuscularity-runtime/   Hot-reload renderer (Tailwind → GPUI styler)
-  crepuscularity-cli/       crepus CLI
+  crepuscularity-web/       HTML backend
   crepuscularity-webext/    Browser extension support
+  crepuscularity-gpui/      GPUI prelude + view! macro
+  crepuscularity-tui/       Ratatui backend + template_refs! handles
+  crepuscularity-lite/      GPUI + V8 shell and native plugin bridge
+  crepuscularity-lite-macros/ Compile-time macros for lite plugin bindings
+  crepuscularity-native/    View IR JSON for SwiftUI / Compose shells
+  crepuscularity-reactive/  WASM signals, memos, effects, hydration lifecycle
+  crepuscularity-ssr/       Server-rendering helpers
+  crepuscularity-dev/       crepus-dev hot-reload server
+  crepuscularity-cli/       crepus CLI
 examples/
   weather/                  Weather app example
   quicknote/                Browser extension example
+  native-shells/            SwiftPM and Gradle View IR hosts
 ```
 
 ## Building
