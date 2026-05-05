@@ -40,6 +40,33 @@
 //! }).unwrap();
 //! ```
 //!
+//! For file-backed templates, use [`template`] when you want to keep ownership
+//! of the Ratatui draw loop:
+//!
+//! ```rust,no_run
+//! # use ratatui::{backend::TestBackend, Terminal};
+//! # let backend = TestBackend::new(80, 24);
+//! # let mut terminal = Terminal::new(backend).unwrap();
+//! let mut ui = crepuscularity_tui::template("ui/ui.crepus").unwrap();
+//! ui.set("title", "My App");
+//! ui.set("input", "hello");
+//! terminal.draw(|frame| {
+//!     ui.draw_full(frame).unwrap();
+//! }).unwrap();
+//! ```
+//!
+//! Or let Crepus run one draw pass:
+//!
+//! ```rust,no_run
+//! # use ratatui::{backend::TestBackend, Terminal};
+//! # let backend = TestBackend::new(80, 24);
+//! # let mut terminal = Terminal::new(backend).unwrap();
+//! crepuscularity_tui::draw(&mut terminal, "ui/ui.crepus", |ui| {
+//!     ui.set("title", "My App");
+//!     ui.set("input", "hello");
+//! }).unwrap();
+//! ```
+//!
 //! # Layout model
 //!
 //! Templates map directly onto ratatui's split-`Rect` layout model:
@@ -74,6 +101,7 @@
 
 pub mod render;
 pub mod style;
+pub mod template;
 #[cfg(test)]
 mod tests;
 
@@ -83,3 +111,4 @@ pub use crepuscularity_core::{
 pub use ratatui;
 pub use render::{paint_node, render_component, render_nodes, render_template};
 pub use style::parse_classes;
+pub use template::{draw, template, Template};

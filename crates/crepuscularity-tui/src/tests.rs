@@ -1,8 +1,11 @@
-use ratatui::{backend::TestBackend, Terminal};
+use ratatui::{backend::TestBackend, style::Color, Terminal};
 use std::fs;
 use std::path::PathBuf;
 
-use crate::{render_component, render_template, TemplateContext, TemplateValue};
+use crate::{
+    draw as draw_template, render_component, render_template, template, TemplateContext,
+    TemplateValue,
+};
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -36,8 +39,32 @@ fn all_text(rows: &[String]) -> String {
     rows.join("\n")
 }
 
+fn buffer_rows(terminal: &Terminal<TestBackend>) -> Vec<String> {
+    let buf = terminal.backend().buffer();
+    let w = buf.area.width as usize;
+    let h = buf.area.height as usize;
+    (0..h)
+        .map(|y| {
+            buf.content[y * w..(y + 1) * w]
+                .iter()
+                .map(|c| c.symbol())
+                .collect::<String>()
+        })
+        .collect()
+}
+
 fn examples_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../examples")
+}
+
+fn temp_case(name: &str) -> PathBuf {
+    let dir = std::env::temp_dir().join(format!(
+        "crepuscularity-tui-{}-{}",
+        name,
+        std::process::id()
+    ));
+    let _ = fs::create_dir_all(&dir);
+    dir
 }
 
 // ─── Basic rendering ──────────────────────────────────────────────────────────
@@ -57,6 +84,49 @@ fn plain_text_renders() {
         "expected 'Hello terminal' in output:\n{}",
         all_text(&rows)
     );
+}
+
+#[test]
+fn file_template_builder_renders() {
+    let dir = temp_case("builder");
+    let path = dir.join("ui.crepus");
+    fs::write(
+        &path,
+        "div w-full h-full flex-col\n  div h-[1]\n    \"{title}\"\n  div h-[1]\n    \"{input}\"",
+    )
+    .unwrap();
+
+    let mut ui = template(&path).unwrap();
+    ui.set("title", "My App");
+    ui.set("input", "input contents");
+
+    let backend = TestBackend::new(40, 4);
+    let mut terminal = Terminal::new(backend).unwrap();
+    terminal
+        .draw(|frame| ui.draw_full(frame).expect("template draws"))
+        .unwrap();
+
+    let text = all_text(&buffer_rows(&terminal));
+    assert!(text.contains("My App"), "{text}");
+    assert!(text.contains("input contents"), "{text}");
+    assert_eq!(ui.context().base_dir.as_deref(), Some(dir.as_path()));
+}
+
+#[test]
+fn draw_helper_owns_terminal_draw_pass() {
+    let dir = temp_case("draw-helper");
+    let path = dir.join("ui.crepus");
+    fs::write(&path, "div\n  \"{title}\"").unwrap();
+
+    let backend = TestBackend::new(40, 4);
+    let mut terminal = Terminal::new(backend).unwrap();
+    draw_template(&mut terminal, &path, |ui| {
+        ui.set("title", "Draw Helper");
+    })
+    .unwrap();
+
+    let text = all_text(&buffer_rows(&terminal));
+    assert!(text.contains("Draw Helper"), "{text}");
 }
 
 #[test]
@@ -310,6 +380,42 @@ fn border_classes_dont_panic() {
     let tpl = "div border rounded p-1\n  \"Boxed\"";
     let rows = render(20, 6, tpl, &ctx);
     assert!(all_text(&rows).contains("Boxed"), "{}", all_text(&rows));
+}
+
+#[test]
+fn fixed_height_with_one_sided_border_keeps_content_visible() {
+    let ctx = TemplateContext::new();
+    let tpl = "div w-full h-full flex-col\n  div h-[1] border-b\n    \"Header\"\n  div flex-1\n    \"Body\"";
+    let rows = render(30, 5, tpl, &ctx);
+    assert!(all_text(&rows).contains("Header"), "{}", all_text(&rows));
+    assert!(all_text(&rows).contains("Body"), "{}", all_text(&rows));
+}
+
+#[test]
+fn child_text_inherits_parent_style() {
+    let backend = TestBackend::new(30, 3);
+    let mut terminal = Terminal::new(backend).unwrap();
+    let ctx = TemplateContext::new();
+    terminal
+        .draw(|frame| {
+            let area = frame.area();
+            render_template(
+                "div text-[#cdd6f4]\n  div\n    \"Inherited\"",
+                &ctx,
+                frame,
+                area,
+            )
+            .expect("render_template returned an error");
+        })
+        .unwrap();
+
+    let buf = terminal.backend().buffer();
+    let cell = buf
+        .content
+        .iter()
+        .find(|c| c.symbol() == "I")
+        .expect("expected inherited text to render");
+    assert_eq!(cell.fg, Color::Rgb(205, 214, 244));
 }
 
 #[test]

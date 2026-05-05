@@ -159,7 +159,7 @@ pub fn render_nodes(
     area: Rect,
 ) -> Result<(), String> {
     // The root is implicitly a vertical flex container filling the whole area.
-    let children = build_children(nodes, ctx, Direction::Vertical);
+    let children = build_children(nodes, ctx, Direction::Vertical, Style::default());
     paint_children(&children, frame, area, Direction::Vertical, 0);
     Ok(())
 }
@@ -199,6 +199,7 @@ fn build_children(
     nodes: &[Node],
     ctx: &TemplateContext,
     parent_dir: Direction,
+    inherited: Style,
 ) -> Vec<WidgetChild> {
     let mut ctx = ctx.clone();
     let mut out: Vec<WidgetChild> = Vec::new();
@@ -224,34 +225,39 @@ fn build_children(
             }
             // Structural nodes: flush buffered text first, then emit.
             Node::Element(el) => {
-                flush_text(&mut text_buf, &mut out, parent_dir);
-                out.push(build_element(el, &ctx, parent_dir));
+                flush_text(&mut text_buf, &mut out, parent_dir, inherited);
+                out.push(build_element(el, &ctx, parent_dir, inherited));
             }
             Node::If(block) => {
-                flush_text(&mut text_buf, &mut out, parent_dir);
-                out.extend(build_if(block, &ctx, parent_dir));
+                flush_text(&mut text_buf, &mut out, parent_dir, inherited);
+                out.extend(build_if(block, &ctx, parent_dir, inherited));
             }
             Node::For(block) => {
-                flush_text(&mut text_buf, &mut out, parent_dir);
-                out.extend(build_for(block, &ctx, parent_dir));
+                flush_text(&mut text_buf, &mut out, parent_dir, inherited);
+                out.extend(build_for(block, &ctx, parent_dir, inherited));
             }
             Node::Match(block) => {
-                flush_text(&mut text_buf, &mut out, parent_dir);
-                out.extend(build_match(block, &ctx, parent_dir));
+                flush_text(&mut text_buf, &mut out, parent_dir, inherited);
+                out.extend(build_match(block, &ctx, parent_dir, inherited));
             }
             Node::Include(inc) => {
-                flush_text(&mut text_buf, &mut out, parent_dir);
-                out.extend(build_include(inc, &ctx, parent_dir));
+                flush_text(&mut text_buf, &mut out, parent_dir, inherited);
+                out.extend(build_include(inc, &ctx, parent_dir, inherited));
             }
         }
     }
 
-    flush_text(&mut text_buf, &mut out, parent_dir);
+    flush_text(&mut text_buf, &mut out, parent_dir, inherited);
     out
 }
 
 /// Emit accumulated text lines as a single `Content` child and clear the buffer.
-fn flush_text(buf: &mut Vec<Line<'static>>, out: &mut Vec<WidgetChild>, parent_dir: Direction) {
+fn flush_text(
+    buf: &mut Vec<Line<'static>>,
+    out: &mut Vec<WidgetChild>,
+    parent_dir: Direction,
+    inherited: Style,
+) {
     if buf.is_empty() {
         return;
     }
@@ -266,7 +272,7 @@ fn flush_text(buf: &mut Vec<Line<'static>>, out: &mut Vec<WidgetChild>, parent_d
     out.push(WidgetChild {
         node: WidgetNode::Content {
             lines,
-            style: Style::default(),
+            style: inherited,
             block: None,
             alignment: Alignment::Left,
         },
@@ -274,11 +280,16 @@ fn flush_text(buf: &mut Vec<Line<'static>>, out: &mut Vec<WidgetChild>, parent_d
     });
 }
 
-fn build_element(el: &Element, ctx: &TemplateContext, parent_dir: Direction) -> WidgetChild {
+fn build_element(
+    el: &Element,
+    ctx: &TemplateContext,
+    parent_dir: Direction,
+    inherited: Style,
+) -> WidgetChild {
     // ── Special pseudo-elements ───────────────────────────────────────────────
     match el.tag.as_str() {
-        "slot" => return build_slot(el, ctx, parent_dir),
-        "slot-rotate" => return build_slot_rotate(el, ctx, parent_dir),
+        "slot" => return build_slot(el, ctx, parent_dir, inherited),
+        "slot-rotate" => return build_slot_rotate(el, ctx, parent_dir, inherited),
         _ => {}
     }
 
@@ -296,7 +307,8 @@ fn build_element(el: &Element, ctx: &TemplateContext, parent_dir: Direction) -> 
         hints.title = Some(title_val);
     }
 
-    let constraint = hints.constraint_for(parent_dir);
+    let constraint = adjusted_constraint(&hints, parent_dir);
+    let style = inherited.patch(hints.to_style());
 
     // ── Detect pure-text vs. mixed/structural children ────────────────────────
     let is_pure_text = !el.children.is_empty()
@@ -306,13 +318,34 @@ fn build_element(el: &Element, ctx: &TemplateContext, parent_dir: Direction) -> 
             .all(|n| matches!(n, Node::Text(_) | Node::RawText(_) | Node::LetDecl(_)));
 
     if is_pure_text {
-        build_content_element(el, &hints, ctx, constraint)
+        build_content_element(el, &hints, ctx, constraint, style)
     } else if el.children.is_empty() {
-        // Empty element: a box that fills space (useful as spacers, backgrounds).
-        build_empty_box(&hints, constraint)
+        build_empty_box(&hints, constraint, style)
     } else {
-        build_container_element(el, &hints, ctx, parent_dir, constraint)
+        build_container_element(el, &hints, ctx, parent_dir, constraint, style)
     }
+}
+
+fn adjusted_constraint(hints: &StyleHints, parent_dir: Direction) -> Constraint {
+    match hints.constraint_for(parent_dir) {
+        Constraint::Length(n) => Constraint::Length(match parent_dir {
+            Direction::Horizontal => n.max(min_width(hints)),
+            Direction::Vertical => n.max(min_height(hints)),
+        }),
+        constraint => constraint,
+    }
+}
+
+fn min_width(hints: &StyleHints) -> u16 {
+    let borders = u16::from(hints.borders.intersects(Borders::LEFT))
+        + u16::from(hints.borders.intersects(Borders::RIGHT));
+    borders + hints.padding.left + hints.padding.right + 1
+}
+
+fn min_height(hints: &StyleHints) -> u16 {
+    let borders = u16::from(hints.borders.intersects(Borders::TOP))
+        + u16::from(hints.borders.intersects(Borders::BOTTOM));
+    borders + hints.padding.top + hints.padding.bottom + 1
 }
 
 /// Element whose children are all text → render as a `Paragraph`.
@@ -321,6 +354,7 @@ fn build_content_element(
     hints: &StyleHints,
     ctx: &TemplateContext,
     constraint: Constraint,
+    style: Style,
 ) -> WidgetChild {
     let mut child_ctx = ctx.clone();
     let mut lines: Vec<Line<'static>> = Vec::new();
@@ -346,7 +380,7 @@ fn build_content_element(
     WidgetChild {
         node: WidgetNode::Content {
             lines,
-            style: hints.to_style(),
+            style,
             block: hints_to_block(hints),
             alignment: hints.alignment,
         },
@@ -355,13 +389,13 @@ fn build_content_element(
 }
 
 /// Element with no children (spacer, background panel, etc.).
-fn build_empty_box(hints: &StyleHints, constraint: Constraint) -> WidgetChild {
+fn build_empty_box(hints: &StyleHints, constraint: Constraint, style: Style) -> WidgetChild {
     WidgetChild {
         node: WidgetNode::Container {
             direction: hints.direction,
             gap: hints.gap,
             children: vec![],
-            style: hints.to_style(),
+            style,
             block: hints_to_block(hints),
         },
         constraint,
@@ -375,16 +409,17 @@ fn build_container_element(
     ctx: &TemplateContext,
     _parent_dir: Direction,
     constraint: Constraint,
+    style: Style,
 ) -> WidgetChild {
     let child_dir = hints.direction;
-    let children = build_children(&el.children, ctx, child_dir);
+    let children = build_children(&el.children, ctx, child_dir, style);
 
     WidgetChild {
         node: WidgetNode::Container {
             direction: child_dir,
             gap: hints.gap,
             children,
-            style: hints.to_style(),
+            style,
             block: hints_to_block(hints),
         },
         constraint,
@@ -393,7 +428,12 @@ fn build_container_element(
 
 /// `<slot>` — renders the caller's slot children (or the element's own children
 /// as fallback when no slot was passed).
-fn build_slot(el: &Element, ctx: &TemplateContext, _parent_dir: Direction) -> WidgetChild {
+fn build_slot(
+    el: &Element,
+    ctx: &TemplateContext,
+    _parent_dir: Direction,
+    inherited: Style,
+) -> WidgetChild {
     let (nodes, slot_ctx): (&[Node], &TemplateContext);
     // We need owned values for the branches; box them.
     let owned_nodes;
@@ -409,13 +449,13 @@ fn build_slot(el: &Element, ctx: &TemplateContext, _parent_dir: Direction) -> Wi
     nodes = n;
     slot_ctx = c;
 
-    let children = build_children(nodes, slot_ctx, Direction::Vertical);
+    let children = build_children(nodes, slot_ctx, Direction::Vertical, inherited);
     WidgetChild {
         node: WidgetNode::Container {
             direction: Direction::Vertical,
             gap: 0,
             children,
-            style: Style::default(),
+            style: inherited,
             block: None,
         },
         constraint: Constraint::Fill(1),
@@ -423,7 +463,12 @@ fn build_slot(el: &Element, ctx: &TemplateContext, _parent_dir: Direction) -> Wi
 }
 
 /// `<slot-rotate>` — TUI cannot do CSS animations, so we show the first phrase.
-fn build_slot_rotate(el: &Element, ctx: &TemplateContext, parent_dir: Direction) -> WidgetChild {
+fn build_slot_rotate(
+    el: &Element,
+    ctx: &TemplateContext,
+    parent_dir: Direction,
+    inherited: Style,
+) -> WidgetChild {
     let phrases = slot_rotate_child_phrases(&el.children).unwrap_or_default();
     let first = phrases
         .into_iter()
@@ -434,11 +479,12 @@ fn build_slot_rotate(el: &Element, ctx: &TemplateContext, parent_dir: Direction)
     let classes = active_classes(el, ctx);
     let hints = parse_classes(&classes);
     let constraint = hints.constraint_for(parent_dir);
+    let style = inherited.patch(hints.to_style());
 
     WidgetChild {
         node: WidgetNode::Content {
             lines: vec![first],
-            style: hints.to_style(),
+            style,
             block: hints_to_block(&hints),
             alignment: hints.alignment,
         },
@@ -446,7 +492,12 @@ fn build_slot_rotate(el: &Element, ctx: &TemplateContext, parent_dir: Direction)
     }
 }
 
-fn build_if(block: &IfBlock, ctx: &TemplateContext, parent_dir: Direction) -> Vec<WidgetChild> {
+fn build_if(
+    block: &IfBlock,
+    ctx: &TemplateContext,
+    parent_dir: Direction,
+    inherited: Style,
+) -> Vec<WidgetChild> {
     let body = if ctx.eval_condition(&block.condition) {
         &block.then_children
     } else if let Some(ref else_children) = block.else_children {
@@ -454,10 +505,15 @@ fn build_if(block: &IfBlock, ctx: &TemplateContext, parent_dir: Direction) -> Ve
     } else {
         return vec![];
     };
-    build_children(body, ctx, parent_dir)
+    build_children(body, ctx, parent_dir, inherited)
 }
 
-fn build_for(block: &ForBlock, ctx: &TemplateContext, parent_dir: Direction) -> Vec<WidgetChild> {
+fn build_for(
+    block: &ForBlock,
+    ctx: &TemplateContext,
+    parent_dir: Direction,
+    inherited: Style,
+) -> Vec<WidgetChild> {
     let items = ctx.get_list(&block.iterator);
     let mut out = Vec::new();
     for item_ctx in items {
@@ -476,7 +532,12 @@ fn build_for(block: &ForBlock, ctx: &TemplateContext, parent_dir: Direction) -> 
                     .insert(pattern.to_string(), TemplateValue::Str(item_str));
             }
         }
-        out.extend(build_children(&block.body, &child_ctx, parent_dir));
+        out.extend(build_children(
+            &block.body,
+            &child_ctx,
+            parent_dir,
+            inherited,
+        ));
     }
     out
 }
@@ -485,6 +546,7 @@ fn build_match(
     block: &MatchBlock,
     ctx: &TemplateContext,
     parent_dir: Direction,
+    inherited: Style,
 ) -> Vec<WidgetChild> {
     let val = value_to_str(&eval_expr(&block.expr, ctx));
     for arm in &block.arms {
@@ -497,7 +559,7 @@ fn build_match(
             pattern == val
         };
         if matched {
-            return build_children(&arm.body, ctx, parent_dir);
+            return build_children(&arm.body, ctx, parent_dir, inherited);
         }
     }
     vec![]
@@ -507,6 +569,7 @@ fn build_include(
     inc: &IncludeNode,
     ctx: &TemplateContext,
     parent_dir: Direction,
+    inherited: Style,
 ) -> Vec<WidgetChild> {
     // Split `path#ComponentName` if present.
     let (file_path, component_name) = if let Some((f, c)) = inc.path.split_once('#') {
@@ -560,7 +623,7 @@ fn build_include(
         },
     };
 
-    build_children(&nodes, &child_ctx, parent_dir)
+    build_children(&nodes, &child_ctx, parent_dir, inherited)
 }
 
 // ─── Phase 2: Paint ───────────────────────────────────────────────────────────
