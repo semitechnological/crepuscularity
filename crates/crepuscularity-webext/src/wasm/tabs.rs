@@ -181,7 +181,10 @@ pub async fn set_zoom(tab_id: i64, zoom_factor: f64) -> Result<()> {
         &tabs,
         "tabs.setZoom",
         "setZoom",
-        &[JsValue::from_f64(tab_id as f64), JsValue::from_f64(zoom_factor)],
+        &[
+            JsValue::from_f64(tab_id as f64),
+            JsValue::from_f64(zoom_factor),
+        ],
     )
     .await?;
     Ok(())
