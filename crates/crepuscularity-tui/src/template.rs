@@ -13,12 +13,60 @@ pub struct Template {
     ctx: TemplateContext,
 }
 
+#[derive(Clone, Debug)]
+pub struct ElementRef {
+    pub id: &'static str,
+    pub content: String,
+}
+
+impl ElementRef {
+    pub fn new(id: &'static str) -> Self {
+        Self {
+            id,
+            content: String::new(),
+        }
+    }
+
+    pub fn set_content(&mut self, content: impl Into<String>) -> &mut Self {
+        self.content = content.into();
+        self
+    }
+
+    pub fn content(&mut self, content: impl Into<String>) -> &mut Self {
+        self.set_content(content)
+    }
+
+    pub fn text(&mut self, content: impl Into<String>) -> &mut Self {
+        self.set_content(content)
+    }
+
+    pub fn val(&mut self, content: impl Into<String>) -> &mut Self {
+        self.set_content(content)
+    }
+
+    pub fn clear(&mut self) -> &mut Self {
+        self.content.clear();
+        self
+    }
+}
+
 impl Template {
     pub fn from_source(source: impl Into<String>) -> Self {
         Self {
             path: PathBuf::new(),
             source: source.into(),
             ctx: TemplateContext::new(),
+        }
+    }
+
+    pub fn from_source_with_path(source: impl Into<String>, path: impl AsRef<Path>) -> Self {
+        let path = path.as_ref().to_path_buf();
+        let mut ctx = TemplateContext::new();
+        ctx.base_dir = path.parent().map(Path::to_path_buf);
+        Self {
+            path,
+            source: source.into(),
+            ctx,
         }
     }
 

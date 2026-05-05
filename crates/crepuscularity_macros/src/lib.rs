@@ -106,7 +106,7 @@ pub fn crepus_refs(input: TokenStream) -> TokenStream {
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
     let entry_path = PathBuf::from(manifest_dir).join(&rel_path);
 
-    match collect_ids_from_path(&entry_path) {
+    match collect_ids_from_path(&entry_path, "crepus_refs!") {
         Ok(ids) => {
             let fields: Vec<TokenStream2> = ids
                 .iter()
@@ -141,15 +141,147 @@ pub fn crepus_refs(input: TokenStream) -> TokenStream {
     }
 }
 
-fn collect_ids_from_path(entry_path: &Path) -> Result<Vec<String>, String> {
+/// Generate a TUI template wrapper with jQuery-like handles for all `#id`s.
+///
+/// ```ignore
+/// let mut ui = crepuscularity_tui::template_refs!("ui/ui.crepus")?;
+/// ui.input.content = "input contents".to_string();
+/// ui.title.text("My App");
+/// ui.draw_full(frame)?;
+/// ```
+#[proc_macro]
+pub fn template_refs(input: TokenStream) -> TokenStream {
+    let lit = parse_macro_input!(input as LitStr);
+    let rel_path = lit.value();
+    let span = lit.span();
+    let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
+    let entry_path = PathBuf::from(manifest_dir).join(&rel_path);
+
+    match build_tui_template_refs(&entry_path) {
+        Ok(tokens) => tokens.into(),
+        Err(message) => syn::Error::new(span, message).to_compile_error().into(),
+    }
+}
+
+fn build_tui_template_refs(entry_path: &Path) -> Result<TokenStream2, String> {
+    let ids = collect_ids_from_path(entry_path, "template_refs!")?;
+    let canonical = std::fs::canonicalize(entry_path).unwrap_or_else(|_| entry_path.to_path_buf());
+    let source = std::fs::read_to_string(&canonical)
+        .map_err(|e| format!("template_refs! could not read {}: {e}", canonical.display()))?;
+    let path = canonical.to_string_lossy().to_string();
+
+    let fields: Vec<TokenStream2> = ids
+        .iter()
+        .filter_map(|id| {
+            make_rust_ident(id).map(|ident| {
+                quote! { pub #ident: ::crepuscularity_tui::ElementRef }
+            })
+        })
+        .collect();
+    let inits: Vec<TokenStream2> = ids
+        .iter()
+        .filter_map(|id| {
+            make_rust_ident(id).map(|ident| {
+                quote! { #ident: ::crepuscularity_tui::ElementRef::new(#id) }
+            })
+        })
+        .collect();
+    let syncs: Vec<TokenStream2> = ids
+        .iter()
+        .filter_map(|id| {
+            make_rust_ident(id).map(|ident| {
+                let key = ident.to_string();
+                quote! {
+                    self.template.set(#key, self.#ident.content.clone());
+                }
+            })
+        })
+        .collect();
+    let matches: Vec<TokenStream2> = ids
+        .iter()
+        .filter_map(|id| {
+            make_rust_ident(id).map(|ident| {
+                quote! { #id => Some(&mut self.#ident) }
+            })
+        })
+        .collect();
+
+    Ok(quote! {{
+        #[allow(non_camel_case_types)]
+        struct __CrepusTuiTemplateRefs {
+            template: ::crepuscularity_tui::Template,
+            #(#fields),*
+        }
+
+        impl __CrepusTuiTemplateRefs {
+            pub fn set(
+                &mut self,
+                key: impl Into<String>,
+                value: impl Into<::crepuscularity_tui::TemplateValue>,
+            ) -> &mut Self {
+                self.template.set(key, value);
+                self
+            }
+
+            pub fn get(&mut self, id: &str) -> Option<&mut ::crepuscularity_tui::ElementRef> {
+                match id {
+                    #(#matches,)*
+                    _ => None,
+                }
+            }
+
+            pub fn find(&mut self, selector: &str) -> Option<&mut ::crepuscularity_tui::ElementRef> {
+                self.get(selector.strip_prefix('#').unwrap_or(selector))
+            }
+
+            pub fn template(&self) -> &::crepuscularity_tui::Template {
+                &self.template
+            }
+
+            pub fn template_mut(&mut self) -> &mut ::crepuscularity_tui::Template {
+                &mut self.template
+            }
+
+            pub fn sync_refs(&mut self) -> &mut Self {
+                #(#syncs)*
+                self
+            }
+
+            pub fn draw(
+                &mut self,
+                frame: &mut ::crepuscularity_tui::ratatui::Frame,
+                area: ::crepuscularity_tui::ratatui::layout::Rect,
+            ) -> Result<(), String> {
+                self.sync_refs();
+                self.template.draw(frame, area)
+            }
+
+            pub fn draw_full(
+                &mut self,
+                frame: &mut ::crepuscularity_tui::ratatui::Frame,
+            ) -> Result<(), String> {
+                self.sync_refs();
+                self.template.draw_full(frame)
+            }
+        }
+
+        Ok::<__CrepusTuiTemplateRefs, String>(__CrepusTuiTemplateRefs {
+            template: ::crepuscularity_tui::Template::from_source_with_path(#source, #path),
+            #(#inits),*
+        })
+    }})
+}
+
+fn collect_ids_from_path(entry_path: &Path, macro_name: &str) -> Result<Vec<String>, String> {
     let mut seen = BTreeSet::new();
     let mut ids = BTreeSet::new();
-    collect_ids_recursive(entry_path, &mut seen, &mut ids)?;
+    collect_ids_recursive(entry_path, macro_name, &mut seen, &mut ids)?;
     Ok(ids.into_iter().collect())
 }
 
 fn collect_ids_recursive(
     path: &Path,
+    macro_name: &str,
     seen: &mut BTreeSet<PathBuf>,
     ids: &mut BTreeSet<String>,
 ) -> Result<(), String> {
@@ -159,23 +291,30 @@ fn collect_ids_recursive(
     }
 
     let content = std::fs::read_to_string(&canonical)
-        .map_err(|e| format!("crepus_refs! could not read {}: {e}", canonical.display()))?;
+        .map_err(|e| format!("{macro_name} could not read {}: {e}", canonical.display()))?;
     if let Ok(file) = crepuscularity_core::parse_component_file(&content) {
         if !file.components.is_empty() {
             for component in file.components.values() {
-                collect_ids_from_nodes(&component.nodes, canonical.parent(), seen, ids)?;
+                collect_ids_from_nodes(
+                    &component.nodes,
+                    canonical.parent(),
+                    macro_name,
+                    seen,
+                    ids,
+                )?;
             }
             return Ok(());
         }
     }
     let nodes = crepuscularity_core::parse_template(&content)
-        .map_err(|e| format!("crepus_refs! parse error in {}: {e}", canonical.display()))?;
-    collect_ids_from_nodes(&nodes, canonical.parent(), seen, ids)
+        .map_err(|e| format!("{macro_name} parse error in {}: {e}", canonical.display()))?;
+    collect_ids_from_nodes(&nodes, canonical.parent(), macro_name, seen, ids)
 }
 
 fn collect_ids_from_nodes(
     nodes: &[crepuscularity_core::ast::Node],
     base_dir: Option<&Path>,
+    macro_name: &str,
     seen: &mut BTreeSet<PathBuf>,
     ids: &mut BTreeSet<String>,
 ) -> Result<(), String> {
@@ -187,18 +326,20 @@ fn collect_ids_from_nodes(
                 if let Some(id) = &el.id {
                     ids.insert(id.clone());
                 }
-                collect_ids_from_nodes(&el.children, base_dir, seen, ids)?;
+                collect_ids_from_nodes(&el.children, base_dir, macro_name, seen, ids)?;
             }
             Node::If(block) => {
-                collect_ids_from_nodes(&block.then_children, base_dir, seen, ids)?;
+                collect_ids_from_nodes(&block.then_children, base_dir, macro_name, seen, ids)?;
                 if let Some(else_children) = &block.else_children {
-                    collect_ids_from_nodes(else_children, base_dir, seen, ids)?;
+                    collect_ids_from_nodes(else_children, base_dir, macro_name, seen, ids)?;
                 }
             }
-            Node::For(block) => collect_ids_from_nodes(&block.body, base_dir, seen, ids)?,
+            Node::For(block) => {
+                collect_ids_from_nodes(&block.body, base_dir, macro_name, seen, ids)?
+            }
             Node::Match(block) => {
                 for arm in &block.arms {
-                    collect_ids_from_nodes(&arm.body, base_dir, seen, ids)?;
+                    collect_ids_from_nodes(&arm.body, base_dir, macro_name, seen, ids)?;
                 }
             }
             Node::Include(inc) => {
@@ -212,8 +353,8 @@ fn collect_ids_from_nodes(
                 } else {
                     PathBuf::from(include_path)
                 };
-                collect_ids_recursive(&resolved, seen, ids)?;
-                collect_ids_from_nodes(&inc.slot, base_dir, seen, ids)?;
+                collect_ids_recursive(&resolved, macro_name, seen, ids)?;
+                collect_ids_from_nodes(&inc.slot, base_dir, macro_name, seen, ids)?;
             }
             Node::Text(_) | Node::RawText(_) | Node::LetDecl(_) => {}
         }
