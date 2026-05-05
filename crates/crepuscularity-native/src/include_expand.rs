@@ -27,16 +27,33 @@ pub(crate) fn read_file(ctx: &TemplateContext, path: &Path) -> Result<String, St
     }
 }
 
-pub(crate) fn resolve_include_path(base_dir: Option<&Path>, path: &str) -> PathBuf {
+pub(crate) fn resolve_include_path(base_dir: Option<&Path>, path: &str) -> Result<PathBuf, String> {
+    let requested = Path::new(path);
+    if requested.is_absolute()
+        || requested
+            .components()
+            .any(|component| matches!(component, std::path::Component::ParentDir))
+    {
+        return Err(format!("include path outside base dir: {path}"));
+    }
+
     let candidate = if let Some(base) = base_dir {
-        base.join(path)
+        base.join(requested)
     } else {
-        PathBuf::from(path)
+        requested.to_path_buf()
     };
     if cfg!(not(target_arch = "wasm32")) {
-        std::fs::canonicalize(&candidate).unwrap_or(candidate)
+        let resolved = std::fs::canonicalize(&candidate).unwrap_or(candidate);
+        if let Some(base) = base_dir {
+            if let Ok(base) = std::fs::canonicalize(base) {
+                if !resolved.starts_with(&base) {
+                    return Err(format!("include path outside base dir: {path}"));
+                }
+            }
+        }
+        Ok(resolved)
     } else {
-        candidate
+        Ok(candidate)
     }
 }
 
@@ -49,7 +66,7 @@ pub(crate) fn expand_include(
         return expand_named_component(inc, ctx, file_part, comp_name);
     }
 
-    let file_path = resolve_include_path(ctx.base_dir.as_deref(), &inc.path);
+    let file_path = resolve_include_path(ctx.base_dir.as_deref(), &inc.path)?;
     let content = read_file(ctx, &file_path)?;
     let nodes = parse_template(&content).map_err(|e| format!("include parse error: {e}"))?;
 
@@ -72,7 +89,7 @@ fn expand_named_component(
     file_part: &str,
     comp_name: &str,
 ) -> Result<(Vec<Node>, TemplateContext), String> {
-    let file_path = resolve_include_path(ctx.base_dir.as_deref(), file_part);
+    let file_path = resolve_include_path(ctx.base_dir.as_deref(), file_part)?;
     let content = read_file(ctx, &file_path)?;
     let comp_file =
         parse_component_file(&content).map_err(|e| format!("component file parse error: {e}"))?;

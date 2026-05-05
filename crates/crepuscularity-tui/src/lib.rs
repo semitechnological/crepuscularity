@@ -40,7 +40,7 @@
 //! }).unwrap();
 //! ```
 //!
-//! For file-backed templates, use [`template`] when you want to keep ownership
+//! For file-backed templates, use [`template()`] when you want to keep ownership
 //! of the Ratatui draw loop:
 //!
 //! ```rust,no_run

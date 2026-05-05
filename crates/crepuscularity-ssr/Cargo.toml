@@ -1,6 +1,6 @@
 [package]
 name = "crepuscularity-ssr"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 license = "MPL-2.0"
 description = "Axum/Tokio SSR helpers for Crepuscularity (UNSTABLE; in active development)."
@@ -9,8 +9,8 @@ documentation = "https://docs.rs/crepuscularity-ssr"
 readme = "../../README.md"
 
 [dependencies]
-crepuscularity-web = { path = "../crepuscularity-web", version = "0.3.2" }
-crepuscularity-core = { path = "../crepuscularity-core", version = "0.3.1" }
+crepuscularity-web = { path = "../crepuscularity-web", version = "0.3.4" }
+crepuscularity-core = { path = "../crepuscularity-core", version = "0.3.2" }
 axum = { workspace = true }
 tokio = { workspace = true }
 tokio-stream = { workspace = true }

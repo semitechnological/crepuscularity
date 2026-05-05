@@ -1,13 +1,17 @@
 use std::rc::Rc;
 
-use crate::runtime::{alloc_id, AnyNode, EffectNode, NodeId, State, NODES, RUNTIME};
+use crate::runtime::{
+    alloc_id, clear_observer_sources, enter_observer, remove_node, AnyNode, EffectNode, NodeId,
+    State, NODES,
+};
 
+/// Reactive side effect that re-runs when signals or memos read inside it change.
 pub struct Effect {
-    #[allow(dead_code)]
     pub(crate) id: NodeId,
 }
 
 impl Effect {
+    /// Create an effect and run it once immediately to establish subscriptions.
     pub fn new(f: impl Fn() + 'static) -> Self {
         let id = alloc_id();
         NODES.with(|n| {
@@ -23,40 +27,16 @@ impl Effect {
         run_effect(id);
         Effect { id }
     }
+
+    /// Remove this effect from the reactive graph.
+    pub fn dispose(self) {
+        remove_node(self.id);
+    }
 }
 
 pub(crate) fn run_effect(id: NodeId) {
-    // 1. Clear old subscriptions: for each source in sources, remove id from source.subscribers
-    let old_sources = NODES.with(|nodes| {
-        let nodes = nodes.borrow();
-        match nodes.get(&id) {
-            Some(AnyNode::Effect(e)) => e.sources.clone(),
-            _ => vec![],
-        }
-    });
+    clear_observer_sources(id);
 
-    for source_id in &old_sources {
-        NODES.with(|nodes| {
-            let mut nodes = nodes.borrow_mut();
-            match nodes.get_mut(source_id) {
-                Some(AnyNode::Signal(s)) => s.subscribers.retain(|&x| x != id),
-                Some(AnyNode::Memo(m)) => m.subscribers.retain(|&x| x != id),
-                _ => {}
-            }
-        });
-    }
-
-    // 2. Clear sources list
-    NODES.with(|nodes| {
-        if let Some(AnyNode::Effect(e)) = nodes.borrow_mut().get_mut(&id) {
-            e.sources.clear();
-        }
-    });
-
-    // 3. Set RUNTIME.current_observer = Some(id)
-    RUNTIME.with(|rt| rt.borrow_mut().current_observer = Some(id));
-
-    // 4. Extract the run closure and call it outside the borrow
     let run = NODES.with(|nodes| {
         let nodes = nodes.borrow();
         match nodes.get(&id) {
@@ -65,14 +45,15 @@ pub(crate) fn run_effect(id: NodeId) {
         }
     });
 
-    if let Some(run) = run {
+    let Some(run) = run else {
+        return;
+    };
+
+    {
+        let _observer = enter_observer(id);
         run();
     }
 
-    // 5. Restore RUNTIME.current_observer = None
-    RUNTIME.with(|rt| rt.borrow_mut().current_observer = None);
-
-    // 6. Set node state = Clean
     NODES.with(|nodes| {
         if let Some(AnyNode::Effect(e)) = nodes.borrow_mut().get_mut(&id) {
             e.state = State::Clean;

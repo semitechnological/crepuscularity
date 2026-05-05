@@ -15,6 +15,37 @@ cd my-gpui-app
 SDKROOT=$(xcrun --show-sdk-path) cargo run
 ```
 
+## macOS Xcode Environment
+
+GPUI's macOS build compiles Metal shaders during Cargo builds. Cargo does not invent Xcode settings; it passes through the shell environment to GPUI's build script.
+
+From this repo, use:
+
+```bash
+eval "$(scripts/metal-env.sh)"
+cargo build -p crepuscularity-gpui
+scripts/metal-env.sh -- cargo check -p crepuscularity-gpui
+```
+
+For an app outside this checkout, export the same values explicitly:
+
+```bash
+export SDKROOT="$(xcrun --show-sdk-path)"
+export DEVELOPER_DIR="$(xcode-select -p)"
+export TOOLCHAINS="Metal"
+export PATH="$(xcodebuild -showComponent MetalToolchain -json | plutil -extract toolchainSearchPath raw -o - -)/Metal.xctoolchain/usr/bin:$PATH"
+```
+
+`SDKROOT` makes SDK headers such as `dispatch.h` visible. `DEVELOPER_DIR` pins the active Xcode for `xcrun`. `TOOLCHAINS=Metal` is the short `xcrun` selector for the installed Metal Toolchain when GPUI runs `xcrun -sdk macosx metal` and `xcrun -sdk macosx metallib`. The `PATH` entry is for direct `metal` / `metallib` diagnostics; GPUI still goes through `xcrun`.
+
+Check the local state without downloading anything:
+
+```bash
+scripts/metal-env.sh --check
+```
+
+If `xcrun_metal=failed` appears even though `path_metal=ok`, Xcode can see the downloaded compiler on disk but has not registered it for `xcrun`. Run `xcodebuild -downloadComponent MetalToolchain` or install the component from Xcode Settings > Components, then rerun the check before treating a Cargo/GPUI failure as a project issue.
+
 ## Project Structure
 
 ```

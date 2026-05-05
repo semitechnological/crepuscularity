@@ -1,6 +1,6 @@
 [package]
 name = "crepuscularity-native"
-version = "0.3.1"
+version = "0.3.2"
 edition = "2021"
 license = "MPL-2.0"
 description = "View intermediate representation (JSON) for native SwiftUI / Compose shells (UNSTABLE)."
@@ -13,7 +13,7 @@ default = []
 schema = ["dep:schemars"]
 
 [dependencies]
-crepuscularity-core = { path = "../crepuscularity-core", version = "0.3.1" }
+crepuscularity-core = { path = "../crepuscularity-core", version = "0.3.2" }
 regex = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -21,8 +21,9 @@ schemars = { workspace = true, optional = true }
 toml = { workspace = true }
 
 [dev-dependencies]
-crepuscularity-core = { path = "../crepuscularity-core", version = "0.3.1" }
+crepuscularity-core = { path = "../crepuscularity-core", version = "0.3.2" }
 serde_json = { workspace = true }
+tempfile = { workspace = true }
 
 [[bin]]
 name = "parity-report"

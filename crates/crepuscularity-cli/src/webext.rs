@@ -87,19 +87,7 @@ fn scaffold_extension(name: &str) {
     std::fs::create_dir_all(base.join("runtime/src")).unwrap();
     std::fs::create_dir_all(base.join("views")).unwrap();
 
-    let webext_toml = format!(
-        r#"[extension]
-name = "{name}"
-version = "0.1.0"
-description = "A browser extension built with crepuscularity"
-
-[capabilities]
-storage = true
-background-script = true
-content-script = true
-host-permissions = ["<all_urls>"]
-"#
-    );
+    let webext_toml = scaffold_webext_toml(name);
     std::fs::write(base.join("webext.toml"), webext_toml).unwrap();
 
     let cargo_toml = format!(
@@ -167,6 +155,22 @@ div flex flex-col gap-4 p-4
         style("# Load dist/unpacked/ in chrome://extensions").dim()
     );
     ui::done_in(t0.elapsed());
+}
+
+fn scaffold_webext_toml(name: &str) -> String {
+    format!(
+        r#"[extension]
+name = "{name}"
+version = "0.1.0"
+description = "A browser extension built with crepuscularity"
+
+[capabilities]
+storage = true
+background-script = true
+content-script = true
+host-permissions = ["https://example.com/*"]
+"#
+    )
 }
 
 // ── build ─────────────────────────────────────────────────────────────────────
@@ -524,6 +528,24 @@ fn print_manifest(app_path: &Path) {
     match crepuscularity_webext::ExtensionManifest::load(&webext_toml) {
         Ok(m) => println!("{}", m.to_manifest_v3_json()),
         Err(e) => ui::error(&format!("failed to parse webext.toml: {e}")),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn scaffold_webext_toml_uses_narrow_content_scope() {
+        let toml = scaffold_webext_toml("My Extension");
+        assert!(!toml.contains("<all_urls>"));
+
+        let manifest: crepuscularity_webext::ExtensionManifest = toml::from_str(&toml).unwrap();
+        assert!(manifest.capabilities.content_script);
+        assert_eq!(
+            manifest.capabilities.host_permissions,
+            vec!["https://example.com/*"]
+        );
     }
 }
 

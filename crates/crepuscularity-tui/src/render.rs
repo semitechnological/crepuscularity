@@ -434,20 +434,11 @@ fn build_slot(
     _parent_dir: Direction,
     inherited: Style,
 ) -> WidgetChild {
-    let (nodes, slot_ctx): (&[Node], &TemplateContext);
-    // We need owned values for the branches; box them.
-    let owned_nodes;
-    let owned_ctx;
-
-    let (n, c) = if let Some((slot_nodes, slot_ctx_box)) = &ctx.slot {
-        owned_nodes = slot_nodes.clone();
-        owned_ctx = *slot_ctx_box.clone();
-        (owned_nodes.as_slice(), &owned_ctx as &TemplateContext)
+    let (nodes, slot_ctx) = if let Some((slot_nodes, slot_ctx_box)) = &ctx.slot {
+        (slot_nodes.as_slice(), slot_ctx_box.as_ref())
     } else {
         (el.children.as_slice(), ctx)
     };
-    nodes = n;
-    slot_ctx = c;
 
     let children = build_children(nodes, slot_ctx, Direction::Vertical, inherited);
     WidgetChild {

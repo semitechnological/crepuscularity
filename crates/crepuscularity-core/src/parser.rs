@@ -1606,6 +1606,10 @@ fn jsx_close<'a>(src: &'a str, tag: &str) -> Result<&'a str, String> {
     ))
 }
 
+fn normalize_fullwidth_braces(s: &str) -> String {
+    s.replace('\u{FF5B}', "{").replace('\u{FF5D}', "}")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1748,8 +1752,4 @@ mod tests {
             "line\n\t\"quote\""
         );
     }
-}
-
-fn normalize_fullwidth_braces(s: &str) -> String {
-    s.replace('\u{FF5B}', "{").replace('\u{FF5D}', "}")
 }

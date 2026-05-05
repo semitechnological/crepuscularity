@@ -69,14 +69,11 @@ fn memo_caches() {
 
 #[test]
 fn memo_partialeq_skip() {
-    // Memo should not mark subscribers dirty if computed value hasn't changed.
-    // We test this indirectly: if signal A changes but memo result is same, effect shouldn't re-run extra times.
     let s = Signal::new(1i32);
     let s2 = s.clone();
-    // Memo always returns the same value regardless of signal
     let m = Memo::new(move || {
-        let _ = s2.get(); // track signal
-        42i32 // always returns 42
+        let _ = s2.get();
+        42i32
     });
 
     let effect_count = Rc::new(RefCell::new(0u32));
@@ -88,10 +85,66 @@ fn memo_partialeq_skip() {
     });
 
     assert_eq!(*effect_count.borrow(), 1, "effect ran on init");
-    // The memo value is stable; changing signal may or may not trigger effect
-    // depending on implementation. We just verify we don't crash and value is correct.
     s.set(2);
     assert_eq!(m.get(), 42, "memo still returns 42");
+    assert_eq!(
+        *effect_count.borrow(),
+        1,
+        "stable memo value should not rerun dependent effect"
+    );
+}
+
+#[test]
+fn effect_dispose_stops_reruns() {
+    let count = Rc::new(RefCell::new(0u32));
+    let s = Signal::new(0i32);
+    let s2 = s.clone();
+    let count2 = Rc::clone(&count);
+    let effect = Effect::new(move || {
+        let _ = s2.get();
+        *count2.borrow_mut() += 1;
+    });
+
+    assert_eq!(*count.borrow(), 1);
+    effect.dispose();
+    s.set(1);
+    assert_eq!(*count.borrow(), 1, "disposed effect must not rerun");
+}
+
+#[test]
+fn memo_dispose_removes_subscriptions() {
+    let s = Signal::new(1i32);
+    let s2 = s.clone();
+    let memo = Memo::new(move || s2.get() * 2);
+
+    assert_eq!(memo.get(), 2);
+    memo.dispose();
+    s.set(2);
+}
+
+#[test]
+fn nested_memo_preserves_outer_effect_observer() {
+    let a = Signal::new(1i32);
+    let b = Signal::new(10i32);
+    let a2 = a.clone();
+    let memo = Memo::new(move || a2.get() * 2);
+
+    let runs = Rc::new(RefCell::new(0u32));
+    let last_b = Rc::new(RefCell::new(0i32));
+    let memo2 = memo.clone();
+    let b2 = b.clone();
+    let runs2 = Rc::clone(&runs);
+    let last_b2 = Rc::clone(&last_b);
+    let _effect = Effect::new(move || {
+        let _ = memo2.get();
+        *last_b2.borrow_mut() = b2.get();
+        *runs2.borrow_mut() += 1;
+    });
+
+    assert_eq!(*runs.borrow(), 1);
+    b.set(20);
+    assert_eq!(*runs.borrow(), 2);
+    assert_eq!(*last_b.borrow(), 20);
 }
 
 #[test]

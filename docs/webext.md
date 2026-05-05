@@ -32,6 +32,8 @@ content-script = true
 host-permissions = ["https://example.com/*"]
 ```
 
+`host-permissions` is emitted exactly as configured. Leave it empty for popup-only extensions with no page access, or add the narrow URL patterns your content scripts need. Crepuscularity does not broaden an empty list to `<all_urls>`.
+
 ### Capabilities
 
 | Capability | Description |
@@ -85,7 +87,7 @@ Output:
     "type": "module"
   },
   "content_scripts": [{
-    "matches": ["<all_urls>"],
+    "matches": ["https://example.com/*"],
     "js": ["src/content.js"]
   }],
   "content_security_policy": {

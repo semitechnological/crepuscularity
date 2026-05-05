@@ -26,9 +26,13 @@ if ! command -v cargo >/dev/null 2>&1; then
   exit 1
 fi
 
-if [[ "$(uname -s)" == "Darwin" && -z "${SDKROOT:-}" ]]; then
-  SDKROOT="$(xcrun --show-sdk-path 2>/dev/null || true)"
-  export SDKROOT
+if [[ "$(uname -s)" == "Darwin" ]]; then
+  if [[ -x "$ROOT/scripts/metal-env.sh" ]]; then
+    eval "$("$ROOT/scripts/metal-env.sh" 2>/dev/null || true)"
+  elif [[ -z "${SDKROOT:-}" ]]; then
+    SDKROOT="$(xcrun --show-sdk-path 2>/dev/null || true)"
+    export SDKROOT
+  fi
 fi
 
 exec cargo run -p crepuscularity-cli -- "${args[@]}"

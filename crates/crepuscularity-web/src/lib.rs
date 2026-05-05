@@ -1,3 +1,8 @@
+//! HTML and WASM rendering backend for `.crepus` templates.
+//!
+//! Use [`render_from_files`] for virtual-file builds, [`render_template_to_html`] for one-off
+//! templates, and [`render_bundle`] for the `crepus web build` JSON bundle format.
+
 use std::path::{Path, PathBuf};
 
 use crepuscularity_core::ast::*;
@@ -128,12 +133,21 @@ pub fn par_render_component_file(
     }
 }
 
+/// Parse a single `.crepus` template string and render it to escaped HTML.
+///
+/// This entry point does not resolve filesystem includes. For component trees that use
+/// `include`, prefer [`render_from_files`] so every source file is supplied through the same
+/// virtual file map used by WASM and static-site builds.
 #[tracing::instrument(skip(template, ctx), fields(template_len = template.len()))]
 pub fn render_template_to_html(template: &str, ctx: &TemplateContext) -> Result<String, String> {
     let nodes = parse_template(template)?;
     render_nodes_to_html(&nodes, ctx)
 }
 
+/// Render one named component from a multi-component `.crepus` source string.
+///
+/// `component_name` is the section name after a `--- Name` separator. Component defaults are
+/// evaluated before rendering and do not override variables already present in `ctx`.
 pub fn render_component_file_to_html(
     content: &str,
     component_name: &str,
@@ -156,6 +170,10 @@ pub fn render_component_file_to_html(
     render_nodes_to_html(&component.nodes, &child_ctx)
 }
 
+/// Render an already parsed AST node list to escaped HTML.
+///
+/// Use this when a caller owns parsing or analysis separately from rendering. `$: let` declarations
+/// are applied in source order to a cloned context, so sibling nodes after a declaration can see it.
 pub fn render_nodes_to_html(nodes: &[Node], ctx: &TemplateContext) -> Result<String, String> {
     render_nodes_with_ctx(nodes, ctx.clone())
 }
@@ -441,7 +459,7 @@ fn render_include(inc: &IncludeNode, ctx: &TemplateContext) -> Result<String, St
         return render_named_component(inc, ctx, file_part, comp_name);
     }
 
-    let file_path = resolve_include_path(ctx.base_dir.as_deref(), &inc.path);
+    let file_path = resolve_include_path(ctx.base_dir.as_deref(), &inc.path)?;
     let content = read_file(ctx, &file_path)?;
     let nodes = parse_template(&content).map_err(|e| format!("include parse error: {}", e))?;
 
@@ -464,7 +482,7 @@ fn render_named_component(
     file_part: &str,
     comp_name: &str,
 ) -> Result<String, String> {
-    let file_path = resolve_include_path(ctx.base_dir.as_deref(), file_part);
+    let file_path = resolve_include_path(ctx.base_dir.as_deref(), file_part)?;
     let content = read_file(ctx, &file_path)?;
     let comp_file =
         parse_component_file(&content).map_err(|e| format!("component file parse error: {}", e))?;
@@ -491,16 +509,33 @@ fn render_named_component(
     render_nodes_to_html(&comp.nodes, &child_ctx)
 }
 
-pub(crate) fn resolve_include_path(base_dir: Option<&Path>, path: &str) -> PathBuf {
+pub(crate) fn resolve_include_path(base_dir: Option<&Path>, path: &str) -> Result<PathBuf, String> {
+    let requested = Path::new(path);
+    if requested.is_absolute()
+        || requested
+            .components()
+            .any(|component| matches!(component, std::path::Component::ParentDir))
+    {
+        return Err(format!("include path outside base dir: {path}"));
+    }
+
     let candidate = if let Some(base) = base_dir {
-        base.join(path)
+        base.join(requested)
     } else {
-        PathBuf::from(path)
+        requested.to_path_buf()
     };
     if cfg!(not(target_arch = "wasm32")) {
-        std::fs::canonicalize(&candidate).unwrap_or(candidate)
+        let resolved = std::fs::canonicalize(&candidate).unwrap_or(candidate);
+        if let Some(base) = base_dir {
+            if let Ok(base) = std::fs::canonicalize(base) {
+                if !resolved.starts_with(&base) {
+                    return Err(format!("include path outside base dir: {path}"));
+                }
+            }
+        }
+        Ok(resolved)
     } else {
-        candidate
+        Ok(candidate)
     }
 }
 
@@ -529,8 +564,8 @@ fn node_is_dynamic(node: &Node) -> bool {
 ///
 /// - The root wrapping element gets `data-crepus-root`.
 /// - Each dynamic descendant element gets a unique `data-crepus-id="N"`.
-/// - A `<script>window.__crepus_ctx__ = {...};</script>` is appended with the
-///   serialized context variables.
+/// - A non-executable JSON `<script>` is appended with the serialized context
+///   variables encoded as base64.
 ///
 /// Enable with the `hydration` cargo feature.
 #[cfg(feature = "hydration")]
@@ -548,8 +583,13 @@ pub fn render_template_to_html_with_hydration(
     let rendered = render_nodes_with_hydration_impl(&nodes, ctx, &counter, /*is_root=*/ true)?;
 
     // Serialize context vars to JSON.
+    use base64::{engine::general_purpose::STANDARD, Engine as _};
+
     let ctx_json = serialize_ctx_to_json(ctx);
-    let script = format!("<script>window.__crepus_ctx__ = {};</script>", ctx_json);
+    let ctx_b64 = STANDARD.encode(ctx_json.as_bytes());
+    let script = format!(
+        r#"<script id="__crepus_ctx__" type="application/json" data-encoding="base64">{ctx_b64}</script>"#
+    );
 
     Ok(format!("{rendered}{script}"))
 }

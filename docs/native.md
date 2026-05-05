@@ -65,16 +65,21 @@ This produces JSON that native shells can parse:
 
 ```json
 {
-  "type": "div",
-  "style": {
-    "display": "flex",
-    "flexDirection": "column",
-    "gap": 16
-  },
-  "children": [
+  "version": 1,
+  "root": [
     {
-      "type": "span",
-      "children": ["Hello Ada"]
+      "kind": "stack",
+      "axis": "column",
+      "spacing": 16.0,
+      "style": {
+        "flexDirection": "column"
+      },
+      "children": [
+        {
+          "kind": "text",
+          "content": "Hello Ada"
+        }
+      ]
     }
   ]
 }
@@ -143,8 +148,8 @@ class MainActivity : ComponentActivity() {
 ### Layout
 
 - **Flexbox**: `flex`, `flex-row`, `flex-col`, `justify-center`, `items-center`
-- **Grid**: `grid`, `grid-cols-3`, `grid-rows-2`
 - **Spacing**: `gap-4`, `p-4`, `m-4`
+- **Scroll containers**: `scroll`, `scroll-x`, `scroll-y`
 
 ### Styling
 
@@ -156,15 +161,16 @@ class MainActivity : ComponentActivity() {
 ### Components
 
 - **Basic elements**: `div`, `span`, `button`, `img`
-- **Form elements**: `input`, `textarea`
-- **Interactive**: `@click`, `@submit` handlers
-- **Animations**: `animate:opacity`, `animate:scale`
+- **Interactive**: `button @click` emits an action string for the native shell to handle
 
 ### Advanced Widgets
 
-- **Scroll views**: `scroll`, `scroll-x`, `scroll-y`
-- **Slot rotate**: Cycling text display
+- **Slot rotate**: Emits phrase data; the example shells currently display the first phrase
 - **Custom components**: Via `include`
+- **Control flow**: `if`, `for`, and `match`
+- **Slots**: Component slots with caller context
+
+The example SwiftUI and Jetpack Compose shells are intentionally small interpreters for the IR. They decode and render the core nodes, while app-specific image loading, navigation, action routing, accessibility, and animation behavior belong in the host shell.
 
 ## Runtime Updates
 
@@ -225,8 +231,9 @@ While the core layout is shared, each platform can customize:
 ## Performance Considerations
 
 - **IR parsing** happens at runtime - keep templates reasonably sized
+- **Includes** are expanded before lowering to IR; file-backed includes reject absolute paths and `..` traversal
 - **Image loading** should be optimized per platform
-- **Animations** use platform-native implementations
+- **Animations** should be implemented in the host shell until animation nodes are added to the IR
 - **Memory usage** scales with template complexity
 
 ## Examples
