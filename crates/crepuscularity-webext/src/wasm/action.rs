@@ -19,6 +19,15 @@ pub struct TitleDetails {
     pub title: String,
 }
 
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetIconDetails {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tab_id: Option<i64>,
+    #[serde(default)]
+    pub path: serde_json::Value,
+}
+
 pub fn namespace() -> Result<JsValue> {
     core::namespace("action")
 }
@@ -62,5 +71,17 @@ pub async fn disable(tab_id: Option<i64>) -> Result<()> {
         .map(|id| vec![JsValue::from_f64(id as f64)])
         .unwrap_or_default();
     core::call_method(&action, "action.disable", "disable", &args).await?;
+    Ok(())
+}
+
+pub async fn set_icon(details: &SetIconDetails) -> Result<()> {
+    let action = namespace()?;
+    core::call_method(
+        &action,
+        "action.setIcon",
+        "setIcon",
+        &[core::to_js(details)?],
+    )
+    .await?;
     Ok(())
 }
