@@ -1,6 +1,6 @@
 [package]
 name = "crepuscularity-cli"
-version = "0.6.18"
+version = "0.7.0"
 edition = "2021"
 license = "MPL-2.0"
 description = "crepus CLI — scaffolding and builds for Crepuscularity (UNSTABLE; in active development)."
@@ -29,11 +29,11 @@ desktop = ["dep:gpui", "dep:crepuscularity-runtime"]
 
 [dependencies]
 gpui                   = { version = "=0.2.2", default-features = false, features = ["font-kit"], optional = true }
-crepuscularity-core    = { path = "../crepuscularity-core", version = "0.3.2" }
-crepuscularity-runtime = { path = "../crepuscularity-runtime", version = "0.3.2", optional = true }
-crepuscularity-web     = { path = "../crepuscularity-web", version = "0.3.4" }
-crepuscularity-webext  = { path = "../crepuscularity-webext", version = "0.1.5" }
-crepuscularity-native  = { path = "../crepuscularity-native", version = "0.3.2" }
+crepuscularity-core    = { path = "../crepuscularity-core", version = "0.4.0" }
+crepuscularity-runtime = { path = "../crepuscularity-runtime", version = "0.4.0", optional = true }
+crepuscularity-web     = { path = "../crepuscularity-web", version = "0.4.0" }
+crepuscularity-webext  = { path = "../crepuscularity-webext", version = "0.2.0" }
+crepuscularity-native  = { path = "../crepuscularity-native", version = "0.4.0" }
 notify                 = { workspace = true }
 walkdir                = { workspace = true }
 serde                  = { workspace = true }
