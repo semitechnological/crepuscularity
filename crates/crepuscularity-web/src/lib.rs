@@ -16,6 +16,7 @@ mod bundle;
 pub mod dom;
 
 pub use bundle::render_bundle;
+pub use crepuscularity_core::build;
 pub use crepuscularity_core::preprocess::google_fonts_head_markup;
 pub use crepuscularity_macros::crepus_refs;
 

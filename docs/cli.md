@@ -136,6 +136,14 @@ pub fn on_refresh_status() -> Result<(), JsValue> {
 
 `crepus_refs!` scans the referenced `.crepus` file and reachable `include`s at compile time, then generates typed fields for discovered `#id`s. Missing DOM nodes return `Result::Err`; the web production path does not panic.
 
+For Cargo rebuild tracking and early syntax validation, add a build dependency on the same crate and put this in `build.rs`:
+
+```rust
+fn main() {
+    crepuscularity_web::build::compile_crepus("views").unwrap();
+}
+```
+
 ### Optional web features
 
 - `dom`: wasm-side DOM lookup and mutation helpers such as `crepus.hero.text(...)`.

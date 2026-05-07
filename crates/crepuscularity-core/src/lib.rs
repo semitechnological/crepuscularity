@@ -5,6 +5,7 @@
 
 pub mod analysis;
 pub mod ast;
+pub mod build;
 pub mod cache;
 pub mod context;
 pub mod eval;

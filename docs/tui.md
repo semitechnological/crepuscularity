@@ -73,6 +73,14 @@ For a template element like `input #input "{input}"`, the macro generates `ui.in
 
 Rust cannot generate fields from a runtime string path. Use `template_refs!("ui/ui.crepus")` when you want generated handles, and use `template(path)` when the path is only known at runtime.
 
+For Cargo rebuild tracking and early syntax validation, add a build dependency on the same crate and put this in `build.rs`:
+
+```rust
+fn main() {
+    crepuscularity_tui::build::compile_crepus("ui").unwrap();
+}
+```
+
 ## Layout
 
 Templates map onto Ratatui's `Rect` layout model.

@@ -109,6 +109,14 @@ impl Render for MyComponent {
 }
 ```
 
+Inline `view!` templates do not need a build script because Cargo already tracks the Rust source file. If a GPUI app also keeps reusable `.crepus` files on disk and loads them from Rust, use the same one-line build helper for Cargo rebuild tracking and early syntax validation:
+
+```rust
+fn main() {
+    crepuscularity_gpui::build::compile_crepus("src/views").unwrap();
+}
+```
+
 ## Event Handling
 
 Events are handled through GPUI's listener system:

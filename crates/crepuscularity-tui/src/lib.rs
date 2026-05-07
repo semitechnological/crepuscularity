@@ -106,7 +106,7 @@ pub mod template;
 mod tests;
 
 pub use crepuscularity_core::{
-    parse_component_file, parse_template, TemplateContext, TemplateValue,
+    build, parse_component_file, parse_template, TemplateContext, TemplateValue,
 };
 pub use crepuscularity_macros::template_refs;
 pub use ratatui;
