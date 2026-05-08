@@ -18,6 +18,7 @@
 //!   crepus tui new NAME                         scaffold TUI app with Ratatui
 //!   crepus tui build [--release]                 build TUI app
 //!   crepus tui run                               run TUI app
+//!   crepus tui preview FILE                      hot-reload preview a .crepus template in the terminal
 //!   crepus native new NAME                       scaffold cross-platform native app
 //!   crepus native build ios [--scheme S]         build iOS app
 //!   crepus native build android [--flavor F]     build Android app
@@ -270,6 +271,11 @@ fn print_usage() {
         "  {}  {}",
         style("tui build [--release]                   ").green(),
         style("build TUI app").dim()
+    );
+    eprintln!(
+        "  {}  {}",
+        style("tui preview <file.crepus>               ").green(),
+        style("hot-reload preview a .crepus template in the terminal").dim()
     );
     eprintln!(
         "  {}  {}",

@@ -4,7 +4,7 @@
 //! using Ratatui for layout and Crossterm for input handling.
 
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use console::style;
 
@@ -24,6 +24,12 @@ pub fn run(args: &[String]) {
         }
         Some("run") => {
             run_tui_app();
+        }
+        Some("preview") => {
+            let path = args.get(1).map(PathBuf::from).unwrap_or_else(|| {
+                ui::error("Usage: crepus tui preview <file.crepus>");
+            });
+            preview_tui_template(&path);
         }
         _ => print_tui_usage(),
     }
@@ -213,9 +219,129 @@ fn print_tui_usage() {
         style("run              ").green(),
         style("run the TUI app").dim()
     );
+    eprintln!(
+        "  {}  {}",
+        style("preview <file>  ").green(),
+        style("live-preview a .crepus template in the terminal").dim()
+    );
     eprintln!();
     eprintln!("{}", style("EXAMPLES").dim());
     eprintln!("  crepus tui new my-tui-app");
     eprintln!("  cd my-tui-app && crepus tui build");
     eprintln!("  crepus tui run");
+    eprintln!("  crepus tui preview app.crepus     # hot-reload preview, q/Esc to quit");
+}
+
+/// Live-preview a `.crepus` template in the current terminal.
+///
+/// Sets up crossterm raw mode via `ratatui::init`, watches the file for
+/// changes via [`crepuscularity_tui::HotTemplate`], and re-renders on each
+/// save. `q` or `Esc` exits cleanly; `r` forces a reload. A `context.toml`
+/// next to the template is loaded as initial variables.
+fn preview_tui_template(path: &Path) {
+    use crepuscularity_tui::{HotTemplate, ReloadOutcome};
+    use ratatui::crossterm::event::{self, Event, KeyCode, KeyEventKind};
+    use std::time::{Duration, Instant};
+
+    if !path.exists() {
+        ui::error(&format!("file not found: {}", path.display()));
+    }
+
+    let mut hot = match HotTemplate::watch(path) {
+        Ok(h) => h,
+        Err(e) => ui::error(&format!("could not load template: {e}")),
+    };
+
+    if let Some(dir) = path.parent() {
+        let ctx_path = dir.join("context.toml");
+        if ctx_path.exists() {
+            load_tui_context_toml(&ctx_path, hot.template_mut().context_mut());
+        }
+    }
+
+    eprintln!(
+        "{} previewing {} (q/Esc to quit, r to force reload)",
+        style("crepus tui").dim(),
+        style(path.display().to_string()).cyan().bold()
+    );
+
+    let mut terminal = ratatui::init();
+    let mut last_reload: Option<(Instant, ReloadOutcome)> = None;
+
+    let result: Result<(), String> = loop {
+        let outcome_holder = std::cell::Cell::new(ReloadOutcome::Unchanged);
+        if let Err(e) = terminal.draw(|frame| match hot.poll_and_draw_full(frame) {
+            Ok(o) => outcome_holder.set(o),
+            Err(_) => outcome_holder.set(ReloadOutcome::Unchanged),
+        }) {
+            break Err(format!("terminal draw: {e}"));
+        }
+        match outcome_holder.into_inner() {
+            ReloadOutcome::Unchanged => {}
+            other => last_reload = Some((Instant::now(), other)),
+        }
+
+        if matches!(event::poll(Duration::from_millis(100)), Ok(true)) {
+            match event::read() {
+                Ok(Event::Key(key)) if key.kind == KeyEventKind::Press => match key.code {
+                    KeyCode::Char('q') | KeyCode::Esc => break Ok(()),
+                    KeyCode::Char('r') => {
+                        if let Err(e) = hot.template_mut().reload() {
+                            last_reload = Some((Instant::now(), ReloadOutcome::Error(e)));
+                        } else {
+                            last_reload = Some((Instant::now(), ReloadOutcome::Reloaded));
+                        }
+                    }
+                    _ => {}
+                },
+                Ok(_) => {}
+                Err(e) => break Err(format!("event read: {e}")),
+            }
+        }
+
+        if let Some((t, _)) = &last_reload {
+            if t.elapsed() > Duration::from_secs(2) {
+                last_reload = None;
+            }
+        }
+    };
+    ratatui::restore();
+
+    if let Some((_, ReloadOutcome::Error(msg))) = last_reload {
+        eprintln!("{} {}", style("⚠").yellow(), msg);
+    }
+    if let Err(e) = result {
+        ui::error(&e);
+    }
+}
+
+/// Minimal TOML loader (key=value, strings/bools/ints/floats) shared with
+/// `crepus preview`.  Lives here to avoid the `desktop` cfg-gate so non-GPUI
+/// builds still get TUI preview support.
+fn load_tui_context_toml(path: &Path, ctx: &mut crepuscularity_tui::TemplateContext) {
+    use crepuscularity_tui::TemplateValue;
+    let Ok(content) = std::fs::read_to_string(path) else {
+        return;
+    };
+    for line in content.lines() {
+        let line = line.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        if let Some(eq) = line.find('=') {
+            let key = line[..eq].trim();
+            let val = line[eq + 1..].trim();
+            if val == "true" {
+                ctx.set(key, TemplateValue::Bool(true));
+            } else if val == "false" {
+                ctx.set(key, TemplateValue::Bool(false));
+            } else if let Ok(n) = val.parse::<i64>() {
+                ctx.set(key, TemplateValue::Int(n));
+            } else if let Ok(f) = val.parse::<f64>() {
+                ctx.set(key, TemplateValue::Float(f));
+            } else {
+                ctx.set(key, val.trim_matches('"').trim_matches('\'').to_string());
+            }
+        }
+    }
 }

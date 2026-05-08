@@ -91,14 +91,37 @@
 //! `border-thick`.  A `title={expr}` binding on any bordered element sets the
 //! block title.
 //!
+//! # Hot reload
+//!
+//! For live-coding `.crepus` files in a running terminal app, use
+//! [`HotTemplate`]: it wraps a [`Template`] with a background `notify` watcher
+//! and a polled "changed" flag. Drive your own crossterm event loop and call
+//! [`HotTemplate::poll_and_draw_full`] each tick — when the file on disk
+//! changes, the next draw renders the new source. The
+//! [`TemplateContext`] (variables, `base_dir`) is preserved across reloads.
+//!
+//! ```rust,no_run
+//! use crepuscularity_tui::HotTemplate;
+//! # use ratatui::{backend::TestBackend, Terminal};
+//! # let backend = TestBackend::new(80, 24);
+//! # let mut terminal = Terminal::new(backend).unwrap();
+//! let mut hot = HotTemplate::watch("ui/ui.crepus").unwrap();
+//! hot.template_mut().set("title", "My App");
+//! terminal.draw(|frame| {
+//!     let _ = hot.poll_and_draw_full(frame);
+//! }).unwrap();
+//! ```
+//!
 //! # Current scope
 //!
-//! This crate is a rendering backend kernel. It supports core template evaluation
-//! (`if`/`else`, `for`, `match`, `include`, `slot`, `$: let`, `$: default`) and
-//! maps static layout/styling into Ratatui widgets. It does not yet provide a
-//! terminal app runtime, event dispatch, hot reload, or animated widgets;
-//! `slot-rotate` renders its first phrase.
+//! This crate is a rendering backend kernel. It supports core template
+//! evaluation (`if`/`else`, `for`, `match`, `include`, `slot`, `$: let`,
+//! `$: default`), maps static layout/styling into Ratatui widgets, and offers
+//! file-watch hot reload via [`HotTemplate`]. It does not yet provide a
+//! terminal app runtime, event dispatch, or animated widgets; `slot-rotate`
+//! renders its first phrase.
 
+pub mod hot_reload;
 pub mod render;
 pub mod style;
 pub mod template;
@@ -109,6 +132,7 @@ pub use crepuscularity_core::{
     build, parse_component_file, parse_template, TemplateContext, TemplateValue,
 };
 pub use crepuscularity_macros::template_refs;
+pub use hot_reload::{HotTemplate, ReloadOutcome};
 pub use ratatui;
 pub use render::{paint_node, render_component, render_nodes, render_template};
 pub use style::parse_classes;

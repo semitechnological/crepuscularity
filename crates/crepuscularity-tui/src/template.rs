@@ -109,6 +109,30 @@ impl Template {
         &self.path
     }
 
+    /// Replace the in-memory template source.
+    ///
+    /// Useful for live-reload pipelines that want to keep the same [`TemplateContext`]
+    /// (variables, `base_dir`) but swap the rendered DSL.
+    pub fn set_source(&mut self, source: impl Into<String>) -> &mut Self {
+        self.source = source.into();
+        self
+    }
+
+    /// Re-read the template source from [`Template::path`].
+    ///
+    /// Returns an error if this template was constructed without a path
+    /// ([`Template::from_source`]) or if reading fails. On error the previous
+    /// source is left intact so the next [`Template::draw`] still renders.
+    pub fn reload(&mut self) -> Result<(), String> {
+        if self.path.as_os_str().is_empty() {
+            return Err("template has no path; reload requires `from_path`".to_string());
+        }
+        let source = std::fs::read_to_string(&self.path)
+            .map_err(|e| format!("template error: {:?}: {}", self.path, e))?;
+        self.source = source;
+        Ok(())
+    }
+
     pub fn draw(&self, frame: &mut Frame, area: Rect) -> Result<(), String> {
         render_template(&self.source, &self.ctx, frame, area)
     }
