@@ -149,7 +149,7 @@ $ crepus webext new ext"
 						"Guides are edited as Markdown in the repo and published as HTML alongside this landing page."
 				a href="./docs/index.html" no-underline text-sm font-medium crepus-t-text hover:opacity-85 transition-colors border-b border-transparent hover:border-[var(--cp-accent)]
 					"View all →"
-			div grid gap-4 sm:grid-cols-2 lg:grid-cols-4
+			div grid gap-4 sm:grid-cols-2 lg:grid-cols-5
 				a href="./docs/dsl.html" doc-card no-underline crepus-t-text hover:opacity-95
 					span text-xs font-mono crepus-t-muted
 						"dsl.md"
@@ -178,6 +178,13 @@ $ crepus webext new ext"
 						"Extensions"
 					span text-xs crepus-t-muted mt-1 block
 						"MV3 toolchain"
+				a href="./docs/aurorality.html" doc-card no-underline crepus-t-text hover:opacity-95
+					span text-xs font-mono crepus-t-muted
+						"aurorality.md"
+					span text-base font-semibold mt-2 block
+						"Aurorality"
+					span text-xs crepus-t-muted mt-1 block
+						"SwiftUI engine"
 
 	footer border-t py-8 sm:py-10 crepus-t-border crepus-entrance crepus-e6
 		div max-w-full sm:max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 footer-row

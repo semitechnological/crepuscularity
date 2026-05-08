@@ -13,6 +13,7 @@ Guides and references for the `.crepus` DSL, tooling, and browser extensions.
 | [GPUI integration](gpui.md) | Desktop apps with GPUI |
 | [Lite shell](lite.md) | GPUI + V8 desktop shell and Rust plugin bridge |
 | [Native shells](native.md) | iOS/Android apps via native UI frameworks |
+| [Aurorality](aurorality.md) | SwiftUI engine and semantic native tag workflow |
 | [TUI mode](tui.md) | Terminal user interfaces |
 
 Implementation details for compilers and agents live in-repo at [`CREPUS_WEB_IMPLEMENTATION_SPEC.md`](CREPUS_WEB_IMPLEMENTATION_SPEC.md) (not published on the docs site).
