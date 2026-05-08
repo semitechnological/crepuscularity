@@ -11,3 +11,9 @@ examples/**/target/
 examples/**/Cargo.lock
 docs-site/**/target/
 docs-site/**/Cargo.lock
+editors/vscode/node_modules/
+editors/zed/target/
+# Built by Zed / cargo for wasm32-wasip2 — rebuild locally or in CI
+editors/zed/extension.wasm
+# Zed dev extension: grammar checkouts live here (nested .git); do not commit
+editors/zed/grammars/

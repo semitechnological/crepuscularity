@@ -1,0 +1,22 @@
+[
+  {
+    "name": "div",
+    "prefix": "div",
+    "body": ["div ${1:class}", "  \"$0\""]
+  },
+  {
+    "name": "if",
+    "prefix": "if",
+    "body": ["if {${1:condition}}", "  $0"]
+  },
+  {
+    "name": "for",
+    "prefix": "for",
+    "body": ["for ${1:item} in {${2:list}}", "  $0"]
+  },
+  {
+    "name": "include",
+    "prefix": "include",
+    "body": ["include ${1:file.crepus}${2:#Name}", "  $0"]
+  }
+]

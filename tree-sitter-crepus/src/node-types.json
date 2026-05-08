@@ -1,0 +1,94 @@
+[
+  {
+    "type": "element_line",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "fragment_section",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "jsx_fragment",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "quoted",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "template",
+    "named": true,
+    "root": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "comment",
+          "named": true
+        },
+        {
+          "type": "element_line",
+          "named": true
+        },
+        {
+          "type": "fragment_section",
+          "named": true
+        },
+        {
+          "type": "frontmatter_marker",
+          "named": true
+        },
+        {
+          "type": "jsx_fragment",
+          "named": true
+        },
+        {
+          "type": "quoted",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "\n",
+    "named": false
+  },
+  {
+    "type": "\"",
+    "named": false
+  },
+  {
+    "type": "---",
+    "named": false
+  },
+  {
+    "type": "/>",
+    "named": false
+  },
+  {
+    "type": "<",
+    "named": false
+  },
+  {
+    "type": "</",
+    "named": false
+  },
+  {
+    "type": ">",
+    "named": false
+  },
+  {
+    "type": "comment",
+    "named": true
+  },
+  {
+    "type": "frontmatter_marker",
+    "named": true
+  }
+]
