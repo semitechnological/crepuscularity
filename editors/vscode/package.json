@@ -2,7 +2,7 @@
   "name": "crepuscularity-vscode",
   "displayName": "Crepuscularity",
   "description": "Syntax highlighting, snippets, and crepus-lsp diagnostics for .crepus templates.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "crepuscularity",
   "author": "Max Carter <max@undivisible.dev>",
   "license": "MPL-2.0",
@@ -45,6 +45,36 @@
           "default": "",
           "description": "Path to the crepus-lsp executable. When empty, uses crepus-lsp on PATH, then <workspace>/target/debug/crepus-lsp."
         }
+      }
+    },
+    "configurationDefaults": {
+      "editor.tokenColorCustomizations": {
+        "textMateRules": [
+          {
+            "scope": "source.crepus entity.other.attribute-name.html.crepus",
+            "settings": {
+              "foreground": "#D19A66"
+            }
+          },
+          {
+            "scope": "source.crepus punctuation.separator.key-value.html.crepus",
+            "settings": {
+              "foreground": "#C678DD"
+            }
+          },
+          {
+            "scope": "source.crepus string.quoted.double.attribute-value.crepus, source.crepus string.quoted.single.attribute-value.crepus, source.crepus string.unquoted.attribute-value.crepus",
+            "settings": {
+              "foreground": "#98C379"
+            }
+          },
+          {
+            "scope": "source.crepus string.quoted.double.crepus, source.crepus string.quoted.single.crepus",
+            "settings": {
+              "foreground": "#61AFEF"
+            }
+          }
+        ]
       }
     },
     "commands": [
