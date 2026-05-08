@@ -151,10 +151,16 @@ fn strip_trailing_inline_css(lines: &[&str], start: usize, mut end: usize) -> (u
 /// boundary, declaration, at-rule, or comment) rather than a `.crepus` template
 /// line?
 ///
-/// Crucially, plain *brace presence* (`{` or `}` somewhere in the middle) is
-/// **not** enough — `.crepus` text nodes (`"Hello {name}"`), bare expression
-/// lines (`{score}`), and `$:` declarations (`$: let x = {expr}`) all contain
-/// braces but must be kept in the body.
+/// `.crepus` lines such as text nodes (`"Hello {name}"`), bare expressions
+/// (`{score}`), `$:` declarations (`$: let x = {expr}`), bound elements
+/// (`div bind:href={url}`), and control headers (`for x in {items}`,
+/// `match {status}`) all contain braces but must be kept in the body — so we
+/// only treat a line as CSS when it has an *unambiguous* CSS shape:
+///
+/// - starts with `@` (at-rule) or `/*` (comment) or `}` (block close)
+/// - ends with `{` (selector opener — never appears in indent-mode `.crepus`)
+/// - is a CSS declaration `prop: value;`
+/// - is a complete inline CSS rule `selector { prop: value; }`
 fn looks_like_css_line(line: &str) -> bool {
     if line.starts_with('@') || line.starts_with("/*") || line.starts_with('}') {
         return true;
@@ -162,20 +168,10 @@ fn looks_like_css_line(line: &str) -> bool {
     if line.ends_with('{') {
         return true;
     }
-    if line.ends_with('}') {
-        // `.crepus` declarations like `$: let total = {price * qty}` end with `}`.
-        if line.starts_with("$:") {
-            return false;
-        }
-        // Bare expression lines like `{score}` — `{`-prefixed and free of CSS
-        // punctuation. CSS rule bodies (`{ opacity: 0; }`) always carry `:`/`;`.
-        if line.starts_with('{') && !line.contains(':') && !line.contains(';') {
-            return false;
-        }
+    if line.ends_with(';') && line.contains(':') {
         return true;
     }
-    // CSS declaration: `prop: value;`.
-    if line.ends_with(';') && line.contains(':') {
+    if line.ends_with('}') && line.contains('{') && line.contains(':') && line.contains(';') {
         return true;
     }
     false
@@ -578,6 +574,42 @@ div
             "body={:?}",
             d.body
         );
+        assert!(d.inline_css.is_empty());
+    }
+
+    #[test]
+    fn strips_css_after_trailing_binding_line_without_blank_separator() {
+        // Regression: a bound element on the last template line directly
+        // followed by a CSS `@keyframes` block (no blank line in between)
+        // must keep the binding in the body and strip only the CSS.
+        let s = "div bind:href={url}\n@keyframes pulse {\n  0% { opacity: .5; }\n  100% { opacity: 1; }\n}\n";
+        let d = strip_indent_decorators(s);
+        assert!(d.body.contains("bind:href={url}"), "body={:?}", d.body);
+        assert!(
+            d.inline_css.contains("@keyframes pulse"),
+            "css={:?}",
+            d.inline_css
+        );
+        assert!(
+            !d.body.contains("@keyframes"),
+            "css leaked into body: body={:?}",
+            d.body
+        );
+    }
+
+    #[test]
+    fn does_not_strip_trailing_match_header() {
+        let s = "div\n  match {status}\n    \"a\" =>\n      div\n        \"A\"\n";
+        let d = strip_indent_decorators(s);
+        assert!(d.body.contains("match {status}"), "body={:?}", d.body);
+        assert!(d.inline_css.is_empty());
+    }
+
+    #[test]
+    fn does_not_strip_trailing_for_header() {
+        let s = "div\n  for item in {items}\n    div\n      {item}\n";
+        let d = strip_indent_decorators(s);
+        assert!(d.body.contains("for item in {items}"), "body={:?}", d.body);
         assert!(d.inline_css.is_empty());
     }
 }
