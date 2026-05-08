@@ -1,5 +1,97 @@
 [
   {
+    "type": "attr_binding_braced",
+    "named": true,
+    "fields": {
+      "attr": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "attr_name_eq",
+            "named": true
+          }
+        ]
+      },
+      "value": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "braced_expression",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "attr_name_only",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "attr_name_eq",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "braced_expression",
+    "named": true,
+    "fields": {
+      "body": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "braced_body",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "class_segment",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "attr_binding_braced",
+          "named": true
+        },
+        {
+          "type": "attr_name_only",
+          "named": true
+        },
+        {
+          "type": "braced_expression",
+          "named": true
+        },
+        {
+          "type": "hash_id",
+          "named": true
+        },
+        {
+          "type": "plain_class",
+          "named": true
+        },
+        {
+          "type": "tailwind_pair",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "element_line",
     "named": true,
     "fields": {
@@ -8,7 +100,7 @@
         "required": false,
         "types": [
           {
-            "type": "element_class",
+            "type": "class_segment",
             "named": true
           }
         ]
@@ -71,7 +163,17 @@
     }
   },
   {
+    "type": "plain_class",
+    "named": true,
+    "fields": {}
+  },
+  {
     "type": "quoted",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "tailwind_pair",
     "named": true,
     "fields": {}
   },
@@ -120,11 +222,15 @@
     "named": false
   },
   {
-    "type": "comment",
+    "type": "attr_name_eq",
     "named": true
   },
   {
-    "type": "element_class",
+    "type": "braced_body",
+    "named": true
+  },
+  {
+    "type": "comment",
     "named": true
   },
   {
@@ -134,5 +240,17 @@
   {
     "type": "frontmatter_marker",
     "named": true
+  },
+  {
+    "type": "hash_id",
+    "named": true
+  },
+  {
+    "type": "{",
+    "named": false
+  },
+  {
+    "type": "}",
+    "named": false
   }
 ]

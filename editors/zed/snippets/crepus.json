@@ -1,22 +1,22 @@
-[
-  {
-    "name": "div",
+{
+  "div": {
     "prefix": "div",
-    "body": ["div ${1:class}", "  \"$0\""]
+    "body": ["div ${1:class}", "  \"$0\""],
+    "description": "Crepus div block"
   },
-  {
-    "name": "if",
+  "if": {
     "prefix": "if",
-    "body": ["if {${1:condition}}", "  $0"]
+    "body": ["if {${1:condition}}", "  $0"],
+    "description": "Crepus if block"
   },
-  {
-    "name": "for",
+  "for": {
     "prefix": "for",
-    "body": ["for ${1:item} in {${2:list}}", "  $0"]
+    "body": ["for ${1:item} in {${2:list}}", "  $0"],
+    "description": "Crepus for loop"
   },
-  {
-    "name": "include",
+  "include": {
     "prefix": "include",
-    "body": ["include ${1:file.crepus}${2:#Name}", "  $0"]
+    "body": ["include ${1:file.crepus}${2:#Name}", "  $0"],
+    "description": "Crepus include statement"
   }
-]
+}

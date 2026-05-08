@@ -2,7 +2,21 @@
 
 ## No syntax highlighting
 
-Tree-sitter **query files must only reference tokens that exist in the grammar**. For example, `brackets.scm` patterns like `\"{\"` only work if `{` is a symbol in `grammar.js`; otherwise query compilation fails and highlighting does not run. After editing queries, validate with:
+### Pin mismatch (`extension.toml` `rev`)
+
+Zed builds the WASM grammar from **`extension.toml` → `[grammars.crepus]`** (`repository`, `path`, **`rev`**), not from your unchecked-out working tree. The extension’s **`languages/crepus/*.scm` queries ship with the extension** and must match that **`rev`**.
+
+If `rev` still points at an **old** grammar (for example one that only had `element_class`) but `highlights.scm` expects **`class_segment`, `hash_id`, `attr_binding_braced`, …**, query compilation fails and **highlighting is off entirely**.
+
+**Fix:** Bump `rev` to a **full Git SHA** on `repository` that includes the matching `tree-sitter-crepus/grammar.js`, **push** that commit (Zed fetches from GitHub), then **Install dev extension** again. To clear a bad WASM build:
+
+```sh
+cd editors/zed && rm -rf grammars crepus.wasm
+```
+
+### Query vs grammar
+
+Tree-sitter **query files must only reference nodes that exist in the grammar**. For example, `brackets.scm` patterns like `\"{\"` only work if `{` is a symbol in `grammar.js`; otherwise query compilation fails and highlighting does not run. After editing queries, validate with:
 
 `tree-sitter query path/to/query.scm sample.crepus`
 
@@ -26,4 +40,11 @@ The `[grammars.crepus].rev` field in `extension.toml` pins a **full Git SHA** so
 
 ## Language server
 
-`crepus-lsp` must be on `PATH` or built at `<worktree>/target/debug/crepus-lsp` (see `src/lib.rs`).
+Zed runs **`crepus-lsp --stdio`**. Resolution (see `src/lib.rs`):
+
+1. **`crepus-lsp` on your `PATH`** (e.g. `cargo install --path crates/crepuscularity-lsp`), or  
+2. **`{worktree}/target/debug/crepus-lsp`** (worktree = Zed project folder) — build with  
+   `SDKROOT="$(xcrun --show-sdk-path)" cargo build -p crepuscularity-lsp`  
+   from the **Cargo workspace root** (the folder you added as the Zed project).
+
+Open the **repo / workspace root** in Zed (`crepuscularity/`), not only a nested crate, so `target/debug/` matches the path the extension uses.
