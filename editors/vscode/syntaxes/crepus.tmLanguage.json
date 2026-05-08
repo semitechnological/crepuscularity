@@ -17,8 +17,9 @@
     "comment": {
       "patterns": [
         {
+          "comment": "Line comment only when # is the first non-whitespace (avoids stealing #id on element lines).",
           "name": "comment.line.number-sign.crepus",
-          "match": "#.*$"
+          "match": "^[\\t ]*#.*$"
         }
       ]
     },
@@ -84,19 +85,65 @@
     "element_tokens": {
       "patterns": [
         {
-          "comment": "Indent-style line: first word is the element / keyword, rest are utilities.",
-          "match": "^([\\t ]*)([^\\s#\"<]+)((?:[\\t ]+[^\\s#\"<]+)*)$",
+          "comment": "Tag only (no trailing classes).",
+          "match": "^([\\t ]*)([^\\s#\"<]+)$",
           "captures": {
-            "2": { "name": "entity.name.tag.crepus" },
-            "3": {
-              "patterns": [
-                {
-                  "name": "entity.other.attribute-name.crepus",
-                  "match": "[^\\s]+"
-                }
-              ]
-            }
+            "1": { "name": "punctuation.whitespace.indent.crepus" },
+            "2": { "name": "entity.name.tag.crepus" }
           }
+        },
+        {
+          "comment": "Indent-style line: first word is the element / keyword, then class / attr segments.",
+          "begin": "^([\\t ]*)([^\\s#\"<]+)([\\t ]+)",
+          "end": "$",
+          "beginCaptures": {
+            "1": { "name": "punctuation.whitespace.indent.crepus" },
+            "2": { "name": "entity.name.tag.crepus" }
+          },
+          "patterns": [{ "include": "#class_segment_inline" }]
+        }
+      ]
+    },
+    "class_segment_inline": {
+      "patterns": [
+        { "match": "\\s+" },
+        {
+          "comment": "`onclick={handler}` before bare `{expr}` so the `=` form wins.",
+          "begin": "(\\b[a-zA-Z@][a-zA-Z0-9_.-]*=)\\s*\\{",
+          "beginCaptures": {
+            "1": { "name": "support.type.property-name.crepus" }
+          },
+          "end": "\\}",
+          "endCaptures": {
+            "0": { "name": "punctuation.definition.binding.end.crepus" }
+          },
+          "contentName": "source.embedded.line.crepus",
+          "patterns": [{ "include": "#string" }]
+        },
+        {
+          "comment": "Bare `{binding}` segment.",
+          "begin": "\\{",
+          "end": "\\}",
+          "beginCaptures": { "0": { "name": "punctuation.section.embedded.begin.crepus" } },
+          "endCaptures": { "0": { "name": "punctuation.section.embedded.end.crepus" } },
+          "contentName": "source.embedded.line.crepus"
+        },
+        {
+          "name": "entity.other.attribute-name.id.crepus",
+          "match": "#[a-zA-Z0-9_-]+"
+        },
+        {
+          "comment": "Tailwind-style variant:utility (utility's first char is not / so https:// is not split).",
+          "match": "([a-zA-Z0-9_\\[\\]-]+)(:)([^\\s/][^\\s]*)",
+          "captures": {
+            "1": { "name": "keyword.other.variant.crepus" },
+            "2": { "name": "punctuation.separator.sequence.crepus" },
+            "3": { "name": "entity.other.attribute-name.crepus" }
+          }
+        },
+        {
+          "name": "entity.other.attribute-name.crepus",
+          "match": "[^\\s]+"
         }
       ]
     },
