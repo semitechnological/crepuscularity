@@ -98,7 +98,7 @@ $ crepus webext new ext"
 						h3 text-sm font-semibold crepus-t-text mb-2
 							"One syntax"
 						p text-xs crepus-t-muted leading-relaxed m-0
-							"Indent or JSX-style tags; control flow, slots, and includes behave the same across backends."
+							"Indent or JSX-style tags; plus semantic native tags (sidebar, item, menu, label, sf-*) for SwiftUI shells."
 					div rounded-xl p-4 sm:p-5 crepus-t-card
 						h3 text-sm font-semibold crepus-t-text mb-2
 							"Rust + WASM"
