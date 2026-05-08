@@ -407,12 +407,15 @@ fn start_watcher(
     std::thread::spawn(move || {
         let site_for_filter = site_for_watcher;
         let tx2 = tx.clone();
-        let mut watcher = notify::recommended_watcher(move |res: notify::Result<Event>| {
-            if let Ok(event) = res {
-                if matches!(
-                    event.kind,
-                    EventKind::Modify(_) | EventKind::Create(_) | EventKind::Remove(_)
-                ) {
+        let mut watcher =
+            notify::recommended_watcher(move |res: notify::Result<Event>| match res {
+                Ok(event) => {
+                    if !matches!(
+                        event.kind,
+                        EventKind::Modify(_) | EventKind::Create(_) | EventKind::Remove(_)
+                    ) {
+                        return;
+                    }
                     for path in &event.paths {
                         if path.extension().and_then(|e| e.to_str()) == Some("crepus") {
                             let _ = tx2.send(WatchEvent::Crepus(path.clone()));
@@ -421,9 +424,11 @@ fn start_watcher(
                         }
                     }
                 }
-            }
-        })
-        .expect("crepus web serve: cannot create file watcher");
+                Err(e) => {
+                    eprintln!("  {} watcher error: {e}", console::style("⚠").yellow());
+                }
+            })
+            .expect("crepus web serve: cannot create file watcher");
 
         watcher
             .watch(&watch_dir, RecursiveMode::Recursive)
@@ -550,21 +555,26 @@ fn start_docs_markdown_watcher(
 
     std::thread::spawn(move || {
         let tx2 = tx.clone();
-        let mut watcher = notify::recommended_watcher(move |res: notify::Result<Event>| {
-            if let Ok(event) = res {
-                if matches!(
-                    event.kind,
-                    EventKind::Modify(_) | EventKind::Create(_) | EventKind::Remove(_)
-                ) {
+        let mut watcher =
+            notify::recommended_watcher(move |res: notify::Result<Event>| match res {
+                Ok(event) => {
+                    if !matches!(
+                        event.kind,
+                        EventKind::Modify(_) | EventKind::Create(_) | EventKind::Remove(_)
+                    ) {
+                        return;
+                    }
                     for path in &event.paths {
                         if path.extension().and_then(|e| e.to_str()) == Some("md") {
                             let _ = tx2.send(path.clone());
                         }
                     }
                 }
-            }
-        })
-        .expect("crepus web serve: docs watcher");
+                Err(e) => {
+                    eprintln!("  {} docs watcher error: {e}", console::style("⚠").yellow());
+                }
+            })
+            .expect("crepus web serve: docs watcher");
 
         watcher
             .watch(&docs_src_watch, RecursiveMode::Recursive)

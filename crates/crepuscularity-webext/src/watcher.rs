@@ -51,9 +51,12 @@ impl CapabilityWatcher {
         let tx_clone = tx.clone();
         let project_dir_clone = project_dir.clone();
 
-        let mut watcher = recommended_watcher(move |res: notify::Result<Event>| {
-            if let Ok(event) = res {
-                handle_event(event, &project_dir_clone, &tx_clone);
+        let mut watcher = recommended_watcher(move |res: notify::Result<Event>| match res {
+            Ok(event) => handle_event(event, &project_dir_clone, &tx_clone),
+            Err(e) => {
+                let _ = tx_clone.send(WatchEvent::Error {
+                    message: format!("watcher error: {e}"),
+                });
             }
         })?;
 
@@ -83,15 +86,17 @@ impl CapabilityWatcher {
 }
 
 fn handle_event(event: Event, project_dir: &Path, tx: &Sender<WatchEvent>) {
+    // Accept Remove too: editor "atomic saves" (write-temp-then-rename) deliver
+    // a Remove on the original path before a Modify/Create on the new file. If
+    // we drop Remove, capability scanning misses the save on Linux/inotify
+    // because the underlying inode is gone.
     match event.kind {
-        EventKind::Modify(_) | EventKind::Create(_) => {
+        EventKind::Modify(_) | EventKind::Create(_) | EventKind::Remove(_) => {
             for path in event.paths {
-                // Check if it's a relevant file
                 let ext = path.extension().and_then(|e| e.to_str());
                 let file_name = path.file_name().and_then(|n| n.to_str());
 
                 if ext == Some("crepus") {
-                    // A .crepus template changed — check for new capabilities
                     let _ = tx.send(WatchEvent::FileChanged { path: path.clone() });
 
                     if let Err(e) = check_capabilities(project_dir, tx) {

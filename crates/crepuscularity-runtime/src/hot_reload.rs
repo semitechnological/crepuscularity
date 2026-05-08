@@ -1,5 +1,20 @@
-/// Hot-reload GPUI view component.
-/// Reads a template file, renders it, and watches for changes.
+//! Hot-reload GPUI view component: reads a template file, renders it, and
+//! watches for changes via the parent-directory `notify` watcher in
+//! [`crate::watcher`].
+//!
+//! # What triggers a reload
+//!
+//! The watcher is rooted at the *directory* that contains the entry template.
+//! A reload fires when:
+//!
+//! - the entry template itself is modified, created, or removed (covers
+//!   editor atomic-save patterns that rename a temp file over the original),
+//! - any other `.crepus` file in that subtree changes (so editing an
+//!   `include`d component reloads the entry), or
+//! - a `context.toml` next to the template is updated.
+//!
+//! Renderer parse errors render an in-window red error block instead of
+//! panicking, so an in-progress edit cannot crash the dev window.
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
