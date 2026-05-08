@@ -18,6 +18,8 @@ pub struct IndentDecorators {
     pub google_fonts: Vec<String>,
     /// Maps shortcut name (without leading dot) → expanded utility string.
     pub class_aliases: HashMap<String, String>,
+    /// Raw CSS collected from trailing style blocks / CSS tails.
+    pub inline_css: String,
 }
 
 /// Strip `google-font` / `google-fonts` lines from the top and `.name tokens…` alias lines from the bottom.
@@ -29,6 +31,7 @@ pub fn strip_indent_decorators(raw: &str) -> IndentDecorators {
             body: raw.to_string(),
             google_fonts: Vec::new(),
             class_aliases: HashMap::new(),
+            inline_css: String::new(),
         };
     }
 
@@ -69,12 +72,69 @@ pub fn strip_indent_decorators(raw: &str) -> IndentDecorators {
         class_aliases.insert(name, exp);
     }
 
+    let (end, inline_css) = strip_trailing_inline_css(&lines, i, end);
     let body = lines[i..end].join("\n");
     IndentDecorators {
         body,
         google_fonts,
         class_aliases,
+        inline_css,
     }
+}
+
+fn strip_trailing_inline_css(lines: &[&str], start: usize, mut end: usize) -> (usize, String) {
+    if end <= start {
+        return (end, String::new());
+    }
+
+    // Explicit trailing <style>...</style> block.
+    let mut cursor = end;
+    while cursor > start && lines[cursor - 1].trim().is_empty() {
+        cursor -= 1;
+    }
+    if cursor > start && lines[cursor - 1].trim() == "</style>" {
+        let mut open = cursor - 1;
+        while open > start {
+            open -= 1;
+            if lines[open].trim() == "<style>" {
+                let css = lines[(open + 1)..(cursor - 1)].join("\n").trim().to_string();
+                return (open, css);
+            }
+        }
+    }
+
+    // Trailing raw CSS lines without <style> wrappers.
+    let mut css_start = end;
+    while css_start > start {
+        let t = lines[css_start - 1].trim();
+        if t.is_empty() {
+            if css_start == end {
+                end -= 1;
+                css_start -= 1;
+                continue;
+            }
+            break;
+        }
+        if !looks_like_css_line(t) {
+            break;
+        }
+        css_start -= 1;
+    }
+    if css_start < end {
+        let css = lines[css_start..end].join("\n").trim().to_string();
+        return (css_start, css);
+    }
+    (end, String::new())
+}
+
+fn looks_like_css_line(line: &str) -> bool {
+    line.starts_with('@')
+        || line.starts_with('}')
+        || line.starts_with("/*")
+        || line.ends_with('{')
+        || line.contains('{')
+        || line.contains('}')
+        || line.ends_with(';')
 }
 
 /// Returns font families declared on this line, or `None` if the line is not a font pragma.
@@ -347,6 +407,7 @@ div center
         assert!(d.body.contains("div center"));
         assert!(!d.body.contains("google-font"));
         assert!(!d.body.contains(".center"));
+        assert!(d.inline_css.is_empty());
     }
 
     #[test]
@@ -365,6 +426,40 @@ div
         let s = "google-font \"IBM Plex Sans\"\ndiv\n";
         let d = strip_indent_decorators(s);
         assert_eq!(d.google_fonts, vec!["IBM Plex Sans"]);
+    }
+
+    #[test]
+    fn strips_trailing_style_block_into_inline_css() {
+        let s = r#"div p-4
+  "hello"
+<style>
+  @keyframes sunset {
+    0% { opacity: .6; }
+    100% { opacity: 1; }
+  }
+</style>
+"#;
+        let d = strip_indent_decorators(s);
+        assert!(d.body.contains("div p-4"));
+        assert!(!d.body.contains("<style>"));
+        assert!(d.inline_css.contains("@keyframes sunset"));
+    }
+
+    #[test]
+    fn strips_trailing_raw_css_tail() {
+        let s = r#"div
+  "x"
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.animate-fade-in {
+  animation: fade-in 1s ease-in-out;
+}
+"#;
+        let d = strip_indent_decorators(s);
+        assert_eq!(d.body.trim(), "div\n  \"x\"");
+        assert!(d.inline_css.contains(".animate-fade-in"));
     }
 
     #[test]

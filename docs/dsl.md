@@ -193,6 +193,23 @@ div animate:opacity={300ms ease-in-out}
   "Fades in on mount"
 ```
 
+For web builds, you can also add trailing raw CSS (including `@keyframes`, class rules, and media queries) directly in the `.crepus` file without wrapping it in `<style>`:
+
+```css
+@keyframes sunset {
+  0% { opacity: 0.6; }
+  100% { opacity: 1; }
+}
+
+.animate-sunset {
+  animation: sunset 10s ease-in-out infinite alternate;
+}
+```
+
+That CSS is collected and injected into the generated document head automatically by `crepus web build` and `crepus web serve`.
+
+Note: class-alias lines (`.alias ...`) still belong at the very bottom of the file. Put trailing CSS above alias lines (or at the end if you have no aliases).
+
 ## Class Aliases
 
 Lines at the bottom of a `.crepus` file starting with `.name` define reusable class groups. Any element with that name in its class list expands to the aliased classes at render time.
