@@ -8,6 +8,7 @@
     { "include": "#section" },
     { "include": "#jsx" },
     { "include": "#string" },
+    { "include": "#element_tokens" },
     { "include": "#directive" },
     { "include": "#keyword" },
     { "include": "#expr" }
@@ -77,6 +78,25 @@
               "match": "\\\\."
             }
           ]
+        }
+      ]
+    },
+    "element_tokens": {
+      "patterns": [
+        {
+          "comment": "Indent-style line: first word is the element / keyword, rest are utilities.",
+          "match": "^([\\t ]*)([^\\s#\"<]+)((?:[\\t ]+[^\\s#\"<]+)*)$",
+          "captures": {
+            "2": { "name": "entity.name.tag.crepus" },
+            "3": {
+              "patterns": [
+                {
+                  "name": "entity.other.attribute-name.crepus",
+                  "match": "[^\\s]+"
+                }
+              ]
+            }
+          }
         }
       ]
     },

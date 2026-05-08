@@ -8,4 +8,6 @@
 
 (frontmatter_marker) @punctuation.special
 
-(element_line) @type @variable
+(element_line
+  (element_tag) @tag
+  (element_class) @attribute)
