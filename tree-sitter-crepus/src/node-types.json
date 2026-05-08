@@ -2,7 +2,28 @@
   {
     "type": "element_line",
     "named": true,
-    "fields": {}
+    "fields": {
+      "class": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "element_class",
+            "named": true
+          }
+        ]
+      },
+      "tag": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "element_tag",
+            "named": true
+          }
+        ]
+      }
+    }
   },
   {
     "type": "fragment_section",
@@ -15,18 +36,12 @@
     "fields": {}
   },
   {
-    "type": "quoted",
+    "type": "logical_line",
     "named": true,
-    "fields": {}
-  },
-  {
-    "type": "template",
-    "named": true,
-    "root": true,
     "fields": {},
     "children": {
-      "multiple": true,
-      "required": false,
+      "multiple": false,
+      "required": true,
       "types": [
         {
           "type": "comment",
@@ -50,6 +65,27 @@
         },
         {
           "type": "quoted",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "quoted",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "template",
+    "named": true,
+    "root": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "logical_line",
           "named": true
         }
       ]
@@ -85,6 +121,14 @@
   },
   {
     "type": "comment",
+    "named": true
+  },
+  {
+    "type": "element_class",
+    "named": true
+  },
+  {
+    "type": "element_tag",
     "named": true
   },
   {

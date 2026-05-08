@@ -1,13 +1,20 @@
 module.exports = grammar({
   name: 'crepus',
 
-  extras: ($) => [/\s/],
+  // Horizontal whitespace only; newlines are explicit in `template` so one
+  // `element_line` spans an entire logical line (tag + Tailwind classes).
+  extras: ($) => [/[\t\f\v ]/],
 
   rules: {
-    template: ($) => repeat(choice($._node, $._eol)),
+    template: ($) =>
+      seq(
+        repeat(choice(seq($.logical_line, $._eol), $._eol)),
+        optional($.logical_line),
+      ),
+
     _eol: ($) => '\n',
 
-    _node: ($) =>
+    logical_line: ($) =>
       choice(
         $.comment,
         $.fragment_section,
@@ -36,9 +43,15 @@ module.exports = grammar({
       ),
 
     element_line: ($) =>
-      prec(
-        -1,
-        seq(repeat1(/[^"<\n#]/), optional(seq(/\s+/, repeat(/[^<\n"]/)))),
+      seq(
+        field('tag', $.element_tag),
+        repeat(field('class', $.element_class)),
       ),
+
+    // First token (element name, `if` / `else` / `for` / `include`, …).
+    element_tag: ($) => token(/[^"<\s#\n]+/),
+
+    // Tailwind-style utilities and following tokens (`#id` is allowed here).
+    element_class: ($) => token(/[^"<\s\n]+/),
   },
 });
