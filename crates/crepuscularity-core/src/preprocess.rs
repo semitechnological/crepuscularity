@@ -106,38 +106,79 @@ fn strip_trailing_inline_css(lines: &[&str], start: usize, mut end: usize) -> (u
         }
     }
 
-    // Trailing raw CSS lines without <style> wrappers.
+    // Trailing raw CSS without `<style>` wrappers.
+    //
+    // The body and the CSS tail are not separated by a blank line in many
+    // templates, so walking back through "CSS-shaped" lines alone is not
+    // enough — `.crepus` element lines like `div bind:href={url}` and bare
+    // expressions like `{score}` also end with `}`. We require an
+    // **unambiguous CSS opener** at the top of the candidate trailing block
+    // (`@`-rule, comment, or a selector line ending with `{`).
+    while end > start && lines[end - 1].trim().is_empty() {
+        end -= 1;
+    }
+    if end <= start {
+        return (end, String::new());
+    }
+    if !lines[end - 1].trim().ends_with('}') {
+        return (end, String::new());
+    }
+
     let mut css_start = end;
     while css_start > start {
         let t = lines[css_start - 1].trim();
-        if t.is_empty() {
-            if css_start == end {
-                end -= 1;
-                css_start -= 1;
-                continue;
-            }
-            break;
-        }
-        if !looks_like_css_line(t) {
+        if t.is_empty() || !looks_like_css_line(t) {
             break;
         }
         css_start -= 1;
     }
-    if css_start < end {
-        let css = lines[css_start..end].join("\n").trim().to_string();
-        return (css_start, css);
+    if css_start >= end {
+        return (end, String::new());
     }
-    (end, String::new())
+
+    let opener = lines[css_start].trim();
+    let opener_is_css =
+        opener.starts_with('@') || opener.starts_with("/*") || opener.ends_with('{');
+    if !opener_is_css {
+        return (end, String::new());
+    }
+
+    let css = lines[css_start..end].join("\n").trim().to_string();
+    (css_start, css)
 }
 
+/// Heuristic: does this trimmed line look like a real CSS line (selector, rule
+/// boundary, declaration, at-rule, or comment) rather than a `.crepus` template
+/// line?
+///
+/// Crucially, plain *brace presence* (`{` or `}` somewhere in the middle) is
+/// **not** enough — `.crepus` text nodes (`"Hello {name}"`), bare expression
+/// lines (`{score}`), and `$:` declarations (`$: let x = {expr}`) all contain
+/// braces but must be kept in the body.
 fn looks_like_css_line(line: &str) -> bool {
-    line.starts_with('@')
-        || line.starts_with('}')
-        || line.starts_with("/*")
-        || line.ends_with('{')
-        || line.contains('{')
-        || line.contains('}')
-        || line.ends_with(';')
+    if line.starts_with('@') || line.starts_with("/*") || line.starts_with('}') {
+        return true;
+    }
+    if line.ends_with('{') {
+        return true;
+    }
+    if line.ends_with('}') {
+        // `.crepus` declarations like `$: let total = {price * qty}` end with `}`.
+        if line.starts_with("$:") {
+            return false;
+        }
+        // Bare expression lines like `{score}` — `{`-prefixed and free of CSS
+        // punctuation. CSS rule bodies (`{ opacity: 0; }`) always carry `:`/`;`.
+        if line.starts_with('{') && !line.contains(':') && !line.contains(';') {
+            return false;
+        }
+        return true;
+    }
+    // CSS declaration: `prop: value;`.
+    if line.ends_with(';') && line.contains(':') {
+        return true;
+    }
+    false
 }
 
 /// Returns font families declared on this line, or `None` if the line is not a font pragma.
@@ -471,5 +512,72 @@ div
         assert!(s.contains("fonts.googleapis.com"));
         assert!(s.contains("JetBrains+Mono"));
         assert!(s.contains("family=Inter"));
+    }
+
+    #[test]
+    fn does_not_strip_trailing_text_with_interpolation() {
+        let s = "div w-full h-full flex-col\n  div\n    \"Hello {name}\"\n";
+        let d = strip_indent_decorators(s);
+        assert!(
+            d.body.contains("Hello {name}"),
+            "trailing text node was stripped: body={:?} css={:?}",
+            d.body,
+            d.inline_css
+        );
+        assert!(d.inline_css.is_empty(), "css={:?}", d.inline_css);
+    }
+
+    #[test]
+    fn does_not_strip_trailing_bare_expression() {
+        let s = "div\n  {score}\n";
+        let d = strip_indent_decorators(s);
+        assert!(
+            d.body.contains("{score}"),
+            "bare expression was stripped: body={:?} css={:?}",
+            d.body,
+            d.inline_css
+        );
+        assert!(d.inline_css.is_empty());
+    }
+
+    #[test]
+    fn does_not_strip_trailing_let_decl() {
+        let s = "div\n  $: let total = {price * qty}\n";
+        let d = strip_indent_decorators(s);
+        assert!(
+            d.body.contains("$: let total"),
+            "$: let was stripped: body={:?} css={:?}",
+            d.body,
+            d.inline_css
+        );
+        assert!(d.inline_css.is_empty());
+    }
+
+    #[test]
+    fn still_strips_at_rule_tail_with_interpolation_above() {
+        let s = "div\n  \"score: {score}\"\n@keyframes pulse {\n  0% { opacity: .5; }\n  100% { opacity: 1; }\n}\n";
+        let d = strip_indent_decorators(s);
+        assert!(d.body.contains("score: {score}"), "body={:?}", d.body);
+        assert!(d.inline_css.contains("@keyframes pulse"));
+    }
+
+    #[test]
+    fn does_not_strip_trailing_element_with_binding() {
+        let s = "div bind:href={url}\n";
+        let d = strip_indent_decorators(s);
+        assert!(d.body.contains("bind:href={url}"), "body={:?}", d.body);
+        assert!(d.inline_css.is_empty());
+    }
+
+    #[test]
+    fn does_not_strip_trailing_class_binding() {
+        let s = "div\n  span class:active={selected}\n";
+        let d = strip_indent_decorators(s);
+        assert!(
+            d.body.contains("class:active={selected}"),
+            "body={:?}",
+            d.body
+        );
+        assert!(d.inline_css.is_empty());
     }
 }
