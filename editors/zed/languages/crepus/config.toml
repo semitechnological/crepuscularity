@@ -1,0 +1,5 @@
+name = "Crepus"
+grammar = "crepus"
+path_suffixes = ["crepus"]
+line_comments = ["# "]
+tab_size = 2
