@@ -4,6 +4,7 @@
   "description": "Syntax highlighting, snippets, and crepus-lsp diagnostics for .crepus templates.",
   "version": "0.1.0",
   "publisher": "crepuscularity",
+  "author": "Max Carter <max@undivisible.dev>",
   "license": "MPL-2.0",
   "engines": {
     "vscode": "^1.85.0"

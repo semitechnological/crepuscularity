@@ -8,4 +8,4 @@
 
 (frontmatter_marker) @punctuation.special
 
-(element_line) @variable
+(element_line) @type @variable

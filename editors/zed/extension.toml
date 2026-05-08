@@ -2,7 +2,7 @@ id = "crepuscularity"
 name = "Crepuscularity"
 version = "0.1.0"
 schema_version = 1
-authors = ["Crepuscularity Contributors"]
+authors = ["Max Carter <max@undivisible.dev>"]
 description = "Crepus templates (.crepus): tree-sitter highlighting, snippets, and crepus-lsp."
 repository = "https://github.com/semitechnological/crepuscularity"
 
