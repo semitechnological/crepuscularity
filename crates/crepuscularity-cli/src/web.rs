@@ -502,6 +502,7 @@ fn build_site_wasm(cli: &WebBuildArgs) {
 
     let head = load_site_head(&b.site_dir);
     let google_fonts = merged_site_google_fonts(&b.site_dir, &files);
+    let inline_css = merged_site_inline_css(&files);
     let vendor_dir = b.out_dir.join("vendor");
     let pkg_dir = b.out_dir.join("pkg");
     std::fs::create_dir_all(&vendor_dir).unwrap_or_else(|e| {
@@ -524,7 +525,7 @@ fn build_site_wasm(cli: &WebBuildArgs) {
     }
 
     copy_unocss(&vendor_dir);
-    let index_html = render_index_html(&head, &google_fonts);
+    let index_html = render_index_html(&head, &google_fonts, &inline_css);
     std::fs::write(b.out_dir.join(".nojekyll"), b"")
         .unwrap_or_else(|e| ui::error(&format!("write .nojekyll: {e}")));
     std::fs::write(b.out_dir.join("index.html"), index_html).unwrap_or_else(|e| {
@@ -730,6 +731,17 @@ pub(crate) fn merged_site_google_fonts(
     merge_unique_font_families(collected)
 }
 
+pub(crate) fn merged_site_inline_css(files: &HashMap<String, String>) -> String {
+    let mut blocks: Vec<String> = Vec::new();
+    for content in files.values() {
+        let css = strip_indent_decorators(content).inline_css;
+        if !css.trim().is_empty() {
+            blocks.push(css.trim().to_string());
+        }
+    }
+    blocks.join("\n\n")
+}
+
 fn load_web_toml_google_fonts(site_dir: &Path) -> Vec<String> {
     let path = site_dir.join("web.toml");
     let Ok(raw) = std::fs::read_to_string(&path) else {
@@ -821,7 +833,11 @@ pub(crate) fn load_site_head(site_dir: &Path) -> SiteHead {
     head
 }
 
-pub(crate) fn render_index_html(head: &SiteHead, google_fonts: &[String]) -> String {
+pub(crate) fn render_index_html(
+    head: &SiteHead,
+    google_fonts: &[String],
+    inline_css: &str,
+) -> String {
     let og = head
         .og_image
         .as_ref()
@@ -841,12 +857,25 @@ pub(crate) fn render_index_html(head: &SiteHead, google_fonts: &[String]) -> Str
         })
         .unwrap_or_else(|| "system-ui, -apple-system, sans-serif".to_string());
     let t = &head.theme;
+    let inline_css_tag = if inline_css.trim().is_empty() {
+        String::new()
+    } else {
+        format!("<style>\n{}\n</style>", inline_css)
+    };
+    let extra_head = if head.extra_head_html.trim().is_empty() {
+        inline_css_tag
+    } else if inline_css_tag.is_empty() {
+        head.extra_head_html.clone()
+    } else {
+        format!("{}\n{}", head.extra_head_html, inline_css_tag)
+    };
+
     WEB_INDEX_HTML
         .replace("__CREPUS_TITLE__", &escape_html_attr(&head.page_title))
         .replace("__CREPUS_DESC__", &escape_html_attr(&head.description))
         .replace("__CREPUS_OG__", &og)
         .replace("__CREPUS_GOOGLE_FONTS__", &font_markup)
-        .replace("__CREPUS_EXTRA_HEAD__", &head.extra_head_html)
+        .replace("__CREPUS_EXTRA_HEAD__", &extra_head)
         .replace("__CREPUS_BODY_FONT__", &body_font_css)
         .replace("__THEME_ACCENT__", &escape_html_attr(&t.accent))
         .replace("__THEME_ACCENT_SOFT__", &escape_html_attr(&t.accent_soft))

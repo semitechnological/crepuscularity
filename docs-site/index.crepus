@@ -205,21 +205,19 @@ $ crepus webext new ext"
 				a href="https://github.com/semitechnological/crepuscularity" no-underline crepus-t-muted hover:text-[var(--cp-fg)] transition-colors rel="noopener noreferrer" target="_blank"
 					"GitHub"
 
-	<style>
-		@keyframes sunset {
-			0% { background: linear-gradient(to bottom right, #1f1f23, #0f0f13, #000); }
-			50% { background: linear-gradient(to bottom right, #ff4500, #ffa500, #8b0000); }
-			100% { background: linear-gradient(to bottom right, #4b0082, #2e003e, #1a001a); }
-		}
-		.animate-sunset {
-			animation: sunset 10s ease-in-out infinite alternate;
-		}
-		@media (prefers-reduced-motion: reduce) {
-			.animate-sunset {
-				animation: none;
-			}
-		}
-	</style>
+@keyframes sunset {
+	0% { background: linear-gradient(to bottom right, #1f1f23, #0f0f13, #000); }
+	50% { background: linear-gradient(to bottom right, #ff4500, #ffa500, #8b0000); }
+	100% { background: linear-gradient(to bottom right, #4b0082, #2e003e, #1a001a); }
+}
+.animate-sunset {
+	animation: sunset 10s ease-in-out infinite alternate;
+}
+@media (prefers-reduced-motion: reduce) {
+	.animate-sunset {
+		animation: none;
+	}
+}
 
 .slot-lede text-[var(--cp-fg)] font-medium
 .footer-row flex flex-col sm:flex-row justify-between gap-4 sm:gap-6 sm:items-center
