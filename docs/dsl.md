@@ -63,6 +63,49 @@ section py-16 #hero "Hello"
     "World"
 ```
 
+## Native SwiftUI Component Tags
+
+When `.crepus` is compiled through Aurorality `swiftgen`, templates can declare native SwiftUI-style components directly. This semantic layer is additive: utility-first layout (`div flex`, `div flex-col`, spacing classes, etc.) still works and can be mixed in the same tree.
+
+### Supported semantic tags (swiftgen path)
+
+| Category | Tags |
+| --- | --- |
+| Navigation | `navigationstack`, `navigationsplitview`, `sidebar`, `detail`, `content` |
+| Layout containers | `vstack`, `hstack`, `zstack`, `group`, `form`, `section`, `list`, `item`, `scrollview`, `scroll`, `spacer`, `divider` |
+| Controls | `button`, `toggle`, `picker`, `textfield`, `input`, `securefield`, `menu` |
+| Content | `label`, `image`, `sf`, `sf-*`, `span`, `p` |
+
+### Example: hybrid semantic + utility layout
+
+```text
+navigationsplitview
+  sidebar
+    vstack gap-2 p-3 w-72
+      hstack
+        label title="Inbox" symbol="tray"
+        spacer
+        button button-bordered @click="newConversation"
+          sf-plus
+      sidebar flex-grow
+        for row in {rows}
+          item @click="select:{row.id}"
+            span "{row.title}"
+  detail
+    vstack gap-2 p-3
+      textfield bind=draft placeholder="Message"
+      hstack
+        spacer
+        button button-prominent @click="send"
+          "Send"
+```
+
+### Notes
+
+- `div flex` and `div flex-col` remain first-class and continue to map to `HStack` / `VStack`.
+- Semantic tags are primarily for readability and explicit intent when building native shells.
+- Backends may support different subsets; the table above applies to the Aurorality SwiftUI `swiftgen` path.
+
 ## Text Nodes
 
 Quoted strings are text nodes. `{expr}` inside quotes interpolates. A bare `{expr}` on its own line renders the value directly.

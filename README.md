@@ -54,6 +54,7 @@ div w-full h-full bg-zinc-950 text-white flex flex-col p-8
 ## Features
 
 - **`.crepus` syntax** — indentation-based, Tailwind-style classes
+- **Semantic native tags** — optional component tags for native shells (`navigationstack`, `sidebar`, `item`, `menu`, `label`, SF symbols, etc. in the SwiftUI `swiftgen` path)
 - **Control flow** — `if/else`, `match`, `for`
 - **String interpolation** — `"Hello {name}"`
 - **Expressions** — arithmetic, comparison, logical operators, property access
@@ -99,7 +100,7 @@ crepus ios build [--dir] [...]       # Simulator build via xcodebuild
 ## Documentation
 
 - **Rendered site (GitHub Pages):** [here](https://crepuscularity.undivisible.dev) — WASM landing page plus HTML generated from the Markdown in [`docs/`](docs/). Built in CI with `crepus web build --site docs-site`.
-- **Sources:** [docs/README.md](docs/README.md) indexes [DSL](docs/dsl.md), [components](docs/components.md), [CLI](docs/cli.md), [runtime/reactivity](docs/runtime.md), [GPUI](docs/gpui.md), [TUI](docs/tui.md), [Lite](docs/lite.md), [native shells](docs/native.md), and [extensions](docs/webext.md). Compiler-focused detail stays in-repo as [CREPUS_WEB_IMPLEMENTATION_SPEC.md](docs/CREPUS_WEB_IMPLEMENTATION_SPEC.md) but is not shipped on the public docs site.
+- **Sources:** [docs/README.md](docs/README.md) indexes [DSL](docs/dsl.md) (including SwiftUI semantic tag mappings), [components](docs/components.md), [CLI](docs/cli.md), [runtime/reactivity](docs/runtime.md), [GPUI](docs/gpui.md), [TUI](docs/tui.md), [Lite](docs/lite.md), [native shells](docs/native.md), and [extensions](docs/webext.md). Compiler-focused detail stays in-repo as [CREPUS_WEB_IMPLEMENTATION_SPEC.md](docs/CREPUS_WEB_IMPLEMENTATION_SPEC.md) but is not shipped on the public docs site.
 - **Native shells:** [examples/native-shells](examples/native-shells/README.md) — SwiftPM (**`ios/`**), Gradle (**`android/`**), and shared **View IR** `fixture.json` next to **`crepuscularity-native`** (replaces the old separate **`crepuscularity-native-ui`** checkout).
 - **Contributors & coding agents:** root [**`AGENTS.md`**](AGENTS.md) is the canonical instructions (macOS `SDKROOT`, `cargo fmt` / `clippy` / `test` before push, workspace layout, DSL notes). **`CLAUDE.md`** is a symlink to **`AGENTS.md`** so duplicate context files cannot drift.
 
