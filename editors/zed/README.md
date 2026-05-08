@@ -1,5 +1,13 @@
 # Crepuscularity — Zed extension (dev)
 
+## No syntax highlighting
+
+Tree-sitter **query files must only reference tokens that exist in the grammar**. For example, `brackets.scm` patterns like `\"{\"` only work if `{` is a symbol in `grammar.js`; otherwise query compilation fails and highlighting does not run. After editing queries, validate with:
+
+`tree-sitter query path/to/query.scm sample.crepus`
+
+(from the `tree-sitter-crepus/` directory).
+
 ## Grammar compile errors
 
 Zed clones `tree-sitter-crepus` into **`grammars/crepus/`** (nested git repo) and writes **`grammars/crepus.wasm`**. If install fails with **failed to compile grammar 'crepus'**:
