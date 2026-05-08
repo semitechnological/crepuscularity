@@ -14,7 +14,7 @@ Zed clones `tree-sitter-crepus` into **`grammars/crepus/`** (nested git repo) an
 
 3. Retry **Install Dev Extension** so Zed runs a fresh `git fetch` / WASI `clang` build.
 
-The committed grammar on `main` must include `tree-sitter-crepus/src/parser.c` (path `tree-sitter-crepus` in the repo root).
+The `[grammars.crepus].rev` field in `extension.toml` pins a **full Git SHA** so Zed’s shallow fetch/checkout is deterministic. After changing the grammar, bump that SHA to a commit that contains the updated `tree-sitter-crepus/` tree.
 
 ## Language server
 
