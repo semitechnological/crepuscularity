@@ -141,6 +141,83 @@ fn raw_expression_renders() {
     );
 }
 
+#[test]
+fn renderer_target_defaults_are_available_to_templates() {
+    let ctx = TemplateContext::new();
+    let rows = render(
+        40,
+        5,
+        "div\n  if {is_tui && crepus_target == \"tui\"}\n    div tui-panel\n      \"TUI target\"",
+        &ctx,
+    );
+    assert!(
+        all_text(&rows).contains("TUI target"),
+        "{}",
+        all_text(&rows)
+    );
+}
+
+#[test]
+fn renderer_target_defaults_do_not_override_context() {
+    let mut ctx = TemplateContext::new();
+    ctx.set("crepus_target", "gui");
+    ctx.set("is_tui", false);
+    ctx.set("is_gui", true);
+    let rows = render(
+        40,
+        5,
+        "div\n  if {is_gui && crepus_target == \"gui\"}\n    div\n      \"GUI target\"",
+        &ctx,
+    );
+    assert!(
+        all_text(&rows).contains("GUI target"),
+        "{}",
+        all_text(&rows)
+    );
+}
+
+#[test]
+fn target_prefixed_classes_apply_only_for_matching_renderer() {
+    let ctx = TemplateContext::new();
+    let rows = render(
+        40,
+        5,
+        "div tui:background-black gpui:background-white web:background-red macos:background-grey\n  \"target styles\"",
+        &ctx,
+    );
+    assert!(
+        all_text(&rows).contains("target styles"),
+        "{}",
+        all_text(&rows)
+    );
+}
+
+#[test]
+fn button_tag_gets_terminal_button_chrome() {
+    let ctx = TemplateContext::new();
+    let rows = render(24, 3, "button w-[12] h-[3]\n  \"Run\"", &ctx);
+    let text = all_text(&rows);
+    assert!(text.contains("Run"), "{text}");
+    assert!(text.contains("╭") || text.contains("┌"), "{text}");
+}
+
+#[test]
+fn overflow_y_scroll_uses_scroll_offset() {
+    let mut ctx = TemplateContext::new();
+    ctx.set("offset", 2i64);
+    let rows = render(
+        20,
+        3,
+        "div h-[3] overflow-y-scroll scroll-offset={offset}\n  div h-[1]\n    \"zero\"\n  div h-[1]\n    \"one\"\n  div h-[1]\n    \"two\"\n  div h-[1]\n    \"three\"",
+        &ctx,
+    );
+    let text = all_text(&rows);
+    assert!(!text.contains("zero"), "{text}");
+    assert!(!text.contains("one"), "{text}");
+    assert!(text.contains("two"), "{text}");
+    assert!(text.contains("three"), "{text}");
+}
+
 // ─── JSX / React-style syntax ─────────────────────────────────────────────────
 //
 // The parser auto-detects JSX when the first content token starts with `<`.

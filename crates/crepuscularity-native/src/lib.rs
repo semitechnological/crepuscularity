@@ -31,7 +31,7 @@ pub mod style;
 
 pub use colors::resolve_rgba;
 pub use hot_reload::{ast_shape_compatible, plan_hot_reload, HotReloadEnvelope, HotReloadMessage};
-pub use ir::{StackAxis, ViewIr, ViewNode, ViewStyle, IR_VERSION};
+pub use ir::{PickerOption, StackAxis, ViewIr, ViewNode, ViewStyle, IR_VERSION};
 pub use mutations::{apply_mutations, diff_ir, IrMutation};
 pub use render::{
     render_component_file_to_ir, render_from_files, render_nodes_to_ir, render_template_to_ir,

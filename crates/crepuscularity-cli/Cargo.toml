@@ -29,11 +29,11 @@ desktop = ["dep:gpui", "dep:crepuscularity-runtime"]
 
 [dependencies]
 gpui                   = { version = "=0.2.2", default-features = false, features = ["font-kit"], optional = true }
-crepuscularity-core    = { path = "../crepuscularity-core", version = "0.4.0" }
+crepuscularity-core    = { path = "../crepuscularity-core", version = "0.4.1" }
 crepuscularity-runtime = { path = "../crepuscularity-runtime", version = "0.4.0", optional = true }
 crepuscularity-web     = { path = "../crepuscularity-web", version = "0.4.0" }
 crepuscularity-webext  = { path = "../crepuscularity-webext", version = "0.2.0" }
-crepuscularity-native  = { path = "../crepuscularity-native", version = "0.4.0" }
+crepuscularity-native  = { path = "../crepuscularity-native", version = "0.4.1" }
 notify                 = { workspace = true }
 walkdir                = { workspace = true }
 serde                  = { workspace = true }

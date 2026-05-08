@@ -8,6 +8,11 @@ repository = "https://github.com/semitechnological/crepuscularity"
 
 snippets = ["./snippets/crepus.json"]
 
+[[capabilities]]
+kind = "process:exec"
+command = "*"
+args = ["**"]
+
 [grammars.crepus]
 repository = "https://github.com/semitechnological/crepuscularity"
 path = "tree-sitter-crepus"

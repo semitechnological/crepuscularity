@@ -4,6 +4,19 @@ use std::collections::HashMap;
 
 use crate::ast::*;
 
+#[derive(Debug, Clone)]
+pub(crate) struct RawParseError {
+    pub message: String,
+    pub byte_offset: Option<usize>,
+}
+
+fn subslice_byte_offset(full: &str, tail: &str) -> usize {
+    let fp = full.as_ptr() as usize;
+    let tp = tail.as_ptr() as usize;
+    debug_assert!(tp >= fp && tp <= fp.saturating_add(full.len()));
+    tp.saturating_sub(fp)
+}
+
 // ── Multi-component files ─────────────────────────────────────────────────────
 
 /// Metadata and default prop values for one component parsed from TOML frontmatter.
@@ -67,14 +80,21 @@ pub struct ComponentFile {
 /// Parse a multi-component `.crepus` file into a [`ComponentFile`].
 #[tracing::instrument(skip(content), fields(len = content.len()))]
 pub fn parse_component_file(content: &str) -> Result<ComponentFile, String> {
-    let (frontmatter_str, body) = split_frontmatter(content);
+    parse_component_file_inner(content).map_err(|e| e.message)
+}
 
-    // Parse TOML for metadata / defaults.
+pub(crate) fn parse_component_file_inner(content: &str) -> Result<ComponentFile, RawParseError> {
+    let (frontmatter_str, body, body_byte_in_file) = split_frontmatter_parts(content);
+
     let mut meta_map: HashMap<String, ComponentMeta> = HashMap::new();
-    if let Some(toml_str) = frontmatter_str {
-        let value: toml::Value = toml_str
+    if let Some(toml_src) = frontmatter_str {
+        let toml_block_start = subslice_byte_offset(content, toml_src);
+        let value: toml::Value = toml_src
             .parse()
-            .map_err(|e| format!("TOML parse error in frontmatter: {e}"))?;
+            .map_err(|e: toml::de::Error| RawParseError {
+                message: format!("TOML parse error in frontmatter: {e}"),
+                byte_offset: e.span().map(|r| toml_block_start + r.start),
+            })?;
 
         if let toml::Value::Table(table) = value {
             for (comp_name, comp_val) in &table {
@@ -97,11 +117,19 @@ pub fn parse_component_file(content: &str) -> Result<ComponentFile, String> {
         }
     }
 
-    let sections = split_sections(body);
+    let sections = split_component_body_sections(body);
     let mut components = HashMap::new();
 
-    for (name, section_content) in sections {
-        let nodes = parse_template(&section_content)?;
+    for (name, section_content, sec_start_in_body) in sections {
+        let nodes = parse_template_raw(&section_content).map_err(|mut e| {
+            if let Some(off) = e.byte_offset {
+                e.byte_offset = Some(body_byte_in_file + sec_start_in_body + off);
+            }
+            if e.byte_offset.is_some() {
+                e.message = format!("component {name:?}: {}", e.message);
+            }
+            e
+        })?;
         let meta = meta_map.remove(&name).unwrap_or_default();
         components.insert(name, ComponentDef { nodes, meta });
     }
@@ -109,42 +137,69 @@ pub fn parse_component_file(content: &str) -> Result<ComponentFile, String> {
     Ok(ComponentFile { components })
 }
 
-/// Split `+++...+++` TOML frontmatter from the rest of the file.
-fn split_frontmatter(content: &str) -> (Option<&str>, &str) {
+pub(crate) fn split_frontmatter_parts(content: &str) -> (Option<&str>, &str, usize) {
     let trimmed = content.trim_start();
     if !trimmed.starts_with("+++") {
-        return (None, content);
+        return (None, content, 0);
     }
     let after_open = &trimmed[3..];
     if let Some(close_pos) = after_open.find("\n+++") {
-        let toml_str = &after_open[..close_pos];
-        let rest = &after_open[close_pos + 4..]; // skip "\n+++"
-        (Some(toml_str.trim()), rest)
+        let raw_toml = &after_open[..close_pos];
+        let rest = &after_open[close_pos + 4..];
+        let body_start = subslice_byte_offset(content, rest);
+        (Some(raw_toml), rest, body_start)
     } else {
-        (None, content)
+        (None, content, 0)
     }
 }
 
-/// Split body into named sections on `--- ComponentName` lines.
-fn split_sections(body: &str) -> Vec<(String, String)> {
-    let mut sections: Vec<(String, String)> = Vec::new();
+pub(crate) fn split_component_body_sections(body: &str) -> Vec<(String, String, usize)> {
+    let mut sections: Vec<(String, String, usize)> = Vec::new();
     let mut current_name: Option<String> = None;
     let mut current_lines: Vec<&str> = Vec::new();
+    let mut content_start_byte: Option<usize> = None;
+    let mut pending_content_start = 0usize;
 
-    for line in body.lines() {
-        if let Some(name) = line.trim().strip_prefix("--- ") {
+    let mut byte_pos = 0usize;
+    while byte_pos <= body.len() {
+        let line_start = byte_pos;
+        if line_start >= body.len() {
+            break;
+        }
+        let nl = body[line_start..].find('\n');
+        let line_end = nl.map(|n| line_start + n).unwrap_or(body.len());
+        let raw_line = &body[line_start..line_end];
+        byte_pos = if nl.is_some() {
+            line_end + 1
+        } else {
+            body.len()
+        };
+
+        let line_content = raw_line.strip_suffix('\r').unwrap_or(raw_line);
+        let trimmed = line_content.trim();
+
+        if let Some(name) = trimmed.strip_prefix("--- ") {
             if let Some(prev) = current_name.take() {
-                sections.push((prev, current_lines.join("\n")));
+                let joined = current_lines.join("\n");
+                let start = content_start_byte.unwrap_or(pending_content_start);
+                sections.push((prev, joined, start));
                 current_lines.clear();
             }
             current_name = Some(name.trim().to_string());
+            content_start_byte = None;
+            pending_content_start = byte_pos;
         } else if current_name.is_some() {
-            current_lines.push(line);
+            if content_start_byte.is_none() {
+                content_start_byte = Some(line_start);
+            }
+            current_lines.push(line_content);
         }
     }
 
     if let Some(name) = current_name {
-        sections.push((name, current_lines.join("\n")));
+        let joined = current_lines.join("\n");
+        let start = content_start_byte.unwrap_or(pending_content_start);
+        sections.push((name, joined, start));
     }
 
     sections
@@ -163,6 +218,10 @@ fn toml_value_to_expr(v: &toml::Value) -> String {
 
 #[tracing::instrument(skip(template), fields(len = template.len()))]
 pub fn parse_template(template: &str) -> Result<Vec<Node>, String> {
+    parse_template_raw(template).map_err(|e| e.message)
+}
+
+pub(crate) fn parse_template_raw(template: &str) -> Result<Vec<Node>, RawParseError> {
     if is_jsx_mode(template) {
         parse_jsx_template(template)
     } else {
@@ -1059,15 +1118,63 @@ impl JsxAttr {
 
 // ── Entry point ───────────────────────────────────────────────────────────────
 
-fn parse_jsx_template(src: &str) -> Result<Vec<Node>, String> {
-    let normalized = normalize_fullwidth_braces(src);
-    let (nodes, _) = parse_jsx_nodes(&normalized)?;
-    Ok(nodes)
+fn normalize_jsx_mapped(s: &str) -> (String, Vec<usize>) {
+    let mut norm = String::with_capacity(s.len());
+    let mut map: Vec<usize> = Vec::with_capacity(s.len());
+    for (orig_b, ch) in s.char_indices() {
+        match ch {
+            '\u{FF5B}' => {
+                norm.push('{');
+                map.push(orig_b);
+            }
+            '\u{FF5D}' => {
+                norm.push('}');
+                map.push(orig_b);
+            }
+            c => {
+                let mut buf = [0u8; 4];
+                let enc = c.encode_utf8(&mut buf);
+                for _ in 0..enc.len() {
+                    map.push(orig_b);
+                }
+                norm.push_str(enc);
+            }
+        }
+    }
+    debug_assert_eq!(norm.len(), map.len());
+    (norm, map)
 }
 
-/// Parse a sequence of JSX nodes, stopping before a closing tag or EOF.
-/// Returns `(nodes, remaining_source)`.
-fn parse_jsx_nodes(src: &str) -> Result<(Vec<Node>, &str), String> {
+fn map_jsx_offset(map: &[usize], off: usize) -> usize {
+    map.get(off).copied().unwrap_or(off)
+}
+
+#[inline]
+fn jsx_err(norm_root: &str, at: &str, message: impl Into<String>) -> RawParseError {
+    RawParseError {
+        message: message.into(),
+        byte_offset: Some(subslice_byte_offset(norm_root, at)),
+    }
+}
+
+fn parse_jsx_template(src: &str) -> Result<Vec<Node>, RawParseError> {
+    let (norm, map) = normalize_jsx_mapped(src);
+    let root = norm.as_str();
+    match parse_jsx_nodes(root, root) {
+        Ok((nodes, _)) => Ok(nodes),
+        Err(mut err) => {
+            if let Some(off) = err.byte_offset.take() {
+                err.byte_offset = Some(map_jsx_offset(&map, off));
+            }
+            Err(err)
+        }
+    }
+}
+
+fn parse_jsx_nodes<'a>(
+    norm_root: &'a str,
+    src: &'a str,
+) -> Result<(Vec<Node>, &'a str), RawParseError> {
     let mut nodes = Vec::new();
     let mut rest = src;
 
@@ -1078,12 +1185,10 @@ fn parse_jsx_nodes(src: &str) -> Result<(Vec<Node>, &str), String> {
             rest = t;
             break;
         }
-        // Stop before any closing tag or <else / <else-if (handled by caller)
         if t.starts_with("</") || t.starts_with("<else") {
             rest = t;
             break;
         }
-        // $: let / $: default — identical syntax to indentation mode
         if t.starts_with("$:") {
             let end = t.find('\n').unwrap_or(t.len());
             let line = t[..end].trim();
@@ -1093,23 +1198,20 @@ fn parse_jsx_nodes(src: &str) -> Result<(Vec<Node>, &str), String> {
             }
             continue;
         }
-        // Opening tag
         if t.starts_with('<') {
             rest = t;
-            let (node, next) = parse_jsx_tag(rest)?;
+            let (node, next) = parse_jsx_tag(norm_root, rest)?;
             nodes.push(node);
             rest = next;
             continue;
         }
-        // Standalone {expr} — becomes RawText
         if t.starts_with('{') {
             rest = t;
-            let (expr, next) = jsx_brace_expr(rest)?;
+            let (expr, next) = jsx_brace_expr(norm_root, rest)?;
             nodes.push(Node::RawText(expr));
             rest = next;
             continue;
         }
-        // Text content (may contain {expr} interpolations)
         let prev_len = rest.len();
         let (node_opt, next) = jsx_text_node(rest);
         if let Some(node) = node_opt {
@@ -1117,7 +1219,6 @@ fn parse_jsx_nodes(src: &str) -> Result<(Vec<Node>, &str), String> {
         }
         rest = next;
         if rest.len() == prev_len {
-            // Safety: no progress, skip one character
             let skip = rest
                 .char_indices()
                 .nth(1)
@@ -1130,11 +1231,8 @@ fn parse_jsx_nodes(src: &str) -> Result<(Vec<Node>, &str), String> {
     Ok((nodes, rest))
 }
 
-// ── Tag dispatcher ─────────────────────────────────────────────────────────────
-
-fn parse_jsx_tag(src: &str) -> Result<(Node, &str), String> {
+fn parse_jsx_tag<'a>(norm_root: &'a str, src: &'a str) -> Result<(Node, &'a str), RawParseError> {
     let src = src.trim_start();
-    // Strip `<`
     let after_lt = &src[1..];
     let name_end = after_lt
         .find(|c: char| c.is_whitespace() || c == '>' || c == '/')
@@ -1142,65 +1240,71 @@ fn parse_jsx_tag(src: &str) -> Result<(Node, &str), String> {
     let tag = &after_lt[..name_end];
     let rest = after_lt[name_end..].trim_start();
 
-    let (attrs, after_gt, self_closing) = jsx_parse_attrs(rest)?;
+    let (attrs, after_gt, self_closing) = jsx_parse_attrs(norm_root, rest)?;
 
     match tag {
-        "if" => parse_jsx_if(attrs, after_gt),
-        "else" | "else-if" => Err(format!("<{tag}> encountered outside <if>")),
-        "for" => parse_jsx_for(attrs, after_gt),
-        "match" => parse_jsx_match(attrs, after_gt),
-        "include" if self_closing => Ok((jsx_build_include(attrs, vec![])?, after_gt)),
+        "if" => parse_jsx_if(norm_root, attrs, after_gt),
+        "else" | "else-if" => Err(jsx_err(
+            norm_root,
+            src,
+            format!("<{tag}> encountered outside <if>"),
+        )),
+        "for" => parse_jsx_for(norm_root, attrs, after_gt),
+        "match" => parse_jsx_match(norm_root, attrs, after_gt),
+        "include" if self_closing => Ok((jsx_build_include(attrs, vec![]), after_gt)),
         "include" => {
-            let (slot, rest) = parse_jsx_nodes(after_gt)?;
-            let rest = jsx_close(rest, "include")?;
-            Ok((jsx_build_include(attrs, slot)?, rest))
+            let (slot, rest) = parse_jsx_nodes(norm_root, after_gt)?;
+            let rest = jsx_close(norm_root, rest, "include")?;
+            Ok((jsx_build_include(attrs, slot), rest))
         }
-        "let" => Ok((Node::LetDecl(jsx_build_let(attrs, false)?), after_gt)),
-        "let-default" => Ok((Node::LetDecl(jsx_build_let(attrs, true)?), after_gt)),
+        "let" => Ok((Node::LetDecl(jsx_build_let(attrs, false)), after_gt)),
+        "let-default" => Ok((Node::LetDecl(jsx_build_let(attrs, true)), after_gt)),
         _ if self_closing => Ok((
             Node::Element(jsx_build_element(tag, attrs, vec![])),
             after_gt,
         )),
         _ => {
-            let (children, rest) = parse_jsx_nodes(after_gt)?;
-            let rest = jsx_close(rest, tag)?;
+            let (children, rest) = parse_jsx_nodes(norm_root, after_gt)?;
+            let rest = jsx_close(norm_root, rest, tag)?;
             Ok((Node::Element(jsx_build_element(tag, attrs, children)), rest))
         }
     }
 }
 
-// ── Control-flow tag parsers ───────────────────────────────────────────────────
-
-fn parse_jsx_if(attrs: Vec<JsxAttr>, children_src: &str) -> Result<(Node, &str), String> {
+fn parse_jsx_if<'a>(
+    norm_root: &'a str,
+    attrs: Vec<JsxAttr>,
+    children_src: &'a str,
+) -> Result<(Node, &'a str), RawParseError> {
     let condition = attrs
         .iter()
         .find(|a| matches!(a.key.as_str(), "condition" | "test" | "cond"))
         .and_then(|a| a.as_expr())
         .unwrap_or_default();
 
-    let (then_children, rest) = parse_jsx_nodes(children_src)?;
+    let (then_children, rest) = parse_jsx_nodes(norm_root, children_src)?;
     let rest = rest.trim_start();
 
     let (else_children, rest) = if rest.starts_with("<else-if") {
         let after_name = rest.strip_prefix("<else-if").unwrap_or("").trim_start();
-        let (ei_attrs, ei_body, _) = jsx_parse_attrs(after_name)?;
-        let (nested, next) = parse_jsx_if(ei_attrs, ei_body)?;
+        let (ei_attrs, ei_body, _) = jsx_parse_attrs(norm_root, after_name)?;
+        let (nested, next) = parse_jsx_if(norm_root, ei_attrs, ei_body)?;
         (Some(vec![nested]), next)
     } else if rest.starts_with("<else") {
         let after_name = rest.strip_prefix("<else").unwrap_or("").trim_start();
-        let (_, else_body, self_closing) = jsx_parse_attrs(after_name)?;
+        let (_, else_body, self_closing) = jsx_parse_attrs(norm_root, after_name)?;
         if self_closing {
             (Some(vec![]), else_body)
         } else {
-            let (else_nodes, after_nodes) = parse_jsx_nodes(else_body)?;
-            let after_close = jsx_close(after_nodes, "else")?;
+            let (else_nodes, after_nodes) = parse_jsx_nodes(norm_root, else_body)?;
+            let after_close = jsx_close(norm_root, after_nodes, "else")?;
             (Some(else_nodes), after_close)
         }
     } else {
         (None, rest)
     };
 
-    let rest = jsx_close(rest, "if")?;
+    let rest = jsx_close(norm_root, rest, "if")?;
     Ok((
         Node::If(IfBlock {
             condition,
@@ -1211,7 +1315,11 @@ fn parse_jsx_if(attrs: Vec<JsxAttr>, children_src: &str) -> Result<(Node, &str),
     ))
 }
 
-fn parse_jsx_for(attrs: Vec<JsxAttr>, children_src: &str) -> Result<(Node, &str), String> {
+fn parse_jsx_for<'a>(
+    norm_root: &'a str,
+    attrs: Vec<JsxAttr>,
+    children_src: &'a str,
+) -> Result<(Node, &'a str), RawParseError> {
     let pattern = attrs
         .iter()
         .find(|a| matches!(a.key.as_str(), "let" | "var"))
@@ -1224,8 +1332,8 @@ fn parse_jsx_for(attrs: Vec<JsxAttr>, children_src: &str) -> Result<(Node, &str)
         .and_then(|a| a.as_expr())
         .unwrap_or_default();
 
-    let (body, rest) = parse_jsx_nodes(children_src)?;
-    let rest = jsx_close(rest, "for")?;
+    let (body, rest) = parse_jsx_nodes(norm_root, children_src)?;
+    let rest = jsx_close(norm_root, rest, "for")?;
     Ok((
         Node::For(ForBlock {
             pattern,
@@ -1236,7 +1344,11 @@ fn parse_jsx_for(attrs: Vec<JsxAttr>, children_src: &str) -> Result<(Node, &str)
     ))
 }
 
-fn parse_jsx_match(attrs: Vec<JsxAttr>, children_src: &str) -> Result<(Node, &str), String> {
+fn parse_jsx_match<'a>(
+    norm_root: &'a str,
+    attrs: Vec<JsxAttr>,
+    children_src: &'a str,
+) -> Result<(Node, &'a str), RawParseError> {
     let expr = attrs
         .iter()
         .find(|a| matches!(a.key.as_str(), "on" | "value"))
@@ -1248,7 +1360,7 @@ fn parse_jsx_match(attrs: Vec<JsxAttr>, children_src: &str) -> Result<(Node, &st
 
     while rest.starts_with("<case") {
         let after_name = &rest["<case".len()..].trim_start();
-        let (case_attrs, case_body, self_closing) = jsx_parse_attrs(after_name)?;
+        let (case_attrs, case_body, self_closing) = jsx_parse_attrs(norm_root, after_name)?;
         let pattern = case_attrs
             .iter()
             .find(|a| matches!(a.key.as_str(), "pattern" | "match" | "when"))
@@ -1261,15 +1373,15 @@ fn parse_jsx_match(attrs: Vec<JsxAttr>, children_src: &str) -> Result<(Node, &st
         let (body, after_body): (Vec<Node>, &str) = if self_closing {
             (vec![], case_body)
         } else {
-            let (b, r) = parse_jsx_nodes(case_body)?;
-            let r = jsx_close(r, "case")?;
+            let (b, r) = parse_jsx_nodes(norm_root, case_body)?;
+            let r = jsx_close(norm_root, r, "case")?;
             (b, r)
         };
         arms.push(MatchArm { pattern, body });
         rest = after_body.trim_start();
     }
 
-    let rest = jsx_close(rest, "match")?;
+    let rest = jsx_close(norm_root, rest, "match")?;
     Ok((Node::Match(MatchBlock { expr, arms }), rest))
 }
 
@@ -1425,7 +1537,7 @@ fn jsx_build_element(tag: &str, attrs: Vec<JsxAttr>, children: Vec<Node>) -> Ele
     }
 }
 
-fn jsx_build_include(attrs: Vec<JsxAttr>, slot: Vec<Node>) -> Result<Node, String> {
+fn jsx_build_include(attrs: Vec<JsxAttr>, slot: Vec<Node>) -> Node {
     let path = attrs
         .iter()
         .find(|a| matches!(a.key.as_str(), "src" | "path"))
@@ -1437,10 +1549,10 @@ fn jsx_build_include(attrs: Vec<JsxAttr>, slot: Vec<Node>) -> Result<Node, Strin
         .filter(|a| !matches!(a.key.as_str(), "src" | "path"))
         .filter_map(|a| a.as_expr().map(|v| (a.key.clone(), v)))
         .collect();
-    Ok(Node::Include(IncludeNode { path, props, slot }))
+    Node::Include(IncludeNode { path, props, slot })
 }
 
-fn jsx_build_let(attrs: Vec<JsxAttr>, is_default: bool) -> Result<LetDecl, String> {
+fn jsx_build_let(attrs: Vec<JsxAttr>, is_default: bool) -> LetDecl {
     let name = attrs
         .iter()
         .find(|a| a.key == "name")
@@ -1452,18 +1564,19 @@ fn jsx_build_let(attrs: Vec<JsxAttr>, is_default: bool) -> Result<LetDecl, Strin
         .find(|a| a.key == "value")
         .and_then(|a| a.as_expr())
         .unwrap_or_default();
-    Ok(LetDecl {
+    LetDecl {
         name,
         expr,
         is_default,
-    })
+    }
 }
 
 // ── Low-level helpers ──────────────────────────────────────────────────────────
 
-/// Parse JSX attributes until `>` or `/>`.
-/// Returns `(attrs, source_after_gt, self_closing)`.
-fn jsx_parse_attrs(src: &str) -> Result<(Vec<JsxAttr>, &str, bool), String> {
+fn jsx_parse_attrs<'a>(
+    norm_root: &'a str,
+    src: &'a str,
+) -> Result<(Vec<JsxAttr>, &'a str, bool), RawParseError> {
     let mut attrs = Vec::new();
     let mut rest = src.trim_start();
     let mut self_closing = false;
@@ -1471,7 +1584,7 @@ fn jsx_parse_attrs(src: &str) -> Result<(Vec<JsxAttr>, &str, bool), String> {
     loop {
         rest = rest.trim_start();
         if rest.is_empty() {
-            return Err("unclosed JSX tag".to_string());
+            return Err(jsx_err(norm_root, rest, "unclosed JSX tag"));
         }
         if rest.starts_with("/>") {
             self_closing = true;
@@ -1483,7 +1596,6 @@ fn jsx_parse_attrs(src: &str) -> Result<(Vec<JsxAttr>, &str, bool), String> {
             break;
         }
 
-        // Read attribute key (ends at whitespace, `=`, `>`, or `/`)
         let key_end = rest
             .find(|c: char| c.is_whitespace() || c == '=' || c == '>' || c == '/')
             .unwrap_or(rest.len());
@@ -1496,7 +1608,7 @@ fn jsx_parse_attrs(src: &str) -> Result<(Vec<JsxAttr>, &str, bool), String> {
 
         if rest.starts_with('=') {
             rest = rest[1..].trim_start();
-            let (value, next) = jsx_attr_value(rest)?;
+            let (value, next) = jsx_attr_value(norm_root, rest)?;
             attrs.push(JsxAttr { key, value });
             rest = next;
         } else {
@@ -1510,8 +1622,10 @@ fn jsx_parse_attrs(src: &str) -> Result<(Vec<JsxAttr>, &str, bool), String> {
     Ok((attrs, rest, self_closing))
 }
 
-/// Parse a single JSX attribute value (after the `=`).
-fn jsx_attr_value(src: &str) -> Result<(JsxAttrValue, &str), String> {
+fn jsx_attr_value<'a>(
+    norm_root: &'a str,
+    src: &'a str,
+) -> Result<(JsxAttrValue, &'a str), RawParseError> {
     if src.starts_with('"') {
         let mut i = 1;
         let bytes = src.as_bytes();
@@ -1535,7 +1649,7 @@ fn jsx_attr_value(src: &str) -> Result<(JsxAttrValue, &str), String> {
             &inner[end + 1..],
         ))
     } else if src.starts_with('{') {
-        let (expr, rest) = jsx_brace_expr(src)?;
+        let (expr, rest) = jsx_brace_expr(norm_root, src)?;
         Ok((JsxAttrValue::Expr(expr), rest))
     } else {
         let end = src
@@ -1551,11 +1665,17 @@ fn jsx_attr_value(src: &str) -> Result<(JsxAttrValue, &str), String> {
     }
 }
 
-/// Consume a `{...}` brace expression, returning `(inner_expr, remaining)`.
-fn jsx_brace_expr(src: &str) -> Result<(String, &str), String> {
+fn jsx_brace_expr<'a>(
+    norm_root: &'a str,
+    src: &'a str,
+) -> Result<(String, &'a str), RawParseError> {
     let src = src.trim_start();
     if !src.starts_with('{') {
-        return Err(format!("expected '{{', got: {}", &src[..src.len().min(10)]));
+        return Err(jsx_err(
+            norm_root,
+            src,
+            format!("expected '{{', got: {}", &src[..src.len().min(10)]),
+        ));
     }
     let mut depth = 0usize;
     for (i, c) in src.char_indices() {
@@ -1571,7 +1691,7 @@ fn jsx_brace_expr(src: &str) -> Result<(String, &str), String> {
             _ => {}
         }
     }
-    Err("unclosed '{' in JSX expression".to_string())
+    Err(jsx_err(norm_root, src, "unclosed '{' in JSX expression"))
 }
 
 /// Consume text content up to the next `<` tag, parsing `{expr}` interpolations.
@@ -1589,8 +1709,7 @@ fn jsx_text_node(src: &str) -> (Option<Node>, &str) {
     (Some(Node::Text(parts)), &src[end..])
 }
 
-/// Consume a closing tag `</tag>`, returning the source after it.
-fn jsx_close<'a>(src: &'a str, tag: &str) -> Result<&'a str, String> {
+fn jsx_close<'a>(norm_root: &str, src: &'a str, tag: &str) -> Result<&'a str, RawParseError> {
     let src = src.trim_start();
     let prefix = format!("</{}", tag);
     if let Some(rest) = src.strip_prefix(&prefix) {
@@ -1599,10 +1718,10 @@ fn jsx_close<'a>(src: &'a str, tag: &str) -> Result<&'a str, String> {
             return Ok(rest);
         }
     }
-    Err(format!(
-        "expected </{}>, got: {}",
-        tag,
-        &src[..src.len().min(40)]
+    Err(jsx_err(
+        norm_root,
+        src,
+        format!("expected </{}>, got: {}", tag, &src[..src.len().min(40)]),
     ))
 }
 

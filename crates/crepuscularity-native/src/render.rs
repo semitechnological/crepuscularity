@@ -9,7 +9,7 @@ use crepuscularity_core::parser::{parse_component_file, parse_template};
 use crepuscularity_core::preprocess::slot_rotate_child_phrases;
 
 use crate::include_expand;
-use crate::ir::{StackAxis, ViewIr, ViewNode, IR_VERSION};
+use crate::ir::{PickerOption, StackAxis, ViewIr, ViewNode, IR_VERSION};
 use crate::style;
 
 /// Render from a virtual file map (`entry` may use `#Component` suffix).
@@ -176,6 +176,66 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<ViewNode, Strin
         });
     }
 
+    if el.tag == "input" {
+        let bind = el
+            .bindings
+            .iter()
+            .find(|b| b.prop == "bind")
+            .map(|b| b.value.clone())
+            .unwrap_or_default();
+        let placeholder = el
+            .bindings
+            .iter()
+            .find(|b| b.prop == "placeholder")
+            .map(|b| {
+                let v = b.value.trim();
+                v.trim_matches(|c| c == '"' || c == '\'').to_string()
+            })
+            .unwrap_or_default();
+        let multiline = classes.iter().any(|c| c == "multiline");
+        let hints = style::extract_stack_hints(&classes, Some(ctx));
+        return Ok(ViewNode::Input {
+            placeholder,
+            bind,
+            multiline,
+            style: hints.style.opt(),
+        });
+    }
+
+    if el.tag == "picker" {
+        let bind = el
+            .bindings
+            .iter()
+            .find(|b| b.prop == "bind")
+            .map(|b| b.value.clone())
+            .unwrap_or_default();
+        let mut options = Vec::new();
+        for child in &el.children {
+            if let Node::Element(inner) = child {
+                if inner.tag == "span" || inner.tag == "button" {
+                    let label = collect_primary_text(&inner.children, ctx)?;
+                    let value = inner
+                        .bindings
+                        .iter()
+                        .find(|b| b.prop == "value")
+                        .map(|b| {
+                            let v = b.value.trim();
+                            v.trim_matches(|c| c == '"' || c == '\'').to_string()
+                        })
+                        .filter(|s| !s.is_empty())
+                        .unwrap_or_else(|| slug_option_value(&label));
+                    options.push(PickerOption { value, label });
+                }
+            }
+        }
+        let hints = style::extract_stack_hints(&classes, Some(ctx));
+        return Ok(ViewNode::Picker {
+            bind,
+            options,
+            style: hints.style.opt(),
+        });
+    }
+
     if el.tag == "img" {
         let src = el
             .bindings
@@ -229,6 +289,18 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<ViewNode, Strin
         style: hints.style.opt(),
         children,
     })
+}
+
+fn slug_option_value(label: &str) -> String {
+    let mut s = label
+        .to_lowercase()
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
+        .collect::<String>();
+    while s.contains("__") {
+        s = s.replace("__", "_");
+    }
+    s.trim_matches('_').to_string()
 }
 
 fn collect_primary_text(children: &[Node], ctx: &TemplateContext) -> Result<String, String> {

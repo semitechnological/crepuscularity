@@ -1,7 +1,8 @@
 use serde::{Deserialize, Serialize};
 
 use crepuscularity_core::ast::{Element, MatchArm, Node, TextPart};
-use crepuscularity_core::{parse_template, TemplateContext};
+use crepuscularity_core::context::TemplateContext;
+use crepuscularity_core::parse_template;
 
 use crate::ir::ViewIr;
 use crate::mutations::{diff_ir, IrMutation};

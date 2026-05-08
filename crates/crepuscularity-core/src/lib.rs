@@ -8,6 +8,7 @@ pub mod ast;
 pub mod build;
 pub mod cache;
 pub mod context;
+pub mod diagnostics;
 pub mod eval;
 pub mod parser;
 pub mod preprocess;
@@ -17,6 +18,7 @@ pub use analysis::{analyze_template, classify_node, BindingMap, Fingerprint, Reg
 #[cfg(not(target_arch = "wasm32"))]
 pub use cache::DriverCache;
 pub use context::{TemplateContext, TemplateValue};
+pub use diagnostics::{diagnose_crepus_source, is_multi_component_file, CrepusDiagnostic};
 pub use parser::{
     parse_component_file, parse_template, unescape_crepus_text_literal, ComponentDef,
     ComponentFile, ComponentMeta,

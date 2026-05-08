@@ -273,3 +273,12 @@ See `examples/ui.crepus` for the format and `examples/ui-demo.crepus` for usage.
 - Error messages from the renderer use a red `div` with the message text — no panics.
 - Multi-component files live alongside single-component ones; the `#Name` fragment in the include path is the only disambiguation.
 - Rust API documentation is encouraged for public items, invariants, security boundaries, and non-obvious performance contracts. Prefer `//!` / `///` docs over ordinary comments; keep implementation comments rare and limited to places where the code would otherwise hide a correctness or safety requirement.
+
+
+<claude-mem-context>
+# Memory Context
+
+# [crepuscularity] recent context, 2026-05-06 3:33pm GMT+10
+
+No previous sessions found.
+</claude-mem-context>

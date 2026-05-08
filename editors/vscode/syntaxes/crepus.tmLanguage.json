@@ -1,0 +1,118 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Crepus",
+  "scopeName": "source.crepus",
+  "patterns": [
+    { "include": "#comment" },
+    { "include": "#frontmatter" },
+    { "include": "#section" },
+    { "include": "#jsx" },
+    { "include": "#string" },
+    { "include": "#directive" },
+    { "include": "#keyword" },
+    { "include": "#expr" }
+  ],
+  "repository": {
+    "comment": {
+      "patterns": [
+        {
+          "name": "comment.line.number-sign.crepus",
+          "match": "#.*$"
+        }
+      ]
+    },
+    "frontmatter": {
+      "patterns": [
+        {
+          "name": "meta.embedded.block.crepus",
+          "begin": "^\\+\\+\\+$",
+          "end": "^\\+\\+\\+$",
+          "beginCaptures": { "0": { "name": "punctuation.section.crepus" } },
+          "endCaptures": { "0": { "name": "punctuation.crepus" } },
+          "contentName": "meta.frontmatter.crepus"
+        }
+      ]
+    },
+    "section": {
+      "patterns": [
+        {
+          "name": "entity.name.section.crepus",
+          "match": "^---\\s+.+$"
+        }
+      ]
+    },
+    "jsx": {
+      "patterns": [
+        {
+          "name": "meta.tag.crepus",
+          "begin": "(</?)([a-zA-Z][a-zA-Z0-9\\-]*)",
+          "end": "(/?>)",
+          "beginCaptures": {
+            "1": { "name": "punctuation.definition.tag.crepus" },
+            "2": { "name": "entity.name.tag.crepus" }
+          },
+          "endCaptures": {
+            "1": { "name": "punctuation.definition.tag.crepus" }
+          },
+          "patterns": [
+            {
+              "name": "entity.other.attribute-name.crepus",
+              "match": "\\b([a-zA-Z@\\-][a-zA-Z0-9\\-:@]*)\\b(?=\\s*=)"
+            },
+            { "include": "#string" },
+            { "include": "#expr" }
+          ]
+        }
+      ]
+    },
+    "string": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.crepus",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "name": "constant.character.escape.crepus",
+              "match": "\\\\."
+            }
+          ]
+        }
+      ]
+    },
+    "directive": {
+      "patterns": [
+        {
+          "name": "keyword.operator.declaration.crepus",
+          "match": "^\\$:\\s*(let|default)\\b"
+        },
+        {
+          "name": "keyword.control.import.crepus",
+          "match": "^include\\s+"
+        }
+      ]
+    },
+    "keyword": {
+      "patterns": [
+        {
+          "name": "keyword.control.crepus",
+          "match": "^(if|else|else if|for|match)\\b"
+        },
+        {
+          "name": "keyword.control.crepus",
+          "match": "\\b(slug|match|then|=>)\\b"
+        }
+      ]
+    },
+    "expr": {
+      "patterns": [
+        {
+          "name": "meta.embedded.expr.crepus",
+          "begin": "\\{",
+          "end": "\\}",
+          "contentName": "source.embedded.crepus"
+        }
+      ]
+    }
+  }
+}
