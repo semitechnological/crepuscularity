@@ -16,7 +16,7 @@ args = ["**"]
 [grammars.crepus]
 repository = "https://github.com/semitechnological/crepuscularity"
 path = "tree-sitter-crepus"
-rev = "3ad5e5a989af7b21fdd8c342b917998fd258c9a3"
+rev = "5f2132a179fed7c2ea03cd0471c7fdbb427a2fc4"
 
 [language_servers.crepus-lsp]
 name = "crepus-lsp"
