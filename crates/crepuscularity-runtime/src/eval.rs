@@ -57,7 +57,8 @@ fn tokenize(input: &str) -> Vec<Token> {
             continue;
         }
 
-        // String literal
+        // String literal — must walk UTF-8 codepoints, not raw bytes, so
+        // multi-byte chars (`"Hola ñ"`) survive the round-trip intact.
         if bytes[i] == b'"' || bytes[i] == b'\'' {
             let quote = bytes[i];
             i += 1;
@@ -74,10 +75,16 @@ fn tokenize(input: &str) -> Vec<Token> {
                             s.push(c as char);
                         }
                     }
+                    i += 1;
                 } else {
-                    s.push(bytes[i] as char);
+                    let ch = input[i..]
+                        .chars()
+                        .next()
+                        .expect("byte index inside string literal must point at a UTF-8 codepoint");
+                    let n = ch.len_utf8();
+                    s.push(ch);
+                    i += n;
                 }
-                i += 1;
             }
             if i < len {
                 i += 1;
@@ -529,4 +536,26 @@ pub fn eval_expr(expr: &str, ctx: &TemplateContext) -> TemplateValue {
 /// Evaluate an expression as a boolean condition.
 pub fn eval_condition(expr: &str, ctx: &TemplateContext) -> bool {
     is_truthy(&eval_expr(expr, ctx))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn string_literal_preserves_multi_byte_utf8() {
+        let ctx = TemplateContext::new();
+        let v = eval_expr("\"Hola ñ — 你好\"", &ctx);
+        match v {
+            TemplateValue::Str(s) => assert_eq!(s, "Hola ñ — 你好"),
+            other => panic!("expected string, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn unterminated_string_does_not_panic() {
+        let ctx = TemplateContext::new();
+        let _ = eval_expr("\"abc", &ctx);
+        let _ = eval_expr("\"ñ", &ctx);
+    }
 }
