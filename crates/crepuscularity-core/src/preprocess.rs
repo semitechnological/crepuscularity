@@ -97,7 +97,10 @@ fn strip_trailing_inline_css(lines: &[&str], start: usize, mut end: usize) -> (u
         while open > start {
             open -= 1;
             if lines[open].trim() == "<style>" {
-                let css = lines[(open + 1)..(cursor - 1)].join("\n").trim().to_string();
+                let css = lines[(open + 1)..(cursor - 1)]
+                    .join("\n")
+                    .trim()
+                    .to_string();
                 return (open, css);
             }
         }
