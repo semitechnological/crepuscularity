@@ -22,9 +22,45 @@ pub struct HotReloadEnvelope {
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum HotReloadMessage {
     Noop,
-    Patch { mutations: Vec<IrMutation> },
-    FullReload { ir: ViewIr, reason: String },
-    Error { message: String },
+    Patch {
+        mutations: Vec<IrMutation>,
+    },
+    FullReload {
+        ir: ViewIr,
+        reason: String,
+    },
+    Error {
+        message: String,
+    },
+    /// Sent once when a WebSocket client connects (`aurorality dev`).
+    DevHello {
+        session_id: String,
+        watch_dir: String,
+        #[serde(default)]
+        swiftgen_view: Option<String>,
+        #[serde(default)]
+        swiftgen_out: Option<String>,
+        #[serde(default)]
+        swiftgen_view_name: Option<String>,
+        #[serde(default)]
+        swiftgen_context_type: Option<String>,
+        /// When false, `plan_hot_reload` is skipped and only swiftgen events fire.
+        #[serde(default = "default_ir_enabled")]
+        ir_enabled: bool,
+    },
+    /// Result of running `swiftgen` after a `.crepus` save (hybrid hot reload).
+    SwiftgenStatus {
+        ok: bool,
+        #[serde(default)]
+        errors: Vec<String>,
+        view_name: String,
+        output_path: String,
+        ts_ms: u64,
+    },
+}
+
+fn default_ir_enabled() -> bool {
+    true
 }
 
 /// Decide between patch vs full reload using a conservative AST compatibility gate.

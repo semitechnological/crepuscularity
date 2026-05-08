@@ -41,8 +41,23 @@ navigationsplitview
 - Layout: `vstack`, `hstack`, `zstack`, `group`, `form`, `section`, `list`, `item`, `scrollview`, `divider`, `spacer`
 - Controls: `button`, `toggle`, `picker`, `textfield`, `input`, `securefield`, `menu`
 - Content: `label`, `image`, `sf`, `sf-*`, `span`, `p`
+- **macOS chrome:** root-level `menubar` emits a companion `<ViewName>Commands: Commands` type (menus, shortcuts). Root `dockbadge bind=<field>` syncs `NSApplication.shared.dockTile.badgeLabel`. `notification` fires `eventSink` on appear (event-only).
+- **Messaging widgets:** `avatar bind=<seed>`, `badge` (inline text), `messagebubble bind=<msg>`, `typingindicator label="…"` (or `{typingLine}`).
+- **Composer:** `textfield` supports utility classes including **`pill`** for capsule chrome.
 
 See [DSL reference](dsl.md) for the living mapping details.
+
+## Hot reload modes (`aurorality dev`)
+
+The CLI can watch `.crepus` and optionally:
+
+1. Push updated **IR** JSON over the WebSocket (default).
+2. Re-run **`swiftgen`** on save (`--swiftgen-view`, `--swiftgen-out`, …) and broadcast a **`SwiftgenStatus`** envelope (ok/errors/output path).
+3. Emit **`DevHello`** when a client connects (session id, watch roots, swiftgen config, whether IR is enabled).
+
+Swift hosts wire [`HotReloadClient`](https://github.com/semitechnological/aurorality) → **`HotReloadBus`** → HUD / optional live IR preview (`AurorDevOverlay`). Pure-swiftgen workflows may pass **`--no-ir`**.
+
+See also [IDE extensions](ide-extensions.md) for editor-facing notes.
 
 ## Integration Notes
 
