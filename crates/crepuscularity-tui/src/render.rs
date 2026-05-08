@@ -92,6 +92,7 @@ pub enum WidgetNode {
         children: Vec<WidgetChild>,
         style: Style,
         block: Option<BlockSpec>,
+        scroll_offset: usize,
     },
     /// A leaf node rendered as a ratatui `Paragraph`.
     Content {
@@ -159,8 +160,9 @@ pub fn render_nodes(
     area: Rect,
 ) -> Result<(), String> {
     // The root is implicitly a vertical flex container filling the whole area.
-    let children = build_children(nodes, ctx, Direction::Vertical, Style::default());
-    paint_children(&children, frame, area, Direction::Vertical, 0);
+    let render_ctx = with_tui_target(ctx);
+    let children = build_children(nodes, &render_ctx, Direction::Vertical, Style::default());
+    paint_children(&children, frame, area, Direction::Vertical, 0, 0);
     Ok(())
 }
 
@@ -178,7 +180,7 @@ pub fn render_component(
         .get(component_name)
         .ok_or_else(|| format!("component not found: {component_name}"))?;
 
-    let mut child_ctx = ctx.clone();
+    let mut child_ctx = with_tui_target(ctx);
     for (key, expr) in &component.meta.defaults {
         child_ctx
             .vars
@@ -187,6 +189,35 @@ pub fn render_component(
     }
 
     render_nodes(&component.nodes, &child_ctx, frame, area)
+}
+
+fn with_tui_target(ctx: &TemplateContext) -> TemplateContext {
+    let mut ctx = ctx.clone();
+    ctx.vars
+        .entry("crepus_target".to_string())
+        .or_insert_with(|| TemplateValue::Str("tui".to_string()));
+    ctx.vars
+        .entry("is_tui".to_string())
+        .or_insert(TemplateValue::Bool(true));
+    ctx.vars
+        .entry("is_gui".to_string())
+        .or_insert(TemplateValue::Bool(false));
+    ctx.vars
+        .entry("is_web".to_string())
+        .or_insert(TemplateValue::Bool(false));
+    ctx.vars
+        .entry("crepus_platform".to_string())
+        .or_insert_with(|| TemplateValue::Str(std::env::consts::OS.to_string()));
+    ctx.vars
+        .entry("is_macos".to_string())
+        .or_insert(TemplateValue::Bool(cfg!(target_os = "macos")));
+    ctx.vars
+        .entry("is_windows".to_string())
+        .or_insert(TemplateValue::Bool(cfg!(target_os = "windows")));
+    ctx.vars
+        .entry("is_linux".to_string())
+        .or_insert(TemplateValue::Bool(cfg!(target_os = "linux")));
+    ctx
 }
 
 // ─── Phase 1: Build ───────────────────────────────────────────────────────────
@@ -294,7 +325,17 @@ fn build_element(
     }
 
     // ── Evaluate conditional classes ──────────────────────────────────────────
-    let classes = active_classes(el, ctx);
+    let mut classes = active_classes(el, ctx);
+    if el.tag == "button"
+        && !classes.iter().any(|class| {
+            matches!(
+                class.as_str(),
+                "tui-button" | "button" | "tui-button-active" | "button-active"
+            )
+        })
+    {
+        classes.push("tui-button".to_string());
+    }
     let mut hints = parse_classes(&classes);
 
     // Allow a `title={expr}` binding to set the block title.
@@ -322,7 +363,7 @@ fn build_element(
     } else if el.children.is_empty() {
         build_empty_box(&hints, constraint, style)
     } else {
-        build_container_element(el, &hints, ctx, parent_dir, constraint, style)
+        build_container_element(el, &hints, ctx, parent_dir, constraint, style, &classes)
     }
 }
 
@@ -397,6 +438,7 @@ fn build_empty_box(hints: &StyleHints, constraint: Constraint, style: Style) -> 
             children: vec![],
             style,
             block: hints_to_block(hints),
+            scroll_offset: 0,
         },
         constraint,
     }
@@ -410,9 +452,11 @@ fn build_container_element(
     _parent_dir: Direction,
     constraint: Constraint,
     style: Style,
+    classes: &[String],
 ) -> WidgetChild {
     let child_dir = hints.direction;
     let children = build_children(&el.children, ctx, child_dir, style);
+    let scroll_offset = scroll_offset(el, ctx, classes);
 
     WidgetChild {
         node: WidgetNode::Container {
@@ -421,6 +465,7 @@ fn build_container_element(
             children,
             style,
             block: hints_to_block(hints),
+            scroll_offset,
         },
         constraint,
     }
@@ -448,6 +493,7 @@ fn build_slot(
             children,
             style: inherited,
             block: None,
+            scroll_offset: 0,
         },
         constraint: Constraint::Fill(1),
     }
@@ -628,6 +674,7 @@ pub fn paint_node(node: &WidgetNode, frame: &mut Frame, area: Rect) {
             children,
             style,
             block,
+            scroll_offset,
         } => {
             // Fill background / draw border, then recurse into the inner area.
             let inner = if let Some(spec) = block {
@@ -643,7 +690,7 @@ pub fn paint_node(node: &WidgetNode, frame: &mut Frame, area: Rect) {
                 area
             };
 
-            paint_children(children, frame, inner, *direction, *gap);
+            paint_children(children, frame, inner, *direction, *gap, *scroll_offset);
         }
 
         WidgetNode::Content {
@@ -674,18 +721,27 @@ fn paint_children(
     area: Rect,
     direction: Direction,
     gap: u16,
+    scroll_offset: usize,
 ) {
     if children.is_empty() {
         return;
     }
-    let constraints: Vec<Constraint> = children.iter().map(|c| c.constraint).collect();
+    let visible_children = if direction == Direction::Vertical && scroll_offset > 0 {
+        &children[scroll_offset.min(children.len())..]
+    } else {
+        children
+    };
+    if visible_children.is_empty() {
+        return;
+    }
+    let constraints: Vec<Constraint> = visible_children.iter().map(|c| c.constraint).collect();
     let chunks = Layout::default()
         .direction(direction)
         .constraints(constraints)
         .spacing(gap)
         .split(area);
 
-    for (i, child) in children.iter().enumerate() {
+    for (i, child) in visible_children.iter().enumerate() {
         if let Some(&chunk) = chunks.get(i) {
             paint_node(&child.node, frame, chunk);
         }
@@ -696,13 +752,79 @@ fn paint_children(
 
 /// Resolve active classes for an element (static + conditional).
 fn active_classes(el: &Element, ctx: &TemplateContext) -> Vec<String> {
-    let mut classes: Vec<String> = el.classes.iter().map(|c| ctx.interpolate(c)).collect();
+    let mut classes: Vec<String> = el
+        .classes
+        .iter()
+        .filter_map(|c| active_class(ctx, &ctx.interpolate(c)))
+        .collect();
     for cc in &el.conditional_classes {
         if ctx.eval_condition(&cc.condition) {
-            classes.push(ctx.interpolate(&cc.class));
+            if let Some(class) = active_class(ctx, &ctx.interpolate(&cc.class)) {
+                classes.push(class);
+            }
         }
     }
     classes
+}
+
+fn active_class(ctx: &TemplateContext, class: &str) -> Option<String> {
+    if let Some((prefix, rest)) = class.split_once(':') {
+        if matches_target_prefix(ctx, prefix) {
+            return Some(rest.to_string());
+        }
+        if known_target_prefix(prefix) {
+            return None;
+        }
+    }
+    Some(class.to_string())
+}
+
+fn scroll_offset(el: &Element, ctx: &TemplateContext, classes: &[String]) -> usize {
+    let scrollable = classes.iter().any(|class| {
+        matches!(
+            class.as_str(),
+            "overflow-y-scroll" | "overflow-scroll" | "virtual-scroll"
+        )
+    });
+    if !scrollable {
+        return 0;
+    }
+    el.bindings
+        .iter()
+        .find(|binding| {
+            matches!(
+                binding.prop.as_str(),
+                "scroll-offset" | "scroll-y" | "scroll"
+            )
+        })
+        .map(|binding| value_to_str(&eval_expr(&binding.value, ctx)))
+        .or_else(|| {
+            let value = ctx.get_str("scroll_offset");
+            (!value.is_empty()).then_some(value)
+        })
+        .and_then(|value| value.parse::<usize>().ok())
+        .unwrap_or(0)
+}
+
+fn matches_target_prefix(ctx: &TemplateContext, prefix: &str) -> bool {
+    match prefix {
+        "tui" => ctx.get_bool("is_tui") || ctx.get_str("crepus_target") == "tui",
+        "gpui" | "gui" => ctx.get_bool("is_gui") || ctx.get_str("crepus_target") == "gpui",
+        "web" => ctx.get_bool("is_web") || ctx.get_str("crepus_target") == "web",
+        "macos" | "darwin" => ctx.get_bool("is_macos") || ctx.get_str("crepus_platform") == "macos",
+        "windows" | "win32" => {
+            ctx.get_bool("is_windows") || ctx.get_str("crepus_platform") == "windows"
+        }
+        "linux" => ctx.get_bool("is_linux") || ctx.get_str("crepus_platform") == "linux",
+        _ => false,
+    }
+}
+
+fn known_target_prefix(prefix: &str) -> bool {
+    matches!(
+        prefix,
+        "tui" | "gpui" | "gui" | "web" | "macos" | "darwin" | "windows" | "win32" | "linux"
+    )
 }
 
 /// Build a ratatui `Line` from a `TextPart` slice.

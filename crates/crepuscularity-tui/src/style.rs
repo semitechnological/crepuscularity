@@ -184,6 +184,47 @@ fn apply_class(class: &str, h: &mut StyleHints) {
         "bg-white" => h.bg = Some(Color::White),
         "bg-black" => h.bg = Some(Color::Black),
         "bg-transparent" => h.bg = None,
+        "tui-panel" => {
+            h.borders |= Borders::ALL;
+            h.border_type = BorderType::Rounded;
+            h.border_fg = Some(Color::DarkGray);
+            h.bg = Some(Color::Black);
+            h.padding = Padding::uniform(1);
+        }
+        "tui-panel-bright" => {
+            h.borders |= Borders::ALL;
+            h.border_type = BorderType::Rounded;
+            h.border_fg = Some(Color::Cyan);
+            h.bg = Some(Color::Black);
+            h.padding = Padding::uniform(1);
+        }
+        "tui-header" => {
+            h.modifiers |= Modifier::BOLD;
+            h.fg = Some(Color::LightCyan);
+            h.bg = Some(Color::Black);
+        }
+        "tui-muted" => {
+            h.modifiers |= Modifier::DIM;
+            h.fg = Some(Color::DarkGray);
+        }
+        "tui-accent" => h.fg = Some(Color::LightMagenta),
+        "tui-button" | "button" => {
+            h.borders |= Borders::ALL;
+            h.border_type = BorderType::Rounded;
+            h.border_fg = Some(Color::Cyan);
+            h.fg = Some(Color::White);
+            h.bg = Some(Color::Black);
+            h.padding = Padding::horizontal(1);
+        }
+        "tui-button-active" | "button-active" => {
+            h.borders |= Borders::ALL;
+            h.border_type = BorderType::Rounded;
+            h.border_fg = Some(Color::LightCyan);
+            h.fg = Some(Color::Black);
+            h.bg = Some(Color::Cyan);
+            h.padding = Padding::horizontal(1);
+            h.modifiers |= Modifier::BOLD;
+        }
 
         _ => apply_parametric(class, h),
     }
@@ -198,6 +239,12 @@ fn apply_parametric(class: &str, h: &mut StyleHints) {
         }
     }
     if let Some(rest) = class.strip_prefix("bg-") {
+        if let Some(c) = parse_color(rest) {
+            h.bg = Some(c);
+            return;
+        }
+    }
+    if let Some(rest) = class.strip_prefix("background-") {
         if let Some(c) = parse_color(rest) {
             h.bg = Some(c);
             return;

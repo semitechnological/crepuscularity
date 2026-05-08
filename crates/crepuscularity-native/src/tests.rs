@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::fs;
 
-use crepuscularity_core::TemplateContext;
+use crepuscularity_core::context::{TemplateContext, TemplateValue};
 use serde_json::json;
 
 use crate::{
@@ -60,10 +60,7 @@ fn for_loop() {
     a.set("value", "a");
     let mut b = TemplateContext::new();
     b.set("value", "b");
-    ctx.set(
-        "items",
-        crepuscularity_core::TemplateValue::List(vec![a, b]),
-    );
+    ctx.set("items", TemplateValue::List(vec![a, b]));
     let tpl = "div\n for item in {items}\n  span\n    \"{item}\"";
     let ir = render_template_to_ir(tpl, &ctx).unwrap();
     let v = serde_json::to_value(&ir).unwrap();
@@ -203,4 +200,19 @@ fn plan_hot_reload_falls_back_to_full_reload_for_semantic_changes() {
         }
         other => panic!("expected FullReload, got {other:?}"),
     }
+}
+
+#[test]
+fn input_and_picker_ir() {
+    let tpl = r#"
+div flex flex-col
+  input bind=note placeholder="Hi"
+  picker bind=mode
+    span value="matrix" "Matrix"
+    span "Stalwart"
+"#;
+    let ir = render_template_to_ir(tpl, &TemplateContext::new()).unwrap();
+    let v = serde_json::to_value(&ir).unwrap();
+    assert_eq!(v["root"][0]["children"][0]["kind"], "input");
+    assert_eq!(v["root"][0]["children"][1]["kind"], "picker");
 }

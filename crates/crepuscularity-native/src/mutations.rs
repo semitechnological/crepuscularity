@@ -299,6 +299,60 @@ fn diff_node(old: &ViewNode, new: &ViewNode, path: &[usize], out: &mut Vec<IrMut
                 });
             }
         }
+        (
+            ViewNode::Input {
+                placeholder: op,
+                bind: ob,
+                multiline: om,
+                style: os,
+            },
+            ViewNode::Input {
+                placeholder: np,
+                bind: nb,
+                multiline: nm,
+                style: ns,
+            },
+        ) => {
+            if op != np || ob != nb || om != nm {
+                out.push(IrMutation::ReplaceNode {
+                    path: path.to_vec(),
+                    node: new.clone(),
+                });
+                return;
+            }
+            if os != ns {
+                out.push(IrMutation::UpdateStyle {
+                    path: path.to_vec(),
+                    style: ns.clone(),
+                });
+            }
+        }
+        (
+            ViewNode::Picker {
+                bind: ob,
+                options: oo,
+                style: os,
+            },
+            ViewNode::Picker {
+                bind: nb,
+                options: no,
+                style: ns,
+            },
+        ) => {
+            if ob != nb || oo != no {
+                out.push(IrMutation::ReplaceNode {
+                    path: path.to_vec(),
+                    node: new.clone(),
+                });
+                return;
+            }
+            if os != ns {
+                out.push(IrMutation::UpdateStyle {
+                    path: path.to_vec(),
+                    style: ns.clone(),
+                });
+            }
+        }
         _ => out.push(IrMutation::ReplaceNode {
             path: path.to_vec(),
             node: new.clone(),
@@ -351,6 +405,8 @@ fn node_style_mut(node: &mut ViewNode) -> Option<&mut Option<ViewStyle>> {
         | ViewNode::Button { style, .. }
         | ViewNode::Image { style, .. }
         | ViewNode::Scroll { style, .. }
-        | ViewNode::SlotRotate { style, .. } => Some(style),
+        | ViewNode::SlotRotate { style, .. }
+        | ViewNode::Input { style, .. }
+        | ViewNode::Picker { style, .. } => Some(style),
     }
 }

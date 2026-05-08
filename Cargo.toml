@@ -1,8 +1,10 @@
 [workspace]
 resolver = "2"
+exclude = ["tree-sitter-crepus"]
 members = [
     "crates/crepuscularity",
     "crates/crepuscularity-core",
+    "crates/crepuscularity-lsp",
     "crates/crepuscularity-native",
     "crates/crepuscularity-gpui",
     "crates/crepuscularity-web",

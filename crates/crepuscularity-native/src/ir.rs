@@ -328,6 +328,35 @@ pub enum ViewNode {
         #[serde(skip_serializing_if = "Option::is_none")]
         style: Option<ViewStyle>,
     },
+    /// Single-line or multi-line text entry; maps to SwiftUI `TextField` / `TextEditor`.
+    #[serde(rename = "input")]
+    Input {
+        placeholder: String,
+        /// Context field name for the bound string (Swift codegen uses `context.<bind>`).
+        bind: String,
+        #[serde(default)]
+        multiline: bool,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        style: Option<ViewStyle>,
+    },
+    /// Segmented / picker control bound to a context string field.
+    #[serde(rename = "picker")]
+    Picker {
+        /// Context field holding the selected option value.
+        bind: String,
+        options: Vec<PickerOption>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        style: Option<ViewStyle>,
+    },
+}
+
+/// One selectable option in a [`ViewNode::Picker`].
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+#[serde(rename_all = "camelCase")]
+pub struct PickerOption {
+    pub value: String,
+    pub label: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

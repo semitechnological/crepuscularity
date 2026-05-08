@@ -1,4 +1,4 @@
-use crepuscularity_core::TemplateContext;
+use crepuscularity_core::context::TemplateContext;
 use crepuscularity_native::{render_template_to_ir, IR_VERSION};
 
 #[test]
