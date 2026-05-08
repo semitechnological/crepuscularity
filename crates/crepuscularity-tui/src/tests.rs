@@ -807,6 +807,21 @@ fn hot_template_consumes_change_flag() {
     assert!(!hot.has_pending_change());
 }
 
+#[test]
+fn hot_template_drop_releases_watcher() {
+    // Smoke test: instantiate and drop many `HotTemplate`s in a row. Before
+    // moving the watcher's ownership into the struct, every `watch()` call
+    // permanently leaked a parked OS thread.
+    let dir = temp_case("hot-drop");
+    let path = dir.join("ui.crepus");
+    fs::write(&path, "div\n  \"x\"").unwrap();
+
+    for _ in 0..16 {
+        let hot = HotTemplate::watch(&path).expect("watch should succeed");
+        drop(hot);
+    }
+}
+
 // ─── Watcher event filter (pure) ──────────────────────────────────────────────
 
 mod watcher_filter {

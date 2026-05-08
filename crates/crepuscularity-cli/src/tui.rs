@@ -340,8 +340,68 @@ fn load_tui_context_toml(path: &Path, ctx: &mut crepuscularity_tui::TemplateCont
             } else if let Ok(f) = val.parse::<f64>() {
                 ctx.set(key, TemplateValue::Float(f));
             } else {
-                ctx.set(key, val.trim_matches('"').trim_matches('\'').to_string());
+                ctx.set(key, strip_one_outer_quote_pair(val).to_string());
             }
         }
+    }
+}
+
+/// Strip exactly one matching pair of `"`/`'` quotes from the outside of `s`.
+///
+/// Unlike `str::trim_matches('"').trim_matches('\'')` this preserves repeated
+/// quotes inside the value, e.g. `"\"\"hi\"\""` → `\"hi\"` rather than `hi`.
+fn strip_one_outer_quote_pair(s: &str) -> &str {
+    let bytes = s.as_bytes();
+    if bytes.len() >= 2 {
+        let first = bytes[0];
+        let last = bytes[bytes.len() - 1];
+        if (first == b'"' && last == b'"') || (first == b'\'' && last == b'\'') {
+            // Slice on byte indices that we just verified are `"` / `'` — both
+            // ASCII, so we are always on a UTF-8 char boundary.
+            return &s[1..s.len() - 1];
+        }
+    }
+    s
+}
+
+#[cfg(test)]
+mod tests {
+    use super::strip_one_outer_quote_pair;
+
+    #[test]
+    fn strips_single_outer_double_quotes() {
+        assert_eq!(strip_one_outer_quote_pair("\"hello\""), "hello");
+    }
+
+    #[test]
+    fn strips_single_outer_single_quotes() {
+        assert_eq!(strip_one_outer_quote_pair("'hi'"), "hi");
+    }
+
+    #[test]
+    fn preserves_inner_quotes_when_repeated() {
+        assert_eq!(
+            strip_one_outer_quote_pair("\"\"keep\"\""),
+            "\"keep\"",
+            "only the outermost pair should be stripped"
+        );
+    }
+
+    #[test]
+    fn preserves_mismatched_quotes() {
+        assert_eq!(strip_one_outer_quote_pair("\"hi'"), "\"hi'");
+        assert_eq!(strip_one_outer_quote_pair("'hi\""), "'hi\"");
+    }
+
+    #[test]
+    fn preserves_unquoted_value() {
+        assert_eq!(strip_one_outer_quote_pair("plain"), "plain");
+    }
+
+    #[test]
+    fn handles_short_inputs() {
+        assert_eq!(strip_one_outer_quote_pair(""), "");
+        assert_eq!(strip_one_outer_quote_pair("\""), "\"");
+        assert_eq!(strip_one_outer_quote_pair("\"\""), "");
     }
 }

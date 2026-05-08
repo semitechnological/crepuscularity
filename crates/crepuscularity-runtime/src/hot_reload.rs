@@ -15,19 +15,29 @@
 //!
 //! Renderer parse errors render an in-window red error block instead of
 //! panicking, so an in-progress edit cannot crash the dev window.
+//!
+//! # Lifetime
+//!
+//! Each [`HotReloadState`] owns its `notify` watcher and a cancellation flag
+//! shared with its background poll task. Dropping the entity drops the
+//! watcher (stopping `notify`'s worker thread) and signals the poll task to
+//! exit on its next tick — so reusing the same process to load a series of
+//! templates does not pile up dead watchers and zombie polling tasks.
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use gpui::{
     div, rems, rgb, AsyncApp, Context, Entity, IntoElement, ParentElement, Render, Styled,
     WeakEntity, Window,
 };
+use notify::Watcher;
 
 use crate::ast::Node;
 use crate::context::TemplateContext;
 use crate::parser::parse_template;
 use crate::renderer::render_nodes;
-use crate::watcher::watch_file;
+use crate::watcher::create_watcher;
 
 /// State model for the hot-reload view.
 pub struct HotReloadState {
@@ -35,11 +45,18 @@ pub struct HotReloadState {
     pub template: Result<Vec<Node>, String>,
     pub context: TemplateContext,
     pub changed: Arc<Mutex<bool>>,
+
+    /// Owning handle to the `notify` watcher. Dropped with `Self`, which
+    /// stops the watcher's internal worker thread.
+    _watcher: Option<Box<dyn Watcher + Send>>,
+
+    /// Set to `true` in [`Drop`] so the spawned poll task exits on its next
+    /// tick instead of running forever after the entity is gone.
+    cancel: Arc<AtomicBool>,
 }
 
 impl HotReloadState {
     pub fn new(path: PathBuf, mut context: TemplateContext, cx: &mut Context<Self>) -> Self {
-        // Set base_dir so `include` directives inside the template can resolve relative paths.
         if context.base_dir.is_none() {
             context.base_dir = path.parent().map(|p| p.to_path_buf());
         }
@@ -47,30 +64,46 @@ impl HotReloadState {
         let template = load_template(&path);
         let changed = Arc::new(Mutex::new(false));
 
-        // Start file watcher
-        watch_file(path.clone(), changed.clone());
+        // The watcher worker keeps running as long as we hold this Box.
+        // Surface creation errors as a red template block so a misconfigured
+        // path does not silently disable hot reload.
+        let watcher = match create_watcher(path.clone(), Arc::clone(&changed)) {
+            Ok(w) => Some(w),
+            Err(e) => {
+                eprintln!("[crepuscularity-runtime] hot reload disabled: {e}");
+                None
+            }
+        };
 
-        // Poll for changes and trigger re-renders
-        let changed_poll = changed.clone();
+        let cancel = Arc::new(AtomicBool::new(false));
+        let cancel_for_task = Arc::clone(&cancel);
+        let changed_poll = Arc::clone(&changed);
+
         cx.spawn(
             async move |this: WeakEntity<HotReloadState>, cx: &mut AsyncApp| loop {
-                let is_changed = {
-                    changed_poll
-                        .lock()
-                        .map(|mut g| {
-                            let v = *g;
-                            *g = false;
-                            v
-                        })
-                        .unwrap_or(false)
-                };
+                if cancel_for_task.load(Ordering::Relaxed) {
+                    break;
+                }
 
-                if is_changed {
-                    this.update(cx, |state, cx| {
-                        state.template = load_template(&state.path);
-                        cx.notify();
+                let is_changed = changed_poll
+                    .lock()
+                    .map(|mut g| {
+                        let v = *g;
+                        *g = false;
+                        v
                     })
-                    .ok();
+                    .unwrap_or(false);
+
+                if is_changed
+                    && this
+                        .update(cx, |state, cx| {
+                            state.template = load_template(&state.path);
+                            cx.notify();
+                        })
+                        .is_err()
+                {
+                    // Entity has been dropped; stop polling.
+                    break;
                 }
 
                 cx.background_executor()
@@ -85,11 +118,21 @@ impl HotReloadState {
             template,
             context,
             changed,
+            _watcher: watcher,
+            cancel,
         }
     }
 
     pub fn reload(&mut self) {
         self.template = load_template(&self.path);
+    }
+}
+
+impl Drop for HotReloadState {
+    fn drop(&mut self) {
+        // Stop the polling task ASAP. The watcher box is dropped with the
+        // struct itself, which terminates `notify`'s worker thread.
+        self.cancel.store(true, Ordering::Relaxed);
     }
 }
 

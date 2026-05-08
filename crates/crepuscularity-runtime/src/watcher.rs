@@ -18,6 +18,15 @@
 //! transparently pick up edits to `include`d components (`include card.crepus`
 //! living next to the entry file) without each include needing its own
 //! watcher.
+//!
+//! # Lifetime
+//!
+//! [`create_watcher`] returns a boxed [`Watcher`] that the caller owns and
+//! drops when it no longer needs change events; dropping the value tears down
+//! `notify`'s internal worker threads cleanly. The legacy [`watch_file`]
+//! helper preserves the old fire-and-forget behaviour by leaking the watcher
+//! into a parked background thread — it remains for backward compatibility
+//! and is no longer used by this crate.
 
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
@@ -25,63 +34,75 @@ use std::thread;
 
 use notify::{recommended_watcher, Event, EventKind, RecursiveMode, Watcher};
 
-/// Spawn a background thread that watches the directory containing `path`
-/// recursively, and flips `*changed = true` when:
+/// Create and start a file-system watcher rooted at the parent directory of
+/// `path`. The watcher flips `*changed = true` when:
 ///
 /// - the watched template itself is modified / created / removed, or
 /// - any sibling/descendant `.crepus` file changes (so `include`d components
 ///   trigger reload), or
 /// - a `context.toml` next to the template is updated.
 ///
-/// The thread runs for the rest of the process lifetime — `notify` requires
-/// the [`Watcher`] value to stay alive for events to fire, so we park inside
-/// the thread on a long sleep loop.
-pub fn watch_file(path: PathBuf, changed: Arc<Mutex<bool>>) {
+/// The returned value owns the `notify` worker; drop it to stop watching.
+pub fn create_watcher(
+    path: PathBuf,
+    changed: Arc<Mutex<bool>>,
+) -> Result<Box<dyn Watcher + Send>, String> {
     let canonical_target = path.canonicalize().unwrap_or_else(|_| path.clone());
     let watch_dir = canonical_target
         .parent()
         .map(Path::to_path_buf)
         .unwrap_or_else(|| PathBuf::from("."));
 
-    thread::spawn(move || {
-        let changed_inner = Arc::clone(&changed);
-        let target = canonical_target.clone();
-        let root = watch_dir.clone();
+    let target = canonical_target.clone();
+    let root = watch_dir.clone();
 
-        let mut watcher = match recommended_watcher(move |res: notify::Result<Event>| match res {
-            Ok(event) => {
-                if !is_relevant_kind(&event.kind) {
-                    return;
-                }
-                if !event_touches_relevant_path(&event, &target, &root) {
-                    return;
-                }
-                if let Ok(mut flag) = changed_inner.lock() {
-                    *flag = true;
-                }
-            }
-            Err(e) => {
-                eprintln!("[crepuscularity-dev] watcher error: {e}");
-            }
-        }) {
-            Ok(w) => w,
-            Err(e) => {
-                eprintln!("[crepuscularity-dev] could not create watcher: {e}");
+    let mut watcher = recommended_watcher(move |res: notify::Result<Event>| match res {
+        Ok(event) => {
+            if !is_relevant_kind(&event.kind) {
                 return;
             }
-        };
+            if !event_touches_relevant_path(&event, &target, &root) {
+                return;
+            }
+            if let Ok(mut flag) = changed.lock() {
+                *flag = true;
+            }
+        }
+        Err(e) => {
+            eprintln!("[crepuscularity-runtime] watcher error: {e}");
+        }
+    })
+    .map_err(|e| format!("could not create watcher: {e}"))?;
 
-        if let Err(e) = watcher.watch(&watch_dir, RecursiveMode::Recursive) {
-            eprintln!(
-                "[crepuscularity-dev] failed to watch {}: {e}",
-                watch_dir.display()
-            );
+    watcher
+        .watch(&watch_dir, RecursiveMode::Recursive)
+        .map_err(|e| format!("failed to watch {}: {e}", watch_dir.display()))?;
+
+    Ok(Box::new(watcher))
+}
+
+/// Legacy fire-and-forget wrapper around [`create_watcher`].
+///
+/// Spawns a background thread that owns the [`Watcher`] for the rest of the
+/// process — convenient for once-per-process tools, but leaks the underlying
+/// worker if the caller is instantiated more than once. New code should call
+/// [`create_watcher`] and store the returned handle alongside the polling
+/// state so it is dropped when the parent goes away.
+#[deprecated(
+    since = "0.4.3",
+    note = "Use `create_watcher` and own the returned `Watcher` so it drops with your hot-reload state."
+)]
+pub fn watch_file(path: PathBuf, changed: Arc<Mutex<bool>>) {
+    let watcher = match create_watcher(path, changed) {
+        Ok(w) => w,
+        Err(e) => {
+            eprintln!("[crepuscularity-runtime] {e}");
             return;
         }
-
-        loop {
-            thread::sleep(std::time::Duration::from_secs(3600));
-        }
+    };
+    thread::spawn(move || {
+        let _keep_alive = watcher;
+        thread::park();
     });
 }
 
@@ -259,5 +280,51 @@ mod tests {
             vec![target_canon.clone()],
         );
         assert!(event_touches_relevant_path(&e, &target_canon, dir.path()));
+    }
+
+    #[test]
+    fn create_watcher_is_droppable_without_leaking_a_thread() {
+        // Smoke test: instantiate and drop many watchers in a row. Before
+        // moving the `notify::Watcher` ownership into the caller this would
+        // permanently leak one parked OS thread per call.
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("ui.crepus");
+        fs::write(&target, "div").unwrap();
+
+        for _ in 0..16 {
+            let flag = Arc::new(Mutex::new(false));
+            let watcher =
+                create_watcher(target.clone(), Arc::clone(&flag)).expect("watcher should start");
+            drop(watcher);
+        }
+    }
+
+    #[test]
+    fn create_watcher_observes_modifications_through_the_flag() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("ui.crepus");
+        fs::write(&target, "div\n  \"x\"").unwrap();
+
+        let flag = Arc::new(Mutex::new(false));
+        let _watcher =
+            create_watcher(target.clone(), Arc::clone(&flag)).expect("watcher should start");
+
+        // Give the OS watcher a moment to begin observing. notify takes a
+        // few ms to subscribe to events on most platforms.
+        thread::sleep(std::time::Duration::from_millis(150));
+
+        fs::write(&target, "div\n  \"y\"").unwrap();
+
+        // Poll briefly for the flag to flip; on busy CI a single sleep can
+        // race the notify worker.
+        let mut saw_change = false;
+        for _ in 0..40 {
+            if *flag.lock().unwrap() {
+                saw_change = true;
+                break;
+            }
+            thread::sleep(std::time::Duration::from_millis(50));
+        }
+        assert!(saw_change, "watcher never flipped the changed flag");
     }
 }

@@ -1,14 +1,20 @@
 //! File-watch + reload helpers for `.crepus` templates rendered with Ratatui.
 //!
-//! [`HotTemplate`] wraps a [`Template`] with a background `notify` watcher and a
-//! shared "changed" flag. The watcher only flips a `bool`; the *application*
-//! decides when to react — typically once per crossterm event-loop tick by
-//! calling [`HotTemplate::poll_reload`] (or [`HotTemplate::poll_and_draw`]).
+//! [`HotTemplate`] wraps a [`Template`] with a `notify` watcher and a shared
+//! "changed" flag. The watcher only flips a `bool`; the *application* decides
+//! when to react — typically once per crossterm event-loop tick by calling
+//! [`HotTemplate::poll_reload`] (or [`HotTemplate::poll_and_draw`]).
 //!
 //! This mirrors the GPUI [`HotReloadState`](https://docs.rs/crepuscularity-runtime)
 //! design: cheap, lock-light, app-driven. Crepus does not own your terminal
 //! event loop, so we do not push reload events at you — we just expose a
 //! polled flag and a reload routine.
+//!
+//! # Lifetime
+//!
+//! Each [`HotTemplate`] owns its `notify` watcher; dropping the value tears
+//! down the watcher's internal worker thread, so a process that opens a
+//! sequence of templates does not pile up dead watchers.
 //!
 //! # Quick start
 //!
@@ -52,8 +58,6 @@
 
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
-use std::thread;
-use std::time::Duration;
 
 use notify::{recommended_watcher, Event, EventKind, RecursiveMode, Watcher};
 use ratatui::layout::Rect;
@@ -73,25 +77,32 @@ pub enum ReloadOutcome {
 }
 
 /// A [`Template`] backed by a file on disk, kept in sync with the file via a
-/// background `notify` watcher.
+/// `notify` watcher whose lifetime is tied to this struct.
 pub struct HotTemplate {
     template: Template,
     changed: Arc<Mutex<bool>>,
+    /// Owning handle to the `notify` watcher — dropped with `Self`, which
+    /// stops the watcher's worker thread.
+    _watcher: Box<dyn Watcher + Send>,
 }
 
 impl HotTemplate {
-    /// Open `path`, load its source, and start a background watcher.
+    /// Open `path`, load its source, and start a watcher rooted at the
+    /// containing directory.
     ///
     /// Subsequent saves of the file flip an internal flag that is consumed by
-    /// [`HotTemplate::poll_reload`]. The watcher thread runs for the lifetime
-    /// of the process; dropping `HotTemplate` stops poll consumption but does
-    /// not actively stop the watcher (it parks until process exit).
+    /// [`HotTemplate::poll_reload`]. Dropping the [`HotTemplate`] tears down
+    /// the watcher cleanly.
     pub fn watch(path: impl AsRef<Path>) -> Result<Self, String> {
         let template = Template::from_path(path)?;
         let watch_path = template.path().to_path_buf();
         let changed = Arc::new(Mutex::new(false));
-        spawn_file_watcher(watch_path, Arc::clone(&changed));
-        Ok(Self { template, changed })
+        let watcher = create_file_watcher(watch_path, Arc::clone(&changed))?;
+        Ok(Self {
+            template,
+            changed,
+            _watcher: watcher,
+        })
     }
 
     /// Borrow the underlying [`Template`] (read-only).
@@ -170,8 +181,8 @@ impl HotTemplate {
     }
 }
 
-/// Spawn a background thread that watches the *directory* containing `path`
-/// recursively, and flips `*changed = true` when:
+/// Create a `notify` watcher rooted at the *directory* containing `path`,
+/// returning the owning handle. The watcher flips `*changed = true` when:
 ///
 /// - the watched template is modified / created / removed (covers
 ///   atomic-save editor patterns that would otherwise leave the inotify
@@ -180,57 +191,46 @@ impl HotTemplate {
 ///   trigger reload), or
 /// - a `context.toml` next to the template is updated.
 ///
-/// The thread runs until process exit; `notify` requires the [`Watcher`] to
-/// stay alive for events to fire, so we park inside the thread on a long
-/// sleep loop.
-fn spawn_file_watcher(path: PathBuf, changed: Arc<Mutex<bool>>) {
+/// Drop the returned handle to stop watching cleanly.
+fn create_file_watcher(
+    path: PathBuf,
+    changed: Arc<Mutex<bool>>,
+) -> Result<Box<dyn Watcher + Send>, String> {
     let canonical_target = path.canonicalize().unwrap_or_else(|_| path.clone());
     let watch_dir = canonical_target
         .parent()
         .map(|p| p.to_path_buf())
         .unwrap_or_else(|| PathBuf::from("."));
 
-    thread::spawn(move || {
-        let changed_inner = Arc::clone(&changed);
-        let target = canonical_target.clone();
-        let root = watch_dir.clone();
+    let target = canonical_target.clone();
+    let root = watch_dir.clone();
 
-        let mut watcher = match recommended_watcher(move |res: notify::Result<Event>| match res {
-            Ok(ev) => {
-                if !matches!(
-                    ev.kind,
-                    EventKind::Modify(_) | EventKind::Create(_) | EventKind::Remove(_)
-                ) {
-                    return;
-                }
-                if !event_touches_relevant_path(&ev, &target, &root) {
-                    return;
-                }
-                if let Ok(mut flag) = changed_inner.lock() {
-                    *flag = true;
-                }
-            }
-            Err(e) => {
-                eprintln!("[crepuscularity-tui] watcher error: {e}");
-            }
-        }) {
-            Ok(w) => w,
-            Err(e) => {
-                eprintln!("[crepuscularity-tui] could not create file watcher: {e}");
+    let mut watcher = recommended_watcher(move |res: notify::Result<Event>| match res {
+        Ok(ev) => {
+            if !matches!(
+                ev.kind,
+                EventKind::Modify(_) | EventKind::Create(_) | EventKind::Remove(_)
+            ) {
                 return;
             }
-        };
-        if let Err(e) = watcher.watch(&watch_dir, RecursiveMode::Recursive) {
-            eprintln!(
-                "[crepuscularity-tui] failed to watch {}: {e}",
-                watch_dir.display()
-            );
-            return;
+            if !event_touches_relevant_path(&ev, &target, &root) {
+                return;
+            }
+            if let Ok(mut flag) = changed.lock() {
+                *flag = true;
+            }
         }
-        loop {
-            thread::sleep(Duration::from_secs(3600));
+        Err(e) => {
+            eprintln!("[crepuscularity-tui] watcher error: {e}");
         }
-    });
+    })
+    .map_err(|e| format!("could not create file watcher: {e}"))?;
+
+    watcher
+        .watch(&watch_dir, RecursiveMode::Recursive)
+        .map_err(|e| format!("failed to watch {}: {e}", watch_dir.display()))?;
+
+    Ok(Box::new(watcher))
 }
 
 /// Pure helper: does this event touch either the canonical target template,
