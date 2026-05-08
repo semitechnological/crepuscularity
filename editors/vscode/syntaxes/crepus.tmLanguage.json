@@ -58,7 +58,7 @@
           },
           "patterns": [
             {
-              "name": "entity.other.attribute-name.crepus",
+              "name": "entity.other.attribute-name.html.crepus",
               "match": "\\b([a-zA-Z@\\-][a-zA-Z0-9\\-:@]*)\\b(?=\\s*=)"
             },
             { "include": "#string" },
@@ -108,10 +108,52 @@
       "patterns": [
         { "match": "\\s+" },
         {
-          "comment": "`onclick={handler}` before bare `{expr}` so the `=` form wins.",
-          "begin": "(\\b[a-zA-Z@][a-zA-Z0-9_.-]*=)\\s*\\{",
+          "comment": "Quoted attribute assignment with double quotes, e.g. href=\"/docs\".",
+          "begin": "(\\b[a-zA-Z@][a-zA-Z0-9_.-]*)(=)(\")",
           "beginCaptures": {
-            "1": { "name": "support.type.property-name.crepus" }
+            "1": { "name": "entity.other.attribute-name.html.crepus" },
+            "2": { "name": "punctuation.separator.key-value.html.crepus" },
+            "3": { "name": "punctuation.definition.string.begin.crepus" }
+          },
+          "end": "\"",
+          "endCaptures": {
+            "0": { "name": "punctuation.definition.string.end.crepus" }
+          },
+          "contentName": "string.quoted.double.attribute-value.crepus",
+          "patterns": [
+            {
+              "name": "constant.character.escape.crepus",
+              "match": "\\\\."
+            }
+          ]
+        },
+        {
+          "comment": "Quoted attribute assignment with single quotes, e.g. href='/docs'.",
+          "begin": "(\\b[a-zA-Z@][a-zA-Z0-9_.-]*)(=)(')",
+          "beginCaptures": {
+            "1": { "name": "entity.other.attribute-name.html.crepus" },
+            "2": { "name": "punctuation.separator.key-value.html.crepus" },
+            "3": { "name": "punctuation.definition.string.begin.crepus" }
+          },
+          "end": "'",
+          "endCaptures": {
+            "0": { "name": "punctuation.definition.string.end.crepus" }
+          },
+          "contentName": "string.quoted.single.attribute-value.crepus",
+          "patterns": [
+            {
+              "name": "constant.character.escape.crepus",
+              "match": "\\\\."
+            }
+          ]
+        },
+        {
+          "comment": "`onclick={handler}` before bare `{expr}` so the `=` form wins.",
+          "begin": "(\\b[a-zA-Z@][a-zA-Z0-9_.-]*)(=)\\s*(\\{)",
+          "beginCaptures": {
+            "1": { "name": "entity.other.attribute-name.html.crepus" },
+            "2": { "name": "punctuation.separator.key-value.html.crepus" },
+            "3": { "name": "punctuation.section.embedded.begin.crepus" }
           },
           "end": "\\}",
           "endCaptures": {
@@ -127,6 +169,15 @@
           "beginCaptures": { "0": { "name": "punctuation.section.embedded.begin.crepus" } },
           "endCaptures": { "0": { "name": "punctuation.section.embedded.end.crepus" } },
           "contentName": "source.embedded.line.crepus"
+        },
+        {
+          "comment": "Unquoted attribute assignment, e.g. rel=noreferrer.",
+          "match": "(\\b[a-zA-Z@][a-zA-Z0-9_.-]*)(=)([^\\s]+)",
+          "captures": {
+            "1": { "name": "entity.other.attribute-name.html.crepus" },
+            "2": { "name": "punctuation.separator.key-value.html.crepus" },
+            "3": { "name": "string.unquoted.attribute-value.crepus" }
+          }
         },
         {
           "name": "entity.other.attribute-name.id.crepus",
@@ -173,6 +224,18 @@
     },
     "expr": {
       "patterns": [
+        {
+          "name": "punctuation.section.embedded.crepus",
+          "match": "\\(\\.\\.\\.\\)"
+        },
+        {
+          "name": "punctuation.section.embedded.begin.crepus",
+          "match": "\\("
+        },
+        {
+          "name": "punctuation.section.embedded.end.crepus",
+          "match": "\\)"
+        },
         {
           "name": "meta.embedded.expr.crepus",
           "begin": "\\{",
