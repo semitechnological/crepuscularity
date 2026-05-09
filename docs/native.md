@@ -25,10 +25,35 @@ The `crepuscularity-native` crate converts templates to a structured JSON format
 
 ## Quick Start
 
-### iOS (SwiftUI)
+### Cross-platform scaffold (iOS + Android in one command)
 
 ```bash
-# Scaffold a new iOS app
+# Scaffold an iOS SwiftPM package + Android Gradle module sharing a fixture.json
+crepus native new my-mobile-app
+cd my-mobile-app
+
+# iOS — open in Xcode or build from the CLI
+swift build --package-path ios
+# or:    crepus native build ios --dir .
+
+# Android — generate the Gradle wrapper (one-time), then build
+cd android && gradle wrapper --gradle-version 8.10
+./gradlew :app:assembleDebug
+# or, from the project root:
+#    crepus native build android --dir <root>
+```
+
+`crepus native run android --dir <root>` runs `gradle :app:installDebug` on a
+connected device/emulator and prints the `adb shell am start` line you need to
+launch the app.
+
+### iOS-only scaffold with XcodeGen + a real `.xcodeproj`
+
+If you want a generated Xcode project (rather than a SwiftPM package), use the
+iOS-specific scaffolder:
+
+```bash
+brew install xcodegen
 crepus ios new my-ios-app
 cd my-ios-app
 crepus ios generate
@@ -37,7 +62,8 @@ open *.xcodeproj
 
 ### Android (Jetpack Compose)
 
-Use the example in `examples/native-shells/android/` as a starting point.
+`crepus native new` lays out a minimal Compose app under `<dir>/android/`.
+For a deeper reference, see `examples/native-shells/android/`.
 
 ## Template to IR Conversion
 
@@ -127,7 +153,8 @@ crepus ios build    # Builds for simulator
 
 ### Jetpack Compose Setup
 
-Use the example in `examples/native-shells/android/`:
+`crepus native new <name>` lays out a Compose app under `<name>/android/` —
+the same source as `examples/native-shells/android/`:
 
 ```kotlin
 // MainActivity.kt
@@ -238,11 +265,16 @@ While the core layout is shared, each platform can customize:
 
 ## Examples
 
-See `examples/native-shells/` for complete working examples:
+See `examples/native-shells/` for complete working examples (the same source
+that `crepus native new` scaffolds):
 
 - **iOS**: SwiftUI app with Swift Package integration
 - **Android**: Jetpack Compose app with Gradle setup
 - **Shared fixture**: Common View IR for testing
+
+`crepus native new <name>` writes that tree (minus the binary Gradle wrapper
+jar — generate it with `gradle wrapper --gradle-version 8.10` or open the
+project in Android Studio).
 
 ## Extending the IR
 
