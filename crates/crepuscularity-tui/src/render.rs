@@ -499,7 +499,13 @@ fn build_slot(
     }
 }
 
-/// `<slot-rotate>` — TUI cannot do CSS animations, so we show the first phrase.
+/// `<slot-rotate>` — TUI does not have CSS animations, but the renderer is
+/// invoked on every poll-and-draw cycle (typically every ~100 ms via
+/// [`crate::HotTemplate::poll_and_draw_full`]), so we cycle the displayed
+/// phrase from wall-clock time. The visible phrase index is
+/// `floor(now_ms / interval_ms) % phrases.len()`, so all `slot-rotate`
+/// elements with the same interval stay in phase across re-renders and
+/// across hot-reloads.
 fn build_slot_rotate(
     el: &Element,
     ctx: &TemplateContext,
@@ -507,11 +513,8 @@ fn build_slot_rotate(
     inherited: Style,
 ) -> WidgetChild {
     let phrases = slot_rotate_child_phrases(&el.children).unwrap_or_default();
-    let first = phrases
-        .into_iter()
-        .next()
-        .map(Line::raw)
-        .unwrap_or_default();
+    let interval_ms = slot_rotate_interval_ms(el, ctx);
+    let line = current_slot_rotate_line(&phrases, interval_ms, current_unix_ms());
 
     let classes = active_classes(el, ctx);
     let hints = parse_classes(&classes);
@@ -520,13 +523,49 @@ fn build_slot_rotate(
 
     WidgetChild {
         node: WidgetNode::Content {
-            lines: vec![first],
+            lines: vec![line],
             style,
             block: hints_to_block(&hints),
             alignment: hints.alignment,
         },
         constraint,
     }
+}
+
+/// Pull the `interval={ms}` binding off `el`, evaluate it against `ctx`, and
+/// fall back to 3200 ms (the same default used by the web/SSR backends) on
+/// any failure to match the cross-target visual behaviour of `slot-rotate`.
+fn slot_rotate_interval_ms(el: &Element, ctx: &TemplateContext) -> u64 {
+    const DEFAULT_INTERVAL_MS: u64 = 3200;
+    for b in &el.bindings {
+        if b.prop == "interval" {
+            let v = value_to_str(&eval_expr(&b.value, ctx));
+            let trimmed = v.trim_matches('"').trim();
+            return trimmed.parse().unwrap_or(DEFAULT_INTERVAL_MS);
+        }
+    }
+    DEFAULT_INTERVAL_MS
+}
+
+/// Compute the `Line` for the current phrase given the rotation parameters.
+///
+/// Pulled out so the time-based selection is unit-testable (the production
+/// caller passes `current_unix_ms()`; tests pass deterministic values).
+fn current_slot_rotate_line(phrases: &[String], interval_ms: u64, now_ms: u64) -> Line<'static> {
+    if phrases.is_empty() {
+        return Line::raw("");
+    }
+    let interval = interval_ms.max(1);
+    let idx = ((now_ms / interval) as usize) % phrases.len();
+    Line::raw(phrases[idx].clone())
+}
+
+fn current_unix_ms() -> u64 {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
 }
 
 fn build_if(
@@ -872,4 +911,79 @@ fn error_children(msg: &str) -> Vec<WidgetChild> {
         },
         constraint: Constraint::Length(1),
     }]
+}
+
+#[cfg(test)]
+mod slot_rotate_tests {
+    use super::*;
+
+    fn lines(strs: &[&str]) -> Vec<String> {
+        strs.iter().map(|s| (*s).to_string()).collect()
+    }
+
+    fn rendered(line: Line<'static>) -> String {
+        line.spans
+            .iter()
+            .map(|span| span.content.as_ref())
+            .collect::<String>()
+    }
+
+    #[test]
+    fn current_slot_rotate_line_cycles_with_time() {
+        let phrases = lines(&["one", "two", "three"]);
+        let interval = 1000u64;
+
+        // t=0   → idx 0
+        // t=999 → idx 0 (still in the first window)
+        // t=1000→ idx 1
+        // t=2999→ idx 2
+        // t=3000→ wraps back to idx 0
+        assert_eq!(
+            rendered(current_slot_rotate_line(&phrases, interval, 0)),
+            "one"
+        );
+        assert_eq!(
+            rendered(current_slot_rotate_line(&phrases, interval, 999)),
+            "one"
+        );
+        assert_eq!(
+            rendered(current_slot_rotate_line(&phrases, interval, 1000)),
+            "two"
+        );
+        assert_eq!(
+            rendered(current_slot_rotate_line(&phrases, interval, 2999)),
+            "three"
+        );
+        assert_eq!(
+            rendered(current_slot_rotate_line(&phrases, interval, 3000)),
+            "one"
+        );
+    }
+
+    #[test]
+    fn current_slot_rotate_line_handles_empty() {
+        let line = current_slot_rotate_line(&[], 1000, 12345);
+        assert_eq!(rendered(line), "");
+    }
+
+    #[test]
+    fn current_slot_rotate_line_handles_zero_interval() {
+        // Guard against the obvious division-by-zero footgun.
+        let phrases = lines(&["a", "b"]);
+        let line = current_slot_rotate_line(&phrases, 0, 4242);
+        // Falls back to a 1ms interval, so idx = 4242 % 2 = 0 → "a".
+        assert_eq!(rendered(line), "a");
+    }
+
+    #[test]
+    fn current_slot_rotate_line_handles_single_phrase() {
+        let phrases = lines(&["solo"]);
+        // Any time should still produce "solo" — modulo 1 is 0.
+        for t in [0u64, 1, 1000, 1_000_000_000] {
+            assert_eq!(
+                rendered(current_slot_rotate_line(&phrases, 1000, t)),
+                "solo"
+            );
+        }
+    }
 }

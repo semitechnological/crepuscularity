@@ -117,9 +117,11 @@
 //! This crate is a rendering backend kernel. It supports core template
 //! evaluation (`if`/`else`, `for`, `match`, `include`, `slot`, `$: let`,
 //! `$: default`), maps static layout/styling into Ratatui widgets, and offers
-//! file-watch hot reload via [`HotTemplate`]. It does not yet provide a
-//! terminal app runtime, event dispatch, or animated widgets; `slot-rotate`
-//! renders its first phrase.
+//! file-watch hot reload via [`HotTemplate`]. `slot-rotate` cycles phrases on
+//! a wall-clock timer (matching the web/SSR `interval={ms}` semantics) so a
+//! poll-and-draw loop that ticks every ~100 ms — see
+//! [`HotTemplate::poll_and_draw_full`] — animates phrases automatically. It
+//! does not yet provide a terminal app runtime or generic event dispatch.
 
 pub mod hot_reload;
 pub mod render;
