@@ -1,7 +1,19 @@
 //! `crepus native` — Native mobile applications for iOS and Android.
 //!
 //! Scaffold and build native iOS (SwiftUI) and Android (Jetpack Compose) apps
-//! that use View IR to render .crepus templates.
+//! that use **View IR** (`crepuscularity-native::render_template_to_ir`) to
+//! render `.crepus` templates.
+//!
+//! The scaffold is the same source tree as `examples/native-shells/` — a
+//! SwiftPM package under `<dir>/ios/` and a Gradle module under
+//! `<dir>/android/`, sharing a common `fixture.json`. We *don't* embed the
+//! Gradle wrapper jar; users run `gradle wrapper --gradle-version 8.10`
+//! (or just open the project in Android Studio, which regenerates it
+//! automatically) before the first `./gradlew` invocation.
+
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::process::Command;
 
 use console::style;
 
@@ -17,56 +29,304 @@ pub fn run(args: &[String]) {
         }
         Some("build") => match args.get(1).map(|s| s.as_str()) {
             Some("ios") => {
-                let scheme = args
-                    .iter()
-                    .find(|a| a.starts_with("--scheme="))
-                    .map(|s| s.strip_prefix("--scheme=").unwrap())
-                    .unwrap_or("NativeShell");
-                build_ios_app(scheme);
+                let dir = parse_dir_arg(&args[2..]);
+                build_ios(&dir);
             }
             Some("android") => {
-                let flavor = args
-                    .iter()
-                    .find(|a| a.starts_with("--flavor="))
-                    .map(|s| s.strip_prefix("--flavor=").unwrap())
-                    .unwrap_or("debug");
-                build_android_app(flavor);
+                let dir = parse_dir_arg(&args[2..]);
+                let flavor = parse_flavor(&args[2..]).unwrap_or_else(|| "Debug".to_string());
+                build_android(&dir, &flavor);
             }
-            _ => ui::error("Usage: crepus native build ios|android [options]"),
+            _ => ui::error("Usage: crepus native build ios|android [--dir <path>]"),
         },
         Some("run") => match args.get(1).map(|s| s.as_str()) {
-            Some("ios") => run_ios_app(),
-            Some("android") => run_android_app(),
-            _ => ui::error("Usage: crepus native run ios|android"),
+            Some("ios") => {
+                let dir = parse_dir_arg(&args[2..]);
+                run_ios_help(&dir);
+            }
+            Some("android") => {
+                let dir = parse_dir_arg(&args[2..]);
+                let flavor = parse_flavor(&args[2..]).unwrap_or_else(|| "Debug".to_string());
+                run_android(&dir, &flavor);
+            }
+            _ => ui::error("Usage: crepus native run ios|android [--dir <path>]"),
         },
         _ => print_native_usage(),
     }
 }
 
-fn scaffold_native_app(_name: &str) {
-    ui::error("Native app scaffolding not implemented yet - coming soon!");
+/// Each entry is `(relative path within the scaffold root, file content)`.
+///
+/// Embedding via `include_str!` keeps the templates next to the published
+/// crate source without an explicit `[package].include` list — `cargo
+/// publish` walks the source tree by default and picks them up.
+const TEMPLATE_FILES: &[(&str, &str)] = &[
+    ("README.md", include_str!("../templates/native/README.md")),
+    ("fixture.json", include_str!("../templates/native/fixture.json")),
+    ("ios/Package.swift", include_str!("../templates/native/ios/Package.swift")),
+    (
+        "ios/Sources/NativeShell/ViewIrModels.swift",
+        include_str!("../templates/native/ios/Sources/NativeShell/ViewIrModels.swift"),
+    ),
+    (
+        "ios/Sources/NativeShell/ViewIrTreeView.swift",
+        include_str!("../templates/native/ios/Sources/NativeShell/ViewIrTreeView.swift"),
+    ),
+    (
+        "ios/Sources/NativeShell/fixture.json",
+        include_str!("../templates/native/ios/Sources/NativeShell/fixture.json"),
+    ),
+    (
+        "android/build.gradle.kts",
+        include_str!("../templates/native/android/build.gradle.kts"),
+    ),
+    (
+        "android/settings.gradle.kts",
+        include_str!("../templates/native/android/settings.gradle.kts"),
+    ),
+    (
+        "android/gradle.properties",
+        include_str!("../templates/native/android/gradle.properties"),
+    ),
+    (
+        "android/gradle/wrapper/gradle-wrapper.properties",
+        include_str!("../templates/native/android/gradle/wrapper/gradle-wrapper.properties"),
+    ),
+    (
+        "android/app/build.gradle.kts",
+        include_str!("../templates/native/android/app/build.gradle.kts"),
+    ),
+    (
+        "android/app/src/main/AndroidManifest.xml",
+        include_str!("../templates/native/android/app/src/main/AndroidManifest.xml"),
+    ),
+    (
+        "android/app/src/main/assets/fixture.json",
+        include_str!("../templates/native/android/app/src/main/assets/fixture.json"),
+    ),
+    (
+        "android/app/src/main/java/dev/crepuscularity/nativeshell/MainActivity.kt",
+        include_str!(
+            "../templates/native/android/app/src/main/java/dev/crepuscularity/nativeshell/MainActivity.kt"
+        ),
+    ),
+    (
+        "android/app/src/main/java/dev/crepuscularity/nativeshell/ViewIr.kt",
+        include_str!(
+            "../templates/native/android/app/src/main/java/dev/crepuscularity/nativeshell/ViewIr.kt"
+        ),
+    ),
+    (
+        "android/app/src/main/java/dev/crepuscularity/nativeshell/ViewIrTree.kt",
+        include_str!(
+            "../templates/native/android/app/src/main/java/dev/crepuscularity/nativeshell/ViewIrTree.kt"
+        ),
+    ),
+    (
+        "android/app/src/main/res/values/themes.xml",
+        include_str!("../templates/native/android/app/src/main/res/values/themes.xml"),
+    ),
+];
+
+fn scaffold_native_app(name: &str) {
+    let root = PathBuf::from(name);
+    if root.exists() {
+        ui::error(&format!(
+            "destination '{}' already exists; pick a fresh name or remove it first",
+            root.display()
+        ));
+    }
+
+    for (rel, content) in TEMPLATE_FILES {
+        let target = root.join(rel);
+        if let Some(parent) = target.parent() {
+            fs::create_dir_all(parent).unwrap_or_else(|e| {
+                ui::error(&format!("failed to create '{}': {e}", parent.display()));
+            });
+        }
+        fs::write(&target, content).unwrap_or_else(|e| {
+            ui::error(&format!("failed to write '{}': {e}", target.display()));
+        });
+    }
+
+    let gitignore = "# Build outputs and IDE caches kept out of source control.\n\
+                     ios/.build/\n\
+                     android/.gradle/\n\
+                     android/build/\n\
+                     android/app/build/\n\
+                     android/local.properties\n\
+                     .idea/\n\
+                     *.iml\n";
+    fs::write(root.join(".gitignore"), gitignore).unwrap_or_else(|e| {
+        ui::error(&format!("failed to write .gitignore: {e}"));
+    });
+
+    ui::success(&format!(
+        "scaffolded native app '{}' at '{}'",
+        name,
+        root.display()
+    ));
+    eprintln!();
+    eprintln!("{}", style("Next steps").dim());
+    eprintln!(
+        "  iOS:     cd {dir}/ios && swift build              # or open Package.swift in Xcode",
+        dir = name
+    );
+    eprintln!(
+        "  Android: cd {dir}/android && gradle wrapper --gradle-version 8.10 && \\\n           ./gradlew :app:assembleDebug",
+        dir = name
+    );
+    eprintln!(
+        "  Build via crepus: crepus native build ios --dir {dir}",
+        dir = name
+    );
+    eprintln!(
+        "                    crepus native build android --dir {dir}",
+        dir = name
+    );
 }
 
-fn build_ios_app(_scheme: &str) {
-    ui::error("iOS build not implemented yet - use Xcode directly");
+fn parse_dir_arg(args: &[String]) -> PathBuf {
+    for window in args.windows(2) {
+        if window[0] == "--dir" {
+            return PathBuf::from(&window[1]);
+        }
+    }
+    for arg in args {
+        if let Some(rest) = arg.strip_prefix("--dir=") {
+            return PathBuf::from(rest);
+        }
+    }
+    PathBuf::from(".")
 }
 
-fn build_android_app(_flavor: &str) {
-    ui::error("Android build not implemented yet - use Gradle directly");
+fn parse_flavor(args: &[String]) -> Option<String> {
+    for window in args.windows(2) {
+        if window[0] == "--flavor" {
+            return Some(window[1].clone());
+        }
+    }
+    for arg in args {
+        if let Some(rest) = arg.strip_prefix("--flavor=") {
+            return Some(rest.to_string());
+        }
+    }
+    None
 }
 
-fn run_ios_app() {
-    ui::error("iOS run not implemented yet - use Xcode to run the app");
+fn build_ios(dir: &Path) {
+    let ios_dir = dir.join("ios");
+    if !ios_dir.join("Package.swift").exists() {
+        ui::error(&format!(
+            "no Package.swift at '{}'. Pass --dir <path-to-scaffold-root> if the project lives elsewhere.",
+            ios_dir.display()
+        ));
+    }
+    let mut cmd = Command::new("swift");
+    cmd.arg("build").current_dir(&ios_dir);
+    delegate(cmd, "swift build");
 }
 
-fn run_android_app() {
-    ui::error("Android run not implemented yet - use Android Studio or adb");
+fn build_android(dir: &Path, flavor: &str) {
+    let android_dir = dir.join("android");
+    let gradlew = android_dir.join("gradlew");
+    if !android_dir.join("settings.gradle.kts").exists() {
+        ui::error(&format!(
+            "no settings.gradle.kts at '{}'. Pass --dir <path-to-scaffold-root> if the project lives elsewhere.",
+            android_dir.display()
+        ));
+    }
+
+    let task = format!(":app:assemble{}", capitalize_ascii(flavor));
+    let mut cmd = if gradlew.exists() {
+        let mut c = Command::new(&gradlew);
+        c.current_dir(&android_dir);
+        c.arg(&task);
+        c
+    } else {
+        // Fall back to system `gradle`. Print a hint either way so users know
+        // why we're not invoking ./gradlew.
+        eprintln!(
+            "{} no ./gradlew at {}; using system `gradle` (run `gradle wrapper --gradle-version 8.10` to generate the wrapper)",
+            style("note:").yellow(),
+            gradlew.display()
+        );
+        let mut c = Command::new("gradle");
+        c.current_dir(&android_dir);
+        c.arg(&task);
+        c
+    };
+    cmd.arg("--quiet"); // don't drown the user in gradle log spam
+    delegate(cmd, "gradle build");
+}
+
+fn run_ios_help(dir: &Path) {
+    eprintln!(
+        "{}",
+        style("crepus native run ios — open in Xcode").cyan().bold()
+    );
+    eprintln!();
+    eprintln!("  open {dir}/ios/Package.swift", dir = dir.display());
+    eprintln!();
+    eprintln!(
+        "{} SwiftPM does not run apps directly; opening Package.swift in Xcode lets you pick a simulator and Run.",
+        style("note:").yellow()
+    );
+    eprintln!(
+        "{} for a fresh iOS app target with a generated `.xcodeproj`, see `crepus ios new`.",
+        style("hint:").dim()
+    );
+}
+
+fn run_android(dir: &Path, flavor: &str) {
+    let android_dir = dir.join("android");
+    let gradlew = android_dir.join("gradlew");
+    let task = format!(":app:install{}", capitalize_ascii(flavor));
+
+    let mut cmd = if gradlew.exists() {
+        let mut c = Command::new(&gradlew);
+        c.current_dir(&android_dir);
+        c.arg(&task);
+        c
+    } else {
+        let mut c = Command::new("gradle");
+        c.current_dir(&android_dir);
+        c.arg(&task);
+        c
+    };
+    cmd.arg("--quiet");
+    delegate(cmd, "gradle install");
+
+    eprintln!(
+        "\n{} APK installed; launch with:\n  adb shell am start -n dev.crepuscularity.nativeshell/.MainActivity",
+        style("note:").dim()
+    );
+}
+
+fn delegate(mut cmd: Command, label: &str) {
+    match cmd.status() {
+        Ok(status) if status.success() => {}
+        Ok(status) => std::process::exit(status.code().unwrap_or(1)),
+        Err(e) => ui::error(&format!(
+            "failed to invoke `{label}`: {e}. Is the toolchain installed and on PATH?"
+        )),
+    }
+}
+
+fn capitalize_ascii(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    let mut chars = s.chars();
+    if let Some(c) = chars.next() {
+        out.extend(c.to_uppercase());
+    }
+    out.extend(chars);
+    out
 }
 
 fn print_native_usage() {
     eprintln!(
         "{}",
-        style("crepus native - Native mobile applications")
+        style("crepus native — Native mobile applications (iOS + Android)")
             .cyan()
             .bold()
     );
@@ -74,32 +334,91 @@ fn print_native_usage() {
     eprintln!("{}", style("COMMANDS").dim());
     eprintln!(
         "  {}  {}",
-        style("new <name>              ").green(),
-        style("scaffold cross-platform native app").dim()
+        style("new <name>                  ").green(),
+        style("scaffold an iOS (SwiftPM) + Android (Gradle) project").dim()
     );
     eprintln!(
         "  {}  {}",
-        style("build ios [--scheme S]   ").green(),
-        style("build iOS app with Xcode").dim()
+        style("build ios [--dir <path>]    ").green(),
+        style("swift build inside <dir>/ios").dim()
     );
     eprintln!(
         "  {}  {}",
-        style("build android [--flavor F]").green(),
-        style("build Android app with Gradle").dim()
+        style("build android [--dir P] [--flavor F]").green(),
+        style("./gradlew :app:assemble<Flavor> inside <dir>/android").dim()
     );
     eprintln!(
         "  {}  {}",
-        style("run ios                  ").green(),
-        style("run iOS app (use Xcode)").dim()
+        style("run ios [--dir <path>]      ").green(),
+        style("print Xcode-open instructions for the SwiftPM package").dim()
     );
     eprintln!(
         "  {}  {}",
-        style("run android              ").green(),
-        style("install and run Android app").dim()
+        style("run android [--dir P]       ").green(),
+        style("./gradlew :app:install<Flavor> + adb launch hint").dim()
     );
     eprintln!();
     eprintln!("{}", style("EXAMPLES").dim());
     eprintln!("  crepus native new my-mobile-app");
-    eprintln!("  crepus native build ios");
-    eprintln!("  crepus native build android");
+    eprintln!("  crepus native build ios --dir my-mobile-app");
+    eprintln!("  crepus native build android --dir my-mobile-app --flavor Debug");
+    eprintln!("  crepus native run android --dir my-mobile-app");
+    eprintln!();
+    eprintln!(
+        "{} Android needs the Gradle wrapper. After scaffolding, run \
+         `cd <name>/android && gradle wrapper --gradle-version 8.10` once \
+         (or open the project in Android Studio, which regenerates it).",
+        style("note:").dim()
+    );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn capitalize_ascii_basic() {
+        assert_eq!(capitalize_ascii("debug"), "Debug");
+        assert_eq!(capitalize_ascii("Release"), "Release");
+        assert_eq!(capitalize_ascii(""), "");
+        assert_eq!(capitalize_ascii("a"), "A");
+    }
+
+    #[test]
+    fn parse_dir_arg_handles_both_styles() {
+        let v = vec!["--dir".to_string(), "/tmp/x".to_string()];
+        assert_eq!(parse_dir_arg(&v), PathBuf::from("/tmp/x"));
+        let v = vec!["--dir=/tmp/y".to_string()];
+        assert_eq!(parse_dir_arg(&v), PathBuf::from("/tmp/y"));
+        let v: Vec<String> = vec![];
+        assert_eq!(parse_dir_arg(&v), PathBuf::from("."));
+    }
+
+    #[test]
+    fn parse_flavor_handles_both_styles() {
+        let v = vec!["--flavor".to_string(), "Release".to_string()];
+        assert_eq!(parse_flavor(&v), Some("Release".to_string()));
+        let v = vec!["--flavor=Debug".to_string()];
+        assert_eq!(parse_flavor(&v), Some("Debug".to_string()));
+        let v: Vec<String> = vec![];
+        assert_eq!(parse_flavor(&v), None);
+    }
+
+    #[test]
+    fn template_files_present() {
+        // Smoke-test: every embedded file is non-empty so we know `include_str!`
+        // is wired correctly to existing template files.
+        for (rel, content) in TEMPLATE_FILES {
+            assert!(!content.is_empty(), "empty template content at {rel}");
+        }
+    }
+
+    #[test]
+    fn template_files_have_unique_paths() {
+        use std::collections::BTreeSet;
+        let mut seen = BTreeSet::new();
+        for (rel, _) in TEMPLATE_FILES {
+            assert!(seen.insert(*rel), "duplicate template entry: {rel}");
+        }
+    }
 }
