@@ -12,6 +12,8 @@ examples/**/Cargo.lock
 docs-site/**/target/
 docs-site/**/Cargo.lock
 editors/vscode/node_modules/
+# Packaged VSIX artifacts (built locally with `vsce package` or CI).
+editors/vscode/*.vsix
 editors/zed/target/
 # Built by Zed / cargo for wasm32-wasip2 — rebuild locally or in CI
 editors/zed/extension.wasm
