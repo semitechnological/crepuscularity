@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use crepuscularity_lsp::crepus_diagnostics_to_lsp;
+use crepuscularity_lsp::{completion_items, crepus_diagnostics_to_lsp, hover_for};
 use tokio::sync::RwLock;
 use tower_lsp::jsonrpc::Result;
 use tower_lsp::lsp_types::*;
@@ -29,6 +29,17 @@ impl LanguageServer for Backend {
                         ..Default::default()
                     },
                 )),
+                completion_provider: Some(CompletionOptions {
+                    // `<`, ` `, and `{` cover the three contexts our completion
+                    // logic recognizes (JSX tag, class slot, expression slot).
+                    trigger_characters: Some(vec![
+                        "<".to_string(),
+                        " ".to_string(),
+                        "{".to_string(),
+                    ]),
+                    ..Default::default()
+                }),
+                hover_provider: Some(HoverProviderCapability::Simple(true)),
                 ..Default::default()
             },
         })
@@ -56,6 +67,33 @@ impl LanguageServer for Backend {
     async fn did_close(&self, params: DidCloseTextDocumentParams) {
         let mut g = self.docs.write().await;
         g.remove(&params.text_document.uri);
+    }
+
+    async fn completion(&self, params: CompletionParams) -> Result<Option<CompletionResponse>> {
+        let uri = params.text_document_position.text_document.uri;
+        let position = params.text_document_position.position;
+        let docs = self.docs.read().await;
+        let Some(text) = docs.get(&uri).cloned() else {
+            return Ok(None);
+        };
+        drop(docs);
+        let items = completion_items(&text, position);
+        if items.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(CompletionResponse::Array(items)))
+        }
+    }
+
+    async fn hover(&self, params: HoverParams) -> Result<Option<Hover>> {
+        let uri = params.text_document_position_params.text_document.uri;
+        let position = params.text_document_position_params.position;
+        let docs = self.docs.read().await;
+        let Some(text) = docs.get(&uri).cloned() else {
+            return Ok(None);
+        };
+        drop(docs);
+        Ok(hover_for(&text, position))
     }
 }
 
