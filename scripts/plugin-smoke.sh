@@ -19,11 +19,11 @@ export CREPUS_ABI_LIB="$ABI_LIB"
 
 python3 -m unittest discover plugins/python
 go test ./plugins/go/...
-bun test plugins/typescript-bun
+bun --cwd plugins test
 v -gc none test plugins/v
-zig build test --build-file plugins/zig/build.zig
+zig build test --build-file plugins/build.zig
 cargo test --manifest-path plugins/rust/Cargo.toml
-swiftc plugins/swift/CrepuscularityPlugin.swift -o /tmp/crepus-swift-smoke
+swift build --package-path plugins
 gcc plugins/c/crepuscularity_plugin.c -o /tmp/crepus-c-smoke
 /tmp/crepus-c-smoke plugins/fixtures/hello.crepus
 gcc plugins/c/abi_smoke.c "$ABI_LIB" -o /tmp/crepus-c-abi-smoke
@@ -35,4 +35,4 @@ php -r 'require "plugins/php/CrepuscularityPlugin.php"; if (CrepuscularityPlugin
 php -r 'require "plugins/php/CrepuscularityAbi.php"; $s = new CrepuscularityAbiSession(); $s->setTemplate("input bind=count\nspan\n  \"Count {count}\""); $s->setContext(["count" => "1"]); $r = $s->dispatchEvent(["handler" => "bind:count:2"]); if (strpos(json_encode($r), "Count 2") === false) exit(1);'
 javac -d /tmp/crepus-java plugins/java/CrepuscularityPlugin.java
 kotlinc plugins/kotlin/CrepuscularityPlugin.kt -d /tmp/crepus-kotlin
-dotnet build plugins/csharp --nologo --verbosity:minimal
+dotnet build plugins/CrepuscularityPlugins.slnx --nologo --verbosity:minimal

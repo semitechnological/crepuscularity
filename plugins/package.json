@@ -1,0 +1,11 @@
+{
+  "name": "@crepuscularity/plugins",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "typescript-bun"
+  ],
+  "scripts": {
+    "test": "bun test typescript-bun"
+  }
+}

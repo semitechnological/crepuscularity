@@ -1,6 +1,19 @@
 # Crepuscularity Reference Plugins
 
-These plugins demonstrate the polyglot contract: spawn `crepus native ir`, read View IR JSON from stdout, decode it into host-language types, and create UI from that tree. The portable reference UI output is HTML; platform-specific packages can map the same node model to native controls. For in-process sessions and event dispatch, wrap `crates/crepuscularity-abi/include/crepuscularity_abi.h`. None of these references depend on Equilibrium.
+These plugins demonstrate the polyglot contract: spawn `crepus native ir`, read View IR JSON from stdout, decode it into host-language types, and create UI from that tree. The portable reference UI output is HTML; platform-specific packages can map the same node model to native controls. For in-process sessions and event dispatch, wrap `crates/crepuscularity-abi/include/crepuscularity_abi.h`. Native workspace files live next to the reference packages so a host project can drop in the matching package and use Crepus without adopting Rust.
+
+Workspace entrypoints:
+
+```bash
+go test ./plugins/go/...
+bun --cwd plugins test
+zig build test --build-file plugins/build.zig
+swift build --package-path plugins
+dotnet build plugins/CrepuscularityPlugins.slnx --nologo --verbosity:minimal
+cargo test --manifest-path plugins/rust/Cargo.toml
+```
+
+`plugins/crepuscularity-plugins.toml` lists every reference package, workspace file, and smoke command.
 
 Build the CLI first:
 
@@ -27,12 +40,12 @@ Smoke commands for installed local toolchains:
 ```bash
 python3 -m unittest discover plugins/python
 go test ./plugins/go/...
-bun test plugins/typescript-bun
+bun --cwd plugins test
 v -gc none test plugins/v
-zig build test --build-file plugins/zig/build.zig
+zig build test --build-file plugins/build.zig
 cargo test --manifest-path plugins/rust/Cargo.toml
 cargo test -p crepuscularity-abi
-swiftc plugins/swift/CrepuscularityPlugin.swift -o /tmp/crepus-swift-smoke
+swift build --package-path plugins
 gcc plugins/c/crepuscularity_plugin.c -o /tmp/crepus-c-smoke && /tmp/crepus-c-smoke plugins/fixtures/hello.crepus
 g++ plugins/cpp/crepuscularity_plugin.cpp -std=c++17 -o /tmp/crepus-cpp-smoke && /tmp/crepus-cpp-smoke plugins/fixtures/hello.crepus
 ruby -Iplugins/ruby -e 'require "crepuscularity_plugin"; p CrepuscularityPlugin.render_ir("plugins/fixtures/hello.crepus").version'
@@ -42,7 +55,7 @@ ruby -Iplugins/ruby -e 'require "crepuscularity_plugin"; raise unless Crepuscula
 Optional when the toolchains are installed:
 
 ```bash
-dotnet build plugins/csharp
+dotnet build plugins/CrepuscularityPlugins.slnx --nologo --verbosity:minimal
 javac -d /tmp/crepus-java plugins/java/CrepuscularityPlugin.java
 kotlinc plugins/kotlin/CrepuscularityPlugin.kt -d /tmp/crepus-kotlin
 php -r 'require "plugins/php/CrepuscularityPlugin.php"; var_dump(CrepuscularityPlugin::renderIr("plugins/fixtures/hello.crepus")["version"]);'
