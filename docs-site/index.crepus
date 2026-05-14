@@ -53,9 +53,9 @@ div min-h-screen overflow-x-hidden antialiased crepus-twilight-page
 								span text-xs crepus-t-muted leading-snug
 									"Mobile"
 						p text-sm crepus-t-muted leading-relaxed m-0 text-center sm:text-left
-							"Crepuscularity Lite is a sibling project: a GPUI + V8 desktop shell with a Capacitor-shaped Rust bridge for embedding web UI in native apps — pair it with this CLI when you want a lighter native host than a full GPUI template tree."
-						a href="https://github.com/semitechnological/crepuscularity-lite" no-underline text-sm font-medium crepus-t-text hover:opacity-85 border-b crepus-t-border transition-colors inline-block self-center sm:self-start rel="noopener noreferrer" target="_blank"
-							"Crepuscularity Lite on GitHub →"
+							"Crepuscularity Lite now lives in this workspace under crates/crepuscularity-lite: a GPUI + V8 desktop shell with a Capacitor-shaped Rust bridge for embedding guest UI in native apps — pair it with this CLI when you want a lighter native host than a full GPUI template tree."
+						a href="./docs/lite.html" no-underline text-sm font-medium crepus-t-text hover:opacity-85 border-b crepus-t-border transition-colors inline-block self-center sm:self-start
+							"Crepuscularity Lite guide →"
 				div w-full min-w-0 mx-auto lg:mx-0 lg:place-self-center order-last lg:order-none min-h-[400px]
 					div rounded-xl border overflow-hidden shadow-xl crepus-t-border crepus-t-card
 						div flex items-center gap-2 px-3 sm:px-4 py-2.5 sm:py-3 border-b crepus-t-border bg-[var(--cp-code)]
@@ -207,7 +207,7 @@ $ crepus webext new ext"
 					"Docs"
 				a href="https://crates.io/crates/crepuscularity" no-underline crepus-t-muted hover:text-[var(--cp-fg)] transition-colors rel="noopener noreferrer" target="_blank"
 					"Crates"
-				a href="https://github.com/semitechnological/crepuscularity-lite" no-underline crepus-t-muted hover:text-[var(--cp-fg)] transition-colors rel="noopener noreferrer" target="_blank"
+				a href="./docs/lite.html" no-underline crepus-t-muted hover:text-[var(--cp-fg)] transition-colors
 					"Lite"
 				a href="https://github.com/semitechnological/crepuscularity" no-underline crepus-t-muted hover:text-[var(--cp-fg)] transition-colors rel="noopener noreferrer" target="_blank"
 					"GitHub"

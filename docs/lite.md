@@ -4,11 +4,13 @@
 
 `crepuscularity-lite` is the desktop shell layer for apps that want GPUI windows, Rust-native capabilities, and an embedded JavaScript/TypeScript guest runtime without building a full web stack. It embeds V8 through the official Rust `v8` crate and exposes a Capacitor-shaped bridge so guest code can call registered Rust plugins.
 
+Lite now lives in this repository at `crates/crepuscularity-lite`, with its plugin macros in `crates/crepuscularity-lite-macros`. Use the in-tree crate while developing the full Crepuscularity workspace, and use the published crate for downstream apps.
+
 ## Install
 
 ```toml
 [dependencies]
-crepuscularity-lite = "0.3.3"
+crepuscularity-lite = "0.4.0"
 ```
 
 The crate builds V8 and GPUI. On macOS, use the Metal helper when Cargo cannot find Xcode's downloaded Metal toolchain:

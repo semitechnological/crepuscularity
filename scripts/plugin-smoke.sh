@@ -35,4 +35,4 @@ php -r 'require "plugins/php/CrepuscularityPlugin.php"; if (CrepuscularityPlugin
 php -r 'require "plugins/php/CrepuscularityAbi.php"; $s = new CrepuscularityAbiSession(); $s->setTemplate("input bind=count\nspan\n  \"Count {count}\""); $s->setContext(["count" => "1"]); $r = $s->dispatchEvent(["handler" => "bind:count:2"]); if (strpos(json_encode($r), "Count 2") === false) exit(1);'
 javac -d /tmp/crepus-java plugins/java/CrepuscularityPlugin.java
 kotlinc plugins/kotlin/CrepuscularityPlugin.kt -d /tmp/crepus-kotlin
-dotnet build plugins/CrepuscularityPlugins.slnx --nologo --verbosity:minimal
+dotnet build plugins/CrepuscularityPlugins.sln --nologo --verbosity:minimal

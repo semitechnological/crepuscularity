@@ -9,7 +9,7 @@ go test ./plugins/go/...
 bun --cwd plugins test
 zig build test --build-file plugins/build.zig
 swift build --package-path plugins
-dotnet build plugins/CrepuscularityPlugins.slnx --nologo --verbosity:minimal
+dotnet build plugins/CrepuscularityPlugins.sln --nologo --verbosity:minimal
 cargo test --manifest-path plugins/rust/Cargo.toml
 ```
 
@@ -55,7 +55,7 @@ ruby -Iplugins/ruby -e 'require "crepuscularity_plugin"; raise unless Crepuscula
 Optional when the toolchains are installed:
 
 ```bash
-dotnet build plugins/CrepuscularityPlugins.slnx --nologo --verbosity:minimal
+dotnet build plugins/CrepuscularityPlugins.sln --nologo --verbosity:minimal
 javac -d /tmp/crepus-java plugins/java/CrepuscularityPlugin.java
 kotlinc plugins/kotlin/CrepuscularityPlugin.kt -d /tmp/crepus-kotlin
 php -r 'require "plugins/php/CrepuscularityPlugin.php"; var_dump(CrepuscularityPlugin::renderIr("plugins/fixtures/hello.crepus")["version"]);'
