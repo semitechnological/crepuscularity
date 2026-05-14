@@ -22,3 +22,5 @@ editors/zed/grammars/
 plugins/**/__pycache__/
 plugins/**/.zig-cache/
 plugins/**/target/
+plugins/**/bin/
+plugins/**/obj/
