@@ -222,11 +222,8 @@ fn run_all_suites() -> Value {
     {
         const ROUNDS: usize = 50_000;
         let t0 = Instant::now();
-        let mut next_id: u64 = 1;
         let mut entities: HashMap<u64, Box<[u8; 64]>> = HashMap::with_capacity(512);
-        for _ in 0..ROUNDS {
-            let id = next_id;
-            next_id += 1;
+        for id in 1..=ROUNDS as u64 {
             let mut data = Box::new([0u8; 64]);
             for (j, b) in data.iter_mut().enumerate() {
                 *b = (id as u8).wrapping_add(j as u8);
