@@ -1,24 +1,29 @@
-use std::collections::BTreeMap;
-use std::process::Command;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::ffi::c_void;
 
 use crepuscularity_gpui::prelude::*;
 use gpui::{bounds, point, size, Application, ClickEvent, WindowOptions};
 
-#[cfg(has_zig_scrobbler)]
-extern "C" {
-    fn crepus_current_track(source: i32, out: *mut u8, out_len: usize) -> i32;
-}
+type CurrentTrackCallback = unsafe extern "C" fn(*mut c_void, i32, *mut u8, usize) -> i32;
+type TrackActionCallback = unsafe extern "C" fn(
+    *mut c_void,
+    i32,
+    *const u8,
+    usize,
+    *const u8,
+    usize,
+    *const u8,
+    usize,
+    *mut u8,
+    usize,
+) -> i32;
 
-#[cfg(not(has_zig_scrobbler))]
-unsafe fn crepus_current_track(_: i32, out: *mut u8, out_len: usize) -> i32 {
-    let msg = b"zig unavailable\0";
-    if out_len == 0 {
-        return -1;
-    }
-    let n = msg.len().min(out_len);
-    std::ptr::copy_nonoverlapping(msg.as_ptr(), out, n);
-    (n.saturating_sub(1)) as i32
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct CrepusScrobblerCallbacks {
+    pub user_data: *mut c_void,
+    pub current_track: Option<CurrentTrackCallback>,
+    pub now_playing: Option<TrackActionCallback>,
+    pub scrobble: Option<TrackActionCallback>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -53,6 +58,7 @@ struct Track {
 }
 
 struct ScrobblerApp {
+    callbacks: CrepusScrobblerCallbacks,
     source: Source,
     track: Option<Track>,
     status: String,
@@ -60,13 +66,14 @@ struct ScrobblerApp {
 }
 
 impl ScrobblerApp {
-    fn new(_cx: &mut Context<Self>) -> Self {
+    fn new(callbacks: CrepusScrobblerCallbacks, _cx: &mut Context<Self>) -> Self {
         Self {
+            callbacks,
             source: Source::Spotify,
             track: None,
             status: "Ready".to_string(),
             last_response:
-                "Set LASTFM_API_KEY, LASTFM_API_SECRET, and LASTFM_SESSION_KEY to scrobble."
+                "Zig owns Spotify, Apple Music, and Last.fm. Rust only hosts Crepus GPUI."
                     .to_string(),
         }
     }
@@ -91,16 +98,8 @@ impl ScrobblerApp {
     fn now_playing(&mut self, _: &ClickEvent, _: &mut Window, cx: &mut Context<Self>) {
         self.refresh_current();
         if let Some(track) = self.track.clone() {
-            match lastfm_call("track.updateNowPlaying", &track, None) {
-                Ok(body) => {
-                    self.status = "Now playing sent".to_string();
-                    self.last_response = body;
-                }
-                Err(err) => {
-                    self.status = "Now playing failed".to_string();
-                    self.last_response = err;
-                }
-            }
+            self.last_response = self.send_track(self.callbacks.now_playing, &track);
+            self.status = "Now playing requested".to_string();
         }
         cx.notify();
     }
@@ -108,26 +107,14 @@ impl ScrobblerApp {
     fn scrobble(&mut self, _: &ClickEvent, _: &mut Window, cx: &mut Context<Self>) {
         self.refresh_current();
         if let Some(track) = self.track.clone() {
-            let timestamp = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .map(|duration| duration.as_secs().to_string())
-                .unwrap_or_else(|_| "0".to_string());
-            match lastfm_call("track.scrobble", &track, Some(timestamp)) {
-                Ok(body) => {
-                    self.status = "Scrobble sent".to_string();
-                    self.last_response = body;
-                }
-                Err(err) => {
-                    self.status = "Scrobble failed".to_string();
-                    self.last_response = err;
-                }
-            }
+            self.last_response = self.send_track(self.callbacks.scrobble, &track);
+            self.status = "Scrobble requested".to_string();
         }
         cx.notify();
     }
 
     fn refresh_current(&mut self) {
-        match current_track(self.source) {
+        match self.current_track() {
             Ok(track) => {
                 self.status = format!("Loaded {}", track.source.label());
                 self.last_response = format!("{} - {}", track.artist, track.title);
@@ -139,6 +126,72 @@ impl ScrobblerApp {
                 self.track = None;
             }
         }
+    }
+
+    fn current_track(&self) -> Result<Track, String> {
+        let Some(callback) = self.callbacks.current_track else {
+            return Err("Zig current_track callback missing".to_string());
+        };
+        let mut buf = [0u8; 2048];
+        let n = unsafe {
+            callback(
+                self.callbacks.user_data,
+                self.source.id(),
+                buf.as_mut_ptr(),
+                buf.len(),
+            )
+        };
+        if n <= 0 {
+            return Err("Zig media bridge returned no track".to_string());
+        }
+        let raw = String::from_utf8_lossy(&buf[..n as usize])
+            .trim()
+            .to_string();
+        if raw == "stopped" || raw == "unavailable" {
+            return Err(raw);
+        }
+        let mut parts = raw.split('\t');
+        let artist = parts.next().unwrap_or_default().trim().to_string();
+        let title = parts.next().unwrap_or_default().trim().to_string();
+        let album = parts.next().unwrap_or_default().trim().to_string();
+        let state = parts.next().unwrap_or_default().trim().to_string();
+        if artist.is_empty() || title.is_empty() {
+            return Err(raw);
+        }
+        Ok(Track {
+            source: self.source,
+            artist,
+            title,
+            album,
+            state,
+        })
+    }
+
+    fn send_track(&self, callback: Option<TrackActionCallback>, track: &Track) -> String {
+        let Some(callback) = callback else {
+            return "Zig Last.fm callback missing".to_string();
+        };
+        let mut out = [0u8; 4096];
+        let n = unsafe {
+            callback(
+                self.callbacks.user_data,
+                track.source.id(),
+                track.artist.as_ptr(),
+                track.artist.len(),
+                track.title.as_ptr(),
+                track.title.len(),
+                track.album.as_ptr(),
+                track.album.len(),
+                out.as_mut_ptr(),
+                out.len(),
+            )
+        };
+        if n <= 0 {
+            return "Zig Last.fm callback returned no response".to_string();
+        }
+        String::from_utf8_lossy(&out[..n as usize])
+            .trim()
+            .to_string()
     }
 }
 
@@ -160,7 +213,7 @@ impl Render for ScrobblerApp {
             .track
             .as_ref()
             .map(|track| track.album.clone())
-            .unwrap_or_else(|| "Local macOS player bridge is provided by Zig.".to_string());
+            .unwrap_or_else(|| "Zig app logic calls Rust Crepus GPUI library.".to_string());
         let player_state = self
             .track
             .as_ref()
@@ -175,7 +228,7 @@ impl Render for ScrobblerApp {
                 div w-[720px] flex flex-col gap-6
                     div flex flex-col gap-2
                         div text-4xl font-bold
-                            "Local Scrobbler"
+                            "Zig Local Scrobbler"
                         div text-base text-zinc-400
                             "{source} / {status}"
 
@@ -215,97 +268,9 @@ impl Render for ScrobblerApp {
     }
 }
 
-fn current_track(source: Source) -> Result<Track, String> {
-    let mut buf = [0u8; 2048];
-    let n = unsafe { crepus_current_track(source.id(), buf.as_mut_ptr(), buf.len()) };
-    if n <= 0 {
-        return Err("Zig media bridge returned no track.".to_string());
-    }
-    let raw = String::from_utf8_lossy(&buf[..n as usize])
-        .trim()
-        .to_string();
-    if raw == "stopped" || raw == "unavailable" || raw == "zig unavailable" {
-        return Err(raw);
-    }
-    let mut parts = raw.split('\t');
-    let artist = parts.next().unwrap_or_default().trim().to_string();
-    let title = parts.next().unwrap_or_default().trim().to_string();
-    let album = parts.next().unwrap_or_default().trim().to_string();
-    let state = parts.next().unwrap_or_default().trim().to_string();
-    if artist.is_empty() || title.is_empty() {
-        return Err(raw);
-    }
-    Ok(Track {
-        source,
-        artist,
-        title,
-        album,
-        state,
-    })
-}
-
-fn lastfm_call(method: &str, track: &Track, timestamp: Option<String>) -> Result<String, String> {
-    let api_key = std::env::var("LASTFM_API_KEY").map_err(|_| "LASTFM_API_KEY is missing")?;
-    let api_secret =
-        std::env::var("LASTFM_API_SECRET").map_err(|_| "LASTFM_API_SECRET is missing")?;
-    let session_key =
-        std::env::var("LASTFM_SESSION_KEY").map_err(|_| "LASTFM_SESSION_KEY is missing")?;
-
-    let mut params = BTreeMap::new();
-    params.insert("album".to_string(), track.album.clone());
-    params.insert("api_key".to_string(), api_key);
-    params.insert("artist".to_string(), track.artist.clone());
-    params.insert("method".to_string(), method.to_string());
-    params.insert("sk".to_string(), session_key);
-    params.insert("track".to_string(), track.title.clone());
-    if let Some(timestamp) = timestamp {
-        params.insert("timestamp".to_string(), timestamp);
-    }
-
-    let signature = api_signature(&params, &api_secret);
-    let mut command = Command::new("curl");
-    command.args(["-fsS", "-X", "POST", "https://ws.audioscrobbler.com/2.0/"]);
-    for (key, value) in &params {
-        command
-            .arg("--data-urlencode")
-            .arg(format!("{key}={value}"));
-    }
-    command
-        .arg("--data-urlencode")
-        .arg(format!("api_sig={signature}"))
-        .arg("--data-urlencode")
-        .arg("format=json");
-
-    let output = command
-        .output()
-        .map_err(|err| format!("curl failed: {err}"))?;
-    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-    if output.status.success() {
-        Ok(if stdout.is_empty() {
-            "Last.fm accepted the request.".to_string()
-        } else {
-            stdout
-        })
-    } else if stderr.is_empty() {
-        Err(format!("Last.fm request failed with {}", output.status))
-    } else {
-        Err(stderr)
-    }
-}
-
-fn api_signature(params: &BTreeMap<String, String>, secret: &str) -> String {
-    let mut raw = String::new();
-    for (key, value) in params {
-        raw.push_str(key);
-        raw.push_str(value);
-    }
-    raw.push_str(secret);
-    format!("{:x}", md5::compute(raw))
-}
-
-fn main() {
-    Application::new().run(|cx: &mut App| {
+#[no_mangle]
+pub extern "C" fn crepus_local_scrobbler_run(callbacks: CrepusScrobblerCallbacks) -> i32 {
+    Application::new().run(move |cx: &mut App| {
         let options = WindowOptions {
             window_bounds: Some(gpui::WindowBounds::Windowed(bounds(
                 point(gpui::px(80.), gpui::px(80.)),
@@ -320,13 +285,16 @@ fn main() {
             is_minimizable: true,
             display_id: None,
             window_background: gpui::WindowBackgroundAppearance::Opaque,
-            app_id: Some("crepuscularity.local-scrobbler".to_string()),
+            app_id: Some("crepuscularity.local-scrobbler.zig".to_string()),
             window_min_size: Some(size(gpui::px(720.), gpui::px(540.))),
             window_decorations: None,
             tabbing_identifier: None,
         };
 
-        cx.open_window(options, |_window, cx| cx.new(ScrobblerApp::new))
-            .unwrap();
+        cx.open_window(options, |_window, cx| {
+            cx.new(|cx| ScrobblerApp::new(callbacks, cx))
+        })
+        .unwrap();
     });
+    0
 }
