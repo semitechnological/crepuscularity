@@ -163,30 +163,22 @@ pub(crate) fn track_read(source_id: NodeId) {
 
         // Add source_id to observer's sources list
         match nodes.get_mut(&observer_id) {
-            Some(AnyNode::Memo(m)) => {
-                if !m.sources.contains(&source_id) {
-                    m.sources.push(source_id);
-                }
+            Some(AnyNode::Memo(m)) if !m.sources.contains(&source_id) => {
+                m.sources.push(source_id);
             }
-            Some(AnyNode::Effect(e)) => {
-                if !e.sources.contains(&source_id) {
-                    e.sources.push(source_id);
-                }
+            Some(AnyNode::Effect(e)) if !e.sources.contains(&source_id) => {
+                e.sources.push(source_id);
             }
             _ => {}
         }
 
         // Add observer_id to source's subscribers list
         match nodes.get_mut(&source_id) {
-            Some(AnyNode::Signal(s)) => {
-                if !s.subscribers.contains(&observer_id) {
-                    s.subscribers.push(observer_id);
-                }
+            Some(AnyNode::Signal(s)) if !s.subscribers.contains(&observer_id) => {
+                s.subscribers.push(observer_id);
             }
-            Some(AnyNode::Memo(m)) => {
-                if !m.subscribers.contains(&observer_id) {
-                    m.subscribers.push(observer_id);
-                }
+            Some(AnyNode::Memo(m)) if !m.subscribers.contains(&observer_id) => {
+                m.subscribers.push(observer_id);
             }
             _ => {}
         }

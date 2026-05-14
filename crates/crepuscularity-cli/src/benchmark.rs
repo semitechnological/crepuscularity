@@ -167,7 +167,7 @@ fn compute_run_summary(suites: &[JsonSuite]) -> JsonRunSummary {
             });
         }
     }
-    rows.sort_by(|a, b| b.wall_ms.cmp(&a.wall_ms));
+    rows.sort_by_key(|b| std::cmp::Reverse(b.wall_ms));
     let total_wall_ms_completed: u128 = rows.iter().map(|r| r.wall_ms).sum();
     let completed_target_count = rows.len();
     for r in &mut rows {
