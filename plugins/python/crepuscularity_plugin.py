@@ -5,7 +5,7 @@ import os
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 from html import escape
 
 
@@ -13,6 +13,39 @@ from html import escape
 class ViewIr:
     version: int
     root: list[dict[str, Any]]
+
+
+EventPayload = dict[str, Any]
+EventHandler = Callable[[EventPayload, "ViewSession"], None]
+
+
+class ViewSession:
+    def __init__(self, path: str | Path, context: dict[str, Any] | None = None) -> None:
+        self.path = Path(path)
+        self.context = dict(context or {})
+        self._handlers: dict[str, EventHandler] = {}
+
+    def on(self, handler: str, callback: EventHandler) -> "ViewSession":
+        self._handlers[handler] = callback
+        return self
+
+    def render_ir(self) -> ViewIr:
+        return render_ir(self.path, self.context)
+
+    def render_html(self) -> str:
+        return "".join(_render_node(node) for node in self.render_ir().root)
+
+    def dispatch(self, event: str | EventPayload) -> ViewIr:
+        payload = {"handler": event} if isinstance(event, str) else event
+        handler = str(payload.get("handler", ""))
+        if handler.startswith("bind:"):
+            parts = handler.removeprefix("bind:").split(":", 1)
+            if len(parts) == 2:
+                self.context[parts[0]] = parts[1]
+        callback = self._handlers.get(handler)
+        if callback is not None:
+            callback(payload, self)
+        return self.render_ir()
 
 
 def _crepus_bin() -> str:
