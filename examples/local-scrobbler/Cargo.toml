@@ -6,11 +6,11 @@ publish = false
 
 [workspace]
 
-[build-dependencies]
-cc = "1"
-equilibrium-ffi = { path = "../../../equilibrium" }
+[lib]
+name = "local_scrobbler"
+path = "src/lib.rs"
+crate-type = ["cdylib", "staticlib"]
 
 [dependencies]
 crepuscularity-gpui = { path = "../../crates/crepuscularity-gpui" }
 gpui = { version = "=0.2.2", default-features = false, features = ["font-kit"] }
-md5 = "0.7"
