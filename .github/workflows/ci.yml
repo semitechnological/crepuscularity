@@ -86,6 +86,108 @@ jobs:
     - name: Build CLI
       run: cargo build --package crepuscularity-cli
 
+  plugin-smoke:
+    name: Plugin Smoke
+    runs-on: macos-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Cache cargo registry
+      uses: actions/cache@v4
+      with:
+        path: ~/.cargo/registry
+        key: ${{ runner.os }}-plugin-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Cache cargo index
+      uses: actions/cache@v4
+      with:
+        path: ~/.cargo/git
+        key: ${{ runner.os }}-plugin-cargo-git-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Cache cargo build
+      uses: actions/cache@v4
+      with:
+        path: target
+        key: ${{ runner.os }}-plugin-cargo-build-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Set SDKROOT
+      run: echo "SDKROOT=$(xcrun --show-sdk-path)" >> $GITHUB_ENV
+
+    - name: Install Bun
+      uses: oven-sh/setup-bun@v2
+      with:
+        bun-version: latest
+
+    - name: Install Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.24.x'
+
+    - name: Install Ruby
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: '3.3'
+
+    - name: Install PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: '8.3'
+        coverage: none
+
+    - name: Install Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: '21'
+
+    - name: Install dotnet
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+
+    - name: Install Zig
+      uses: mlugg/setup-zig@v2
+      with:
+        version: '0.14.1'
+
+    - name: Install V
+      run: |
+        git clone --depth 1 https://github.com/vlang/v.git /tmp/v
+        make -C /tmp/v
+        echo "/tmp/v" >> "$GITHUB_PATH"
+
+    - name: Install Kotlin
+      run: |
+        KOTLIN_VERSION=2.1.21
+        curl -fsSL -o /tmp/kotlin-compiler.zip "https://github.com/JetBrains/kotlin/releases/download/v${KOTLIN_VERSION}/kotlin-compiler-${KOTLIN_VERSION}.zip"
+        unzip -q /tmp/kotlin-compiler.zip -d /tmp/kotlin
+        echo "/tmp/kotlin/kotlinc/bin" >> "$GITHUB_PATH"
+
+    - name: Print plugin toolchain versions
+      run: |
+        rustc --version
+        cargo --version
+        python3 --version
+        go version
+        bun --version
+        v version
+        zig version
+        swiftc --version
+        gcc --version | head -n 1
+        g++ --version | head -n 1
+        ruby --version
+        php --version | head -n 1
+        javac -version
+        kotlinc -version
+        dotnet --version
+
+    - name: Run plugin smoke
+      run: bash scripts/plugin-smoke.sh
+
   docs:
     name: Documentation
     runs-on: ubuntu-latest
