@@ -19,3 +19,5 @@ editors/zed/target/
 editors/zed/extension.wasm
 # Zed dev extension: grammar checkouts live here (nested .git); do not commit
 editors/zed/grammars/
+plugins/**/__pycache__/
+plugins/**/.zig-cache/

@@ -211,6 +211,18 @@ crepus ios build
 
 To refresh bundled fixtures after template changes, regenerate IR with **`crepuscularity-native`** (`render_template_to_ir` / `to_json_pretty`) and replace `NativeShell/Sources/NativeShell/fixture.json`. See [`examples/native-shells/README.md`](../examples/native-shells/README.md).
 
+## View IR JSON (`crepus native ir`)
+
+Emit the same **View IR** JSON contract used by native shells and polyglot plugins:
+
+```bash
+crepus native ir views/main.crepus --ctx context.json --pretty
+crepus native ir views/ui.crepus --component Card --var title=Hello
+cat views/main.crepus | crepus native ir --stdin --base-dir views
+```
+
+For tool integrations, `crepus native ir --stdin-json` accepts an envelope with `entry`, `files`, `template`, `context`, and `pretty`. Successful output is JSON on stdout only; failures are JSON on stderr. See [Polyglot plugins](polyglot.md).
+
 ## Browser Extension Commands
 
 ### `crepus webext new <name>`

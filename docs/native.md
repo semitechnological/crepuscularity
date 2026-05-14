@@ -1,6 +1,6 @@
 # Native Shells
 
-**Also:** [Documentation home](README.md) · [DSL](dsl.md) · [Components](components.md) · [CLI](cli.md)
+**Also:** [Documentation home](README.md) · [DSL](dsl.md) · [Components](components.md) · [CLI](cli.md) · [Polyglot plugins](polyglot.md)
 
 Crepuscularity can target native mobile platforms through **View IR** (Intermediate Representation), enabling code sharing between iOS (SwiftUI) and Android (Jetpack Compose) applications.
 
@@ -22,6 +22,8 @@ Instead of compiling directly to native UI frameworks, Crepuscularity generates 
 ```
 
 The `crepuscularity-native` crate converts templates to a structured JSON format that native applications can consume.
+
+For non-Rust hosts, the stable boundary is the same View IR JSON emitted by `crepus native ir`. See [Polyglot plugins](polyglot.md).
 
 ## Quick Start
 
@@ -69,6 +71,10 @@ For a deeper reference, see `examples/native-shells/android/`.
 
 Convert `.crepus` templates to View IR JSON:
 
+```bash
+crepus native ir views/main.crepus --ctx context.json --pretty
+```
+
 ```rust
 use crepuscularity_core::TemplateContext;
 use crepuscularity_native::{render_template_to_ir, to_json_pretty};
@@ -91,7 +97,7 @@ This produces JSON that native shells can parse:
 
 ```json
 {
-  "version": 1,
+  "version": 2,
   "root": [
     {
       "kind": "stack",

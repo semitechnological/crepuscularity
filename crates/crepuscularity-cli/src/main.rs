@@ -20,6 +20,7 @@
 //!   crepus tui run                               run TUI app
 //!   crepus tui preview FILE                      hot-reload preview a .crepus template in the terminal
 //!   crepus native new NAME                       scaffold cross-platform native app
+//!   crepus native ir FILE                        emit View IR JSON
 //!   crepus native build ios [--scheme S]         build iOS app
 //!   crepus native build android [--flavor F]     build Android app
 //!   crepus native run ios                        run iOS app (Xcode)
@@ -281,6 +282,11 @@ fn print_usage() {
         "  {}  {}",
         style("native new <name>                       ").green(),
         style("scaffold native iOS/Android app").dim()
+    );
+    eprintln!(
+        "  {}  {}",
+        style("native ir <file.crepus>                  ").green(),
+        style("emit View IR JSON").dim()
     );
     eprintln!(
         "  {}  {}",
