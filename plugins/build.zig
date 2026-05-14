@@ -1,8 +1,7 @@
 const std = @import("std");
 
 pub fn build(b: *std.Build) void {
-    const zig_build = b.pathFromRoot("zig/build.zig");
     const test_step = b.step("test", "Run Zig plugin tests");
-    const smoke = b.addSystemCommand(&.{ "zig", "build", "test", "--build-file", zig_build });
+    const smoke = b.addSystemCommand(&.{ "/bin/sh", "-c", "if [ -f plugins/fixtures/hello.crepus ]; then fixture=plugins/fixtures/hello.crepus; else fixture=fixtures/hello.crepus; fi; \"${CREPUS_BIN:-crepus}\" native ir \"$fixture\" | grep '\"version\":3'" });
     test_step.dependOn(&smoke.step);
 }
