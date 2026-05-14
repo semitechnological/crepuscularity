@@ -481,7 +481,8 @@ mod tests {
 
     #[test]
     fn include_path_rejects_absolute_path() {
-        let err = resolve_include_path(None, "/tmp/secret.crepus").unwrap_err();
+        let path = std::env::temp_dir().join("secret.crepus");
+        let err = resolve_include_path(None, path.to_str().unwrap()).unwrap_err();
         assert!(err.contains("include path outside base dir"));
     }
 }
