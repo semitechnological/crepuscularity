@@ -15,6 +15,19 @@ type ViewIr struct {
 	Root    []map[string]any `json:"root"`
 }
 
+type Event struct {
+	Handler string         `json:"handler"`
+	Payload map[string]any `json:"payload,omitempty"`
+}
+
+type EventHandler func(Event, *ViewSession) error
+
+type ViewSession struct {
+	Path    string
+	Context map[string]any
+	events  map[string]EventHandler
+}
+
 func crepusBin() string {
 	if bin := os.Getenv("CREPUS_BIN"); bin != "" {
 		return bin
@@ -61,6 +74,41 @@ func RenderHTML(path string, context map[string]any) (string, error) {
 		out.WriteString(renderNode(node))
 	}
 	return out.String(), nil
+}
+
+func NewViewSession(path string, context map[string]any) *ViewSession {
+	if context == nil {
+		context = map[string]any{}
+	}
+	return &ViewSession{Path: path, Context: context, events: map[string]EventHandler{}}
+}
+
+func (session *ViewSession) On(handler string, callback EventHandler) *ViewSession {
+	session.events[handler] = callback
+	return session
+}
+
+func (session *ViewSession) RenderIR() (ViewIr, error) {
+	return RenderIR(session.Path, session.Context)
+}
+
+func (session *ViewSession) RenderHTML() (string, error) {
+	return RenderHTML(session.Path, session.Context)
+}
+
+func (session *ViewSession) Dispatch(event Event) (ViewIr, error) {
+	if strings.HasPrefix(event.Handler, "bind:") {
+		parts := strings.SplitN(strings.TrimPrefix(event.Handler, "bind:"), ":", 2)
+		if len(parts) == 2 {
+			session.Context[parts[0]] = parts[1]
+		}
+	}
+	if callback := session.events[event.Handler]; callback != nil {
+		if err := callback(event, session); err != nil {
+			return ViewIr{}, err
+		}
+	}
+	return session.RenderIR()
 }
 
 func renderNode(node map[string]any) string {

@@ -26,6 +26,51 @@ export async function renderHtml(path: string, context: Record<string, unknown> 
   return ir.root.map(renderNode).join("")
 }
 
+export type EventPayload = {
+  handler: string
+  payload?: unknown
+}
+
+export type EventHandler = (event: EventPayload, session: CrepusViewSession) => void | Promise<void>
+
+export class CrepusViewSession {
+  readonly path: string
+  context: Record<string, unknown>
+  private handlers = new Map<string, EventHandler>()
+
+  constructor(path: string, context: Record<string, unknown> = {}) {
+    this.path = path
+    this.context = { ...context }
+  }
+
+  on(handler: string, callback: EventHandler): this {
+    this.handlers.set(handler, callback)
+    return this
+  }
+
+  async renderIr(): Promise<ViewIr> {
+    return renderIr(this.path, this.context)
+  }
+
+  async renderHtml(): Promise<string> {
+    const ir = await this.renderIr()
+    return ir.root.map(renderNode).join("")
+  }
+
+  async dispatch(event: string | EventPayload): Promise<ViewIr> {
+    const parsed = typeof event === "string" ? { handler: event } : event
+    if (parsed.handler.startsWith("bind:")) {
+      const [, key, ...rest] = parsed.handler.split(":")
+      this.context[key] = rest.join(":")
+    }
+    const callback = this.handlers.get(parsed.handler)
+    if (callback) {
+      await callback(parsed, this)
+    }
+    return this.renderIr()
+  }
+}
+
 function renderNode(node: Record<string, unknown>): string {
   switch (node.kind) {
     case "text":
