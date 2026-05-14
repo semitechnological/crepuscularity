@@ -1,0 +1,10 @@
+{
+  "name": "@crepuscularity/plugin-reference",
+  "type": "module",
+  "scripts": {
+    "test": "bun test"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  }
+}
