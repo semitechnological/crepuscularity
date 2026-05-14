@@ -40,7 +40,7 @@ crepus webext build
 # Load dist/unpacked/ in chrome://extensions
 ```
 
-## Template Syntax
+## Template Syntax (or you can write React JSX)
 
 ```text
 div w-full h-full bg-zinc-950 text-white flex flex-col p-8
