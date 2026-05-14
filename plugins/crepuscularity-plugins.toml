@@ -37,8 +37,8 @@ test = "swift build --package-path plugins"
 [[package]]
 language = "csharp"
 path = "plugins/csharp"
-workspace = "plugins/CrepuscularityPlugins.slnx"
-test = "dotnet build plugins/CrepuscularityPlugins.slnx --nologo --verbosity:minimal"
+workspace = "plugins/CrepuscularityPlugins.sln"
+test = "dotnet build plugins/CrepuscularityPlugins.sln --nologo --verbosity:minimal"
 
 [[package]]
 language = "python"
