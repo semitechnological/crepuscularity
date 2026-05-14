@@ -589,11 +589,13 @@ fn include_rejects_parent_dir_escape() {
 fn include_rejects_absolute_path() {
     let mut ctx = TemplateContext::new();
     ctx.base_dir = Some(PathBuf::from("/virtual"));
+    let path = std::env::temp_dir().join("secret.crepus");
+    let include_path = path.to_string_lossy().into_owned();
     ctx.virtual_files
-        .insert("/tmp/secret.crepus".into(), "div\n  \"secret\"".into());
+        .insert(include_path.clone(), "div\n  \"secret\"".into());
 
-    let tpl = "div\n include /tmp/secret.crepus";
-    let rows = render(40, 4, tpl, &ctx);
+    let tpl = format!("div\n include {include_path}");
+    let rows = render(40, 4, &tpl, &ctx);
     let text = all_text(&rows);
     assert!(text.contains("include path outside base dir"), "{text}");
     assert!(!text.contains("secret"), "{text}");
