@@ -4,7 +4,7 @@ fn test_render_ir() {
 	ir := render_ir('plugins/fixtures/hello.crepus', {
 		'name': 'Ada'
 	})!
-	assert ir.version == 2
+	assert ir.version == 3
 	html := render_html('plugins/fixtures/hello.crepus', {
 		'name': 'Ada'
 	})!

@@ -25,7 +25,7 @@ ViewIr render_ir(const std::string& path) {
     if (pclose(pipe) != 0) {
         throw std::runtime_error("crepus native ir failed");
     }
-    int version = json.find("\"version\":2") != std::string::npos || json.find("\"version\": 2") != std::string::npos ? 2 : -1;
+    int version = json.find("\"version\":3") != std::string::npos || json.find("\"version\": 3") != std::string::npos ? 3 : -1;
     return {version, json};
 }
 
@@ -46,5 +46,5 @@ int main(int argc, char** argv) {
     if (argc != 2) {
         return 2;
     }
-    return render_ir(argv[1]).version == 2 && render_html(argv[1]).find("data-crepus-kind=\"stack\"") != std::string::npos ? 0 : 1;
+    return render_ir(argv[1]).version == 3 && render_html(argv[1]).find("data-crepus-kind=\"stack\"") != std::string::npos ? 0 : 1;
 }

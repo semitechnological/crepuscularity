@@ -97,7 +97,7 @@ This produces JSON that native shells can parse:
 
 ```json
 {
-  "version": 2,
+  "version": 3,
   "root": [
     {
       "kind": "stack",

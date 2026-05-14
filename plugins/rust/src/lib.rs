@@ -24,7 +24,11 @@ pub enum ViewNode {
         children: Vec<ViewNode>,
     },
     #[serde(rename = "button")]
-    Button { label: String },
+    Button {
+        label: String,
+        #[serde(rename = "onClick")]
+        on_click: Option<String>,
+    },
     #[serde(other)]
     Other,
 }
@@ -59,7 +63,13 @@ fn render_node(node: &ViewNode) -> String {
                 children.iter().map(render_node).collect::<String>()
             )
         }
-        ViewNode::Button { label } => format!("<button>{}</button>", escape_html(label)),
+        ViewNode::Button { label, on_click } => {
+            let attr = on_click
+                .as_deref()
+                .map(|handler| format!(" data-onclick=\"{}\"", escape_html(handler)))
+                .unwrap_or_default();
+            format!("<button{}>{}</button>", attr, escape_html(label))
+        }
         ViewNode::Other => String::new(),
     }
 }

@@ -1,6 +1,6 @@
 # Crepuscularity Reference Plugins
 
-These plugins demonstrate the polyglot contract: spawn `crepus native ir`, read View IR JSON from stdout, decode it into host-language types, and create UI from that tree. The portable reference UI output is HTML; platform-specific packages can map the same node model to native controls. They are not FFI bindings and do not depend on Equilibrium.
+These plugins demonstrate the polyglot contract: spawn `crepus native ir`, read View IR JSON from stdout, decode it into host-language types, and create UI from that tree. The portable reference UI output is HTML; platform-specific packages can map the same node model to native controls. For in-process sessions and event dispatch, wrap `crates/crepuscularity-abi/include/crepuscularity_abi.h`. None of these references depend on Equilibrium.
 
 Build the CLI first:
 
@@ -18,6 +18,7 @@ bun test plugins/typescript-bun
 v -gc none test plugins/v
 zig build test --build-file plugins/zig/build.zig
 cargo test --manifest-path plugins/rust/Cargo.toml
+cargo test -p crepuscularity-abi
 swiftc plugins/swift/CrepuscularityPlugin.swift -o /tmp/crepus-swift-smoke
 gcc plugins/c/crepuscularity_plugin.c -o /tmp/crepus-c-smoke && /tmp/crepus-c-smoke plugins/fixtures/hello.crepus
 g++ plugins/cpp/crepuscularity_plugin.cpp -std=c++17 -o /tmp/crepus-cpp-smoke && /tmp/crepus-cpp-smoke plugins/fixtures/hello.crepus

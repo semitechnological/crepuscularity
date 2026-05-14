@@ -17,7 +17,7 @@ public final class CrepuscularityPlugin {
         if (code != 0) {
             throw new IllegalStateException("crepus native ir failed");
         }
-        int version = json.contains("\"version\":2") || json.contains("\"version\": 2") ? 2 : -1;
+        int version = json.contains("\"version\":3") || json.contains("\"version\": 3") ? 3 : -1;
         return new ViewIr(version, json);
     }
 
