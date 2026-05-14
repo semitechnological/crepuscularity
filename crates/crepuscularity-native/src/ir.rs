@@ -5,7 +5,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// Bumped when the JSON schema gains incompatible fields; shells should check `version`.
-pub const IR_VERSION: u32 = 2;
+pub const IR_VERSION: u32 = 3;
 
 /// Root document from parsing + lowering (see `crepuscularity_native::render_template_to_ir`).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -277,7 +277,11 @@ impl ViewStyle {
 /// A node in the platform-neutral tree. Serialized with `kind` for Swift/Kotlin.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(JsonSchema))]
-#[serde(tag = "kind", rename_all = "camelCase")]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
 pub enum ViewNode {
     #[serde(rename = "text")]
     Text {

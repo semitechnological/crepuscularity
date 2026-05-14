@@ -43,7 +43,7 @@ fn ios_new_scaffold_writes_project_yml_and_native_shell() {
             .join("fixture.json"),
     )
     .unwrap();
-    assert!(fixture.contains("\"version\": 2"));
+    assert!(fixture.contains("\"version\": 3"));
 
     // Exercise naming edge case: NativeShell package name collision → HostApp target
     let coll = dir.path().join("native-shell");

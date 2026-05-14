@@ -143,6 +143,7 @@ fn button_and_dynamic_color() {
     let v = serde_json::to_value(&ir).unwrap();
     assert_eq!(v["root"][0]["kind"], "button");
     assert_eq!(v["root"][0]["label"], "Tap");
+    assert_eq!(v["root"][0]["onClick"], "go");
     round_trip(&ir);
 }
 

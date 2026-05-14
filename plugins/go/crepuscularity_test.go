@@ -7,7 +7,7 @@ func TestRenderIR(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if ir.Version != 2 {
+	if ir.Version != 3 {
 		t.Fatalf("version = %d", ir.Version)
 	}
 	if len(ir.Root) != 1 {

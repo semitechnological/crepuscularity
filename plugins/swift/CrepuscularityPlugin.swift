@@ -84,6 +84,9 @@ private func renderNode(_ node: ViewIr.Node) -> String {
         return "<div data-crepus-kind=\"\(escapeHtml(kind))\" data-axis=\"\(escapeHtml(axis))\">\(children)</div>"
     case "button":
         if case let .string(label)? = node["label"] {
+            if case let .string(onClick)? = node["onClick"] {
+                return "<button data-onclick=\"\(escapeHtml(onClick))\">\(escapeHtml(label))</button>"
+            }
             return "<button>\(escapeHtml(label))</button>"
         }
         return "<button></button>"
