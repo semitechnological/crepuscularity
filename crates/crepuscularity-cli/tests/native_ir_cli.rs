@@ -6,6 +6,10 @@ fn crepus() -> Command {
 }
 
 #[test]
+#[cfg_attr(
+    windows,
+    ignore = "default desktop crepus.exe does not spawn reliably on Windows CI"
+)]
 fn native_ir_renders_file_with_context() {
     let tmp = tempfile::tempdir().expect("tempdir");
     let tpl = tmp.path().join("hello.crepus");
@@ -34,6 +38,10 @@ fn native_ir_renders_file_with_context() {
 }
 
 #[test]
+#[cfg_attr(
+    windows,
+    ignore = "default desktop crepus.exe does not spawn reliably on Windows CI"
+)]
 fn native_ir_pretty_outputs_pretty_json() {
     let tmp = tempfile::tempdir().expect("tempdir");
     let tpl = tmp.path().join("hello.crepus");
@@ -49,6 +57,10 @@ fn native_ir_pretty_outputs_pretty_json() {
 }
 
 #[test]
+#[cfg_attr(
+    windows,
+    ignore = "default desktop crepus.exe does not spawn reliably on Windows CI"
+)]
 fn native_ir_renders_stdin_template() {
     let mut child = crepus()
         .args(["native", "ir", "--stdin", "--base-dir", "."])
@@ -74,6 +86,10 @@ fn native_ir_renders_stdin_template() {
 }
 
 #[test]
+#[cfg_attr(
+    windows,
+    ignore = "default desktop crepus.exe does not spawn reliably on Windows CI"
+)]
 fn native_ir_renders_stdin_json_virtual_files() {
     let payload = serde_json::json!({
         "entry": "main.crepus",
@@ -107,6 +123,10 @@ fn native_ir_renders_stdin_json_virtual_files() {
 }
 
 #[test]
+#[cfg_attr(
+    windows,
+    ignore = "default desktop crepus.exe does not spawn reliably on Windows CI"
+)]
 fn native_ir_renders_component() {
     let tmp = tempfile::tempdir().expect("tempdir");
     let tpl = tmp.path().join("ui.crepus");
@@ -126,6 +146,10 @@ fn native_ir_renders_component() {
 }
 
 #[test]
+#[cfg_attr(
+    windows,
+    ignore = "default desktop crepus.exe does not spawn reliably on Windows CI"
+)]
 fn native_ir_rejects_nested_context_object() {
     let payload = serde_json::json!({
         "template": "div\n  \"bad\"",

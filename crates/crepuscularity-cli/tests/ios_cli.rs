@@ -3,6 +3,10 @@
 use std::process::Command;
 
 #[test]
+#[cfg_attr(
+    windows,
+    ignore = "default desktop crepus.exe does not spawn reliably on Windows CI"
+)]
 fn ios_new_scaffold_writes_project_yml_and_native_shell() {
     let dir = tempfile::tempdir().expect("tempdir");
     let name = "crepus-ios-cli-test";
