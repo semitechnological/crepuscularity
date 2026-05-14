@@ -9,6 +9,19 @@ cargo build -p crepuscularity-cli --no-default-features
 export CREPUS_BIN="$PWD/target/debug/crepus"
 ```
 
+Build the optional ABI runtime when testing in-process sessions:
+
+```bash
+cargo build -p crepuscularity-abi
+export CREPUS_ABI_LIB="$PWD/target/debug/libcrepuscularity_abi.dylib" # macOS
+```
+
+Run the full local smoke matrix:
+
+```bash
+scripts/plugin-smoke.sh
+```
+
 Smoke commands for installed local toolchains:
 
 ```bash
@@ -34,3 +47,5 @@ javac -d /tmp/crepus-java plugins/java/CrepuscularityPlugin.java
 kotlinc plugins/kotlin/CrepuscularityPlugin.kt -d /tmp/crepus-kotlin
 php -r 'require "plugins/php/CrepuscularityPlugin.php"; var_dump(CrepuscularityPlugin::renderIr("plugins/fixtures/hello.crepus")["version"]);'
 ```
+
+ABI-backed session wrappers currently exist for C, Python, PHP, and C#. The wrappers expose the shared session lifecycle, context JSON, IR rendering, and event dispatch path. Other language references remain CLI-backed until their package-specific native loading story is promoted from smoke coverage to maintained SDK surface.
