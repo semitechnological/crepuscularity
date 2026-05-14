@@ -17,7 +17,8 @@ cargo run -p crepuscularity-native --features schema --bin export-view-ir-schema
 ```
 
 - A plugin must provide host-language types generated from or compatible with the schema.
-- A plugin must provide a render or compile entrypoint that calls `crepus native ir`.
+- A plugin must provide a compile entrypoint that calls `crepus native ir`.
+- A plugin must provide a UI creation entrypoint. The in-tree references expose `renderHtml` / `render_html` as the portable baseline; platform packages can map the same typed nodes to native controls.
 - Hot reload, if supported, should transport the native hot-reload envelope from `crepuscularity-native`.
 
 ## CLI Boundary
@@ -68,9 +69,11 @@ Reference plugins live under `plugins/` and all use subprocess JSON:
 | `plugins/csharp` | C# / .NET |
 | `plugins/swift` | Swift |
 | `plugins/java` | Java |
+| `plugins/kotlin` | Kotlin |
 | `plugins/ruby` | Ruby |
 | `plugins/php` | PHP |
 | `plugins/c` | C |
 | `plugins/cpp` | C++ |
+| `plugins/rust` | Rust |
 
-These are reference implementations, not registry packages. Production plugins can live in dedicated package repositories with their own CI, versioning, and release cadence.
+Each reference plugin has two jobs: invoke the Crepus compiler and create a usable UI representation from the resulting IR. These are reference implementations, not registry packages. Production plugins can live in dedicated package repositories with their own CI, versioning, and release cadence.

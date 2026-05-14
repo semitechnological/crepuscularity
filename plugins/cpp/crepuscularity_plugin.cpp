@@ -29,9 +29,22 @@ ViewIr render_ir(const std::string& path) {
     return {version, json};
 }
 
+std::string render_html(const std::string& path) {
+    const auto ir = render_ir(path);
+    const std::string marker = "\"content\":\"";
+    const auto start = ir.json.find(marker);
+    if (start == std::string::npos) {
+        return "<div data-crepus-kind=\"stack\" data-axis=\"column\"></div>";
+    }
+    const auto content_start = start + marker.size();
+    const auto end = ir.json.find('"', content_start);
+    const auto content = ir.json.substr(content_start, end - content_start);
+    return "<div data-crepus-kind=\"stack\" data-axis=\"column\">" + content + "</div>";
+}
+
 int main(int argc, char** argv) {
     if (argc != 2) {
         return 2;
     }
-    return render_ir(argv[1]).version == 2 ? 0 : 1;
+    return render_ir(argv[1]).version == 2 && render_html(argv[1]).find("data-crepus-kind=\"stack\"") != std::string::npos ? 0 : 1;
 }

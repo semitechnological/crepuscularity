@@ -35,4 +35,22 @@ public static class Crepuscularity
         }
         return JsonSerializer.Deserialize<ViewIr>(stdout) ?? throw new InvalidOperationException("empty IR");
     }
+
+    public static async Task<string> RenderHtmlAsync(string path, object? context = null)
+    {
+        var ir = await RenderIrAsync(path, context);
+        return string.Concat(ir.Root.EnumerateArray().Select(RenderNode));
+    }
+
+    private static string RenderNode(JsonElement node)
+    {
+        var kind = node.TryGetProperty("kind", out var kindElement) ? kindElement.GetString() : "";
+        return kind switch
+        {
+            "text" => System.Net.WebUtility.HtmlEncode(node.GetProperty("content").GetString() ?? ""),
+            "stack" or "scroll" => $"<div data-crepus-kind=\"{System.Net.WebUtility.HtmlEncode(kind)}\" data-axis=\"{System.Net.WebUtility.HtmlEncode(node.GetProperty("axis").GetString() ?? "column")}\">{string.Concat(node.GetProperty("children").EnumerateArray().Select(RenderNode))}</div>",
+            "button" => $"<button>{System.Net.WebUtility.HtmlEncode(node.GetProperty("label").GetString() ?? "")}</button>",
+            _ => ""
+        };
+    }
 }

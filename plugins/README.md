@@ -1,6 +1,6 @@
 # Crepuscularity Reference Plugins
 
-These plugins demonstrate the polyglot contract: spawn `crepus native ir`, read View IR JSON from stdout, and decode it into host-language types. They are not FFI bindings and do not depend on Equilibrium.
+These plugins demonstrate the polyglot contract: spawn `crepus native ir`, read View IR JSON from stdout, decode it into host-language types, and create UI from that tree. The portable reference UI output is HTML; platform-specific packages can map the same node model to native controls. They are not FFI bindings and do not depend on Equilibrium.
 
 Build the CLI first:
 
@@ -17,10 +17,12 @@ go test ./plugins/go/...
 bun test plugins/typescript-bun
 v -gc none test plugins/v
 zig build test --build-file plugins/zig/build.zig
+cargo test --manifest-path plugins/rust/Cargo.toml
 swiftc plugins/swift/CrepuscularityPlugin.swift -o /tmp/crepus-swift-smoke
 gcc plugins/c/crepuscularity_plugin.c -o /tmp/crepus-c-smoke && /tmp/crepus-c-smoke plugins/fixtures/hello.crepus
 g++ plugins/cpp/crepuscularity_plugin.cpp -std=c++17 -o /tmp/crepus-cpp-smoke && /tmp/crepus-cpp-smoke plugins/fixtures/hello.crepus
 ruby -Iplugins/ruby -e 'require "crepuscularity_plugin"; p CrepuscularityPlugin.render_ir("plugins/fixtures/hello.crepus").version'
+ruby -Iplugins/ruby -e 'require "crepuscularity_plugin"; raise unless CrepuscularityPlugin.render_html("plugins/fixtures/hello.crepus").include?("data-crepus-kind")'
 ```
 
 Optional when the toolchains are installed:
@@ -28,5 +30,6 @@ Optional when the toolchains are installed:
 ```bash
 dotnet build plugins/csharp
 javac -d /tmp/crepus-java plugins/java/CrepuscularityPlugin.java
+kotlinc plugins/kotlin/CrepuscularityPlugin.kt -d /tmp/crepus-kotlin
 php -r 'require "plugins/php/CrepuscularityPlugin.php"; var_dump(CrepuscularityPlugin::renderIr("plugins/fixtures/hello.crepus")["version"]);'
 ```
