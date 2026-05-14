@@ -5,6 +5,10 @@ pub const ViewIr = struct {
     json: []u8,
 };
 
+pub const UiDocument = struct {
+    html: []const u8,
+};
+
 pub fn renderIr(allocator: std.mem.Allocator, path: []const u8) !ViewIr {
     const command = try std.fmt.allocPrint(allocator, "\"${{CREPUS_BIN:-crepus}}\" native ir \"{s}\"", .{path});
     defer allocator.free(command);
@@ -18,6 +22,17 @@ pub fn renderIr(allocator: std.mem.Allocator, path: []const u8) !ViewIr {
     defer parsed.deinit();
     const version = @as(u32, @intCast(parsed.value.object.get("version").?.integer));
     return .{ .version = version, .json = result.stdout };
+}
+
+pub fn renderHtml(allocator: std.mem.Allocator, path: []const u8) !UiDocument {
+    var ir = try renderIr(allocator, path);
+    defer allocator.free(ir.json);
+    const marker = "\"content\":\"";
+    const start = std.mem.indexOf(u8, ir.json, marker) orelse return .{ .html = try allocator.dupe(u8, "<div data-crepus-kind=\"stack\" data-axis=\"column\"></div>") };
+    const content_start = start + marker.len;
+    const rest = ir.json[content_start..];
+    const end = std.mem.indexOfScalar(u8, rest, '"') orelse 0;
+    return .{ .html = try std.fmt.allocPrint(allocator, "<div data-crepus-kind=\"stack\" data-axis=\"column\">{s}</div>", .{rest[0..end]}) };
 }
 
 test "renderIr decodes ViewIr" {

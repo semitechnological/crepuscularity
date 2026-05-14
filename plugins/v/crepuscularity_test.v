@@ -5,4 +5,8 @@ fn test_render_ir() {
 		'name': 'Ada'
 	})!
 	assert ir.version == 2
+	html := render_html('plugins/fixtures/hello.crepus', {
+		'name': 'Ada'
+	})!
+	assert html == '<div data-crepus-kind="stack" data-axis="column">Hello Ada</div>'
 }

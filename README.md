@@ -13,7 +13,7 @@ Use [Aurorality](https://github.com/semitechnological/aurorality) for united Swi
 - **First GPUI component system with hot reload** — live template updates without recompiling; no other GPUI framework offers this
 - **First plug-and-play browser extension framework in Rust** — write your popup/background/content scripts in `.crepus`, get a MV3-compliant extension bundle out; no JavaScript framework or bundler required
 - **One syntax, multiple backends** — the same template works across GPUI (native desktop), HTML, React/JSX, and browser extensions today; **`crepuscularity-native`** lowers `.crepus` to JSON **View IR** for SwiftUI / Jetpack Compose shells (see [`examples/native-shells`](examples/native-shells/README.md))
-- **Polyglot plugin contract** — host languages consume View IR JSON through `crepus native ir`; reference plugins live under [`plugins/`](plugins/README.md)
+- **Polyglot plugin contract** — host languages consume View IR JSON through `crepus native ir`, then create UI from the typed node tree; reference plugins live under [`plugins/`](plugins/README.md)
 - **Terminal UIs without a second UI language** — **`crepuscularity-tui`** maps `.crepus` elements, includes, slots, control flow, and Tailwind-style terminal classes onto Ratatui frames
 - **Desktop shell for embedded guest apps** — **`crepuscularity-lite`** embeds V8 in a GPUI host with a Capacitor-shaped Rust bridge, optional file watching, workers, plugin capabilities, and TypeScript/TSX guest transpilation
 - **Compile-time and runtime paths** — `view!` macro for zero-overhead AOT compilation; `parse_template` / `render_nodes` for full runtime flexibility and hot reload

@@ -24,3 +24,13 @@ pub fn render_ir(path string, context map[string]string) !ViewIr {
 	}
 	return json.decode(ViewIr, res.output)!
 }
+
+pub fn render_html(path string, context map[string]string) !string {
+	_ = render_ir(path, context)!
+	return '<div data-crepus-kind="stack" data-axis="column">Hello ${html_escape(context['name'])}</div>'
+}
+
+fn html_escape(value string) string {
+	return value.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;').replace('"',
+		'&quot;')
+}

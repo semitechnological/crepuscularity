@@ -21,3 +21,4 @@ editors/zed/extension.wasm
 editors/zed/grammars/
 plugins/**/__pycache__/
 plugins/**/.zig-cache/
+plugins/**/target/
