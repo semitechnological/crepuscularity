@@ -1,0 +1,16 @@
+[package]
+name = "local-scrobbler"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[workspace]
+
+[build-dependencies]
+cc = "1"
+equilibrium-ffi = { path = "../../../equilibrium" }
+
+[dependencies]
+crepuscularity-gpui = { path = "../../crates/crepuscularity-gpui" }
+gpui = { version = "=0.2.2", default-features = false, features = ["font-kit"] }
+md5 = "0.7"
