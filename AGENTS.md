@@ -62,6 +62,8 @@ Use **semver `0.y.z`**. Until `1.0`:
 | `crates/crepuscularity-dev` | `crepus-dev` binary — hot-reload dev server |
 | `crates/crepuscularity-cli` | `crepus` CLI for scaffolding and builds |
 | `crates/crepuscularity-native` | View IR (JSON) for SwiftUI / Jetpack Compose shells — `render_template_to_ir`, schema export |
+| `crates/crepuscularity-abi` | Optional C ABI (`cdylib`) for in-process IR compile/sessions; no Equilibrium — polyglot plugins default to `crepus native ir` |
+| `plugins/` | Reference language plugins (Python, Go, Zig, …) — subprocess JSON + optional ABI wrappers; see `docs/polyglot.md` |
 | `crates/crepuscularity-tui` | Ratatui backend for `.crepus` terminal UIs, file-backed templates, includes, slots, and `template_refs!` handles |
 | `crates/crepuscularity-lite` | GPUI desktop shell with embedded V8, TypeScript/TSX guest transpilation, native plugin bridge, workers, and host command queue |
 | `crates/crepuscularity-lite-macros` | Proc-macros for lite bridge/plugin bindings |
@@ -71,7 +73,7 @@ Use **semver `0.y.z`**. Until `1.0`:
 
 **Web / compiler / hot-reload implementation spec (single doc for agents):** [docs/CREPUS_WEB_IMPLEMENTATION_SPEC.md](docs/CREPUS_WEB_IMPLEMENTATION_SPEC.md)
 
-**Documentation hub (Markdown):** [docs/README.md](docs/README.md). It includes the public guides for DSL, components, CLI, runtime/reactivity, GPUI, TUI, Lite, native shells, browser extensions, and production readiness. **`crepus web build --site docs-site`** also emits **`dist/docs/*.html`** (styled HTML from the same Markdown) for the GitHub Pages site.
+**Documentation hub (Markdown):** [docs/README.md](docs/README.md). It includes the public guides for DSL, components, CLI, runtime/reactivity, GPUI, TUI, Lite, native shells, **polyglot plugins** ([docs/polyglot.md](docs/polyglot.md), [view-ir-contract](docs/view-ir-contract.md)), browser extensions, and production readiness. **`crepus web build --site docs-site`** also emits **`dist/docs/*.html`** (styled HTML from the same Markdown) for the GitHub Pages site.
 
 ## DSL quick reference
 
@@ -278,7 +280,16 @@ See `examples/ui.crepus` for the format and `examples/ui-demo.crepus` for usage.
 <claude-mem-context>
 # Memory Context
 
-# [crepuscularity] recent context, 2026-05-06 3:33pm GMT+10
+# claude-mem status
 
-No previous sessions found.
+This project has no memory yet. The current session will seed it; subsequent sessions will receive auto-injected context for relevant past work.
+
+Memory injection starts on your second session in a project.
+
+`/learn-codebase` is available if the user wants to front-load the entire repo into memory in a single pass (~5 minutes on a typical repo, optional). Otherwise memory builds passively as work happens.
+
+Live activity: http://localhost:37701
+How it works: `/how-it-works`
+
+This message disappears once the first observation lands.
 </claude-mem-context>
