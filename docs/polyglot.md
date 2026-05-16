@@ -1,26 +1,17 @@
 # Polyglot Plugins
 
-**Also:** [Documentation home](README.md) · [Native shells](native.md) · [CLI](cli.md)
+**Also:** [Documentation home](README.md) · [View IR contract](view-ir-contract.md) · [Plugin surface](plugin-surface.md) · [Native shells](native.md) · [CLI](cli.md)
 
-Crepuscularity's cross-language contract is **View IR JSON**. Rust remains the compiler: it parses `.crepus`, evaluates context, expands includes, and lowers to `ViewIr`. Language plugins can call the `crepus` CLI, decode JSON, and render or adapt the IR in their own ecosystem. Hosts that need in-process rendering or event dispatch can load the optional plain C ABI crate.
+Crepuscularity's cross-language contract is **View IR JSON**. Rust remains the compiler: it parses `.crepus`, evaluates context, expands includes, and lowers to `ViewIr`. Language plugins call the `crepus` CLI (default) or optionally load **`crepuscularity-abi`** for in-process sessions.
 
 Equilibrium stays separate. Plugin authors can use Equilibrium, PyO3, JNI, `cgo`, `ctypes`, or another bridge in their own package when they want native loading, but core Crepuscularity does not require those tools.
 
-## Contract
+## Contract summary
 
-- `ViewIr` JSON is the stable data boundary.
-- `version` must equal the Rust `IR_VERSION`; current version is `3`.
-- JSON Schema is available from `crepuscularity-native` with the `schema` feature:
+See **[View IR contract](view-ir-contract.md)** for the full spec (versioning, schema export, CLI stderr/stdout, hot reload). See **[Plugin surface](plugin-surface.md)** for what each language package must implement.
 
-```bash
-cargo run -p crepuscularity-native --features schema --bin export-view-ir-schema
-```
-
-- A plugin must provide host-language types generated from or compatible with the schema.
-- A plugin must provide a compile entrypoint that calls `crepus native ir` or `crepuscularity-abi`.
-- A plugin must provide a UI creation entrypoint. The in-tree references expose `renderHtml` / `render_html` as the portable baseline; platform packages can map the same typed nodes to native controls such as SwiftUI, Jetpack Compose, GPUI, Qt, GTK, WPF, WinUI, or terminal widgets.
-- Event-capable plugins should map `onClick` and binding events to host handlers and re-render or patch from the same session.
-- Hot reload, if supported, should transport the native hot-reload envelope from `crepuscularity-native`.
+- `ViewIr.version` must equal `IR_VERSION` (currently **3**).
+- Reference plugins: [`plugins/README.md`](../plugins/README.md).
 
 ## CLI Boundary
 

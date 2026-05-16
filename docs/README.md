@@ -13,7 +13,9 @@ Guides and references for the `.crepus` DSL, tooling, and browser extensions.
 | [GPUI integration](gpui.md) | Desktop apps with GPUI |
 | [Lite shell](lite.md) | GPUI + V8 desktop shell and Rust plugin bridge |
 | [Native shells](native.md) | iOS/Android apps via native UI frameworks |
-| [Polyglot plugins](polyglot.md) | View IR JSON contract and language plugin references |
+| [Polyglot plugins](polyglot.md) | Overview: View IR JSON, CLI, optional ABI |
+| [View IR contract](view-ir-contract.md) | Stable JSON boundary, schema, CLI envelopes, hot reload |
+| [Plugin surface](plugin-surface.md) | Required capabilities for language packages |
 | [Aurorality](aurorality.md) | SwiftUI engine and semantic native tag workflow |
 | [IDE extensions](ide-extensions.md) | Editor integration sketch (CLI tasks, `aurorality dev`, diagnostics) |
 | [TUI mode](tui.md) | Terminal user interfaces |
