@@ -485,6 +485,13 @@ fn start_watcher(
                             }
                         }
                         drop(map);
+                        let map = vfm.read().unwrap().clone();
+                        let dev_root = site_dir.join(crate::web::WEB_DEV_ARTIFACT_DIR);
+                        if let Err(e) =
+                            crate::web_islands::build_web_islands(&site_dir, &dev_root, &map)
+                        {
+                            eprintln!("  {} island build failed: {e}", console::style("✗").red());
+                        }
                     }
 
                     let mut runtime_rebuilt = false;
@@ -690,6 +697,10 @@ fn handle_connection(
             serve_crepus_bundle(&mut stream, &vfm, entry);
         }
 
+        ("GET", "/crepus-islands.json") => {
+            serve_dev_fs_file(&mut stream, &dev_root.join("crepus-islands.json"));
+        }
+
         ("GET", "/app.js") => {
             serve_dev_fs_file(&mut stream, &dev_root.join("app.js"));
         }
@@ -700,6 +711,10 @@ fn handle_connection(
 
         ("GET", p) if p.starts_with("/pkg/") => {
             serve_pkg_path(&mut stream, p, dev_root);
+        }
+
+        ("GET", p) if p.starts_with("/islands/") => {
+            serve_dev_fs_file(&mut stream, &dev_root.join(p.trim_start_matches('/')));
         }
 
         ("GET", p) if p.starts_with("/docs") => {

@@ -314,7 +314,7 @@ pub fn expand_class_aliases_in_nodes(nodes: &mut [Node], aliases: &HashMap<Strin
             Node::Include(inc) => {
                 expand_class_aliases_in_nodes(&mut inc.slot, aliases);
             }
-            Node::LetDecl(_) | Node::Text(_) | Node::RawText(_) => {}
+            Node::LetDecl(_) | Node::Text(_) | Node::RawText(_) | Node::Embed(_) => {}
         }
     }
 }
