@@ -209,7 +209,7 @@ $ crepus webext new ext"
 					"Crates"
 				a href="./docs/lite.html" no-underline crepus-t-muted hover:text-[var(--cp-fg)] transition-colors
 					"Lite"
-				a href="https://github.com/semitechnological/crepuscularity" no-underline crepus-t-muted hover:text-[var(--cp-fg)] transition-colors rel="noopener noreferrer" target="_blank"
+				a href="https://github.com/tschk/crepuscularity" no-underline crepus-t-muted hover:text-[var(--cp-fg)] transition-colors rel="noopener noreferrer" target="_blank"
 					"GitHub"
 
 @keyframes sunset {
