@@ -14,6 +14,7 @@ const delegatedEvents = [
 
 let currentBundle = null;
 let currentRoot = null;
+let currentIslandManifest = { islands: {} };
 
 function setRootHtml(root, html) {
   const doc = new DOMParser().parseFromString(html, "text/html");
@@ -88,6 +89,66 @@ function initSlotRotate(root) {
 
 function initInteractive(root) {
   initSlotRotate(root);
+  initWebIslands(root);
+}
+
+function parseIslandProps(el) {
+  const raw = el.getAttribute("data-crepus-island-props") || "{}";
+  try {
+    const value = JSON.parse(raw);
+    return value && typeof value === "object" ? value : {};
+  } catch {
+    return {};
+  }
+}
+
+async function loadIslandManifest() {
+  try {
+    const res = await fetch("./crepus-islands.json", { cache: "no-store" });
+    if (!res.ok) return { islands: {} };
+    const manifest = await res.json();
+    return manifest && typeof manifest === "object" ? manifest : { islands: {} };
+  } catch {
+    return { islands: {} };
+  }
+}
+
+function resolveIslandModule(src) {
+  const entry = currentIslandManifest?.islands?.[src];
+  return entry?.module || src;
+}
+
+function initWebIslands(root) {
+  const islands = root.querySelectorAll("[data-crepus-island]");
+  for (const el of islands) {
+    if (el.dataset.crepusIslandMounted === "true") continue;
+    el.dataset.crepusIslandMounted = "true";
+
+    const src = el.getAttribute("data-crepus-island-src");
+    if (!src) continue;
+
+    const props = parseIslandProps(el);
+    const modulePath = resolveIslandModule(src);
+    import(modulePath)
+      .then((mod) => {
+        const mount = typeof mod.mount === "function" ? mod.mount : mod.default;
+        if (typeof mount === "function") {
+          return mount(el, props, { runtime, rerender });
+        }
+        if (mount && typeof mount.mount === "function") {
+          return mount.mount(el, props, { runtime, rerender });
+        }
+        throw new Error(`Missing island mount export: ${src}`);
+      })
+      .catch((error) => {
+        console.error(`crepus island failed: ${src}`, error);
+        el.textContent = "";
+        const pre = document.createElement("pre");
+        pre.style.cssText = "white-space:pre-wrap;color:#ef4444;font-family:monospace";
+        pre.textContent = String(error);
+        el.appendChild(pre);
+      });
+  }
 }
 
 function findHandlerTarget(root, eventName, startNode) {
@@ -143,6 +204,7 @@ async function main() {
   }
   const bundle = await res.json();
   currentBundle = bundle;
+  currentIslandManifest = await loadIslandManifest();
   const root = document.getElementById("crepus-root");
   if (root) {
     currentRoot = root;

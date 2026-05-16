@@ -122,6 +122,7 @@ fn classify_node_inner(node: &Node) -> (Region, usize) {
 
         Node::LetDecl(_) => (Region::Dynamic, 1),
         Node::Include(inc) => (Region::Dynamic, inc.props.len().max(1)),
+        Node::Embed(embed) => (Region::Dynamic, embed.props.len().max(1)),
         Node::RawText(_) => (Region::Dynamic, 1),
     }
 }

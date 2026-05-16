@@ -564,6 +564,10 @@ fn build_site_wasm(cli: &WebBuildArgs) {
         });
     }
 
+    if let Err(e) = crate::web_islands::build_web_islands(&b.site_dir, &b.out_dir, &files) {
+        ui::error(&e);
+    }
+
     {
         let sp = ui::spinner("compiling site WASM (wasm32-unknown-unknown)");
         match cargo_build_wasm32(&runtime_dir) {
@@ -922,6 +926,10 @@ pub(crate) fn ensure_web_dev_artifacts(site_dir: &Path) -> Result<(), String> {
 
     copy_unocss(&vendor_dir);
     std::fs::write(dev.join("app.js"), WEB_APP_JS).map_err(|e| e.to_string())?;
+
+    let mut files: HashMap<String, String> = HashMap::new();
+    load_all_crepus(site_dir, site_dir, &mut files);
+    crate::web_islands::build_web_islands(site_dir, &dev, &files)?;
 
     cargo_build_wasm32(&runtime_dir)?;
     let (workspace_target, local_target) = wasm_release_dirs(site_dir, &runtime_dir);

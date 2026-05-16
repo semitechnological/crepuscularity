@@ -184,6 +184,20 @@ include components/card.crepus title={t} subtitle={sub}
     "Slot content rendered inside the component"
 ```
 
+## Web embed
+
+`embed` mounts a browser module as a client island in `crepus web build` and `crepus web serve`. Props are evaluated from the current context and passed to the island module's `mount(el, props, ctx)` export.
+
+```
+embed ./islands/wave.ts adapter="module" title={title} intensity={level}
+```
+
+JSX/tag syntax uses `island`:
+
+```jsx
+<island src="./islands/wave.ts" adapter="module" title={title} intensity={level} />
+```
+
 ## Animations
 
 `animate:property={duration timing-function}` attaches a CSS transition or entry animation to the element.
