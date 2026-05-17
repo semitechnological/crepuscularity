@@ -1,4 +1,4 @@
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
 use super::core::{self, Result};
