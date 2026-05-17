@@ -1,4 +1,4 @@
-//! File-backed and `include_str!` templates — same ergonomics as [`crepuscularity_tui::Template`].
+//! File-backed and `include_str!` templates — same ergonomics as the TUI `Template` type.
 //!
 //! Parsed AST nodes are cached until the template source or component name changes.
 //! Variable updates (`set`) skip re-parse and only re-layout + paint.
