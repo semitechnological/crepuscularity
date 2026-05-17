@@ -4,6 +4,9 @@
 pub use crepuscularity_core::build;
 pub use crepuscularity_macros::view;
 
+#[cfg(feature = "symbols")]
+pub use gpui_symbols::Icon;
+
 pub mod prelude {
     pub use crepuscularity_macros::view;
     pub use gpui::prelude::*;
@@ -11,4 +14,6 @@ pub mod prelude {
         black, div, px, relative, rems, rgb, white, App, AppContext, Application, Context, Entity,
         FontWeight, IntoElement, Render, SharedString, Window, WindowOptions,
     };
+    #[cfg(feature = "symbols")]
+    pub use gpui_symbols::Icon;
 }
