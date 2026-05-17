@@ -45,6 +45,10 @@ pub enum Capability {
     NativeMessaging,
     /// Context menus
     ContextMenus,
+    Sessions,
+    WebNavigation,
+    Search,
+    Favicon,
     /// Host permission pattern
     HostPermission(String),
     /// Custom capability (for future extensions)
@@ -74,6 +78,10 @@ impl Capability {
             Capability::Alarms => "alarms".to_string(),
             Capability::NativeMessaging => "nativeMessaging".to_string(),
             Capability::ContextMenus => "contextMenus".to_string(),
+            Capability::Sessions => "sessions".to_string(),
+            Capability::WebNavigation => "webNavigation".to_string(),
+            Capability::Search => "search".to_string(),
+            Capability::Favicon => "favicon".to_string(),
             Capability::HostPermission(pattern) => pattern.clone(),
             Capability::Custom(name) => name.clone(),
         }

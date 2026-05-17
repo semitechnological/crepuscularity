@@ -258,6 +258,7 @@ fn build_extension(app_path: &Path) {
             crepuscularity_webext::extension_assets::UNOCSS_JS,
         )
         .unwrap();
+        copy_app_assets(app_path, &dist).unwrap();
         ui::spinner_ok(&sp, "runtime assets");
     }
 
@@ -547,6 +548,75 @@ mod tests {
             vec!["https://example.com/*"]
         );
     }
+
+    #[test]
+    fn copy_app_assets_overlays_app_owned_directories_only() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let app = tmp.path().join("app");
+        let dist = tmp.path().join("dist/unpacked");
+
+        std::fs::create_dir_all(app.join("src")).expect("app src");
+        std::fs::create_dir_all(app.join("pages")).expect("app pages");
+        std::fs::create_dir_all(app.join("icons")).expect("app icons");
+        std::fs::create_dir_all(app.join("resources")).expect("app resources");
+        std::fs::create_dir_all(dist.join("src")).expect("dist src");
+        std::fs::create_dir_all(dist.join("vendor")).expect("dist vendor");
+
+        std::fs::write(app.join("src/content.js"), "custom content").expect("write app src");
+        std::fs::write(app.join("pages/options.html"), "options").expect("write page");
+        std::fs::write(app.join("icons/icon16.png"), b"icon").expect("write icon");
+        std::fs::write(app.join("resources/tlds.txt"), "com").expect("write resource");
+        std::fs::write(dist.join("src/content.js"), "runtime content").expect("write runtime src");
+        std::fs::write(dist.join("vendor/runtime_bg.wasm"), b"wasm").expect("write wasm");
+
+        copy_app_assets(&app, &dist).expect("copy app assets");
+
+        assert_eq!(
+            std::fs::read_to_string(dist.join("src/content.js")).expect("read content"),
+            "custom content"
+        );
+        assert_eq!(
+            std::fs::read_to_string(dist.join("pages/options.html")).expect("read page"),
+            "options"
+        );
+        assert_eq!(
+            std::fs::read(dist.join("icons/icon16.png")).expect("read icon"),
+            b"icon"
+        );
+        assert_eq!(
+            std::fs::read_to_string(dist.join("resources/tlds.txt")).expect("read resource"),
+            "com"
+        );
+        assert_eq!(
+            std::fs::read(dist.join("vendor/runtime_bg.wasm")).expect("read wasm"),
+            b"wasm"
+        );
+    }
 }
 
 // ── helpers ───────────────────────────────────────────────────────────────────
+
+fn copy_app_assets(app_path: &Path, dist: &Path) -> std::io::Result<()> {
+    for dir in ["src", "pages", "icons", "resources"] {
+        let source = app_path.join(dir);
+        if source.is_dir() {
+            copy_dir_contents(&source, &dist.join(dir))?;
+        }
+    }
+    Ok(())
+}
+
+fn copy_dir_contents(source: &Path, destination: &Path) -> std::io::Result<()> {
+    std::fs::create_dir_all(destination)?;
+    for entry in std::fs::read_dir(source)? {
+        let entry = entry?;
+        let file_type = entry.file_type()?;
+        let target = destination.join(entry.file_name());
+        if file_type.is_dir() {
+            copy_dir_contents(&entry.path(), &target)?;
+        } else if file_type.is_file() {
+            std::fs::copy(entry.path(), target)?;
+        }
+    }
+    Ok(())
+}
