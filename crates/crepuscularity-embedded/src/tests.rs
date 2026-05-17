@@ -7,9 +7,9 @@ use crepuscularity_core::context::TemplateContext;
 use sha2::{Digest, Sha256};
 
 use crate::{
-    include_expand, layout_tree, lookup_named_color, parse_classes,
-    parse_hex, render_template_to_framebuffer, EmbeddedDocument, EmbeddedNode, PanelConfig, Rect,
-    Rgb565View, Rgb888Buffer, ScreenSize, Template, Ui,
+    include_expand, layout_tree, lookup_named_color, parse_classes, parse_hex,
+    render_template_to_framebuffer, EmbeddedDocument, EmbeddedNode, PanelConfig, Rect, Rgb565View,
+    Rgb888Buffer, ScreenSize, Template, Ui,
 };
 
 fn screen() -> ScreenSize {
@@ -122,13 +122,13 @@ fn hit_test_deepest_id() {
 
 #[test]
 fn include_path_traversal_rejected() {
-    let err = include_expand::resolve_include_path(None, "../secret.crepus").unwrap_err();
+    let err = crepuscularity_core::resolve_include_path(None, "../secret.crepus").unwrap_err();
     assert!(err.contains("include path outside base dir"), "{err}");
 }
 
 #[test]
 fn include_absolute_path_rejected() {
-    let err = include_expand::resolve_include_path(None, "/etc/passwd").unwrap_err();
+    let err = crepuscularity_core::resolve_include_path(None, "/etc/passwd").unwrap_err();
     assert!(err.contains("include path outside base dir"), "{err}");
 }
 

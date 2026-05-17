@@ -10,16 +10,19 @@ pub mod cache;
 pub mod context;
 pub mod diagnostics;
 pub mod eval;
+pub mod include_paths;
 pub mod parser;
 pub mod preprocess;
 pub mod tailwind;
 mod util;
+pub mod virtual_files;
 
 pub use analysis::{analyze_template, classify_node, BindingMap, Fingerprint, Region};
 #[cfg(not(target_arch = "wasm32"))]
 pub use cache::DriverCache;
 pub use context::{TemplateContext, TemplateValue};
 pub use diagnostics::{diagnose_crepus_source, is_multi_component_file, CrepusDiagnostic};
+pub use include_paths::resolve_include_path;
 pub use parser::{
     parse_component_file, parse_template, unescape_crepus_text_literal, ComponentDef,
     ComponentFile, ComponentMeta,
@@ -27,3 +30,4 @@ pub use parser::{
 pub use preprocess::{
     google_fonts_head_markup, merge_unique_font_families, strip_indent_decorators, IndentDecorators,
 };
+pub use virtual_files::lookup_virtual_file;

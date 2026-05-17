@@ -54,6 +54,9 @@ jobs:
         cargo install wasm-bindgen-cli --locked
       shell: bash
     
+    - name: Check formatting
+      run: cargo fmt --all -- --check
+
     - name: Run tests
       run: cargo test --workspace
 

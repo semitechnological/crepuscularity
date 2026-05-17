@@ -1973,4 +1973,3 @@ fn arbitrary_length(inner: &str) -> Option<TokenStream2> {
 fn tailwind_color(family: &str, shade: &str) -> Option<u32> {
     crepuscularity_core::tailwind::lookup_color_u32(&format!("{family}-{shade}"))
 }
-

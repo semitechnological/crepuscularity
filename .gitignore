@@ -23,5 +23,6 @@ plugins/**/__pycache__/
 plugins/**/.zig-cache/
 plugins/**/zig-out/
 plugins/**/target/
+plugins/.build/
 plugins/**/bin/
 plugins/**/obj/

@@ -144,25 +144,26 @@ impl Template {
     }
 
     fn ensure_parsed_nodes(&mut self) -> Result<&[Node], String> {
-        if self.parse_cache.is_some() && self.cache_generation == self.source_generation {
-            return Ok(self
-                .parse_cache
-                .as_ref()
-                .expect("cache populated when generations match"));
+        let cache_valid =
+            self.cache_generation == self.source_generation && self.parse_cache.is_some();
+        if !cache_valid {
+            let nodes = if let Some(ref name) = self.component {
+                let file = parse_component_file(&self.source)?;
+                let component = file
+                    .components
+                    .get(name)
+                    .ok_or_else(|| format!("component not found: {name}"))?;
+                component.nodes.clone()
+            } else {
+                parse_template(&self.source)?
+            };
+            self.parse_cache = Some(nodes);
+            self.cache_generation = self.source_generation;
         }
-        let nodes = if let Some(ref name) = self.component {
-            let file = parse_component_file(&self.source)?;
-            let component = file
-                .components
-                .get(name)
-                .ok_or_else(|| format!("component not found: {name}"))?;
-            component.nodes.clone()
-        } else {
-            parse_template(&self.source)?
-        };
-        self.parse_cache = Some(nodes);
-        self.cache_generation = self.source_generation;
-        Ok(self.parse_cache.as_ref().expect("cache set after parse"))
+        Ok(self
+            .parse_cache
+            .as_deref()
+            .expect("parse cache set when generation matches source"))
     }
 
     /// Parse (if needed), layout, and paint into `fb`. Returns the retained document (ids, hit targets).

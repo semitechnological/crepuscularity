@@ -171,8 +171,7 @@ fn desired_main(child: &EmbeddedNode, row: bool, inner: Rect) -> u16 {
             if den == 0 {
                 avail
             } else {
-                ((avail as u32).saturating_mul(num as u32) / den as u32).min(u16::MAX as u32)
-                    as u16
+                ((avail as u32).saturating_mul(num as u32) / den as u32).min(u16::MAX as u32) as u16
             }
         }
         SizeHint::Auto => {
@@ -199,8 +198,7 @@ fn cross_size(child: &EmbeddedNode, row: bool, inner: Rect) -> u16 {
             if den == 0 {
                 avail
             } else {
-                ((avail as u32).saturating_mul(num as u32) / den as u32).min(u16::MAX as u32)
-                    as u16
+                ((avail as u32).saturating_mul(num as u32) / den as u32).min(u16::MAX as u32) as u16
             }
         }
         SizeHint::Auto => {

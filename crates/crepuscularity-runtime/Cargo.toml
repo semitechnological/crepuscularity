@@ -14,7 +14,7 @@ default = []
 gpui_text_run_styles = []
 
 [dependencies]
-crepuscularity-core = { path = "../crepuscularity-core", version = "0.4.3" }
+crepuscularity-core = { path = "../crepuscularity-core", version = "0.4.5" }
 # Pinned: `cargo publish` widens inherited `0.2.2` to `0.2`, which resolves to 0.2.1 (no `Div::hidden`).
 gpui = { version = "=0.2.2", default-features = false, features = ["font-kit"] }
 notify = { workspace = true }

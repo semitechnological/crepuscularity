@@ -1125,4 +1125,3 @@ mod tailwind_color_tests {
         assert_eq!(tailwind_color("red", "500"), Some(0xfb2c36));
     }
 }
-
