@@ -7,9 +7,9 @@ use crepuscularity_core::context::TemplateContext;
 use sha2::{Digest, Sha256};
 
 use crate::{
-    include_expand, layout_tree, lookup_named_color, parse_classes, parse_hex,
-    render_template_to_framebuffer, EmbeddedDocument, EmbeddedNode, PanelConfig, Rect, Rgb565View,
-    Rgb888Buffer, ScreenSize, Template, Ui,
+    layout_tree, lookup_named_color, parse_classes, parse_hex, render_template_to_framebuffer,
+    EmbeddedDocument, EmbeddedNode, PanelConfig, Rect, Rgb565View, Rgb888Buffer, ScreenSize,
+    Template, Ui,
 };
 
 fn screen() -> ScreenSize {

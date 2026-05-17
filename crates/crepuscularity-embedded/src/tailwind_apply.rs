@@ -397,9 +397,9 @@ fn apply_text(class: &str, s: &mut EmbeddedStyle, ctx: Ctx<'_>) {
     }
 }
 
-fn resolve_color_token(name: &str, ctx: Ctx<'_>) -> Option<Color> {
+fn resolve_color_token(name: &str, _ctx: Ctx<'_>) -> Option<Color> {
     #[cfg(feature = "std")]
-    if let Some(ctx) = ctx {
+    if let Some(ctx) = _ctx {
         if name.starts_with('{') && name.ends_with('}') {
             use crepuscularity_core::context::value_to_str;
             use crepuscularity_core::eval::eval_expr;
