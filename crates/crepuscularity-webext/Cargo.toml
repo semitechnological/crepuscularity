@@ -18,7 +18,7 @@ wasm = [
 ]
 
 [dependencies]
-crepuscularity-core = { path = "../crepuscularity-core", version = "0.4.5" }
+crepuscularity-core = { path = "../crepuscularity-core", version = "0.4.6" }
 crepuscularity-web = { path = "../crepuscularity-web", version = "0.4.0" }
 serde = { workspace = true }
 serde_json = { workspace = true }

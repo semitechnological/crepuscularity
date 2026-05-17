@@ -9,6 +9,7 @@ pub enum Node {
     Match(MatchBlock),
     LetDecl(LetDecl),
     Include(IncludeNode),
+    Embed(EmbedNode),
     RawText(String),
 }
 
@@ -117,4 +118,11 @@ pub struct IncludeNode {
     pub props: Vec<(String, String)>,
     /// Children of the include directive — become the component's slot content.
     pub slot: Vec<Node>,
+}
+
+#[derive(Debug, Clone)]
+pub struct EmbedNode {
+    pub src: String,
+    pub adapter: Option<String>,
+    pub props: Vec<(String, String)>,
 }

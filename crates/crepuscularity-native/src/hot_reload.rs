@@ -166,6 +166,9 @@ fn node_compatible(old: &Node, new: &Node) -> bool {
                     .all(|((ak, av), (bk, bv))| ak == bk && av == bv)
                 && ast_shape_compatible(&a.slot, &b.slot)
         }
+        (Node::Embed(a), Node::Embed(b)) => {
+            a.src == b.src && a.adapter == b.adapter && a.props == b.props
+        }
         (Node::RawText(a), Node::RawText(b)) => a == b,
         _ => false,
     }

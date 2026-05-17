@@ -111,6 +111,10 @@ fn render_node(node: &Node, ctx: &TemplateContext) -> Result<ViewNode, String> {
         Node::Include(_) => {
             Err("internal error: include should be expanded in render_nodes_list".into())
         }
+        Node::Embed(_) => Ok(ViewNode::Text {
+            content: String::new(),
+            style: None,
+        }),
         Node::RawText(expr) => Ok(ViewNode::Text {
             content: value_to_str(&eval_expr(expr, ctx)),
             style: None,

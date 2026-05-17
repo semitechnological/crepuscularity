@@ -238,6 +238,9 @@ fn build_children(
                 flush_text(&mut text_buf, &mut out, parent_dir, inherited);
                 out.extend(build_include(inc, &ctx, parent_dir, inherited));
             }
+            Node::Embed(_) => {
+                flush_text(&mut text_buf, &mut out, parent_dir, inherited);
+            }
         }
     }
 

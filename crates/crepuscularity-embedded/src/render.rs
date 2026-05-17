@@ -187,6 +187,13 @@ fn render_node(node: &Node, ctx: &TemplateContext) -> Result<EmbeddedNode, Strin
             None,
         )),
         Node::Include(_) => Err("include not expanded".into()),
+        Node::Embed(_) => Ok(container(
+            "embed",
+            EmbeddedStyle::default(),
+            vec![],
+            None,
+            None,
+        )),
         Node::RawText(expr) => Ok(text_node(value_to_str(&eval_expr(expr, ctx)))),
     }
 }

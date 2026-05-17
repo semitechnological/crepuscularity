@@ -209,7 +209,47 @@ fn render_node(node: &Node, ctx: &TemplateContext) -> Result<String, String> {
         Node::Match(block) => render_match(block, ctx),
         Node::LetDecl(_) => Ok(String::new()),
         Node::Include(inc) => render_include(inc, ctx),
+        Node::Embed(embed) => render_embed(embed, ctx),
         Node::RawText(expr) => Ok(escape_html(&value_to_str(&eval_expr(expr, ctx)))),
+    }
+}
+
+fn render_embed(embed: &EmbedNode, ctx: &TemplateContext) -> Result<String, String> {
+    let mut props = serde_json::Map::new();
+    for (key, expr) in &embed.props {
+        props.insert(key.clone(), template_value_to_json(&eval_expr(expr, ctx)));
+    }
+    let props_json = serde_json::Value::Object(props).to_string();
+    let adapter = embed.adapter.as_deref().unwrap_or("module");
+    Ok(format!(
+        "<div data-crepus-island=\"\" data-crepus-island-src=\"{}\" data-crepus-island-adapter=\"{}\" data-crepus-island-props=\"{}\"></div>",
+        escape_html_attr(&embed.src),
+        escape_html_attr(adapter),
+        escape_html_attr(&props_json)
+    ))
+}
+
+fn template_value_to_json(value: &TemplateValue) -> serde_json::Value {
+    match value {
+        TemplateValue::Str(s) => serde_json::Value::String(s.clone()),
+        TemplateValue::Int(n) => serde_json::Value::Number((*n).into()),
+        TemplateValue::Float(f) => serde_json::Number::from_f64(*f)
+            .map(serde_json::Value::Number)
+            .unwrap_or(serde_json::Value::Null),
+        TemplateValue::Bool(b) => serde_json::Value::Bool(*b),
+        TemplateValue::List(items) => serde_json::Value::Array(
+            items
+                .iter()
+                .map(|item| {
+                    let mut object = serde_json::Map::new();
+                    for (key, value) in &item.vars {
+                        object.insert(key.clone(), template_value_to_json(value));
+                    }
+                    serde_json::Value::Object(object)
+                })
+                .collect(),
+        ),
+        TemplateValue::Null => serde_json::Value::Null,
     }
 }
 
@@ -511,7 +551,7 @@ fn render_named_component(
 #[cfg(feature = "hydration")]
 fn node_is_dynamic(node: &Node) -> bool {
     match node {
-        Node::If(_) | Node::For(_) | Node::Match(_) | Node::RawText(_) => true,
+        Node::If(_) | Node::For(_) | Node::Match(_) | Node::RawText(_) | Node::Embed(_) => true,
         Node::Text(parts) => parts
             .iter()
             .any(|p| matches!(p, crepuscularity_core::ast::TextPart::Expr(_))),
@@ -743,7 +783,6 @@ pub(crate) fn escape_html(input: &str) -> String {
         .replace('"', "&quot;")
 }
 
-#[cfg(feature = "ssr")]
 pub(crate) fn escape_html_attr(s: &str) -> String {
     s.replace('&', "&amp;")
         .replace('<', "&lt;")

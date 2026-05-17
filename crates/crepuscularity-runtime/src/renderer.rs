@@ -71,6 +71,7 @@ pub fn render_node(node: &Node, ctx: &TemplateContext) -> AnyElement {
                 .into_any_element()
         }
         Node::Include(inc) => render_include(inc, ctx),
+        Node::Embed(_) => div().into_any_element(),
     }
 }
 

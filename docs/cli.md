@@ -98,7 +98,7 @@ Optional **`site.json`**: SEO (`seo.title`, `seo.description`, `ogImage`) and **
 
 First paint is **`.crepus` → WASM** (same as `crepus web serve`). You can still add **fine-grained reactivity** the same way as on the web in general:
 
-- **Client islands** — small scripts under **`static/`** (copied to `dist/static/`) or hooks in the shipped **`app.js`** pattern; the template can emit `data-*` hooks (see **`docs-site/index.crepus`** + **`initSlotRotate`** in `assets/web/app.js` for a slot-machine phrase example).
+- **Client islands** — `embed ./islands/wave.ts title={title}` compiles the island entry with Bun, writes `dist/islands/*.js`, and mounts the module's `mount(el, props, ctx)` export after the `.crepus` shell renders. Shader imports work through Bun's browser bundler; use import attributes such as `import src from "./wave.glsl" with { type: "text" }` when the shader source should be bundled as a string.
 - **Reactive graph** — the **`crepuscularity-reactive`** crate is the direction for signal-driven DOM updates; compose with WASM templates as “compiled shell + targeted patches”.
 - **Hydration / islands** — described in **`docs/CREPUS_WEB_IMPLEMENTATION_SPEC.md`**; goal is optional client graphs without duplicating template semantics.
 
