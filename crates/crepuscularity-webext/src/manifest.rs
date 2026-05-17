@@ -102,6 +102,8 @@ pub struct ExtensionInfo {
     pub author: Option<String>,
     #[serde(default)]
     pub homepage: Option<String>,
+    #[serde(default)]
+    pub minimum_chrome_version: Option<String>,
 }
 
 /// Capabilities section in the manifest.
@@ -199,10 +201,23 @@ pub struct ManifestOptions {
     #[serde(default)]
     pub options_page: Option<String>,
     #[serde(default)]
+    pub options_ui: Option<OptionsUiSpec>,
+    #[serde(default)]
     pub action_popup: Option<String>,
+    #[serde(default)]
+    pub action_icons: BTreeMap<String, String>,
     /// Custom background script path (default: "src/background.js")
     #[serde(default)]
     pub background_script: Option<String>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct OptionsUiSpec {
+    pub page: String,
+    #[serde(default)]
+    pub browser_style: Option<bool>,
+    #[serde(default)]
+    pub open_in_tab: Option<bool>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -224,6 +239,8 @@ pub struct ManifestV3 {
     pub name: String,
     pub version: String,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub minimum_chrome_version: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     #[serde(skip_serializing_if = "BTreeMap::is_empty")]
     pub icons: BTreeMap<String, String>,
@@ -239,6 +256,8 @@ pub struct ManifestV3 {
     pub action: Option<ActionSpec>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub options_page: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub options_ui: Option<OptionsUiJson>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub content_scripts: Vec<ContentScriptSpec>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -270,6 +289,15 @@ pub struct ManifestSuggestedKeyJson {
     pub linux: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub chromeos: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct OptionsUiJson {
+    pub page: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub browser_style: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub open_in_tab: Option<bool>,
 }
 
 /// Content Security Policy for extension pages.
@@ -433,7 +461,11 @@ impl ManifestV3 {
                 .or_else(|| opts.popup_html.clone())
                 .unwrap_or_else(|| "src/popup.html".to_string()),
             default_title: manifest.extension.name.clone(),
-            default_icon: opts.icons.clone(),
+            default_icon: if opts.action_icons.is_empty() {
+                opts.icons.clone()
+            } else {
+                opts.action_icons.clone()
+            },
         });
 
         let commands: BTreeMap<String, ManifestCommandJson> = manifest
@@ -465,6 +497,7 @@ impl ManifestV3 {
             manifest_version: 3,
             name: manifest.extension.name.clone(),
             version: manifest.extension.version.clone(),
+            minimum_chrome_version: manifest.extension.minimum_chrome_version.clone(),
             description: manifest.extension.description.clone(),
             icons: opts.icons.clone(),
             permissions,
@@ -474,7 +507,16 @@ impl ManifestV3 {
             }),
             background,
             action,
-            options_page: opts.options_page.clone(),
+            options_page: if opts.options_ui.is_some() {
+                None
+            } else {
+                opts.options_page.clone()
+            },
+            options_ui: opts.options_ui.as_ref().map(|options_ui| OptionsUiJson {
+                page: options_ui.page.clone(),
+                browser_style: options_ui.browser_style,
+                open_in_tab: options_ui.open_in_tab,
+            }),
             content_scripts,
             web_accessible_resources,
             commands,
@@ -686,6 +728,7 @@ host-permissions = ["https://example.com/*"]
                 description: Some("A test extension".to_string()),
                 author: None,
                 homepage: None,
+                minimum_chrome_version: None,
             },
             capabilities: CapabilitiesSection {
                 storage: true,
@@ -714,6 +757,7 @@ host-permissions = ["https://example.com/*"]
                 description: None,
                 author: None,
                 homepage: None,
+                minimum_chrome_version: None,
             },
             capabilities: CapabilitiesSection {
                 content_script: true,
@@ -754,6 +798,7 @@ host-permissions = ["https://example.com/*"]
                 description: None,
                 author: None,
                 homepage: None,
+                minimum_chrome_version: None,
             },
             capabilities: CapabilitiesSection {
                 content_script: true,
@@ -793,6 +838,7 @@ host-permissions = ["https://example.com/*"]
                 description: Some("A full test extension".to_string()),
                 author: None,
                 homepage: None,
+                minimum_chrome_version: None,
             },
             capabilities: CapabilitiesSection {
                 storage: true,
@@ -882,6 +928,7 @@ alarms = true
 [extension]
 name = "vimium-crepus"
 version = "0.2.0"
+minimum_chrome_version = "117.0"
 
 [capabilities]
 tabs = true
@@ -911,6 +958,12 @@ match_about_blank = true
 content_css = ["src/content.css"]
 options_page = "pages/options.html"
 action_popup = "pages/action.html"
+action_icons = { "16" = "icons/action_disabled_16.png", "32" = "icons/action_disabled_32.png" }
+
+[options.options_ui]
+page = "pages/options.html"
+browser_style = false
+open_in_tab = true
 
 [web_accessible_resources]
 resources = ["pages/vomnibar.html", "resources/tlds.txt"]
@@ -924,12 +977,30 @@ matches = ["<all_urls>"]
         assert!(mv3.permissions.contains(&"webNavigation".to_string()));
         assert!(mv3.permissions.contains(&"search".to_string()));
         assert!(mv3.permissions.contains(&"favicon".to_string()));
-        assert_eq!(mv3.options_page.as_deref(), Some("pages/options.html"));
+        assert_eq!(mv3.minimum_chrome_version.as_deref(), Some("117.0"));
+        assert!(mv3.options_page.is_none());
+        assert_eq!(
+            mv3.options_ui.as_ref().map(|options| options.page.as_str()),
+            Some("pages/options.html")
+        );
+        assert_eq!(
+            mv3.options_ui
+                .as_ref()
+                .and_then(|options| options.open_in_tab),
+            Some(true)
+        );
         assert_eq!(
             mv3.action
                 .as_ref()
                 .map(|action| action.default_popup.as_str()),
             Some("pages/action.html")
+        );
+        assert_eq!(
+            mv3.action
+                .as_ref()
+                .and_then(|action| action.default_icon.get("16"))
+                .map(String::as_str),
+            Some("icons/action_disabled_16.png")
         );
         assert_eq!(mv3.content_scripts.len(), 1);
         assert_eq!(mv3.content_scripts[0].all_frames, Some(true));
