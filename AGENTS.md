@@ -65,6 +65,7 @@ Use **semver `0.y.z`**. Until `1.0`:
 | `crates/crepuscularity-abi` | Optional C ABI (`cdylib`) for in-process IR compile/sessions; no Equilibrium — polyglot plugins default to `crepus native ir` |
 | `plugins/` | Reference language plugins (Python, Go, Zig, …) — subprocess JSON + optional ABI wrappers; see `docs/polyglot.md` |
 | `crates/crepuscularity-tui` | Ratatui backend for `.crepus` terminal UIs, file-backed templates, includes, slots, and `template_refs!` handles |
+| `crates/crepuscularity-embedded` | **UNSTABLE** — RGB565 framebuffer + `Ui`; optional features `mipidsi`, `embassy-stm32`, `esp-idf` in `panel/`; see `docs/embedded.md`, `examples/embedded-dashboard`, `embedded-stm32`, `embedded-esp32` |
 | `crates/crepuscularity-lite` | GPUI desktop shell with embedded V8, TypeScript/TSX guest transpilation, native plugin bridge, workers, and host command queue |
 | `crates/crepuscularity-lite-macros` | Proc-macros for lite bridge/plugin bindings |
 | `examples/text-features` | GPUI demo for letter-spacing and text-transform (vendored gpui) |

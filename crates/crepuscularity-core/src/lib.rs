@@ -12,6 +12,7 @@ pub mod diagnostics;
 pub mod eval;
 pub mod parser;
 pub mod preprocess;
+pub mod tailwind;
 mod util;
 
 pub use analysis::{analyze_template, classify_node, BindingMap, Fingerprint, Region};

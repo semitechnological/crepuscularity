@@ -1,6 +1,6 @@
 //! Maps Tailwind utility classes onto [`ViewStyle`] and stack alignment hints.
 //!
-//! Coverage targets Tailwind v3. Skipped (no SwiftUI equivalent or irrelevant):
+//! Coverage targets Tailwind CSS v4. Skipped (no SwiftUI equivalent or irrelevant):
 //! breakpoints, dark-mode, hover/focus/active pseudo-classes, gradients,
 //! shadows, z-index, cursor, grid, transitions, animations.
 

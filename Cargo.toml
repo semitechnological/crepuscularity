@@ -6,6 +6,8 @@ members = [
     "crates/crepuscularity-core",
     "crates/crepuscularity-lsp",
     "crates/crepuscularity-native",
+    "crates/crepuscularity-embedded",
+    "crates/crepuscularity-embedded-macros",
     "crates/crepuscularity-abi",
     "crates/crepuscularity-gpui",
     "crates/crepuscularity-web",
@@ -25,6 +27,8 @@ members = [
     "examples/text-features",
     "examples/weather",
     "examples/todo",
+    "examples/embedded-dashboard",
+    "examples/embedded-stm32/host-sim",
 ]
 
 [profile.release]

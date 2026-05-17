@@ -223,6 +223,21 @@ cat views/main.crepus | crepus native ir --stdin --base-dir views
 
 For tool integrations, `crepus native ir --stdin-json` accepts an envelope with `entry`, `files`, `template`, `context`, and `pretty`. Successful output is JSON on stdout only; failures are JSON on stderr. See [Polyglot plugins](polyglot.md).
 
+## Embedded framebuffer (`crepus embedded`) — UNSTABLE
+
+> In active development and testing. Prefer the Rust [`crepuscularity-embedded`](../crates/crepuscularity-embedded) `Ui` API in firmware; CLI commands are for CI and debug snapshots.
+
+```bash
+crepus embedded check ui/dashboard.crepus
+crepus embedded snapshot ui/dashboard.crepus --width 240 --height 320 --out /tmp/preview.ppm
+crepus embedded snapshot ui.crepus --component Card --ctx context.json --var cpu=88 --width 128 --height 64 --out card.ppm
+```
+
+- **`check`** — parse validation (use in CI alongside `crepuscularity_core::build::compile_crepus` in `build.rs`).
+- **`snapshot`** — writes RGB888 PPM (P6) for visual inspection only, not for shipping to devices.
+
+See [Embedded / framebuffer](embedded.md).
+
 ## Browser Extension Commands
 
 ### `crepus webext new <name>`

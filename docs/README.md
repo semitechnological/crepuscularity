@@ -19,6 +19,7 @@ Guides and references for the `.crepus` DSL, tooling, and browser extensions.
 | [Aurorality](aurorality.md) | SwiftUI engine and semantic native tag workflow |
 | [IDE extensions](ide-extensions.md) | Editor integration sketch (CLI tasks, `aurorality dev`, diagnostics) |
 | [TUI mode](tui.md) | Terminal user interfaces |
+| [Embedded / framebuffer](embedded.md) | **UNSTABLE** — RGB565 `Ui` for firmware and fixed displays |
 
 Implementation details for compilers and agents live in-repo at [`CREPUS_WEB_IMPLEMENTATION_SPEC.md`](CREPUS_WEB_IMPLEMENTATION_SPEC.md) (not published on the docs site).
 

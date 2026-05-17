@@ -1,0 +1,12 @@
+[package]
+name = "embedded-stm32-host-sim"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+crepuscularity-embedded = { path = "../../../crates/crepuscularity-embedded", features = ["std", "macros"] }
+crepuscularity-embedded-macros = { path = "../../../crates/crepuscularity-embedded-macros" }
+
+[build-dependencies]
+crepuscularity-core = { path = "../../../crates/crepuscularity-core" }
