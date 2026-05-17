@@ -1,6 +1,8 @@
 # Embedded / framebuffer mode
 
-> **UNSTABLE — in active development and testing.** The `crepuscularity-embedded` crate and `crepus embedded` commands may change without a semver-major bump until the API is proven on real hardware. Report issues and pin exact crate versions in firmware projects.
+> **UNSTABLE — still in development; largely untested on real hardware.** The `crepuscularity-embedded` crate and `crepus embedded` commands are experimental. Treat snapshots and host simulators as the supported validation path until board bring-up is documented. APIs may change without a semver-major bump. Pin exact crate versions in firmware projects and expect regressions.
+
+**Status:** CI covers parsing, layout, and host-side PPM snapshots. End-to-end SPI/LTDC/ESP-LCD paths are **not** production-ready and have **not** been broadly exercised on physical panels.
 
 **Also:** [Documentation home](README.md) · [DSL](dsl.md) · [Components](components.md) · [CLI](cli.md) · [TUI](tui.md) · [Native shells](native.md)
 
