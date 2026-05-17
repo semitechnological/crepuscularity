@@ -13,14 +13,15 @@ path = "src/lib.rs"
 
 [features]
 default = []
-# Letter-spacing / text-transform in `view!` (needs patched `gpui`; see repo `.cargo/config.toml.example`).
 gpui-text-extras = [
     "crepuscularity_macros/gpui_text_run_styles",
     "crepuscularity-runtime/gpui_text_run_styles",
 ]
+symbols = ["dep:gpui-symbols"]
 
 [dependencies]
 gpui = { version = "=0.2.2", default-features = false, features = ["font-kit"] }
 crepuscularity-core = { path = "../crepuscularity-core", version = "0.4.7" }
 crepuscularity_macros = { path = "../crepuscularity_macros", version = "0.5.0" }
 crepuscularity-runtime = { path = "../crepuscularity-runtime", version = "0.4.0" }
+gpui-symbols = { version = "0.6", optional = true }
