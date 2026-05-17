@@ -9,10 +9,13 @@ use std::path::{Path, PathBuf};
 /// joined candidate path is returned (virtual bundles have no real filesystem).
 pub fn resolve_include_path(base_dir: Option<&Path>, path: &str) -> Result<PathBuf, String> {
     let requested = Path::new(path);
-    if requested.is_absolute()
-        || requested
-            .components()
-            .any(|c| matches!(c, std::path::Component::ParentDir))
+    if requested.has_root()
+        || requested.components().any(|c| {
+            matches!(
+                c,
+                std::path::Component::ParentDir | std::path::Component::Prefix(_)
+            )
+        })
     {
         return Err(format!("include path outside base dir: {path}"));
     }

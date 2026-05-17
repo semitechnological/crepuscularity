@@ -33,7 +33,6 @@ pub fn lookup_virtual_file(ctx: &TemplateContext, path: &Path) -> Option<String>
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
     use std::path::Path;
 
     use crate::context::TemplateContext;
