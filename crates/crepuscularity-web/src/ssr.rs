@@ -376,6 +376,7 @@ fn render_node_ssr(
         }
         Node::LetDecl(_) => Ok(String::new()),
         Node::Include(inc) => render_include_ssr(inc, ctx, counter, bind),
+        Node::Embed(embed) => crate::render_embed(embed, ctx),
         Node::RawText(expr) => {
             let id = alloc_binding(
                 counter,

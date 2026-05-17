@@ -37,7 +37,7 @@ desktop = ["dep:gpui", "dep:crepuscularity-runtime"]
 
 [dependencies]
 gpui                   = { version = "=0.2.2", default-features = false, features = ["font-kit"], optional = true }
-crepuscularity-core    = { path = "../crepuscularity-core", version = "0.4.5" }
+crepuscularity-core    = { path = "../crepuscularity-core", version = "0.4.6" }
 crepuscularity-runtime = { path = "../crepuscularity-runtime", version = "0.4.3", optional = true }
 crepuscularity-tui     = { path = "../crepuscularity-tui", version = "0.4.2" }
 crepuscularity-web     = { path = "../crepuscularity-web", version = "0.4.0" }

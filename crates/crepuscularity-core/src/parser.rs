@@ -355,6 +355,12 @@ fn parse_nodes(
             break;
         }
 
+        if let Some(embed) = try_parse_embed(line) {
+            nodes.push(Node::Embed(embed));
+            i += 1;
+            continue;
+        }
+
         // include directive
         if let Some(mut inc) = try_parse_include(line) {
             i += 1;
@@ -532,6 +538,38 @@ fn try_parse_include(line: &str) -> Option<IncludeNode> {
         props,
         slot: vec![],
     })
+}
+
+fn try_parse_embed(line: &str) -> Option<EmbedNode> {
+    let rest = line.strip_prefix("embed ")?;
+    let (src, props_str) = match rest.find(' ') {
+        Some(pos) => (rest[..pos].trim().to_string(), rest[pos + 1..].trim()),
+        None => (rest.trim().to_string(), ""),
+    };
+    if src.is_empty() {
+        return None;
+    }
+    let mut props = parse_props(props_str);
+    let adapter = take_literal_prop(&mut props, "adapter");
+    Some(EmbedNode {
+        src,
+        adapter,
+        props,
+    })
+}
+
+fn take_literal_prop(props: &mut Vec<(String, String)>, key: &str) -> Option<String> {
+    let pos = props.iter().position(|(k, _)| k == key)?;
+    let (_, value) = props.remove(pos);
+    Some(unquote_expr_string(&value).unwrap_or(value))
+}
+
+fn unquote_expr_string(value: &str) -> Option<String> {
+    if value.len() >= 2 && value.starts_with('"') && value.ends_with('"') {
+        Some(value[1..value.len() - 1].replace("\\\"", "\""))
+    } else {
+        None
+    }
 }
 
 fn parse_props(s: &str) -> Vec<(String, String)> {
@@ -1251,6 +1289,7 @@ fn parse_jsx_tag<'a>(norm_root: &'a str, src: &'a str) -> Result<(Node, &'a str)
         )),
         "for" => parse_jsx_for(norm_root, attrs, after_gt),
         "match" => parse_jsx_match(norm_root, attrs, after_gt),
+        "island" | "crepus-island" if self_closing => Ok((jsx_build_embed(attrs), after_gt)),
         "include" if self_closing => Ok((jsx_build_include(attrs, vec![]), after_gt)),
         "include" => {
             let (slot, rest) = parse_jsx_nodes(norm_root, after_gt)?;
@@ -1552,6 +1591,30 @@ fn jsx_build_include(attrs: Vec<JsxAttr>, slot: Vec<Node>) -> Node {
     Node::Include(IncludeNode { path, props, slot })
 }
 
+fn jsx_build_embed(attrs: Vec<JsxAttr>) -> Node {
+    let src = attrs
+        .iter()
+        .find(|a| matches!(a.key.as_str(), "src" | "path"))
+        .and_then(|a| a.as_str())
+        .unwrap_or("")
+        .to_string();
+    let adapter = attrs
+        .iter()
+        .find(|a| a.key == "adapter")
+        .and_then(|a| a.as_str())
+        .map(|s| s.to_string());
+    let props = attrs
+        .iter()
+        .filter(|a| !matches!(a.key.as_str(), "src" | "path" | "adapter"))
+        .filter_map(|a| a.as_expr().map(|v| (a.key.clone(), v)))
+        .collect();
+    Node::Embed(EmbedNode {
+        src,
+        adapter,
+        props,
+    })
+}
+
 fn jsx_build_let(attrs: Vec<JsxAttr>, is_default: bool) -> LetDecl {
     let name = attrs
         .iter()
@@ -1801,6 +1864,43 @@ mod tests {
         assert_eq!(el.conditional_classes[0].class, "font-bold");
         assert_eq!(el.conditional_classes[0].condition, "active");
         assert_eq!(el.conditional_classes[1].class, "text-white");
+    }
+
+    #[test]
+    fn embed_indent_parses_src_adapter_and_props() {
+        let nodes =
+            parse_template(r#"embed ./islands/wave.ts adapter="module" title="Wave" count={n}"#)
+                .unwrap();
+        let Node::Embed(embed) = &nodes[0] else {
+            panic!("expected embed");
+        };
+        assert_eq!(embed.src, "./islands/wave.ts");
+        assert_eq!(embed.adapter.as_deref(), Some("module"));
+        assert_eq!(embed.props.len(), 2);
+        assert_eq!(
+            embed.props[0],
+            ("title".to_string(), "\"Wave\"".to_string())
+        );
+        assert_eq!(embed.props[1], ("count".to_string(), "n".to_string()));
+    }
+
+    #[test]
+    fn island_jsx_parses_src_adapter_and_props() {
+        let nodes = parse_template(
+            r#"<island src="./islands/wave.ts" adapter="module" title="Wave" count={n} />"#,
+        )
+        .unwrap();
+        let Node::Embed(embed) = &nodes[0] else {
+            panic!("expected embed");
+        };
+        assert_eq!(embed.src, "./islands/wave.ts");
+        assert_eq!(embed.adapter.as_deref(), Some("module"));
+        assert_eq!(embed.props.len(), 2);
+        assert_eq!(
+            embed.props[0],
+            ("title".to_string(), "\"Wave\"".to_string())
+        );
+        assert_eq!(embed.props[1], ("count".to_string(), "n".to_string()));
     }
 
     #[test]

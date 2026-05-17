@@ -40,3 +40,25 @@ button #status @click="on_refresh_status"
         "{html}"
     );
 }
+
+#[test]
+fn renders_embed_island_placeholder_with_props() {
+    let mut ctx = TemplateContext::new();
+    ctx.set("n", 7_i32);
+    let tpl = r#"embed ./islands/wave.ts adapter="module" title="Wave" count={n}"#;
+    let html = render_template_to_html(tpl, &ctx).unwrap();
+    assert!(html.contains(r#"data-crepus-island="""#), "{html}");
+    assert!(
+        html.contains(r#"data-crepus-island-src="./islands/wave.ts""#),
+        "{html}"
+    );
+    assert!(
+        html.contains(r#"data-crepus-island-adapter="module""#),
+        "{html}"
+    );
+    assert!(
+        html.contains("&quot;title&quot;:&quot;Wave&quot;"),
+        "{html}"
+    );
+    assert!(html.contains("&quot;count&quot;:7"), "{html}");
+}
