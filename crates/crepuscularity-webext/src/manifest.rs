@@ -84,6 +84,8 @@ pub struct ExtensionManifest {
     pub plugins: HashMap<String, PluginEntry>,
     #[serde(default)]
     pub options: ManifestOptions,
+    #[serde(default)]
+    pub web_accessible_resources: WebAccessibleResourcesOptions,
     /// Map of Chrome command name → spec. Use `_execute_action` to open the toolbar popup from a keybinding.
     #[serde(default)]
     pub commands: BTreeMap<String, ExtensionManifestCommand>,
@@ -143,6 +145,14 @@ pub struct CapabilitiesSection {
     pub native_messaging: bool,
     #[serde(default, rename = "context-menus")]
     pub context_menus: bool,
+    #[serde(default)]
+    pub sessions: bool,
+    #[serde(default, rename = "web-navigation")]
+    pub web_navigation: bool,
+    #[serde(default)]
+    pub search: bool,
+    #[serde(default)]
+    pub favicon: bool,
     #[serde(default, rename = "host-permissions")]
     pub host_permissions: Vec<String>,
 }
@@ -157,6 +167,10 @@ pub struct ContentScriptEntry {
     pub css: Vec<String>,
     #[serde(default)]
     pub run_at: Option<String>,
+    #[serde(default)]
+    pub all_frames: Option<bool>,
+    #[serde(default)]
+    pub match_about_blank: Option<bool>,
 }
 
 /// Plugin entry for custom functionality.
@@ -182,9 +196,21 @@ pub struct ManifestOptions {
     /// Custom popup HTML path (default: "src/popup.html")
     #[serde(default)]
     pub popup_html: Option<String>,
+    #[serde(default)]
+    pub options_page: Option<String>,
+    #[serde(default)]
+    pub action_popup: Option<String>,
     /// Custom background script path (default: "src/background.js")
     #[serde(default)]
     pub background_script: Option<String>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct WebAccessibleResourcesOptions {
+    #[serde(default)]
+    pub resources: Vec<String>,
+    #[serde(default)]
+    pub matches: Vec<String>,
 }
 
 // ---------------------------------------------------------------------------
@@ -211,6 +237,8 @@ pub struct ManifestV3 {
     pub background: Option<BackgroundSpec>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub action: Option<ActionSpec>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub options_page: Option<String>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub content_scripts: Vec<ContentScriptSpec>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -277,6 +305,10 @@ pub struct ContentScriptSpec {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub css: Vec<String>,
     pub run_at: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub all_frames: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub match_about_blank: Option<bool>,
 }
 
 /// Web accessible resources specification.
@@ -323,6 +355,8 @@ impl ManifestV3 {
                             .run_at
                             .clone()
                             .unwrap_or_else(|| "document_idle".to_string()),
+                        all_frames: cs.all_frames,
+                        match_about_blank: cs.match_about_blank,
                     }
                 })
                 .collect()
@@ -339,6 +373,8 @@ impl ManifestV3 {
                 js: vec!["src/content.js".to_string()],
                 css,
                 run_at: "document_idle".to_string(),
+                all_frames: None,
+                match_about_blank: None,
             }]
         } else {
             vec![]
@@ -351,12 +387,18 @@ impl ManifestV3 {
             "views/*".to_string(),
         ];
         resources.extend(opts.extra_resources.iter().cloned());
+        resources.extend(manifest.web_accessible_resources.resources.iter().cloned());
+        resources.sort();
+        resources.dedup();
 
-        let mut resource_matches = host_permissions.clone();
-        for content_script in &content_scripts {
-            for pattern in &content_script.matches {
-                if !resource_matches.contains(pattern) {
-                    resource_matches.push(pattern.clone());
+        let mut resource_matches = manifest.web_accessible_resources.matches.clone();
+        if resource_matches.is_empty() {
+            resource_matches = host_permissions.clone();
+            for content_script in &content_scripts {
+                for pattern in &content_script.matches {
+                    if !resource_matches.contains(pattern) {
+                        resource_matches.push(pattern.clone());
+                    }
                 }
             }
         }
@@ -386,8 +428,9 @@ impl ManifestV3 {
         // Action (popup)
         let action = Some(ActionSpec {
             default_popup: opts
-                .popup_html
+                .action_popup
                 .clone()
+                .or_else(|| opts.popup_html.clone())
                 .unwrap_or_else(|| "src/popup.html".to_string()),
             default_title: manifest.extension.name.clone(),
             default_icon: opts.icons.clone(),
@@ -431,6 +474,7 @@ impl ManifestV3 {
             }),
             background,
             action,
+            options_page: opts.options_page.clone(),
             content_scripts,
             web_accessible_resources,
             commands,
@@ -519,6 +563,18 @@ impl ExtensionManifest {
         if self.capabilities.context_menus {
             set.add(Capability::ContextMenus);
         }
+        if self.capabilities.sessions {
+            set.add(Capability::Sessions);
+        }
+        if self.capabilities.web_navigation {
+            set.add(Capability::WebNavigation);
+        }
+        if self.capabilities.search {
+            set.add(Capability::Search);
+        }
+        if self.capabilities.favicon {
+            set.add(Capability::Favicon);
+        }
 
         for pattern in &self.capabilities.host_permissions {
             set.add(Capability::HostPermission(pattern.clone()));
@@ -570,6 +626,12 @@ impl ExtensionManifest {
                     }
                     if let Some(run_at) = &cs.run_at {
                         entry["run_at"] = serde_json::json!(run_at);
+                    }
+                    if let Some(all_frames) = cs.all_frames {
+                        entry["all_frames"] = serde_json::json!(all_frames);
+                    }
+                    if let Some(match_about_blank) = cs.match_about_blank {
+                        entry["match_about_blank"] = serde_json::json!(match_about_blank);
                     }
                     entry
                 })
@@ -634,6 +696,7 @@ host-permissions = ["https://example.com/*"]
             content_scripts: vec![],
             plugins: HashMap::new(),
             options: ManifestOptions::default(),
+            web_accessible_resources: WebAccessibleResourcesOptions::default(),
             commands: BTreeMap::new(),
         };
 
@@ -661,6 +724,7 @@ host-permissions = ["https://example.com/*"]
             content_scripts: vec![],
             plugins: HashMap::new(),
             options: ManifestOptions::default(),
+            web_accessible_resources: WebAccessibleResourcesOptions::default(),
             commands: BTreeMap::new(),
         };
 
@@ -699,6 +763,7 @@ host-permissions = ["https://example.com/*"]
             content_scripts: vec![],
             plugins: HashMap::new(),
             options: ManifestOptions::default(),
+            web_accessible_resources: WebAccessibleResourcesOptions::default(),
             commands: BTreeMap::new(),
         };
 
@@ -741,6 +806,8 @@ host-permissions = ["https://example.com/*"]
                 js: vec!["src/content.js".to_string()],
                 css: vec!["src/content.css".to_string()],
                 run_at: Some("document_idle".to_string()),
+                all_frames: None,
+                match_about_blank: None,
             }],
             plugins: HashMap::new(),
             options: ManifestOptions {
@@ -750,6 +817,7 @@ host-permissions = ["https://example.com/*"]
                 ]),
                 ..Default::default()
             },
+            web_accessible_resources: WebAccessibleResourcesOptions::default(),
             commands: BTreeMap::new(),
         };
 
@@ -806,5 +874,70 @@ alarms = true
         let mv3 = manifest.to_manifest_v3();
         assert!(mv3.permissions.contains(&"nativeMessaging".to_string()));
         assert!(mv3.permissions.contains(&"alarms".to_string()));
+    }
+
+    #[test]
+    fn vimium_grade_manifest_fields_round_trip_to_mv3() {
+        let toml = r#"
+[extension]
+name = "vimium-crepus"
+version = "0.2.0"
+
+[capabilities]
+tabs = true
+storage = true
+sessions = true
+bookmarks = true
+history = true
+notifications = true
+scripting = true
+web-navigation = true
+search = true
+favicon = true
+background-script = true
+content-script = true
+clipboard = true
+host-permissions = ["<all_urls>"]
+
+[[content_scripts]]
+matches = ["<all_urls>"]
+js = ["src/content.js"]
+css = ["src/content.css"]
+run_at = "document_idle"
+all_frames = true
+match_about_blank = true
+
+[options]
+content_css = ["src/content.css"]
+options_page = "pages/options.html"
+action_popup = "pages/action.html"
+
+[web_accessible_resources]
+resources = ["pages/vomnibar.html", "resources/tlds.txt"]
+matches = ["<all_urls>"]
+"#;
+
+        let manifest: ExtensionManifest = toml::from_str(toml).unwrap();
+        let mv3 = manifest.to_manifest_v3();
+
+        assert!(mv3.permissions.contains(&"sessions".to_string()));
+        assert!(mv3.permissions.contains(&"webNavigation".to_string()));
+        assert!(mv3.permissions.contains(&"search".to_string()));
+        assert!(mv3.permissions.contains(&"favicon".to_string()));
+        assert_eq!(mv3.options_page.as_deref(), Some("pages/options.html"));
+        assert_eq!(
+            mv3.action
+                .as_ref()
+                .map(|action| action.default_popup.as_str()),
+            Some("pages/action.html")
+        );
+        assert_eq!(mv3.content_scripts.len(), 1);
+        assert_eq!(mv3.content_scripts[0].all_frames, Some(true));
+        assert_eq!(mv3.content_scripts[0].match_about_blank, Some(true));
+        assert_eq!(mv3.web_accessible_resources.len(), 1);
+        assert!(mv3.web_accessible_resources[0]
+            .resources
+            .contains(&"pages/vomnibar.html".to_string()));
+        assert_eq!(mv3.web_accessible_resources[0].matches, vec!["<all_urls>"]);
     }
 }
