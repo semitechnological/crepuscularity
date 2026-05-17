@@ -25,6 +25,8 @@
 //!   crepus native build android [--flavor F]     build Android app
 //!   crepus native run ios                        run iOS app (Xcode)
 //!   crepus native run android                    install Android app
+//!   crepus embedded check FILE
+//!   crepus embedded snapshot FILE --width W --height H --out path.ppm
 //!   crepus benchmark [all|run|check] [flags…]    benchmark.toml run or prereq check (examples/benchmarks)
 
 mod benchmark;
@@ -34,6 +36,7 @@ mod builder;
 mod crepus_toml;
 #[cfg(feature = "desktop")]
 mod dev;
+mod embedded;
 #[cfg(feature = "desktop")]
 pub mod events;
 #[cfg(feature = "desktop")]
@@ -167,6 +170,10 @@ fn main() {
             native::run(&args[2..]);
         }
 
+        Some("embedded") => {
+            embedded::run(&args[2..]);
+        }
+
         Some("benchmark") => match args.get(2).map(|s| s.as_str()) {
             Some("check") => benchmark::run_check(args.get(3..).unwrap_or(&[])),
             _ => benchmark::run(args.get(2..).unwrap_or(&[])),
@@ -297,6 +304,16 @@ fn print_usage() {
         "  {}  {}",
         style("native build android [--flavor]         ").green(),
         style("build native Android app").dim()
+    );
+    eprintln!(
+        "  {}  {}",
+        style("embedded check <file> [--component Name]  ").green(),
+        style("validate .crepus for CI / build.rs").dim()
+    );
+    eprintln!(
+        "  {}  {}",
+        style("embedded snapshot <file> -W -H --out ppm").green(),
+        style("debug PPM only (use Rust API in firmware)").dim()
     );
     eprintln!(
         "  {}  {}",

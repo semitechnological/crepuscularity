@@ -1,0 +1,17 @@
+[package]
+name = "crepuscularity-embedded-macros"
+version = "0.1.0"
+edition = "2021"
+license = "MPL-2.0"
+description = "Compile-time .crepus validation for crepuscularity-embedded (UNSTABLE)."
+repository = "https://github.com/semitechnological/crepuscularity"
+readme = "../../README.md"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+crepuscularity-core = { path = "../crepuscularity-core", version = "0.4.3" }
+proc-macro2 = { workspace = true }
+quote = { workspace = true }
+syn = { workspace = true }

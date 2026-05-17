@@ -15,6 +15,7 @@ Use [Aurorality](https://github.com/semitechnological/aurorality) for united Swi
 - **One syntax, multiple backends** — the same template works across GPUI (native desktop), HTML, React/JSX, and browser extensions today; **`crepuscularity-native`** lowers `.crepus` to JSON **View IR** for SwiftUI / Jetpack Compose shells (see [`examples/native-shells`](examples/native-shells/README.md))
 - **Polyglot plugin contract** — host languages consume View IR JSON through `crepus native ir` or the optional `crepuscularity-abi` C session API, then create UI from the typed node tree; drop-in reference packages and native workspace files live under [`plugins/`](plugins/README.md)
 - **Terminal UIs without a second UI language** — **`crepuscularity-tui`** maps `.crepus` elements, includes, slots, control flow, and Tailwind-style terminal classes onto Ratatui frames
+- **Embedded panels (in testing)** — **`crepuscularity-embedded`** renders `.crepus` into an RGB565 buffer you flush over SPI (**ILI9341**, **ST7789**) or into an **LTDC** framebuffer on STM32/ESP32; see [`docs/embedded.md`](docs/embedded.md) and [`examples/embedded-dashboard`](examples/embedded-dashboard/README.md)
 - **Desktop shell for embedded guest apps** — **`crepuscularity-lite`** embeds V8 in a GPUI host with a Capacitor-shaped Rust bridge, optional file watching, workers, plugin capabilities, and TypeScript/TSX guest transpilation
 - **Compile-time and runtime paths** — `view!` macro for zero-overhead AOT compilation; `parse_template` / `render_nodes` for full runtime flexibility and hot reload
 
@@ -80,6 +81,7 @@ The `.crepus` DSL is the primary language. Each output target is a renderer that
 | `crepuscularity-abi`    | Optional C ABI sessions for in-process IR rendering and event dispatch |
 | `crepuscularity-web`    | HTML strings — server rendering, WASM, browser extensions      |
 | `crepuscularity-webext` | MV3 browser extensions — manifest, assets, capability scanning |
+| `crepuscularity-embedded` | **UNSTABLE** — RGB565 framebuffer for SPI/LTDC panels (ILI9341, ST7789, ESP-LCD, …); see [`docs/embedded.md`](docs/embedded.md) |
 
 
 JSX/HTML tag syntax is supported as an **input format** in the core parser — the same `.crepus` templates can be written in either indentation style or `<tag>` style, and both compile to the same AST.
@@ -101,12 +103,15 @@ crepus ios generate [--dir]          # Run xcodegen (finds crepus.toml [ios] upw
 crepus ios build [--dir] [...]       # Simulator build via xcodebuild
 
 crepus native ir <file.crepus>       # Emit View IR JSON for plugins and native shells
+
+crepus embedded check <file.crepus>  # UNSTABLE: validate template for firmware CI
+crepus embedded snapshot … --out x.ppm  # UNSTABLE: debug PPM only (use Ui + rgb565() on device)
 ```
 
 ## Documentation
 
 - **Rendered site (GitHub Pages):** [here](https://crepuscularity.undivisible.dev) — WASM landing page plus HTML generated from the Markdown in [`docs/`](docs/). Built in CI with `crepus web build --site docs-site`.
-- **Sources:** [docs/README.md](docs/README.md) indexes [DSL](docs/dsl.md) (including SwiftUI semantic tag mappings), [components](docs/components.md), [CLI](docs/cli.md), [runtime/reactivity](docs/runtime.md), [GPUI](docs/gpui.md), [TUI](docs/tui.md), [Lite](docs/lite.md), [native shells](docs/native.md), [polyglot plugins](docs/polyglot.md), and [extensions](docs/webext.md). Compiler-focused detail stays in-repo as [CREPUS_WEB_IMPLEMENTATION_SPEC.md](docs/CREPUS_WEB_IMPLEMENTATION_SPEC.md) but is not shipped on the public docs site.
+- **Sources:** [docs/README.md](docs/README.md) indexes [DSL](docs/dsl.md) (including SwiftUI semantic tag mappings), [components](docs/components.md), [CLI](docs/cli.md), [runtime/reactivity](docs/runtime.md), [GPUI](docs/gpui.md), [TUI](docs/tui.md), [embedded / framebuffer](docs/embedded.md) (**UNSTABLE** — STM32, ESP32, SPI panels), [Lite](docs/lite.md), [native shells](docs/native.md), [polyglot plugins](docs/polyglot.md), and [extensions](docs/webext.md). Compiler-focused detail stays in-repo as [CREPUS_WEB_IMPLEMENTATION_SPEC.md](docs/CREPUS_WEB_IMPLEMENTATION_SPEC.md) but is not shipped on the public docs site.
 - **Native shells:** [examples/native-shells](examples/native-shells/README.md) — SwiftPM (**`ios/`**), Gradle (**`android/`**), and shared **View IR** `fixture.json` next to **`crepuscularity-native`** (replaces the old separate **`crepuscularity-native-ui`** checkout).
 - **Contributors & coding agents:** root [**`AGENTS.md`**](AGENTS.md) is the canonical instructions (macOS `SDKROOT`, `cargo fmt` / `clippy` / `test` before push, workspace layout, DSL notes). **`CLAUDE.md`** is a symlink to **`AGENTS.md`** so duplicate context files cannot drift.
 

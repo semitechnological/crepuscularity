@@ -87,7 +87,7 @@ fn include_virtual_file() {
     let ir = render_template_to_ir(tpl, &ctx).unwrap();
     let s = serde_json::to_string(&ir).unwrap();
     assert!(s.contains("In child"));
-    assert!(s.contains("#4ade80") || s.contains("green"));
+    assert!(s.contains("#05df72") || s.contains("green"));
 }
 
 #[test]

@@ -1,0 +1,15 @@
+[package]
+name = "embedded-dashboard"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+crepuscularity-embedded = { path = "../../crates/crepuscularity-embedded", features = ["std"] }
+
+[build-dependencies]
+crepuscularity-core = { path = "../../crates/crepuscularity-core" }
+
+[[test]]
+name = "smoke"
+path = "tests/smoke.rs"
