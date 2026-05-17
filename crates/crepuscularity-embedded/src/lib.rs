@@ -3,7 +3,7 @@
 //!
 //! Framebuffer rendering for `.crepus` on embedded displays and firmware.
 //!
-//! Same workflow as [`crepuscularity_tui`] or [`crepuscularity_native`]: depend on this crate,
+//! Same workflow as the `crepuscularity-tui` or `crepuscularity-native` crates: depend on this crate,
 //! build a [`TemplateContext`], render a template into your surface, use the retained
 //! [`EmbeddedDocument`] for layout bounds and hit-testing.
 //!

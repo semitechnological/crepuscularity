@@ -5,6 +5,10 @@ fn crepus() -> Command {
 }
 
 #[test]
+#[cfg_attr(
+    windows,
+    ignore = "crepus embedded subcommand does not run reliably on Windows CI (see embedded_cli.rs)"
+)]
 fn embedded_check_valid_template() {
     let tmp = tempfile::tempdir().expect("tempdir");
     let tpl = tmp.path().join("ok.crepus");
