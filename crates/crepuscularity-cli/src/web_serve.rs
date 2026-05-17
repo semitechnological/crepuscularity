@@ -894,7 +894,16 @@ fn write_simple_not_found(stream: &mut TcpStream) {
 
 fn serve_static_file(stream: &mut TcpStream, url_path: &str, site_dir: &Path) {
     let rel = url_path.trim_start_matches('/');
-    let file_path = site_dir.join(rel);
+    if rel.is_empty() || rel.contains("..") {
+        write_simple_not_found(stream);
+        return;
+    }
+    let base = std::fs::canonicalize(site_dir).unwrap_or_else(|_| site_dir.to_path_buf());
+    let file_path = base.join(rel);
+    if !file_path.starts_with(&base) {
+        write_simple_not_found(stream);
+        return;
+    }
 
     match std::fs::read(&file_path) {
         Ok(bytes) => {

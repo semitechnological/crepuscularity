@@ -40,7 +40,10 @@ pub enum SizeHint {
     Fixed(u16),
     Flex1,
     /// `w-1/2`, `h-1/3`, etc.
-    Fraction { num: u16, den: u16 },
+    Fraction {
+        num: u16,
+        den: u16,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -106,7 +109,11 @@ pub struct EmbeddedStyle {
 
 impl EmbeddedStyle {
     fn axis_or_shorthand(axis: u16, shorthand: u16) -> u16 {
-        if axis > 0 { axis } else { shorthand }
+        if axis > 0 {
+            axis
+        } else {
+            shorthand
+        }
     }
 
     pub fn pad_left(&self) -> u16 {

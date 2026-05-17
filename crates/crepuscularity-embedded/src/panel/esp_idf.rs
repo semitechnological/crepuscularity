@@ -26,10 +26,7 @@ impl EspIdfLcdPanel {
     /// # Safety
     ///
     /// See struct-level safety note.
-    pub unsafe fn new(
-        handle: esp_idf_sys::esp_lcd_panel_handle_t,
-        preset: PanelPreset,
-    ) -> Self {
+    pub unsafe fn new(handle: esp_idf_sys::esp_lcd_panel_handle_t, preset: PanelPreset) -> Self {
         Self {
             handle,
             size: preset.size(),

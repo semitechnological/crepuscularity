@@ -3,13 +3,15 @@
 //! Use [`render_from_files`] for virtual-file builds, [`render_template_to_html`] for one-off
 //! templates, and [`render_bundle`] for the `crepus web build` JSON bundle format.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use crepuscularity_core::ast::*;
 use crepuscularity_core::context::{value_to_str, TemplateContext, TemplateValue};
 use crepuscularity_core::eval::eval_expr;
+pub use crepuscularity_core::include_paths::resolve_include_path;
 use crepuscularity_core::parser::{parse_component_file, parse_template};
 use crepuscularity_core::preprocess::{slot_rotate_child_phrases, slot_rotate_words_json_attr};
+use crepuscularity_core::virtual_files::lookup_virtual_file;
 
 mod bundle;
 #[cfg(all(target_arch = "wasm32", feature = "dom"))]
@@ -434,23 +436,15 @@ fn render_match(block: &MatchBlock, ctx: &TemplateContext) -> Result<String, Str
 }
 
 pub(crate) fn read_file(ctx: &TemplateContext, path: &Path) -> Result<String, String> {
-    // Check virtual files first (enables WASM / no-filesystem rendering).
-    let key = path.to_string_lossy();
-    if let Some(content) = ctx.virtual_files.get(key.as_ref()) {
-        return Ok(content.clone());
-    }
-    // Also check with just the filename portion for relative paths.
-    for (vkey, content) in &ctx.virtual_files {
-        if vkey.ends_with(key.as_ref()) || key.ends_with(vkey.as_str()) {
-            return Ok(content.clone());
-        }
+    if let Some(content) = lookup_virtual_file(ctx, path) {
+        return Ok(content);
     }
     if cfg!(not(target_arch = "wasm32")) {
         std::fs::read_to_string(path).map_err(|e| format!("include error: {:?}: {}", path, e))
     } else {
         Err(format!(
             "include error: file not in virtual bundle: {}",
-            key
+            path.to_string_lossy()
         ))
     }
 }
@@ -508,36 +502,6 @@ fn render_named_component(
     }
 
     render_nodes_to_html(&comp.nodes, &child_ctx)
-}
-
-pub(crate) fn resolve_include_path(base_dir: Option<&Path>, path: &str) -> Result<PathBuf, String> {
-    let requested = Path::new(path);
-    if requested.is_absolute()
-        || requested
-            .components()
-            .any(|component| matches!(component, std::path::Component::ParentDir))
-    {
-        return Err(format!("include path outside base dir: {path}"));
-    }
-
-    let candidate = if let Some(base) = base_dir {
-        base.join(requested)
-    } else {
-        requested.to_path_buf()
-    };
-    if cfg!(not(target_arch = "wasm32")) {
-        let resolved = std::fs::canonicalize(&candidate).unwrap_or(candidate);
-        if let Some(base) = base_dir {
-            if let Ok(base) = std::fs::canonicalize(base) {
-                if !resolved.starts_with(&base) {
-                    return Err(format!("include path outside base dir: {path}"));
-                }
-            }
-        }
-        Ok(resolved)
-    } else {
-        Ok(candidate)
-    }
 }
 
 // ── Hydration ─────────────────────────────────────────────────────────────────

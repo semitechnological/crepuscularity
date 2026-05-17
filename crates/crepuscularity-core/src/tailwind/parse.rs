@@ -86,10 +86,7 @@ pub fn parse_color_rgb(name: &str) -> Option<[u8; 3]> {
     if let Some((color_part, _opacity)) = name.split_once('/') {
         return parse_color_rgb(color_part);
     }
-    if let Some(inner) = name
-        .strip_prefix('[')
-        .and_then(|s| s.strip_suffix(']'))
-    {
+    if let Some(inner) = name.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
         return parse_color_rgb(inner);
     }
     if let Some(hex) = lookup_named_color(name) {

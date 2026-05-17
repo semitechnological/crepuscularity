@@ -1,50 +1,19 @@
 //! Expand `include` directives into parsed child nodes + context.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use crepuscularity_core::ast::{IncludeNode, Node};
 use crepuscularity_core::context::TemplateContext;
 use crepuscularity_core::eval::eval_expr;
+use crepuscularity_core::include_paths::resolve_include_path;
 use crepuscularity_core::parser::{parse_component_file, parse_template};
+use crepuscularity_core::virtual_files::lookup_virtual_file;
 
 pub(crate) fn read_file(ctx: &TemplateContext, path: &Path) -> Result<String, String> {
-    let key = path.to_string_lossy();
-    if let Some(content) = ctx.virtual_files.get(key.as_ref()) {
-        return Ok(content.clone());
-    }
-    for (vkey, content) in &ctx.virtual_files {
-        if vkey.ends_with(key.as_ref()) || key.ends_with(vkey.as_str()) {
-            return Ok(content.clone());
-        }
+    if let Some(content) = lookup_virtual_file(ctx, path) {
+        return Ok(content);
     }
     std::fs::read_to_string(path).map_err(|e| format!("include error: {:?}: {}", path, e))
-}
-
-pub(crate) fn resolve_include_path(base_dir: Option<&Path>, path: &str) -> Result<PathBuf, String> {
-    let requested = Path::new(path);
-    if requested.is_absolute()
-        || requested
-            .components()
-            .any(|c| matches!(c, std::path::Component::ParentDir))
-    {
-        return Err(format!("include path outside base dir: {path}"));
-    }
-
-    let candidate = if let Some(base) = base_dir {
-        base.join(requested)
-    } else {
-        requested.to_path_buf()
-    };
-
-    let resolved = std::fs::canonicalize(&candidate).unwrap_or(candidate);
-    if let Some(base) = base_dir {
-        if let Ok(base) = std::fs::canonicalize(base) {
-            if !resolved.starts_with(&base) {
-                return Err(format!("include path outside base dir: {path}"));
-            }
-        }
-    }
-    Ok(resolved)
 }
 
 pub(crate) fn expand_include(

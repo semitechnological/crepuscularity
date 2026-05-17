@@ -56,13 +56,13 @@ extern crate alloc;
 
 pub mod color;
 pub mod display;
-pub mod panel;
 pub mod document;
 pub mod font;
 pub mod framebuffer;
 pub mod layout;
 pub mod paint;
 pub mod palette;
+pub mod panel;
 pub mod screen;
 pub mod style;
 mod tailwind_apply;

@@ -22,61 +22,24 @@ use ratatui::Frame;
 use crepuscularity_core::ast::*;
 use crepuscularity_core::context::{value_to_str, TemplateContext, TemplateValue};
 use crepuscularity_core::eval::eval_expr;
+use crepuscularity_core::include_paths::resolve_include_path;
 use crepuscularity_core::parser::{parse_component_file, parse_template};
 use crepuscularity_core::preprocess::slot_rotate_child_phrases;
+use crepuscularity_core::virtual_files::lookup_virtual_file;
 
 use crate::style::{parse_classes, StyleHints};
 
 fn read_file(ctx: &TemplateContext, path: &std::path::Path) -> Result<String, String> {
-    let key = path.to_string_lossy();
-    if let Some(content) = ctx.virtual_files.get(key.as_ref()) {
-        return Ok(content.clone());
-    }
-    for (vkey, content) in &ctx.virtual_files {
-        if vkey.ends_with(key.as_ref()) || key.ends_with(vkey.as_str()) {
-            return Ok(content.clone());
-        }
+    if let Some(content) = lookup_virtual_file(ctx, path) {
+        return Ok(content);
     }
     if cfg!(not(target_arch = "wasm32")) {
         std::fs::read_to_string(path).map_err(|e| format!("include error: {:?}: {}", path, e))
     } else {
         Err(format!(
             "include error: file not in virtual bundle: {}",
-            key
+            path.to_string_lossy()
         ))
-    }
-}
-
-fn resolve_include_path(
-    base_dir: Option<&std::path::Path>,
-    path: &str,
-) -> Result<std::path::PathBuf, String> {
-    let requested = std::path::Path::new(path);
-    if requested.is_absolute()
-        || requested
-            .components()
-            .any(|component| matches!(component, std::path::Component::ParentDir))
-    {
-        return Err(format!("include path outside base dir: {path}"));
-    }
-
-    let candidate = if let Some(base) = base_dir {
-        base.join(requested)
-    } else {
-        requested.to_path_buf()
-    };
-    if cfg!(not(target_arch = "wasm32")) {
-        let resolved = std::fs::canonicalize(&candidate).unwrap_or(candidate);
-        if let Some(base) = base_dir {
-            if let Ok(base) = std::fs::canonicalize(base) {
-                if !resolved.starts_with(&base) {
-                    return Err(format!("include path outside base dir: {path}"));
-                }
-            }
-        }
-        Ok(resolved)
-    } else {
-        Ok(candidate)
     }
 }
 

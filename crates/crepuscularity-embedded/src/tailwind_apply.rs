@@ -9,7 +9,9 @@ use crate::palette::lookup_named_color;
 #[cfg(feature = "std")]
 use crepuscularity_core::context::TemplateContext;
 #[cfg(feature = "std")]
-use crepuscularity_core::tailwind::parse::{parse_color_rgb, parse_size_width_height, parse_spacing_px, SizeToken};
+use crepuscularity_core::tailwind::parse::{
+    parse_color_rgb, parse_size_width_height, parse_spacing_px, SizeToken,
+};
 
 #[cfg(not(feature = "std"))]
 mod tailwind_parse {
@@ -72,10 +74,7 @@ mod tailwind_parse {
         if let Some((color_part, _)) = name.split_once('/') {
             return parse_color_rgb(color_part);
         }
-        if let Some(inner) = name
-            .strip_prefix('[')
-            .and_then(|s| s.strip_suffix(']'))
-        {
+        if let Some(inner) = name.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
             return parse_color_rgb(inner);
         }
         if let Some(hex) = lookup_named_color(name) {
@@ -105,7 +104,11 @@ mod tailwind_parse {
 use tailwind_parse::{parse_color_rgb, parse_size_width_height, parse_spacing_px, SizeToken};
 
 #[cfg(feature = "std")]
-pub fn apply_classes(classes: &[impl AsRef<str>], s: &mut EmbeddedStyle, ctx: Option<&TemplateContext>) {
+pub fn apply_classes(
+    classes: &[impl AsRef<str>],
+    s: &mut EmbeddedStyle,
+    ctx: Option<&TemplateContext>,
+) {
     for c in classes {
         apply_class(c.as_ref(), s, ctx);
     }

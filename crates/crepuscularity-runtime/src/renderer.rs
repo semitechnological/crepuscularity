@@ -11,6 +11,7 @@ use gpui::{
     AnyElement, ElementId, IntoElement, ParentElement, SharedString, Styled,
 };
 
+use crepuscularity_core::include_paths::resolve_include_path;
 use crepuscularity_core::preprocess::slot_rotate_child_phrases;
 
 use crate::ast::*;
@@ -360,36 +361,6 @@ fn render_include(inc: &IncludeNode, ctx: &TemplateContext) -> AnyElement {
     render_nodes(&nodes, &child_ctx)
 }
 
-fn resolve_include_path(
-    base_dir: Option<&std::path::Path>,
-    path: &str,
-) -> Result<std::path::PathBuf, String> {
-    let requested = std::path::Path::new(path);
-    if requested.is_absolute()
-        || requested
-            .components()
-            .any(|component| matches!(component, std::path::Component::ParentDir))
-    {
-        return Err(format!("include path outside base dir: {path}"));
-    }
-
-    let candidate = if let Some(base) = base_dir {
-        base.join(requested)
-    } else {
-        requested.to_path_buf()
-    };
-
-    let resolved = std::fs::canonicalize(&candidate).unwrap_or(candidate);
-    if let Some(base) = base_dir {
-        if let Ok(base) = std::fs::canonicalize(base) {
-            if !resolved.starts_with(&base) {
-                return Err(format!("include path outside base dir: {path}"));
-            }
-        }
-    }
-    Ok(resolved)
-}
-
 /// Render a named component from a multi-component file (`path#Name` syntax).
 fn render_named_component(
     inc: &IncludeNode,
@@ -467,22 +438,4 @@ fn render_named_component(
     }
 
     render_nodes(&comp.nodes, &child_ctx)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::resolve_include_path;
-
-    #[test]
-    fn include_path_rejects_parent_dir() {
-        let err = resolve_include_path(None, "../secret.crepus").unwrap_err();
-        assert!(err.contains("include path outside base dir"));
-    }
-
-    #[test]
-    fn include_path_rejects_absolute_path() {
-        let path = std::env::temp_dir().join("secret.crepus");
-        let err = resolve_include_path(None, path.to_str().unwrap()).unwrap_err();
-        assert!(err.contains("include path outside base dir"));
-    }
 }

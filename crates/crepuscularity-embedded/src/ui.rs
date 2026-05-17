@@ -138,7 +138,7 @@ impl Ui {
         &mut self,
         display: &mut D,
     ) -> Result<&EmbeddedDocument, DisplayError> {
-        self.render().map_err(|e| DisplayError::Message(e))?;
+        self.render().map_err(DisplayError::Message)?;
         flush_framebuffer(display, &self.buffer, self.panel, &mut self.panel_scratch)?;
         Ok(self.document().expect("render stores document"))
     }
