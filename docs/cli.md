@@ -225,7 +225,7 @@ For tool integrations, `crepus native ir --stdin-json` accepts an envelope with 
 
 ## Embedded framebuffer (`crepus embedded`) — UNSTABLE
 
-> In active development and testing. Prefer the Rust [`crepuscularity-embedded`](../crates/crepuscularity-embedded) `Ui` API in firmware; CLI commands are for CI and debug snapshots.
+> **Still in development; largely untested on real hardware.** Prefer host `cargo test` / `crepus embedded snapshot` for validation. Physical display wiring is experimental — see [Embedded / framebuffer](embedded.md). CLI commands are for CI and debug snapshots, not a supported production deploy path yet.
 
 ```bash
 crepus embedded check ui/dashboard.crepus

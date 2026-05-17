@@ -3,7 +3,7 @@ name = "crepuscularity-embedded-macros"
 version = "0.1.0"
 edition = "2021"
 license = "MPL-2.0"
-description = "Compile-time .crepus validation for crepuscularity-embedded (UNSTABLE)."
+description = "Compile-time .crepus validation for crepuscularity-embedded (UNSTABLE; embedded stack largely untested on hardware)."
 repository = "https://github.com/semitechnological/crepuscularity"
 readme = "../../README.md"
 

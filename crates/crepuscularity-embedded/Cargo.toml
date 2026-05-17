@@ -3,7 +3,7 @@ name = "crepuscularity-embedded"
 version = "0.1.8"
 edition = "2021"
 license = "MPL-2.0"
-description = "UNSTABLE: embedded RGB565 framebuffer rendering for .crepus (in active development and testing)."
+description = "UNSTABLE: embedded RGB565 framebuffer rendering for .crepus — still in development, largely untested on real hardware."
 repository = "https://github.com/semitechnological/crepuscularity"
 readme = "../../README.md"
 

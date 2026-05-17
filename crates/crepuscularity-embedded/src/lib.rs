@@ -1,4 +1,5 @@
-//! **UNSTABLE — in active development and testing.** APIs may change before 1.0; pin exact versions in firmware.
+//! **UNSTABLE — still in development; largely untested on real hardware.** APIs may change before 1.0.
+//! Validate with host tests and `crepus embedded snapshot` before relying on SPI/LTDC/ESP paths.
 //!
 //! Framebuffer rendering for `.crepus` on embedded displays and firmware.
 //!
