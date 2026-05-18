@@ -42,4 +42,11 @@ mod tests {
         assert!(CONTENT_JS.contains("?v=${cacheKey}"));
         assert!(CONTENT_JS.contains("cache: \"no-store\""));
     }
+
+    #[test]
+    fn content_host_skips_child_frame_wasm_compile_failures() {
+        assert!(CONTENT_JS.contains("globalThis.top === globalThis"));
+        assert!(CONTENT_JS.contains("if (topFrame) throw error"));
+        assert!(CONTENT_JS.contains("error instanceof WebAssembly.CompileError"));
+    }
 }
