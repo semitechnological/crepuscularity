@@ -66,7 +66,7 @@ impl StorageArea {
         T: Serialize,
     {
         let area = area_value(self.name)?;
-        core::call_method(
+        core::call_browser_method(
             &area,
             &format!("storage.{}.get", self.name.as_str()),
             "get",
@@ -88,7 +88,7 @@ impl StorageArea {
         T: Serialize,
     {
         let area = area_value(self.name)?;
-        core::call_method(
+        core::call_browser_method(
             &area,
             &format!("storage.{}.set", self.name.as_str()),
             "set",
@@ -103,7 +103,7 @@ impl StorageArea {
         T: Serialize,
     {
         let area = area_value(self.name)?;
-        core::call_method(
+        core::call_browser_method(
             &area,
             &format!("storage.{}.remove", self.name.as_str()),
             "remove",
@@ -115,7 +115,7 @@ impl StorageArea {
 
     pub async fn clear(&self) -> Result<()> {
         let area = area_value(self.name)?;
-        core::call_method(
+        core::call_browser_method(
             &area,
             &format!("storage.{}.clear", self.name.as_str()),
             "clear",

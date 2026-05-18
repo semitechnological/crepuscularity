@@ -81,7 +81,8 @@ pub fn namespace() -> Result<JsValue> {
 
 pub async fn query(info: &QueryInfo) -> Result<Vec<Tab>> {
     let tabs = namespace()?;
-    let value = core::call_method(&tabs, "tabs.query", "query", &[core::to_js(info)?]).await?;
+    let value =
+        core::call_browser_method(&tabs, "tabs.query", "query", &[core::to_js(info)?]).await?;
     core::from_js(value)
 }
 
@@ -130,7 +131,7 @@ pub async fn duplicate(tab_id: i64) -> Result<Tab> {
 
 pub async fn send_message_value(tab_id: i64, message: JsValue) -> Result<JsValue> {
     let tabs = namespace()?;
-    core::call_method(
+    core::call_browser_method(
         &tabs,
         "tabs.sendMessage",
         "sendMessage",

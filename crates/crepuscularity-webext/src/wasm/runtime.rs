@@ -37,7 +37,7 @@ pub fn get_url(path: &str) -> Result<String> {
 
 pub async fn send_message_value(message: JsValue) -> Result<JsValue> {
     let runtime = namespace()?;
-    core::call_method(&runtime, "runtime.sendMessage", "sendMessage", &[message]).await
+    core::call_browser_method(&runtime, "runtime.sendMessage", "sendMessage", &[message]).await
 }
 
 pub async fn send_message<T, R>(message: &T) -> Result<R>
