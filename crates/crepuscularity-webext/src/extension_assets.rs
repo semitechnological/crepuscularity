@@ -3,6 +3,8 @@
 pub const POPUP_HTML: &str =
     include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/popup.html"));
 pub const POPUP_JS: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/popup.js"));
+pub const OPTIONS_JS: &str =
+    include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/options.js"));
 pub const POPUP_CSS: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/popup.css"));
 pub const BACKGROUND_JS: &str =
     include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/background.js"));

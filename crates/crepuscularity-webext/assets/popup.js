@@ -1,72 +1,16 @@
-import { browserApi } from "./browser-shim.js";
+import init, * as runtime from "../vendor/runtime.js";
 
-// popup.html is pre-rendered at build time by `crepus webext build`.
-// This file only handles two concerns:
-//   1. Reading storage and patching stateful elements (checkboxes).
-//   2. Routing click/change actions to storage writes or view toggles.
+const wasmBytes = await fetch("../vendor/runtime_bg.wasm").then((response) => response.arrayBuffer());
+await init({ module_or_path: wasmBytes });
 
-const viewMain = document.getElementById("view-main");
-const viewHelp = document.getElementById("view-help");
-const viewCrepus = document.getElementById("view-crepus");
-
-const DEFAULTS = { enabled: true, autoRender: false };
-
-function showView(which) {
-  if (viewMain) viewMain.hidden = which !== "main";
-  if (viewHelp) viewHelp.hidden = which !== "help";
-  if (viewCrepus) viewCrepus.hidden = which !== "crepus";
-}
-
-async function syncState() {
-  const data = await browserApi.storage.sync
-    .get(DEFAULTS)
-    .catch(() => DEFAULTS);
-  const settings = { ...DEFAULTS, ...data };
-
-  const enabledCb = document.getElementById("enabled");
-  const autoRenderCb = document.getElementById("autoRender");
-  if (enabledCb) enabledCb.checked = settings.enabled;
-  if (autoRenderCb) autoRenderCb.checked = settings.autoRender;
-}
-
-syncState();
-
-document.addEventListener("click", (e) => {
-  const btn = e.target.closest("[data-action]");
-  if (!btn) return;
-  const action = btn.dataset.action;
-
-  if (action === "show-help") {
-    showView("help");
-  } else if (action === "hide-help") {
-    showView("main");
-    syncState();
-  } else if (action === "show-crepus") {
-    showView("crepus");
-  } else if (action === "hide-crepus") {
-    showView("help");
-  } else if (action === "copy-prompt") {
-    const pre = document.getElementById("system-prompt");
-    if (pre) {
-      navigator.clipboard.writeText(pre.textContent).then(() => {
-        const icon = btn.querySelector(".material-symbols-outlined");
-        if (icon) {
-          icon.textContent = "check";
-          setTimeout(() => { icon.textContent = "content_copy"; }, 1500);
-        }
-      }).catch(() => {});
-    }
+if (typeof runtime.popup_main === "function") {
+  runtime.popup_main();
+} else if (typeof runtime.render_popup === "function") {
+  const output = runtime.render_popup({});
+  if (output.css) {
+    const style = document.createElement("style");
+    style.textContent = output.css;
+    document.head.append(style);
   }
-});
-
-document.addEventListener("change", async (e) => {
-  const actionEl = e.target.closest("input[data-action]");
-  if (!actionEl) return;
-
-  const action = actionEl.dataset.action;
-  if (action === "set-enabled") {
-    await browserApi.storage.sync.set({ enabled: actionEl.checked }).catch(() => {});
-  } else if (action === "set-auto-render") {
-    await browserApi.storage.sync.set({ autoRender: actionEl.checked }).catch(() => {});
-  }
-});
+  document.getElementById("root").innerHTML = output.html ?? "";
+}
