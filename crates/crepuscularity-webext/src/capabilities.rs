@@ -131,11 +131,16 @@ impl CapabilitySet {
 
     /// Get capabilities as permission strings for manifest.json.
     pub fn to_permissions(&self) -> Vec<String> {
-        self.capabilities
+        let mut permissions: Vec<String> = self
+            .capabilities
             .iter()
             .filter(|c| !c.is_host_permission() && c.is_permission())
             .map(|c| c.to_permission_string())
-            .collect()
+            .collect();
+        if self.capabilities.contains(&Capability::Clipboard) {
+            permissions.push("clipboardWrite".to_string());
+        }
+        permissions
     }
 
     /// Get host permissions for manifest.json.
