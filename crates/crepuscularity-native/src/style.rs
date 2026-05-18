@@ -1,8 +1,8 @@
 //! Maps Tailwind utility classes onto [`ViewStyle`] and stack alignment hints.
 //!
 //! Coverage targets Tailwind CSS v4. Skipped (no SwiftUI equivalent or irrelevant):
-//! breakpoints, dark-mode, hover/focus/active pseudo-classes, gradients,
-//! shadows, z-index, cursor, grid, transitions, animations.
+//! breakpoints, dark-mode, hover/focus/active pseudo-classes,
+//! grid, transitions, animations.
 
 use crepuscularity_core::context::TemplateContext;
 
@@ -540,6 +540,8 @@ fn apply_layout_class(hints: &mut StackLayoutHints, class: &str, ctx: Option<&Te
     apply_text_layout_class(s, class);
     apply_cursor_class(s, class);
     apply_user_select_class(s, class);
+    apply_gradient_class(s, class);
+    apply_object_class(s, class);
 }
 
 fn apply_text_class(s: &mut ViewStyle, class: &str, ctx: Option<&TemplateContext>) {
@@ -1040,6 +1042,69 @@ fn apply_user_select_class(s: &mut ViewStyle, class: &str) {
         "select-auto" => {
             s.user_select = Some("auto".into());
         }
+        _ => {}
+    }
+}
+
+// Gradients
+fn apply_gradient_class(s: &mut ViewStyle, class: &str) {
+    if let Some(rest) = class.strip_prefix("bg-gradient-to-") {
+        if matches!(rest, "r" | "l" | "t" | "b" | "tr" | "tl" | "br" | "bl") {
+            s.background_gradient_direction = Some(format!("to-{rest}"));
+            return;
+        }
+    }
+
+    if let Some(rest) = class.strip_prefix("from-") {
+        if let Some(color) = resolve_color(rest).or_else(|| resolve_arbitrary_color(rest)) {
+            s.background_gradient_from = Some(color);
+            return;
+        }
+    }
+
+    if let Some(rest) = class.strip_prefix("to-") {
+        if let Some(color) = resolve_color(rest).or_else(|| resolve_arbitrary_color(rest)) {
+            s.background_gradient_to = Some(color);
+        }
+    }
+}
+
+// Object fit / object position
+fn apply_object_class(s: &mut ViewStyle, class: &str) {
+    match class {
+        "object-contain" => {
+            s.object_fit = Some("contain".into());
+            return;
+        }
+        "object-cover" => {
+            s.object_fit = Some("cover".into());
+            return;
+        }
+        "object-fill" => {
+            s.object_fit = Some("fill".into());
+            return;
+        }
+        "object-none" => {
+            s.object_fit = Some("none".into());
+            return;
+        }
+        "object-scale-down" => {
+            s.object_fit = Some("scale-down".into());
+            return;
+        }
+        _ => {}
+    }
+
+    match class {
+        "object-center" => s.object_position = Some("center".into()),
+        "object-top" => s.object_position = Some("top".into()),
+        "object-bottom" => s.object_position = Some("bottom".into()),
+        "object-left" => s.object_position = Some("left".into()),
+        "object-right" => s.object_position = Some("right".into()),
+        "object-left-top" => s.object_position = Some("left-top".into()),
+        "object-left-bottom" => s.object_position = Some("left-bottom".into()),
+        "object-right-top" => s.object_position = Some("right-top".into()),
+        "object-right-bottom" => s.object_position = Some("right-bottom".into()),
         _ => {}
     }
 }

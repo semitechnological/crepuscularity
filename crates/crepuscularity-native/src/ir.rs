@@ -193,6 +193,20 @@ pub struct ViewStyle {
     pub cursor: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub user_select: Option<String>,
+
+    // ── Gradients ───────────────────────────────────────────────────
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub background_gradient_direction: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub background_gradient_from: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub background_gradient_to: Option<String>,
+
+    // ── Media ───────────────────────────────────────────────────────
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub object_fit: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub object_position: Option<String>,
 }
 
 impl ViewStyle {
@@ -263,6 +277,11 @@ impl ViewStyle {
             && self.line_clamp.is_none()
             && self.cursor.is_none()
             && self.user_select.is_none()
+            && self.background_gradient_direction.is_none()
+            && self.background_gradient_from.is_none()
+            && self.background_gradient_to.is_none()
+            && self.object_fit.is_none()
+            && self.object_position.is_none()
     }
 
     pub(crate) fn opt(self) -> Option<Self> {
@@ -315,6 +334,8 @@ pub enum ViewNode {
         src: String,
         #[serde(skip_serializing_if = "Option::is_none")]
         alt: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        placeholder: Option<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
         style: Option<ViewStyle>,
     },

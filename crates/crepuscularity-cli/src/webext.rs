@@ -117,9 +117,30 @@ pub fn runtime_version() -> String {
 }
 
 #[wasm_bindgen]
-pub fn render_popup(_state: JsValue) -> Result<JsValue, JsValue> {
-    let html = r#"<div class="popup">Hello from crepuscularity!</div>"#;
-    let result = serde_json::json!({ "html": html });
+pub fn popup_main() {}
+
+#[wasm_bindgen]
+pub fn options_main() {}
+
+#[wasm_bindgen]
+pub fn content_main() {}
+
+#[wasm_bindgen]
+pub fn background_main() {}
+
+#[wasm_bindgen]
+pub fn settings_seed() -> Result<(), JsValue> {
+    Ok(())
+}
+
+#[wasm_bindgen]
+pub fn handle_background_message(message: JsValue) -> Result<JsValue, JsValue> {
+    let message_json: serde_json::Value =
+        serde_wasm_bindgen::from_value(message).unwrap_or(serde_json::Value::Null);
+    let result = serde_json::json!({
+        "ok": true,
+        "echo": message_json,
+    });
     serde_wasm_bindgen::to_value(&result)
         .map_err(|e| JsValue::from_str(&e.to_string()))
 }
@@ -464,8 +485,8 @@ div dashboard
 
 /// Render `views/popup.crepus` with three states (main / help / crepus-ref)
 /// and embed all three as sibling `<div>` elements in the returned HTML.
-/// The popup opens instantly from the pre-rendered HTML; popup.js only reads
-/// storage to patch checkbox states and handles click events — no WASM needed.
+/// The popup opens instantly from the pre-rendered HTML; popup.js still loads
+/// runtime WASM and requires `popup_main` for behavior wiring.
 fn prerender_popup_html(
     template_path: &Path,
     manifest: &crepuscularity_webext::ExtensionManifest,

@@ -217,3 +217,36 @@ div flex flex-col
     assert_eq!(v["root"][0]["children"][0]["kind"], "input");
     assert_eq!(v["root"][0]["children"][1]["kind"], "picker");
 }
+
+#[test]
+fn image_object_fit_and_position_classes() {
+    let tpl = r#"
+img object-cover object-right-top src="https://example.com/cat.png" placeholder="Loading image…"
+"#;
+    let ir = render_template_to_ir(tpl, &TemplateContext::new()).unwrap();
+    let v = serde_json::to_value(&ir).unwrap();
+    assert_eq!(v["root"][0]["kind"], "image");
+    assert_eq!(v["root"][0]["style"]["objectFit"], "cover");
+    assert_eq!(v["root"][0]["style"]["objectPosition"], "right-top");
+    assert_eq!(v["root"][0]["placeholder"], "Loading image…");
+}
+
+#[test]
+fn gradient_background_classes() {
+    let tpl = r#"
+div bg-gradient-to-r from-blue-500 to-red-500
+  "Gradient"
+"#;
+    let ir = render_template_to_ir(tpl, &TemplateContext::new()).unwrap();
+    let v = serde_json::to_value(&ir).unwrap();
+    assert_eq!(v["root"][0]["kind"], "stack");
+    assert_eq!(v["root"][0]["style"]["backgroundGradientDirection"], "to-r");
+    assert_eq!(
+        v["root"][0]["style"]["backgroundGradientFrom"],
+        crate::colors::lookup_named_color("blue-500").unwrap()
+    );
+    assert_eq!(
+        v["root"][0]["style"]["backgroundGradientTo"],
+        crate::colors::lookup_named_color("red-500").unwrap()
+    );
+}
