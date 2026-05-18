@@ -24,3 +24,16 @@ pub static UNOCSS_JS: &[u8] = include_bytes!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/assets/vendor/unocss.js"
 ));
+
+#[cfg(test)]
+mod tests {
+    use super::BACKGROUND_JS;
+
+    #[test]
+    fn background_host_is_mv3_service_worker_safe() {
+        assert!(BACKGROUND_JS.contains("import init, * as runtimeModule"));
+        assert!(!BACKGROUND_JS.contains("await import("));
+        assert!(!BACKGROUND_JS.contains("const runtimeModule = await"));
+        assert!(!BACKGROUND_JS.contains("await fetch("));
+    }
+}
