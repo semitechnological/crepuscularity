@@ -252,10 +252,16 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<ViewNode, Strin
             .iter()
             .find(|b| b.prop == "alt")
             .map(|b| value_to_str(&eval_expr(&b.value, ctx)));
+        let placeholder = el
+            .bindings
+            .iter()
+            .find(|b| b.prop == "placeholder")
+            .map(|b| value_to_str(&eval_expr(&b.value, ctx)));
         let hints = style::extract_stack_hints(&classes, Some(ctx));
         return Ok(ViewNode::Image {
             src,
             alt,
+            placeholder,
             style: hints.style.opt(),
         });
     }

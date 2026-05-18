@@ -251,15 +251,17 @@ fn diff_node(old: &ViewNode, new: &ViewNode, path: &[usize], out: &mut Vec<IrMut
             ViewNode::Image {
                 src: osrc,
                 alt: oalt,
+                placeholder: oph,
                 style: os,
             },
             ViewNode::Image {
                 src: nsrc,
                 alt: nalt,
+                placeholder: nph,
                 style: ns,
             },
         ) => {
-            if osrc != nsrc || oalt != nalt {
+            if osrc != nsrc || oalt != nalt || oph != nph {
                 out.push(IrMutation::ReplaceNode {
                     path: path.to_vec(),
                     node: new.clone(),
