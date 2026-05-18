@@ -50,6 +50,12 @@ pub fn browser() -> Result<JsValue> {
     Err(BrowserError::ApiUnavailable("browser/chrome".to_string()))
 }
 
+pub fn has_browser_global() -> bool {
+    Reflect::get(&js_sys::global(), &JsValue::from_str("browser"))
+        .ok()
+        .is_some_and(|value| !value.is_undefined() && !value.is_null())
+}
+
 pub fn get_path(root: &JsValue, path: &str) -> Result<JsValue> {
     let mut current = root.clone();
     for part in path.split('.') {
@@ -113,6 +119,19 @@ impl RawNamespace {
             event,
             handler,
         )
+    }
+}
+
+pub async fn call_browser_method(
+    target: &JsValue,
+    display_name: &str,
+    method: &str,
+    args: &[JsValue],
+) -> Result<JsValue> {
+    if has_browser_global() {
+        call_method(target, display_name, method, args).await
+    } else {
+        call_callback_method(target, display_name, method, args).await
     }
 }
 
@@ -223,7 +242,9 @@ pub fn to_js<T>(value: &T) -> Result<JsValue>
 where
     T: Serialize,
 {
-    serde_wasm_bindgen::to_value(value).map_err(|error| BrowserError::Serde(error.to_string()))
+    value
+        .serialize(&serde_wasm_bindgen::Serializer::json_compatible())
+        .map_err(|error| BrowserError::Serde(error.to_string()))
 }
 
 pub fn from_js<T>(value: JsValue) -> Result<T>
