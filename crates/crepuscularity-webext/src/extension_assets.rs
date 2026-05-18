@@ -27,7 +27,7 @@ pub static UNOCSS_JS: &[u8] = include_bytes!(concat!(
 
 #[cfg(test)]
 mod tests {
-    use super::BACKGROUND_JS;
+    use super::{BACKGROUND_JS, CONTENT_JS};
 
     #[test]
     fn background_host_is_mv3_service_worker_safe() {
@@ -35,5 +35,11 @@ mod tests {
         assert!(!BACKGROUND_JS.contains("await import("));
         assert!(!BACKGROUND_JS.contains("const runtimeModule = await"));
         assert!(!BACKGROUND_JS.contains("await fetch("));
+    }
+
+    #[test]
+    fn content_host_cache_busts_runtime_assets() {
+        assert!(CONTENT_JS.contains("?v=${cacheKey}"));
+        assert!(CONTENT_JS.contains("cache: \"no-store\""));
     }
 }
