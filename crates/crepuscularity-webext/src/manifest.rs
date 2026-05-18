@@ -977,6 +977,8 @@ matches = ["<all_urls>"]
         assert!(mv3.permissions.contains(&"webNavigation".to_string()));
         assert!(mv3.permissions.contains(&"search".to_string()));
         assert!(mv3.permissions.contains(&"favicon".to_string()));
+        assert!(mv3.permissions.contains(&"clipboardRead".to_string()));
+        assert!(mv3.permissions.contains(&"clipboardWrite".to_string()));
         assert_eq!(mv3.minimum_chrome_version.as_deref(), Some("117.0"));
         assert!(mv3.options_page.is_none());
         assert_eq!(
