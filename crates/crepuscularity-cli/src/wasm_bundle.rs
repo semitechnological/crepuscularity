@@ -89,6 +89,7 @@ pub fn cargo_build_wasm32(runtime_dir: &Path) -> Result<(), String> {
     let cargo_exe = cargo_executable();
     let mut cmd = Command::new(cargo_exe);
     prepend_rustup_bin_to_path(&mut cmd);
+    cmd.env_remove("CARGO_TARGET_DIR");
     let out = cmd
         .args([
             "build",
