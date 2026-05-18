@@ -264,6 +264,12 @@ fn build_extension(app_path: &Path) {
         )
         .unwrap();
         copy_app_assets(app_path, &dist).unwrap();
+        render_crepus_css_assets(app_path, &dist).unwrap_or_else(|e| {
+            ui::error(&format!("render extension .css.crepus assets: {e}"));
+        });
+        render_crepus_pages(app_path, &dist, &manifest).unwrap_or_else(|e| {
+            ui::error(&format!("render extension .crepus pages: {e}"));
+        });
         ui::spinner_ok(&sp, "runtime assets");
     }
 
@@ -597,6 +603,64 @@ mod tests {
             b"wasm"
         );
     }
+
+    #[test]
+    fn renders_extension_pages_from_crepus_sources() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let app = tmp.path().join("app");
+        let dist = tmp.path().join("dist/unpacked");
+        std::fs::create_dir_all(app.join("pages")).expect("pages");
+
+        std::fs::write(
+            app.join("pages/options.crepus"),
+            "section #root\n  h1\n    \"Options\"\n<style>\n#root{color:#000}\n</style>",
+        )
+        .expect("write crepus");
+
+        let manifest = crepuscularity_webext::ExtensionManifest {
+            extension: crepuscularity_webext::ExtensionInfo {
+                name: "Test Extension".to_string(),
+                version: "1.0.0".to_string(),
+                description: None,
+                author: None,
+                homepage: None,
+                minimum_chrome_version: None,
+            },
+            capabilities: Default::default(),
+            content_scripts: Vec::new(),
+            plugins: HashMap::new(),
+            options: Default::default(),
+            web_accessible_resources: Default::default(),
+            commands: Default::default(),
+        };
+
+        render_crepus_pages(&app, &dist, &manifest).expect("render pages");
+        let html = std::fs::read_to_string(dist.join("pages/options.html")).expect("read html");
+        assert!(html.contains("<title>Test Extension Options</title>"));
+        assert!(html.contains("<section id=\"root\">"));
+        assert!(html.contains("#root{color:#000}"));
+        assert!(html.contains("../src/options.js"));
+    }
+
+    #[test]
+    fn renders_extension_css_from_crepus_sources() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let app = tmp.path().join("app");
+        let dist = tmp.path().join("dist/unpacked");
+        std::fs::create_dir_all(app.join("src")).expect("src");
+
+        std::fs::write(
+            app.join("src/content.css.crepus"),
+            "div\n<style>\n.vc-find{color:#000}\n</style>",
+        )
+        .expect("write crepus css");
+
+        render_crepus_css_assets(&app, &dist).expect("render css");
+        assert_eq!(
+            std::fs::read_to_string(dist.join("src/content.css")).expect("read css"),
+            ".vc-find{color:#000}"
+        );
+    }
 }
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -620,8 +684,189 @@ fn copy_dir_contents(source: &Path, destination: &Path) -> std::io::Result<()> {
         if file_type.is_dir() {
             copy_dir_contents(&entry.path(), &target)?;
         } else if file_type.is_file() {
+            if entry
+                .path()
+                .extension()
+                .and_then(|ext| ext.to_str())
+                .is_some_and(|ext| ext == "crepus")
+            {
+                continue;
+            }
             std::fs::copy(entry.path(), target)?;
         }
     }
     Ok(())
+}
+
+fn render_crepus_css_assets(app_path: &Path, dist: &Path) -> Result<(), String> {
+    let src_dir = app_path.join("src");
+    if !src_dir.is_dir() {
+        return Ok(());
+    }
+    render_crepus_css_assets_in(&src_dir, &src_dir, &dist.join("src"))
+}
+
+fn render_crepus_css_assets_in(root: &Path, dir: &Path, out_root: &Path) -> Result<(), String> {
+    use crepuscularity_core::preprocess::strip_indent_decorators;
+
+    for entry in std::fs::read_dir(dir).map_err(|e| e.to_string())? {
+        let entry = entry.map_err(|e| e.to_string())?;
+        let path = entry.path();
+        if entry.file_type().map_err(|e| e.to_string())?.is_dir() {
+            render_crepus_css_assets_in(root, &path, out_root)?;
+            continue;
+        }
+        if !path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| name.ends_with(".css.crepus"))
+        {
+            continue;
+        }
+        let rel = path.strip_prefix(root).map_err(|e| e.to_string())?;
+        let output_name = rel
+            .file_name()
+            .and_then(|name| name.to_str())
+            .ok_or_else(|| "invalid css asset name".to_string())?
+            .trim_end_matches(".crepus")
+            .to_string();
+        let output = out_root.join(rel).with_file_name(output_name);
+        if let Some(parent) = output.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+        }
+        let source = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+        std::fs::write(output, strip_indent_decorators(&source).inline_css)
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+fn render_crepus_pages(
+    app_path: &Path,
+    dist: &Path,
+    manifest: &crepuscularity_webext::ExtensionManifest,
+) -> Result<(), String> {
+    let pages_dir = app_path.join("pages");
+    if !pages_dir.is_dir() {
+        return Ok(());
+    }
+
+    let mut files = HashMap::new();
+    let mut entries = Vec::new();
+    collect_crepus_pages(&pages_dir, &pages_dir, &mut files, &mut entries)?;
+    if entries.is_empty() {
+        return Ok(());
+    }
+
+    let out_dir = dist.join("pages");
+    std::fs::create_dir_all(&out_dir).map_err(|e| e.to_string())?;
+
+    for entry in entries {
+        let source = files
+            .get(&entry)
+            .ok_or_else(|| format!("missing page source: {entry}"))?;
+        let html = render_crepus_page_html(source, &files, &entry, manifest)?;
+        let output = out_dir
+            .join(entry.trim_end_matches(".crepus"))
+            .with_extension("html");
+        if let Some(parent) = output.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+        }
+        std::fs::write(output, html).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+fn collect_crepus_pages(
+    root: &Path,
+    dir: &Path,
+    files: &mut HashMap<String, String>,
+    entries: &mut Vec<String>,
+) -> Result<(), String> {
+    for entry in std::fs::read_dir(dir).map_err(|e| e.to_string())? {
+        let entry = entry.map_err(|e| e.to_string())?;
+        let path = entry.path();
+        if entry.file_type().map_err(|e| e.to_string())?.is_dir() {
+            collect_crepus_pages(root, &path, files, entries)?;
+        } else if path.extension().and_then(|ext| ext.to_str()) == Some("crepus") {
+            let rel = path
+                .strip_prefix(root)
+                .map_err(|e| e.to_string())?
+                .to_string_lossy()
+                .replace('\\', "/");
+            let source = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+            files.insert(rel.clone(), source);
+            entries.push(rel);
+        }
+    }
+    entries.sort();
+    Ok(())
+}
+
+fn render_crepus_page_html(
+    source: &str,
+    files: &HashMap<String, String>,
+    entry: &str,
+    manifest: &crepuscularity_webext::ExtensionManifest,
+) -> Result<String, String> {
+    use crepuscularity_core::context::TemplateContext;
+    use crepuscularity_core::preprocess::{google_fonts_head_markup, strip_indent_decorators};
+    use crepuscularity_web::render_from_files;
+
+    let decorators = strip_indent_decorators(source);
+    let body = render_from_files(files, entry, &TemplateContext::new())?;
+    let stem = Path::new(entry)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("page");
+    let title_suffix = title_case(stem);
+    let title = if title_suffix.is_empty() {
+        manifest.extension.name.clone()
+    } else {
+        format!("{} {}", manifest.extension.name, title_suffix)
+    };
+    let script = match stem {
+        "action" => r#"<script type="module" src="../src/popup.js"></script>"#,
+        "options" => r#"<script type="module" src="../src/options.js"></script>"#,
+        _ => "",
+    };
+    let fonts = google_fonts_head_markup(&decorators.google_fonts);
+    let style = if decorators.inline_css.is_empty() {
+        String::new()
+    } else {
+        format!("<style>{}</style>", decorators.inline_css)
+    };
+    Ok(format!(
+        r#"<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{title}</title>
+  {fonts}
+  {style}
+</head>
+<body>
+{body}
+{script}
+</body>
+</html>"#
+    ))
+}
+
+fn title_case(value: &str) -> String {
+    value
+        .split(['-', '_'])
+        .filter(|part| !part.is_empty())
+        .map(|part| {
+            let mut chars = part.chars();
+            let Some(first) = chars.next() else {
+                return String::new();
+            };
+            let mut out = first.to_uppercase().to_string();
+            out.push_str(chars.as_str());
+            out
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
 }
