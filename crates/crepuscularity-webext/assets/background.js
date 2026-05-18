@@ -1,34 +1,22 @@
-import { browserApi } from "./browser-shim.js";
+const api = globalThis.browser ?? globalThis.chrome;
+const runtimeModule = await import("../vendor/runtime.js");
+const wasmBytes = await fetch("../vendor/runtime_bg.wasm").then((response) => response.arrayBuffer());
+await runtimeModule.default({ module_or_path: wasmBytes });
 
-const DEFAULT_SETTINGS = {
-  enabled: true,
-  autoRender: false
-};
-
-browserApi.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-  if (message?.type === "settings:get") {
-    browserApi.storage.sync
-      .get(DEFAULT_SETTINGS)
-      .then((settings) => sendResponse({ ok: true, settings: { ...DEFAULT_SETTINGS, ...settings } }))
-      .catch((error) => sendResponse({ ok: false, error: error.message }));
-    return true;
-  }
-
-  if (message?.type === "settings:set") {
-    const nextSettings = { ...DEFAULT_SETTINGS, ...message.settings };
-    browserApi.storage.sync
-      .set(nextSettings)
-      .then(() => sendResponse({ ok: true, settings: nextSettings }))
-      .catch((error) => sendResponse({ ok: false, error: error.message }));
-    return true;
-  }
-
-  return false;
+api.runtime?.onMessage?.addListener((message, _sender, sendResponse) => {
+  if (typeof runtimeModule.handle_background_message !== "function") return false;
+  runtimeModule.handle_background_message(message)
+    .then((response) => sendResponse(response))
+    .catch((error) => sendResponse({ ok: false, error: String(error) }));
+  return true;
 });
 
-browserApi.storage.sync
-  .get(DEFAULT_SETTINGS)
-  .then((settings) => browserApi.storage.sync.set({ ...DEFAULT_SETTINGS, ...settings }))
-  .catch((error) => {
-    console.error("Failed to seed extension settings", error);
-  });
+api.runtime?.onInstalled?.addListener(() => {
+  runtimeModule.settings_seed?.().catch(() => {});
+});
+
+api.storage?.onChanged?.addListener((_changes, area) => {
+  if (area === "sync") runtimeModule.settings_seed?.().catch(() => {});
+});
+
+runtimeModule.background_main?.();

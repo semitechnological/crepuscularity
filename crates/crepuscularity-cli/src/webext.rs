@@ -225,6 +225,11 @@ fn build_extension(app_path: &Path) {
         )
         .unwrap();
         std::fs::write(
+            src_dir.join("options.js"),
+            crepuscularity_webext::extension_assets::OPTIONS_JS,
+        )
+        .unwrap();
+        std::fs::write(
             src_dir.join("background.js"),
             crepuscularity_webext::extension_assets::BACKGROUND_JS,
         )
