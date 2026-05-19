@@ -21,7 +21,13 @@ pub fn run(args: &[String]) {
 
         Some("build") => {
             let app_path = parse_app_path(&args[1..]);
-            build_extension(&app_path);
+            build_extension(&app_path, false);
+        }
+
+        Some("dev") => {
+            let app_path = parse_app_path(&args[1..]);
+            build_extension(&app_path, true);
+            watch_and_reload(&app_path);
         }
 
         Some("manifest") => {
@@ -60,6 +66,11 @@ fn print_webext_usage() {
         "  {}  {}",
         style("build [--app PATH]    ").green(),
         style("build extension to dist/unpacked/").dim()
+    );
+    eprintln!(
+        "  {}  {}",
+        style("dev [--app PATH]      ").green(),
+        style("build, watch, and hot-reload").dim()
     );
     eprintln!(
         "  {}  {}",
@@ -196,7 +207,7 @@ host-permissions = ["https://example.com/*"]
 
 // ── build ─────────────────────────────────────────────────────────────────────
 
-fn build_extension(app_path: &Path) {
+fn build_extension(app_path: &Path, dev: bool) {
     let t0 = Instant::now();
 
     let webext_toml = app_path.join("webext.toml");
@@ -222,7 +233,10 @@ fn build_extension(app_path: &Path) {
     // ── Step 1: manifest.json ────────────────────────────────────────────────
     {
         let sp = ui::spinner("generating manifest.json");
-        let json = manifest.to_manifest_v3_json();
+        let mut json = manifest.to_manifest_v3_json();
+        if dev {
+            json = inject_dev_content_script(&json);
+        }
         std::fs::write(dist.join("manifest.json"), &json).unwrap();
         ui::spinner_ok(&sp, "manifest.json");
     }
@@ -279,6 +293,13 @@ fn build_extension(app_path: &Path) {
             crepuscularity_webext::extension_assets::RUNTIME_ADAPTER,
         )
         .unwrap();
+        if dev {
+            std::fs::write(
+                src_dir.join("dev.js"),
+                crepuscularity_webext::extension_assets::DEV_JS,
+            )
+            .unwrap();
+        }
         std::fs::write(
             vendor_dir.join("unocss.js"),
             crepuscularity_webext::extension_assets::UNOCSS_JS,
@@ -417,18 +438,19 @@ pub const SYSTEM_PROMPT: &str = "\
 When creating charts, forms, interactive UI, or visualisations,
 wrap output in <ai-anywhere> tags for the AI Anywhere browser extension.
 
-── Format ───────────────────────────────────────────────────
+── Format (crepus + data only — no JavaScript) ─────────────
 <ai-anywhere type=\"widget\" title=\"Widget Title\">
   <anywhere-ui lang=\"crepus\">
     <!-- crepus template here (see syntax below) -->
   </anywhere-ui>
   <anywhere-data>{\"key\": \"value\"}</anywhere-data>
-  <anywhere-script lang=\"js\">/* optional JS */</anywhere-script>
 </ai-anywhere>
 
-ui langs:     crepus (preferred) | html
-script langs: js | mermaid | latex
-types:        widget | chart | form | visualization | tool
+ui langs: crepus (preferred) | html
+types:    widget | chart | form | visualization | tool
+Do NOT use <anywhere-script>. Put all UI in crepus. Put all data in anywhere-data JSON.
+Crepus expressions support variables, if/for/match, and simple math — not arrow functions or .filter().
+Precompute counts/aggregates in anywhere-data when needed.
 
 ── Crepus template syntax ───────────────────────────────────
 Indent-based. Children are indented under their parent.
@@ -653,6 +675,7 @@ mod tests {
             options: Default::default(),
             web_accessible_resources: Default::default(),
             commands: Default::default(),
+            chrome_url_overrides: Default::default(),
         };
 
         render_crepus_pages(&app, &dist, &manifest).expect("render pages");
@@ -780,13 +803,32 @@ fn render_crepus_pages(
     }
 
     let out_dir = dist.join("pages");
+    let src_dir = dist.join("src");
     std::fs::create_dir_all(&out_dir).map_err(|e| e.to_string())?;
 
-    for entry in entries {
+    for entry in &entries {
         let source = files
-            .get(&entry)
+            .get(entry)
             .ok_or_else(|| format!("missing page source: {entry}"))?;
-        let html = render_crepus_page_html(source, &files, &entry, manifest)?;
+        let stem = Path::new(entry)
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("page");
+        // WASM exports use underscore, not hyphen
+        let fn_name = stem.replace('-', "_");
+
+        // Generate JS bootstrapper for every page stem
+        let js = format!(
+            r#"import init, * as runtime from "../vendor/runtime.js";
+const wasmBytes = await fetch("../vendor/runtime_bg.wasm").then(r => r.arrayBuffer());
+await init({{ module_or_path: wasmBytes }});
+if (typeof runtime.{fn}_main === "function") runtime.{fn}_main();"#,
+            fn = fn_name
+        );
+        std::fs::write(src_dir.join(format!("{stem}.js")), &js)
+            .map_err(|e| format!("write {stem}.js: {e}"))?;
+
+        let html = render_crepus_page_html(source, &files, entry, manifest)?;
         let output = out_dir
             .join(entry.trim_end_matches(".crepus"))
             .with_extension("html");
@@ -846,11 +888,7 @@ fn render_crepus_page_html(
     } else {
         format!("{} {}", manifest.extension.name, title_suffix)
     };
-    let script = match stem {
-        "action" => r#"<script type="module" src="../src/popup.js"></script>"#,
-        "options" => r#"<script type="module" src="../src/options.js"></script>"#,
-        _ => "",
-    };
+    let script = format!(r#"<script type="module" src="../src/{stem}.js"></script>"#);
     let fonts = google_fonts_head_markup(&decorators.google_fonts);
     let style = if decorators.inline_css.is_empty() {
         String::new()
@@ -873,6 +911,79 @@ fn render_crepus_page_html(
 </body>
 </html>"#
     ))
+}
+
+fn inject_dev_content_script(manifest_json: &str) -> String {
+    if let Ok(mut v) = serde_json::from_str::<serde_json::Value>(manifest_json) {
+        if let Some(scripts) = v.get_mut("content_scripts").and_then(|v| v.as_array_mut()) {
+            for entry in scripts {
+                if let Some(js) = entry.get_mut("js").and_then(|v| v.as_array_mut()) {
+                    js.push(serde_json::Value::String("src/dev.js".to_string()));
+                }
+            }
+        }
+        return serde_json::to_string_pretty(&v).unwrap_or_else(|_| manifest_json.to_string());
+    }
+    manifest_json.to_string()
+}
+
+fn watch_and_reload(app_path: &Path) {
+    use console::style;
+    use notify::Watcher;
+    use std::sync::mpsc::channel;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    eprintln!();
+    eprintln!("  {}", style("watching for changes — Ctrl+C to stop").dim());
+
+    let reload_id = AtomicU64::new(1);
+    let src_dir = app_path.join("dist/unpacked/src");
+    let _ = std::fs::write(src_dir.join(".reload-id"), "1");
+
+    let (tx, rx) = channel();
+    let mut watcher = match notify::recommended_watcher(move |res: Result<notify::Event, notify::Error>| {
+        if let Ok(event) = res {
+            if event.kind.is_modify() || matches!(event.kind, notify::EventKind::Create(_)) {
+                let _ = tx.send(());
+            }
+        }
+    }) {
+        Ok(w) => w,
+        Err(e) => {
+            ui::warning(&format!("file watcher failed: {e}"));
+            return;
+        }
+    };
+
+    let dirs = ["runtime/src", "runtime/views", "src", "pages", "views", "icons", "resources"];
+    for dir in &dirs {
+        let d = app_path.join(dir);
+        if d.exists() {
+            let _ = watcher.watch(&d, notify::RecursiveMode::Recursive);
+        }
+    }
+    let _ = watcher.watch(
+        app_path.join("webext.toml").as_path(),
+        notify::RecursiveMode::NonRecursive,
+    );
+
+    // Throttle: rebuild at most every 500ms
+    loop {
+        let _ = rx.recv();
+        // drain pending events
+        while rx.try_recv().is_ok() {}
+        std::thread::sleep(std::time::Duration::from_millis(200));
+
+        eprintln!();
+        let sp = ui::spinner("rebuilding");
+        let t0 = std::time::Instant::now();
+        build_extension(app_path, true);
+        sp.finish_and_clear();
+
+        let id = reload_id.fetch_add(1, Ordering::SeqCst);
+        let _ = std::fs::write(src_dir.join(".reload-id"), id.to_string());
+        ui::done_in(t0.elapsed());
+    }
 }
 
 fn title_case(value: &str) -> String {

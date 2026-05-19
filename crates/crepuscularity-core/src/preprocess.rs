@@ -136,15 +136,26 @@ fn strip_trailing_inline_css(lines: &[&str], start: usize, mut end: usize) -> (u
         return (end, String::new());
     }
 
-    let opener = lines[css_start].trim();
-    let opener_is_css =
-        opener.starts_with('@') || opener.starts_with("/*") || opener.ends_with('{');
-    if !opener_is_css {
+    // If the first line at css_start doesn't look like a CSS opener, try
+    // the next line — the walk may have landed on a template-remnant line
+    // (e.g. `div` placeholder) when the file is CSS-only.
+    let mut actual_start = css_start;
+    while actual_start < end {
+        let candidate = lines[actual_start].trim();
+        if candidate.starts_with('@')
+            || candidate.starts_with("/*")
+            || candidate.ends_with('{')
+            || (candidate.ends_with('}') && candidate.contains('{') && candidate.contains(':'))
+        {
+            break;
+        }
+        actual_start += 1;
+    }
+    if actual_start >= end {
         return (end, String::new());
     }
-
-    let css = lines[css_start..end].join("\n").trim().to_string();
-    (css_start, css)
+    let css = lines[actual_start..end].join("\n").trim().to_string();
+    (actual_start, css)
 }
 
 /// Heuristic: does this trimmed line look like a real CSS line (selector, rule
@@ -165,13 +176,16 @@ fn looks_like_css_line(line: &str) -> bool {
     if line.starts_with('@') || line.starts_with("/*") || line.starts_with('}') {
         return true;
     }
-    if line.ends_with('{') {
+    if line.ends_with('{') || line.ends_with(',') {
         return true;
     }
     if line.ends_with(';') && line.contains(':') {
         return true;
     }
     if line.ends_with('}') && line.contains('{') && line.contains(':') && line.contains(';') {
+        return true;
+    }
+    if line.contains(':') && line.contains(';') {
         return true;
     }
     false
@@ -611,5 +625,14 @@ div
         let d = strip_indent_decorators(s);
         assert!(d.body.contains("for item in {items}"), "body={:?}", d.body);
         assert!(d.inline_css.is_empty());
+    }
+
+    #[test]
+    fn css_only_file_without_template_placeholder() {
+        let s = ".foo {\n  color: red;\n}\n.bar {\n  color: blue;\n}\n";
+        let d = strip_indent_decorators(s);
+        assert!(d.body.trim().is_empty(), "body should be empty, got {:?}", d.body);
+        assert!(d.inline_css.contains(".foo"), "css missing .foo: {:?}", d.inline_css);
+        assert!(d.inline_css.contains(".bar"), "css missing .bar: {:?}", d.inline_css);
     }
 }

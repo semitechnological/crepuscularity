@@ -89,6 +89,9 @@ pub struct ExtensionManifest {
     /// Map of Chrome command name → spec. Use `_execute_action` to open the toolbar popup from a keybinding.
     #[serde(default)]
     pub commands: BTreeMap<String, ExtensionManifestCommand>,
+    /// Chrome `chrome_url_overrides` (e.g. `newtab` → `pages/new-tab.crepus`).
+    #[serde(default)]
+    pub chrome_url_overrides: BTreeMap<String, String>,
 }
 
 /// Basic extension information.
@@ -264,6 +267,8 @@ pub struct ManifestV3 {
     pub web_accessible_resources: Vec<WebAccessibleResources>,
     #[serde(skip_serializing_if = "BTreeMap::is_empty")]
     pub commands: BTreeMap<String, ManifestCommandJson>,
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub chrome_url_overrides: BTreeMap<String, String>,
 }
 
 /// Serialized form of a `commands` entry for `manifest.json`.
@@ -454,11 +459,19 @@ impl ManifestV3 {
         };
 
         // Action (popup)
+        let resolve_page = |p: String| -> String {
+            if p.ends_with(".crepus") {
+                p.trim_end_matches(".crepus").to_string() + ".html"
+            } else {
+                p
+            }
+        };
         let action = Some(ActionSpec {
             default_popup: opts
                 .action_popup
                 .clone()
                 .or_else(|| opts.popup_html.clone())
+                .map(resolve_page)
                 .unwrap_or_else(|| "src/popup.html".to_string()),
             default_title: manifest.extension.name.clone(),
             default_icon: if opts.action_icons.is_empty() {
@@ -467,6 +480,12 @@ impl ManifestV3 {
                 opts.action_icons.clone()
             },
         });
+
+        let chrome_url_overrides: BTreeMap<String, String> = manifest
+            .chrome_url_overrides
+            .iter()
+            .map(|(key, page)| (key.clone(), resolve_page(page.clone())))
+            .collect();
 
         let commands: BTreeMap<String, ManifestCommandJson> = manifest
             .commands
@@ -511,16 +530,17 @@ impl ManifestV3 {
             options_page: if opts.options_ui.is_some() {
                 None
             } else {
-                opts.options_page.clone()
+                opts.options_page.clone().map(resolve_page)
             },
             options_ui: opts.options_ui.as_ref().map(|options_ui| OptionsUiJson {
-                page: options_ui.page.clone(),
+                page: resolve_page(options_ui.page.clone()),
                 browser_style: options_ui.browser_style,
                 open_in_tab: options_ui.open_in_tab,
             }),
             content_scripts,
             web_accessible_resources,
             commands,
+            chrome_url_overrides,
         }
     }
 
@@ -742,6 +762,7 @@ host-permissions = ["https://example.com/*"]
             options: ManifestOptions::default(),
             web_accessible_resources: WebAccessibleResourcesOptions::default(),
             commands: BTreeMap::new(),
+            chrome_url_overrides: BTreeMap::new(),
         };
 
         let browser = manifest.to_browser_manifest();
@@ -771,6 +792,7 @@ host-permissions = ["https://example.com/*"]
             options: ManifestOptions::default(),
             web_accessible_resources: WebAccessibleResourcesOptions::default(),
             commands: BTreeMap::new(),
+            chrome_url_overrides: BTreeMap::new(),
         };
 
         let mv3 = manifest.to_manifest_v3();
@@ -811,6 +833,7 @@ host-permissions = ["https://example.com/*"]
             options: ManifestOptions::default(),
             web_accessible_resources: WebAccessibleResourcesOptions::default(),
             commands: BTreeMap::new(),
+            chrome_url_overrides: BTreeMap::new(),
         };
 
         let mv3 = manifest.to_manifest_v3();
@@ -866,6 +889,7 @@ host-permissions = ["https://example.com/*"]
             },
             web_accessible_resources: WebAccessibleResourcesOptions::default(),
             commands: BTreeMap::new(),
+            chrome_url_overrides: BTreeMap::new(),
         };
 
         let mv3 = manifest.to_manifest_v3();
@@ -879,6 +903,24 @@ host-permissions = ["https://example.com/*"]
         assert!(json.contains("\"manifest_version\": 3"));
         assert!(json.contains("wasm-unsafe-eval"));
         assert!(json.contains("object-src 'self'"));
+    }
+
+    #[test]
+    fn chrome_url_overrides_resolve_crepus_pages() {
+        let toml = r#"
+[extension]
+name = "nt"
+version = "1.0.0"
+
+[chrome_url_overrides]
+newtab = "pages/new-tab.crepus"
+"#;
+        let manifest: ExtensionManifest = toml::from_str(toml).unwrap();
+        let mv3 = manifest.to_manifest_v3();
+        assert_eq!(
+            mv3.chrome_url_overrides.get("newtab").map(String::as_str),
+            Some("pages/new-tab.html")
+        );
     }
 
     #[test]
