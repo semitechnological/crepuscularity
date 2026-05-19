@@ -23,6 +23,8 @@ pub enum TemplateValue {
     Float(f64),
     Bool(bool),
     List(Vec<TemplateContext>),
+    /// Object scope for `for item in {items}` — enables `{item.field}` in templates.
+    Scope(TemplateContext),
     Null,
 }
 
@@ -116,6 +118,7 @@ pub fn value_to_str(v: &TemplateValue) -> String {
         TemplateValue::Bool(b) => b.to_string(),
         TemplateValue::Null => String::new(),
         TemplateValue::List(items) => format!("[{} items]", items.len()),
+        TemplateValue::Scope(_) => String::new(),
     }
 }
 

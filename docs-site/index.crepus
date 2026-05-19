@@ -7,7 +7,7 @@ div min-h-screen overflow-x-hidden antialiased crepus-twilight-page
 				img src="./static/favicon.svg" alt="" w-9 h-9 sm:w-10 sm:h-10 shrink-0 rounded-lg
 				span text-sm sm:text-base font-semibold tracking-tight
 					"Crepuscularity"
-		section pt-6 pb-12 sm:pt-10 sm:pb-20 md:pt-12 md:pb-24 crepus-entrance crepus-e2 bg-gradient-to-br from-zinc-950 via-zinc-900 to-black rounded-2xl p-6 sm:p-8 lg:p-12 mx-4 sm:mx-6 lg:mx-8 animate-sunset
+		section pt-14 pb-12 sm:pt-16 sm:pb-20 md:pt-20 md:pb-24 crepus-entrance crepus-e2 bg-gradient-to-br from-zinc-950 via-zinc-900 to-black rounded-2xl p-6 sm:p-8 lg:p-12 animate-sunset
 			div grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_min(100%,450px)] gap-6 sm:gap-8 lg:gap-12 items-start
 				div max-w-3xl min-w-0
 					h1 text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold crepus-t-text tracking-tight leading-[1.08] mb-4 sm:mb-6 text-pretty
@@ -79,6 +79,60 @@ $ crepus webext new ext"
 			div flex flex-col lg:flex-row lg:items-stretch gap-5 sm:gap-6 lg:gap-8
 				div flex-1 rounded-xl p-5 sm:p-8 crepus-t-card
 					p text-xs font-semibold uppercase tracking-widest crepus-t-muted mb-3 sm:mb-4
+						"Native UI from one source"
+					p text-lg sm:text-xl font-medium crepus-t-text leading-relaxed mb-4 sm:mb-5
+						"Aurorality transforms .crepus templates into native SwiftUI views for macOS and iOS — no WebView, no JavaScript bridge."
+					p text-sm crepus-t-muted m-0 leading-relaxed
+						"Semantic tags like navigationstack, sidebar, list, and menu compile to their SwiftUI equivalents. Add eventSink callbacks for app-state integration, wire Rust backends through UniFFI, and hot-reload through the same crepus dev pipeline that serves GPUI and WASM targets."
+				div flex-1 rounded-xl p-5 sm:p-8 crepus-t-card
+					p text-xs font-semibold uppercase tracking-widest crepus-t-muted mb-3 sm:mb-4
+						"SwiftUI Engine"
+					pre font-mono text-sm m-0 leading-relaxed crepus-t-pre p-4 sm:p-5 rounded-lg whitespace-pre-wrap overflow-x-auto
+						"navigationsplitview\n  sidebar\n    section header=\"Conversations\"\n      for conv in {conversations}\n        item @click=\"select:{conv.id}\"\n          span \"{conv.title}\"\n  detail\n    vstack gap-3 p-4\n      textfield bind=draft placeholder=\"Message\"\n      button button-prominent @click=\"send\"\n        \"Send\""
+				div flex-1 rounded-xl p-5 sm:p-8 crepus-t-card
+					p text-xs font-semibold uppercase tracking-widest crepus-t-muted mb-3 sm:mb-4
+						"Capabilities"
+					div flex flex-col gap-3
+						div flex items-start gap-3
+							span text-xs crepus-t-muted leading-snug mt-0.5
+								"•"
+							div
+								p text-sm font-medium crepus-t-text m-0
+									"Semantic native tags"
+								p text-xs crepus-t-muted m-0 leading-relaxed
+									"navigationstack, sidebar, form, picker, sf-*, and more — all compile to direct SwiftUI views."
+						div flex items-start gap-3
+							span text-xs crepus-t-muted leading-snug mt-0.5
+								"•"
+							div
+								p text-sm font-medium crepus-t-text m-0
+									"macOS chrome"
+								p text-xs crepus-t-muted m-0 leading-relaxed
+									"Root-level menubar and dockbadge for native menu commands and dock badges."
+						div flex items-start gap-3
+							span text-xs crepus-t-muted leading-snug mt-0.5
+								"•"
+							div
+								p text-sm font-medium crepus-t-text m-0
+									"Hot-reload IR & swiftgen"
+								p text-xs crepus-t-muted m-0 leading-relaxed
+									"crepus dev pushes JSON IR updates or re-runs swiftgen on save — same dev loop as every other target."
+						div flex items-start gap-3
+							span text-xs crepus-t-muted leading-snug mt-0.5
+								"•"
+							div
+								p text-sm font-medium crepus-t-text m-0
+									"Rust ↔ Swift bridge"
+								p text-xs crepus-t-muted m-0 leading-relaxed
+									"Plug Rust backends through UniFFI with eventSink wiring for shared state models."
+					div mt-4 sm:mt-5
+						a href="./docs/aurorality.html" no-underline text-sm font-medium crepus-t-text hover:opacity-85 transition-colors border-b border-transparent hover:border-[var(--cp-accent)]
+							"Aurorality guide →"
+
+		section py-10 sm:py-14 border-t crepus-t-border crepus-entrance crepus-e4
+			div flex flex-col lg:flex-row lg:items-stretch gap-5 sm:gap-6 lg:gap-8
+				div flex-1 rounded-xl p-5 sm:p-8 crepus-t-card
+					p text-xs font-semibold uppercase tracking-widest crepus-t-muted mb-3 sm:mb-4
 						"Why it's different"
 					p text-xl sm:text-2xl md:text-3xl font-semibold crepus-t-text leading-snug mb-4 sm:mb-5
 						slot-rotate interval={3000} slot-lede
@@ -115,7 +169,7 @@ $ crepus webext new ext"
 						p text-xs crepus-t-muted leading-relaxed m-0
 							"Markdown in docs/ is rendered to styled HTML on every crepus web build."
 
-		section py-10 sm:py-14 border-t crepus-t-border crepus-entrance crepus-e4
+		section py-10 sm:py-14 border-t crepus-t-border crepus-entrance crepus-e5
 			h2 text-lg font-semibold crepus-t-text mb-2
 				"Three ways to write the same tree"
 			p text-sm crepus-t-muted mb-2 max-w-2xl m-0
@@ -231,4 +285,4 @@ $ crepus webext new ext"
 
 .slot-lede text-[var(--cp-fg)] font-medium
 .footer-row flex flex-col sm:flex-row justify-between gap-4 sm:gap-6 sm:items-center
-.doc-card group flex flex-col rounded-xl p-4 sm:p-5 transition-colors duration-200 crepus-t-card hover:border-[var(--cp-accent)]
+.doc-card group flex flex-col rounded-xl p-4 sm:p-5 transition-colors duration-200 crepus-t-card border-[var(--cp-border)] hover:border-[var(--cp-accent)]

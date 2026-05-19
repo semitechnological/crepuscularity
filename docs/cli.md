@@ -211,6 +211,10 @@ crepus ios build
 
 To refresh bundled fixtures after template changes, regenerate IR with **`crepuscularity-native`** (`render_template_to_ir` / `to_json_pretty`) and replace `NativeShell/Sources/NativeShell/fixture.json`. See [`examples/native-shells/README.md`](../examples/native-shells/README.md).
 
+## Examples
+
+The example catalog lives in [`examples/examples.toml`](../examples/examples.toml), grouped by output target. External browser extensions ([undivisible/anywhere](https://github.com/undivisible/anywhere), [undivisible/rs_vimium](https://github.com/undivisible/rs_vimium)) are symlinked under `examples/extensions/` — see [`examples/README.md`](../examples/README.md) and `./scripts/examples-link.sh`.
+
 ## View IR JSON (`crepus native ir`)
 
 Emit the same **View IR** JSON contract used by native shells and polyglot plugins:

@@ -89,12 +89,12 @@ pub(crate) fn parse_component_file_inner(content: &str) -> Result<ComponentFile,
     let mut meta_map: HashMap<String, ComponentMeta> = HashMap::new();
     if let Some(toml_src) = frontmatter_str {
         let toml_block_start = subslice_byte_offset(content, toml_src);
-        let value: toml::Value = toml_src
-            .parse()
-            .map_err(|e: toml::de::Error| RawParseError {
+        let value: toml::Value = toml::from_str(toml_src).map_err(|e: toml::de::Error| {
+            RawParseError {
                 message: format!("TOML parse error in frontmatter: {e}"),
                 byte_offset: e.span().map(|r| toml_block_start + r.start),
-            })?;
+            }
+        })?;
 
         if let toml::Value::Table(table) = value {
             for (comp_name, comp_val) in &table {
@@ -424,12 +424,45 @@ fn parse_nodes(
             // Raw expressions — rendered as evaluated text
             nodes.push(Node::RawText(line[1..line.len() - 1].trim().to_string()));
         } else {
-            let element = parse_element_line(line, children);
+            let element = merge_attr_only_children(parse_element_line(line, children));
             nodes.push(Node::Element(element));
         }
     }
 
     (nodes, i)
+}
+
+fn merge_attr_only_children(mut el: Element) -> Element {
+    let mut kept = Vec::new();
+    for child in std::mem::take(&mut el.children) {
+        if let Node::Element(c) = child {
+            if is_attr_only_element(&c) {
+                hoist_attr_element(&mut el, &c);
+                continue;
+            }
+            kept.push(Node::Element(merge_attr_only_children(c)));
+        } else {
+            kept.push(child);
+        }
+    }
+    el.children = kept;
+    el
+}
+
+fn is_attr_only_element(el: &Element) -> bool {
+    el.tag.contains('=')
+        && el.classes.is_empty()
+        && el.children.is_empty()
+        && el.bindings.is_empty()
+}
+
+fn hoist_attr_element(parent: &mut Element, attr_el: &Element) {
+    let fake = parse_element_line(&format!("div {}", attr_el.tag), vec![]);
+    parent.bindings.extend(fake.bindings);
+    if let Some(id) = fake.id {
+        parent.id = Some(id);
+    }
+    parent.classes.extend(fake.classes);
 }
 
 fn parse_if_node(lines: &[(usize, String)], i: usize, expected_indent: usize) -> (Node, usize) {
@@ -1969,6 +2002,25 @@ mod tests {
         assert_eq!(
             unescape_crepus_text_literal(r#"line\n\t\"quote""#),
             "line\n\t\"quote\""
+        );
+    }
+
+    #[test]
+    fn parse_component_file_frontmatter_with_dotted_defaults() {
+        let source = r#"+++
+[Panel.defaults]
+warning = "sandboxed"
+show_source = true
++++
+
+--- Panel
+div
+  "{warning}""#;
+        let file = parse_component_file(source).expect("frontmatter should parse");
+        let panel = file.components.get("Panel").expect("Panel component");
+        assert_eq!(
+            panel.meta.defaults.get("warning").map(|e| format!("{e}")),
+            Some("\"sandboxed\"".to_string())
         );
     }
 }

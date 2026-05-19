@@ -228,6 +228,7 @@ fn template_value_to_json(v: &TemplateValue) -> Result<Value, String> {
             }
             Value::Array(arr)
         }
+        TemplateValue::Scope(ctx) => flat_context_object(ctx)?,
     })
 }
 
@@ -346,6 +347,11 @@ fn render_node_ssr(
                         child_ctx
                             .vars
                             .insert(pattern.to_string(), TemplateValue::Str(item_str));
+                    } else {
+                        child_ctx.vars.insert(
+                            pattern.to_string(),
+                            TemplateValue::Scope(item_ctx.clone()),
+                        );
                     }
                 }
                 inner.push_str(&render_nodes_ssr(

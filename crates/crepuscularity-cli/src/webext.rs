@@ -539,8 +539,10 @@ Precompute counts/aggregates in anywhere-data when needed.
 ── Crepus template syntax ───────────────────────────────────
 Indent-based. Children are indented under their parent.
 
-Elements:
-  tag class1 class2 attr=\"value\" dynattr={expr}
+Elements (put ALL HTML attributes on the SAME line as the tag):
+  button.primary type=\"button\" data-action=\"toggle\" data-id={id}
+    \"Toggle\"
+  div card
     \"child text with {variable} interpolation\"
 
 Conditionals:

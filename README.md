@@ -187,8 +187,10 @@ crates/
   crepuscularity-dev/       crepus-dev hot-reload server
   crepuscularity-cli/       crepus CLI
 examples/
+  examples.toml             Catalog by target (see examples/README.md)
+  extensions/               Git symlinks to undivisible/anywhere, rs_vimium
   weather/                  Weather app example
-  quicknote/                Browser extension example
+  quicknote/                Browser extension example (in-repo)
   native-shells/            SwiftPM and Gradle View IR hosts
 ```
 
