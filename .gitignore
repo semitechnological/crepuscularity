@@ -6,7 +6,8 @@ Cargo.lock
 .claude/
 docs-site/dist/
 examples/web-site/dist/
-examples/vimium-crepus/dist/
+examples/extensions/*/dist/
+examples/extensions/*/target/
 # standalone example builds (server/, ssr-demo/, etc.)
 examples/**/target/
 examples/**/Cargo.lock

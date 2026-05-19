@@ -50,4 +50,15 @@ mod tests {
         assert!(CONTENT_JS.contains("if (topFrame) throw error"));
         assert!(CONTENT_JS.contains("error instanceof WebAssembly.CompileError"));
     }
+
+    #[test]
+    fn content_host_scans_and_replaces_code_blocks() {
+        assert!(CONTENT_JS.contains("extract_widgets"));
+        assert!(CONTENT_JS.contains("enhanceCodeBlock"));
+        assert!(CONTENT_JS.contains("widgetTextFromPre"));
+        assert!(CONTENT_JS.contains("replaceWith"));
+        assert!(CONTENT_JS.contains("render_frontend"));
+        assert!(!CONTENT_JS.contains("enhanceMessage"));
+        assert!(!CONTENT_JS.contains("throw new Error(\"runtime.content_main is required\")"));
+    }
 }

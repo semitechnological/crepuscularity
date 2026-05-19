@@ -1,0 +1,146 @@
+# Example catalog — grouped by output target (see examples/README.md).
+#
+# In-repo examples use `path` relative to this file.
+# External repos use `git` + a symlink under `extensions/` (./scripts/examples-link.sh).
+
+version = 1
+
+[[examples]]
+target = "webext"
+id = "quicknote"
+label = "Quicknote (MV3 scratchpad)"
+path = "quicknote"
+
+[[examples]]
+target = "webext"
+id = "anywhere"
+label = "AI Anywhere"
+path = "extensions/anywhere"
+git = "https://github.com/undivisible/anywhere"
+
+[[examples]]
+target = "webext"
+id = "rs-vimium"
+label = "Vimium (Rust + .crepus)"
+path = "extensions/rs_vimium"
+git = "https://github.com/undivisible/rs_vimium"
+
+[[examples]]
+target = "web"
+id = "web-site"
+label = "Minimal static site scaffold"
+path = "web-site"
+
+[[examples]]
+target = "web"
+id = "weather-web"
+label = "Weather app (web)"
+path = "weather-web"
+
+[[examples]]
+target = "web"
+id = "todo-web"
+label = "Todo app (web)"
+path = "todo-web"
+
+[[examples]]
+target = "web"
+id = "counter"
+label = "Counter with SSR server"
+path = "counter"
+
+[[examples]]
+target = "web"
+id = "ssr-demo"
+label = "SSR router demo"
+path = "ssr-demo"
+
+[[examples]]
+target = "gpui"
+id = "weather"
+label = "Weather app (GPUI)"
+path = "weather"
+
+[[examples]]
+target = "gpui"
+id = "todo"
+label = "Todo app (GPUI)"
+path = "todo"
+
+[[examples]]
+target = "gpui"
+id = "text-features"
+label = "Letter-spacing and text-transform"
+path = "text-features"
+
+[[examples]]
+target = "native"
+id = "native-shells"
+label = "SwiftUI + Jetpack Compose View IR"
+path = "native-shells"
+
+[[examples]]
+target = "embedded"
+id = "embedded-dashboard"
+label = "Host-sim RGB565 panel"
+path = "embedded-dashboard"
+
+[[examples]]
+target = "embedded"
+id = "embedded-stm32"
+label = "STM32 ILI9341 walkthrough"
+path = "embedded-stm32"
+
+[[examples]]
+target = "embedded"
+id = "embedded-esp32"
+label = "ESP32-S3 ST7789 walkthrough"
+path = "embedded-esp32"
+
+[[examples]]
+target = "render"
+id = "render"
+label = "CLI render demos"
+path = "render"
+
+[[examples]]
+target = "render"
+id = "ui-demo"
+label = "UI primitives demo"
+path = "ui-demo.crepus"
+
+[[examples]]
+target = "render"
+id = "demo"
+label = "Language showcase"
+path = "demo.crepus"
+
+[[examples]]
+target = "render"
+id = "layout"
+label = "Layout patterns"
+path = "layout.crepus"
+
+[[examples]]
+target = "render"
+id = "typography"
+label = "Typography"
+path = "typography.crepus"
+
+[[examples]]
+target = "render"
+id = "components-demo"
+label = "Shared components"
+path = "components-demo.crepus"
+
+[[examples]]
+target = "render"
+id = "jsx-demo"
+label = "JSX interop demo"
+path = "jsx-demo.crepus"
+
+[[examples]]
+target = "benchmark"
+id = "benchmarks"
+label = "Build-time compare harness"
+path = "benchmarks"

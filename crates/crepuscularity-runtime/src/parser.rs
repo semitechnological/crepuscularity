@@ -73,9 +73,8 @@ pub fn parse_component_file(content: &str) -> Result<ComponentFile, String> {
     // Parse TOML for metadata / defaults.
     let mut meta_map: HashMap<String, ComponentMeta> = HashMap::new();
     if let Some(toml_str) = frontmatter_str {
-        let value: toml::Value = toml_str
-            .parse()
-            .map_err(|e| format!("TOML parse error in frontmatter: {e}"))?;
+        let value: toml::Value =
+            toml::from_str(toml_str).map_err(|e| format!("TOML parse error in frontmatter: {e}"))?;
 
         if let toml::Value::Table(table) = value {
             for (comp_name, comp_val) in &table {

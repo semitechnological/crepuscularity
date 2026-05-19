@@ -383,6 +383,7 @@ pub(crate) fn is_truthy(v: &TemplateValue) -> bool {
         TemplateValue::Float(f) => *f != 0.0,
         TemplateValue::Str(s) => !s.is_empty(),
         TemplateValue::List(l) => !l.is_empty(),
+        TemplateValue::Scope(s) => !s.vars.is_empty(),
         TemplateValue::Null => false,
     }
 }
@@ -431,6 +432,7 @@ fn value_to_cmp_str(v: &TemplateValue) -> String {
         TemplateValue::Bool(b) => b.to_string(),
         TemplateValue::Null => String::new(),
         TemplateValue::List(l) => format!("[{} items]", l.len()),
+        TemplateValue::Scope(_) => String::new(),
     }
 }
 
@@ -510,6 +512,11 @@ fn apply_property(val: TemplateValue, prop: &str) -> TemplateValue {
         (TemplateValue::Float(f), "floor") => TemplateValue::Int(f.floor() as i64),
         (TemplateValue::Float(f), "ceil") => TemplateValue::Int(f.ceil() as i64),
         (TemplateValue::Float(f), "round") => TemplateValue::Int(f.round() as i64),
+        (TemplateValue::Scope(ctx), prop) => ctx
+            .vars
+            .get(prop)
+            .cloned()
+            .unwrap_or(TemplateValue::Null),
         _ => TemplateValue::Null,
     }
 }

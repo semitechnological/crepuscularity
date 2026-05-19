@@ -249,6 +249,13 @@ fn template_value_to_json(value: &TemplateValue) -> serde_json::Value {
                 })
                 .collect(),
         ),
+        TemplateValue::Scope(ctx) => {
+            let mut object = serde_json::Map::new();
+            for (key, value) in &ctx.vars {
+                object.insert(key.clone(), template_value_to_json(value));
+            }
+            serde_json::Value::Object(object)
+        }
         TemplateValue::Null => serde_json::Value::Null,
     }
 }
@@ -443,6 +450,10 @@ fn render_for(block: &ForBlock, ctx: &TemplateContext) -> Result<String, String>
                 child_ctx
                     .vars
                     .insert(pattern.to_string(), TemplateValue::Str(item_str));
+            } else {
+                child_ctx
+                    .vars
+                    .insert(pattern.to_string(), TemplateValue::Scope(item_ctx.clone()));
             }
         }
 
