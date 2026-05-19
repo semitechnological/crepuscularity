@@ -205,6 +205,86 @@ host-permissions = ["https://example.com/*"]
     )
 }
 
+// ── auto-detect ──────────────────────────────────────────────────────────────
+
+fn auto_detect_pages(app_path: &Path, manifest: &mut crepuscularity_webext::ExtensionManifest) {
+    let pages_dir = app_path.join("pages");
+    let opts = &mut manifest.options;
+
+    // action_popup: look for popup.crepus or action.crepus
+    if opts.action_popup.is_none() {
+        for stem in ["popup", "action"] {
+            let p = pages_dir.join(format!("{stem}.crepus"));
+            if p.exists() {
+                opts.action_popup = Some(format!("pages/{stem}.crepus"));
+                break;
+            }
+        }
+    }
+
+    // options_ui: look for options.crepus
+    if opts.options_ui.is_none() {
+        let p = pages_dir.join("options.crepus");
+        if p.exists() {
+            opts.options_ui = Some(crepuscularity_webext::OptionsUiSpec {
+                page: "pages/options.crepus".to_string(),
+                browser_style: Some(false),
+                open_in_tab: Some(true),
+            });
+        }
+    }
+
+    // chrome_url_overrides: look for new-tab.crepus
+    if manifest.chrome_url_overrides.is_empty() {
+        let p = pages_dir.join("new-tab.crepus");
+        if p.exists() {
+            manifest.chrome_url_overrides.insert(
+                "newtab".to_string(),
+                "pages/new-tab.crepus".to_string(),
+            );
+        }
+    }
+}
+
+fn auto_detect_icons(app_path: &Path, manifest: &mut crepuscularity_webext::ExtensionManifest) {
+    let icons_dir = app_path.join("icons");
+    if !icons_dir.is_dir() { return; }
+
+    if manifest.options.icons.is_empty() {
+        if let Ok(entries) = std::fs::read_dir(&icons_dir) {
+            for entry in entries.flatten() {
+                let name = entry.file_name().to_string_lossy().to_string();
+                // Only match icon{size}.png (not action_* icons)
+                if name.starts_with("icon") && !name.contains("action") {
+                    if let Some(size) = detect_icon_size(&name) {
+                        manifest.options.icons.insert(size, format!("icons/{name}"));
+                    }
+                }
+            }
+        }
+    }
+
+    if manifest.options.action_icons.is_empty() {
+        if let Ok(entries) = std::fs::read_dir(&icons_dir) {
+            for entry in entries.flatten() {
+                let name = entry.file_name().to_string_lossy().to_string();
+                // Match action_disabled_* files
+                if name.contains("action_disabled") {
+                    if let Some(size) = detect_icon_size(&name) {
+                        manifest.options.action_icons.insert(size, format!("icons/{name}"));
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn detect_icon_size(filename: &str) -> Option<String> {
+    // Extract digits from filename: icon128.png → "128", action_disabled_16.png → "16"
+    let digits: String = filename.chars().filter(|c| c.is_ascii_digit()).collect();
+    if digits.is_empty() { None } else { Some(digits) }
+}
+
 // ── build ─────────────────────────────────────────────────────────────────────
 
 fn build_extension(app_path: &Path, dev: bool) {
@@ -215,10 +295,14 @@ fn build_extension(app_path: &Path, dev: bool) {
         ui::error(&format!("no webext.toml found in {}", app_path.display()));
     }
 
-    let manifest = match crepuscularity_webext::ExtensionManifest::load(&webext_toml) {
+    let mut manifest = match crepuscularity_webext::ExtensionManifest::load(&webext_toml) {
         Ok(m) => m,
         Err(e) => ui::error(&format!("failed to parse webext.toml: {e}")),
     };
+
+    // Auto-detect options from project structure
+    auto_detect_pages(app_path, &mut manifest);
+    auto_detect_icons(app_path, &mut manifest);
 
     let ext_name = style(manifest.extension.name.as_str()).cyan().bold();
     eprintln!("{} building {ext_name}", style("crepus webext").dim());
