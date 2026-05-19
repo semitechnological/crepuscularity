@@ -5,20 +5,13 @@
   }
   const cacheKey = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const topFrame = (() => {
-    try {
-      return globalThis.top === globalThis;
-    } catch (_) {
-      return false;
-    }
+    try { return globalThis.top === globalThis; } catch (_) { return false; }
   })();
   try {
     const runtime = await import(`${runtimeApi.getURL("vendor/runtime.js")}?v=${cacheKey}`);
-    const wasmBytes = await fetch(`${runtimeApi.getURL("vendor/runtime_bg.wasm")}?v=${cacheKey}`, { cache: "no-store" }).then((response) => response.arrayBuffer());
+    const wasmBytes = await fetch(`${runtimeApi.getURL("vendor/runtime_bg.wasm")}?v=${cacheKey}`, { cache: "no-store" }).then(r => r.arrayBuffer());
     await runtime.default({ module_or_path: wasmBytes });
-    if (typeof runtime.content_main !== "function") {
-      throw new Error("runtime.content_main is required");
-    }
-    runtime.content_main();
+    if (typeof runtime.content_main === "function") runtime.content_main();
   } catch (error) {
     if (topFrame) throw error;
     if (!(error instanceof WebAssembly.CompileError)) throw error;

@@ -12,6 +12,7 @@ pub const CONTENT_JS: &str =
     include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/content.js"));
 pub const CONTENT_CSS: &str =
     include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/content.css"));
+pub const DEV_JS: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/dev.js"));
 pub const BROWSER_SHIM: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/assets/browser-shim.js"
