@@ -512,11 +512,9 @@ fn apply_property(val: TemplateValue, prop: &str) -> TemplateValue {
         (TemplateValue::Float(f), "floor") => TemplateValue::Int(f.floor() as i64),
         (TemplateValue::Float(f), "ceil") => TemplateValue::Int(f.ceil() as i64),
         (TemplateValue::Float(f), "round") => TemplateValue::Int(f.round() as i64),
-        (TemplateValue::Scope(ctx), prop) => ctx
-            .vars
-            .get(prop)
-            .cloned()
-            .unwrap_or(TemplateValue::Null),
+        (TemplateValue::Scope(ctx), prop) => {
+            ctx.vars.get(prop).cloned().unwrap_or(TemplateValue::Null)
+        }
         _ => TemplateValue::Null,
     }
 }

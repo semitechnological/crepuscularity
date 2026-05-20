@@ -631,8 +631,20 @@ div
     fn css_only_file_without_template_placeholder() {
         let s = ".foo {\n  color: red;\n}\n.bar {\n  color: blue;\n}\n";
         let d = strip_indent_decorators(s);
-        assert!(d.body.trim().is_empty(), "body should be empty, got {:?}", d.body);
-        assert!(d.inline_css.contains(".foo"), "css missing .foo: {:?}", d.inline_css);
-        assert!(d.inline_css.contains(".bar"), "css missing .bar: {:?}", d.inline_css);
+        assert!(
+            d.body.trim().is_empty(),
+            "body should be empty, got {:?}",
+            d.body
+        );
+        assert!(
+            d.inline_css.contains(".foo"),
+            "css missing .foo: {:?}",
+            d.inline_css
+        );
+        assert!(
+            d.inline_css.contains(".bar"),
+            "css missing .bar: {:?}",
+            d.inline_css
+        );
     }
 }
