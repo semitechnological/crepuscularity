@@ -169,7 +169,7 @@ fn render_docs_landing_body(site_name: &str, items: &[DocNavItem]) -> String {
     }
     format!(
         r#"<div class="docs-landing">
-  <p class="lede">Guides and references for the <strong>.crepus</strong> DSL, native and WASM renderers, and the <code>crepus</code> CLI. Same Markdown sources as the <a href="https://github.com/semitechnological/crepuscularity/tree/main/docs">repository <code>docs/</code> folder</a>.</p>
+  <p class="lede">Guides and references for the <strong>.crepus</strong> DSL, native and WASM renderers, and the <code>crepus</code> CLI. Same Markdown sources as the <a href="https://github.com/tschk/crepuscularity/tree/main/docs">repository <code>docs/</code> folder</a>.</p>
   <div class="doc-grid">{cards}</div>
   <p class="footnote"><a href="../index.html">← Back to {esc} home</a></p>
 </div>"#

@@ -6,7 +6,7 @@ The first GPUI component and runtime system with hot reloading, and the first no
 
 Write UI in a concise, indentation-based template DSL (`.crepus` files). Templates compile at build time via the `view!` macro or render at runtime with full hot-reload support. The same `.crepus` syntax drives native desktop (GPUI), terminal UIs (Ratatui), browser extensions (MV3), HTML output, and React/JSX — and is the foundation for native mobile backends targeting SwiftUI and Jetpack Compose.
 
-Use [Aurorality](https://github.com/semitechnological/aurorality) for united SwiftUI macOS + iOS apps.
+Use [Aurorality](https://github.com/tschk/aurorality) for united SwiftUI macOS + iOS apps.
 
 ## Why Crepuscularity
 

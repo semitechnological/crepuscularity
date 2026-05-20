@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 license = "MPL-2.0"
 description = "Compile-time .crepus validation for crepuscularity-embedded (UNSTABLE; embedded stack largely untested on hardware)."
-repository = "https://github.com/semitechnological/crepuscularity"
+repository = "https://github.com/tschk/crepuscularity"
 readme = "../../README.md"
 
 [lib]

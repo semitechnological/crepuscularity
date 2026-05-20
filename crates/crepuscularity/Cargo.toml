@@ -4,7 +4,7 @@ version = "0.4.0"
 edition = "2021"
 license = "MPL-2.0"
 description = "Crepuscularity UI framework: .crepus templates for GPUI and web (UNSTABLE; in active development)."
-repository = "https://github.com/semitechnological/crepuscularity"
+repository = "https://github.com/tschk/crepuscularity"
 documentation = "https://docs.rs/crepuscularity"
 readme = "../../README.md"
 

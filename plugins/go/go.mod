@@ -1,3 +1,3 @@
-module github.com/semitechnological/crepuscularity/plugins/go
+module github.com/tschk/crepuscularity/plugins/go
 
 go 1.24
