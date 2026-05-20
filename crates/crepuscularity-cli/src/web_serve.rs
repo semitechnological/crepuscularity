@@ -326,7 +326,9 @@ fn load_all_crepus(site_dir: &Path, vfm: &Arc<RwLock<HashMap<String, String>>>) 
             })
         })
         .collect();
-    let mut map = vfm.write().unwrap();
+    let mut map = vfm
+        .write()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     for (key, content) in results {
         map.insert(key, content);
     }
@@ -468,7 +470,9 @@ fn start_watcher(
                     let mut last_crepus_path: Option<PathBuf> = None;
 
                     if !pending_crepus.is_empty() {
-                        let mut map = vfm.write().unwrap();
+                        let mut map = vfm
+                            .write()
+                            .unwrap_or_else(std::sync::PoisonError::into_inner);
                         for path in pending_crepus.drain(..) {
                             let key = relative_key(&site_dir, &path);
                             match std::fs::read_to_string(&path) {
@@ -485,7 +489,10 @@ fn start_watcher(
                             }
                         }
                         drop(map);
-                        let map = vfm.read().unwrap().clone();
+                        let map = vfm
+                            .read()
+                            .unwrap_or_else(std::sync::PoisonError::into_inner)
+                            .clone();
                         let dev_root = site_dir.join(crate::web::WEB_DEV_ARTIFACT_DIR);
                         if let Err(e) =
                             crate::web_islands::build_web_islands(&site_dir, &dev_root, &map)
@@ -762,7 +769,10 @@ fn serve_index_document(
     entry: &str,
     site_dir: &Path,
 ) {
-    let files = vfm.read().unwrap().clone();
+    let files = vfm
+        .read()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .clone();
     let head = load_site_head(site_dir);
     let google_fonts = merged_site_google_fonts(site_dir, &files);
     let inline_css = merged_site_inline_css(&files);
@@ -794,7 +804,10 @@ fn serve_secondary_preview(
     template_key: &str,
     site_dir: &Path,
 ) {
-    let files = vfm.read().unwrap().clone();
+    let files = vfm
+        .read()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .clone();
     let ctx = TemplateContext::new();
     let inner = match render_from_files(&files, template_key, &ctx) {
         Ok(h) => h,
@@ -855,7 +868,10 @@ fn serve_crepus_bundle(
     vfm: &Arc<RwLock<HashMap<String, String>>>,
     entry: &str,
 ) {
-    let files = vfm.read().unwrap().clone();
+    let files = vfm
+        .read()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .clone();
     let body = json!({ "entry": entry, "files": files }).to_string();
     let resp = format!(
         "HTTP/1.1 200 OK\r\nContent-Type: application/json; charset=utf-8\r\nContent-Length: {}\r\nCache-Control: no-store\r\n\r\n{}",

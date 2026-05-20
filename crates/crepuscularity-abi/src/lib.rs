@@ -12,6 +12,14 @@ use crepuscularity_native::{
 use serde::Deserialize;
 use serde_json::{json, Value};
 
+// Safety: all `#[no_mangle] extern "C"` functions validate null pointers before
+// dereferencing. The `session` pointer passed to every function except
+// `crepus_session_new` MUST have been returned by `crepus_session_new` and MUST
+// NOT have been freed via `crepus_session_free`. String pointers (`template_utf8`,
+// `event_json_utf8`, etc.) MUST point to valid null-terminated UTF-8 C strings.
+// `crepus_string_free` MUST only be called on pointers returned by this crate;
+// after calling it the pointer is invalid and MUST NOT be used again.
+
 thread_local! {
     static LAST_ERROR: RefCell<Option<String>> = const { RefCell::new(None) };
 }

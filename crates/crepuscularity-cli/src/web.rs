@@ -148,7 +148,9 @@ fn parse_site_dir(args: &[String]) -> PathBuf {
         }
         i += 1;
     }
-    std::env::current_dir().unwrap()
+    std::env::current_dir().unwrap_or_else(|e| {
+        ui::error(&format!("cannot determine current directory: {e}"));
+    })
 }
 
 fn print_site_json(site_dir: &Path) {
@@ -279,8 +281,12 @@ fn scaffold_site(name: &str) {
     }
 
     let rt_name = slug.replace('-', "_");
-    std::fs::create_dir_all(base.join("runtime/src")).unwrap();
-    std::fs::create_dir_all(base.join("dist")).unwrap();
+    std::fs::create_dir_all(base.join("runtime/src")).unwrap_or_else(|e| {
+        ui::error(&format!("create runtime/src dir: {e}"));
+    });
+    std::fs::create_dir_all(base.join("dist")).unwrap_or_else(|e| {
+        ui::error(&format!("create dist dir: {e}"));
+    });
 
     let web_toml = format!(
         r#"[site]
@@ -292,7 +298,9 @@ description = "Crepus static site (.crepus + WASM)"
 # Ship: crepus web build --site .
 "#
     );
-    std::fs::write(base.join("web.toml"), web_toml).unwrap();
+    std::fs::write(base.join("web.toml"), web_toml).unwrap_or_else(|e| {
+        ui::error(&format!("write web.toml: {e}"));
+    });
 
     let index_crepus = r#"div w-full min-h-screen bg-zinc-950 text-zinc-50 p-8 flex flex-col gap-4
  div text-3xl font-bold
@@ -300,7 +308,9 @@ description = "Crepus static site (.crepus + WASM)"
  div text-zinc-400 max-w-xl
   "This page is rendered in the browser by the same pipeline as crepus web serve — wasm32 + crepus-bundle.json."
 "#;
-    std::fs::write(base.join("index.crepus"), index_crepus).unwrap();
+    std::fs::write(base.join("index.crepus"), index_crepus).unwrap_or_else(|e| {
+        ui::error(&format!("write index.crepus: {e}"));
+    });
 
     let cargo_toml = format!(
         r#"[package]
@@ -318,7 +328,9 @@ wasm-bindgen = "0.2"
 [workspace]
 "#
     );
-    std::fs::write(base.join("runtime/Cargo.toml"), cargo_toml).unwrap();
+    std::fs::write(base.join("runtime/Cargo.toml"), cargo_toml).unwrap_or_else(|e| {
+        ui::error(&format!("write runtime/Cargo.toml: {e}"));
+    });
 
     let lib_rs = r#"use wasm_bindgen::prelude::*;
 
@@ -327,7 +339,9 @@ pub fn crepus_render(bundle_json: &str) -> Result<String, JsValue> {
     crepuscularity_web::render_bundle(bundle_json).map_err(|e| JsValue::from_str(&e))
 }
 "#;
-    std::fs::write(base.join("runtime/src/lib.rs"), lib_rs).unwrap();
+    std::fs::write(base.join("runtime/src/lib.rs"), lib_rs).unwrap_or_else(|e| {
+        ui::error(&format!("write runtime/src/lib.rs: {e}"));
+    });
 
     eprintln!(
         "\n{} created {}",
@@ -967,7 +981,9 @@ struct BuildFullArgs {
 }
 
 fn parse_build_full_args(args: &[String]) -> BuildFullArgs {
-    let mut site_dir = std::env::current_dir().unwrap();
+    let mut site_dir = std::env::current_dir().unwrap_or_else(|e| {
+        ui::error(&format!("cannot determine current directory: {e}"));
+    });
     let mut wasm = false;
     let mut server = false;
     let mut i = 0;
