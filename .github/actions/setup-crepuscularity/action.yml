@@ -52,7 +52,7 @@ runs:
       shell: bash
       run: |
         if ! command -v crepu &> /dev/null; then
-          cargo install --git https://github.com/semitechnological/crepuscularity crepuscularity-cli
+          cargo install --git https://github.com/tschk/crepuscularity crepuscularity-cli
         fi
     
     - name: Verify installation

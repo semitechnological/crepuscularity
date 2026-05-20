@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 description = "GPUI desktop shell with an embedded V8 runtime and a Capacitor-shaped native bridge."
-repository = "https://github.com/semitechnological/crepuscularity"
+repository = "https://github.com/tschk/crepuscularity"
 
 [features]
 default = []
