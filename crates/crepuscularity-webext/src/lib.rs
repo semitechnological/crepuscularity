@@ -39,8 +39,8 @@ pub use api::{
 pub use capabilities::{Capability, CapabilitySet};
 pub use manifest::{
     ActionSpec, BackgroundSpec, CapabilitiesSection, ContentScriptEntry, ContentScriptSpec,
-    ExtensionInfo, ExtensionManifest, ManifestError, ManifestOptions, ManifestV3,
-    OptionsUiSpec, WebAccessibleResources,
+    ExtensionInfo, ExtensionManifest, ManifestError, ManifestOptions, ManifestV3, OptionsUiSpec,
+    WebAccessibleResources,
 };
 pub use scanner::{scan_crepus_for_capabilities, CapabilityUsage};
 pub use watcher::{check_project_capabilities, CapabilityWatcher, WatchEvent};

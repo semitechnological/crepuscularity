@@ -89,12 +89,11 @@ pub(crate) fn parse_component_file_inner(content: &str) -> Result<ComponentFile,
     let mut meta_map: HashMap<String, ComponentMeta> = HashMap::new();
     if let Some(toml_src) = frontmatter_str {
         let toml_block_start = subslice_byte_offset(content, toml_src);
-        let value: toml::Value = toml::from_str(toml_src).map_err(|e: toml::de::Error| {
-            RawParseError {
+        let value: toml::Value =
+            toml::from_str(toml_src).map_err(|e: toml::de::Error| RawParseError {
                 message: format!("TOML parse error in frontmatter: {e}"),
                 byte_offset: e.span().map(|r| toml_block_start + r.start),
-            }
-        })?;
+            })?;
 
         if let toml::Value::Table(table) = value {
             for (comp_name, comp_val) in &table {

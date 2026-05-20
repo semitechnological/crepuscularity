@@ -348,10 +348,9 @@ fn render_node_ssr(
                             .vars
                             .insert(pattern.to_string(), TemplateValue::Str(item_str));
                     } else {
-                        child_ctx.vars.insert(
-                            pattern.to_string(),
-                            TemplateValue::Scope(item_ctx.clone()),
-                        );
+                        child_ctx
+                            .vars
+                            .insert(pattern.to_string(), TemplateValue::Scope(item_ctx.clone()));
                     }
                 }
                 inner.push_str(&render_nodes_ssr(
