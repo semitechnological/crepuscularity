@@ -73,12 +73,32 @@ pub fn build_frame_doc(html: &str, css: &str, js: &str, unocss: &str, empty_msg:
     } else {
         format!("\n  <script type=\"module\">{js}</script>")
     };
+    let resize_script = r#"<script>
+(function () {
+  function report() {
+    var h = Math.max(
+      document.documentElement.scrollHeight,
+      document.body ? document.body.scrollHeight : 0
+    );
+    parent.postMessage({ type: "anywhere-resize", height: h }, "*");
+  }
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", report);
+  } else {
+    report();
+  }
+  window.addEventListener("load", report);
+  if (typeof ResizeObserver !== "undefined") {
+    new ResizeObserver(report).observe(document.documentElement);
+  }
+})();
+</script>"#;
     format!(
         "<!doctype html>\n<html>\n<head>\n  <meta charset=\"utf-8\">\n  \
          <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n  \
          {fonts_link}\n  \
          <style>{base_css}{css}</style>{unocss_tag}\n</head>\n<body>\n  \
-         {body_html}{js_tag}\n</body>\n</html>"
+         {body_html}{js_tag}{resize_script}\n</body>\n</html>"
     )
 }
 
@@ -114,7 +134,13 @@ mod tests {
     #[test]
     fn build_frame_doc_omits_unocss_when_empty() {
         let doc = build_frame_doc("x", "", "", "", "");
-        assert!(!doc.contains("<script>"));
+        assert!(!doc.contains("<script>{"));
+    }
+
+    #[test]
+    fn build_frame_doc_includes_resize_postmessage() {
+        let doc = build_frame_doc("x", "", "", "", "");
+        assert!(doc.contains("anywhere-resize"));
     }
 
     #[test]
