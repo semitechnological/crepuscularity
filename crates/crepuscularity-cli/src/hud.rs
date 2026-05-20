@@ -228,8 +228,10 @@ pub fn open_hud_window(
         tabbing_identifier: None,
     };
 
-    cx.open_window(window_options, move |_window, cx| {
+    match cx.open_window(window_options, move |_window, cx| {
         cx.new(|cx| DevHud::new(shared.clone(), shutdown.clone(), cx))
-    })
-    .unwrap();
+    }) {
+        Ok(_) => {}
+        Err(e) => eprintln!("crepus dev: failed to open HUD window: {e}"),
+    }
 }

@@ -6,6 +6,20 @@ fn crepus() -> Command {
     Command::new(env!("CARGO_BIN_EXE_crepus"))
 }
 
+fn wasm_build_prereqs_ok() -> bool {
+    let has_target = std::process::Command::new("rustup")
+        .args(["target", "list", "--installed"])
+        .output()
+        .map(|o| String::from_utf8_lossy(&o.stdout).contains("wasm32-unknown-unknown"))
+        .unwrap_or(false);
+    let has_bindgen = std::process::Command::new("wasm-bindgen")
+        .arg("--version")
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false);
+    has_target && has_bindgen
+}
+
 #[test]
 #[cfg_attr(
     windows,
@@ -34,6 +48,10 @@ fn web_new_scaffolds_crepus_and_runtime() {
     ignore = "default desktop crepus.exe does not spawn reliably on Windows CI"
 )]
 fn web_build_example_site_emits_wasm() {
+    if !wasm_build_prereqs_ok() {
+        eprintln!("skipping: wasm32 target or wasm-bindgen not installed");
+        return;
+    }
     let out = tempfile::tempdir().expect("tempdir");
     let example = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../examples/web-site")
@@ -78,6 +96,10 @@ fn web_build_example_site_emits_wasm() {
     ignore = "default desktop crepus.exe does not spawn reliably on Windows CI"
 )]
 fn web_build_docs_site_emits_wasm() {
+    if !wasm_build_prereqs_ok() {
+        eprintln!("skipping: wasm32 target or wasm-bindgen not installed");
+        return;
+    }
     let out = tempfile::tempdir().expect("tempdir");
     let docs_site = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../docs-site")
@@ -156,6 +178,10 @@ fn web_build_docs_site_emits_wasm() {
     ignore = "default desktop crepus.exe does not spawn reliably on Windows CI"
 )]
 fn web_build_via_crepus_toml_target_docs_emits_wasm() {
+    if !wasm_build_prereqs_ok() {
+        eprintln!("skipping: wasm32 target or wasm-bindgen not installed");
+        return;
+    }
     use std::path::Path;
 
     let out = tempfile::tempdir().expect("tempdir");

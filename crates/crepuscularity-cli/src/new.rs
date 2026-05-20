@@ -17,9 +17,15 @@ pub fn run(name: &str) {
         ui::error(&format!("could not create directories: {e}"));
     });
 
-    fs::write(dir.join("Cargo.toml"), cargo_toml(name)).unwrap();
-    fs::write(dir.join("src").join("main.rs"), main_rs(name)).unwrap();
-    fs::write(dir.join(".gitignore"), "/target\n").unwrap();
+    fs::write(dir.join("Cargo.toml"), cargo_toml(name)).unwrap_or_else(|e| {
+        ui::error(&format!("write Cargo.toml: {e}"));
+    });
+    fs::write(dir.join("src").join("main.rs"), main_rs(name)).unwrap_or_else(|e| {
+        ui::error(&format!("write main.rs: {e}"));
+    });
+    fs::write(dir.join(".gitignore"), "/target\n").unwrap_or_else(|e| {
+        ui::error(&format!("write .gitignore: {e}"));
+    });
 
     use console::style;
     eprintln!("\n{} created {}", ui::ok(), style(name).cyan().bold());

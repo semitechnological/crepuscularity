@@ -116,16 +116,18 @@ impl DownloadPlugin {
     }
 
     fn make_filename(url: &str, requested: Option<&str>) -> String {
-        if let Some(name) = requested.filter(|s| !s.trim().is_empty()) {
-            return name.to_string();
-        }
-        let parts: Vec<&str> = url.split('/').filter(|part| !part.is_empty()).collect();
-        parts
-            .iter()
-            .rfind(|part| !part.contains('?'))
-            .copied()
-            .unwrap_or("download.bin")
-            .to_string()
+        let raw = if let Some(name) = requested.filter(|s| !s.trim().is_empty()) {
+            name.to_string()
+        } else {
+            let parts: Vec<&str> = url.split('/').filter(|part| !part.is_empty()).collect();
+            parts
+                .iter()
+                .rfind(|part| !part.contains('?'))
+                .copied()
+                .unwrap_or("download.bin")
+                .to_string()
+        };
+        raw.replace(['/', '\\', '\0'], "_")
     }
 
     fn create_task(
@@ -143,6 +145,12 @@ impl DownloadPlugin {
         let output_dir = Self::task_dir();
         let display_name = Self::make_filename(url, filename);
         let output_path = output_dir.join(format!("{gid}-{display_name}"));
+        if !output_path.starts_with(&output_dir) {
+            return Err(BridgeError::new(
+                "path_escape",
+                "download filename escapes output directory",
+            ));
+        }
         let task = DownloadTask {
             gid,
             status: STATUS_WAITING.to_string(),

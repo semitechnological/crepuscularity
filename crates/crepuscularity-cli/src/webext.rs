@@ -49,7 +49,9 @@ fn parse_app_path(args: &[String]) -> PathBuf {
         }
         i += 1;
     }
-    std::env::current_dir().unwrap()
+    std::env::current_dir().unwrap_or_else(|e| {
+        ui::error(&format!("cannot determine current directory: {e}"));
+    })
 }
 
 fn print_webext_usage() {
@@ -95,11 +97,17 @@ fn scaffold_extension(name: &str) {
         ui::error(&format!("directory already exists: {slug}"));
     }
 
-    std::fs::create_dir_all(base.join("runtime/src")).unwrap();
-    std::fs::create_dir_all(base.join("views")).unwrap();
+    std::fs::create_dir_all(base.join("runtime/src")).unwrap_or_else(|e| {
+        ui::error(&format!("create runtime/src dir: {e}"));
+    });
+    std::fs::create_dir_all(base.join("views")).unwrap_or_else(|e| {
+        ui::error(&format!("create views dir: {e}"));
+    });
 
     let webext_toml = scaffold_webext_toml(name);
-    std::fs::write(base.join("webext.toml"), webext_toml).unwrap();
+    std::fs::write(base.join("webext.toml"), webext_toml).unwrap_or_else(|e| {
+        ui::error(&format!("write webext.toml: {e}"));
+    });
 
     let cargo_toml = format!(
         r#"[package]
@@ -118,7 +126,9 @@ serde-wasm-bindgen = "0.6"
 wasm-bindgen = "0.2"
 "#
     );
-    std::fs::write(base.join("runtime/Cargo.toml"), cargo_toml).unwrap();
+    std::fs::write(base.join("runtime/Cargo.toml"), cargo_toml).unwrap_or_else(|e| {
+        ui::error(&format!("write runtime/Cargo.toml: {e}"));
+    });
 
     let lib_rs = r##"use wasm_bindgen::prelude::*;
 
@@ -156,7 +166,9 @@ pub fn handle_background_message(message: JsValue) -> Result<JsValue, JsValue> {
         .map_err(|e| JsValue::from_str(&e.to_string()))
 }
 "##;
-    std::fs::write(base.join("runtime/src/lib.rs"), lib_rs).unwrap();
+    std::fs::write(base.join("runtime/src/lib.rs"), lib_rs).unwrap_or_else(|e| {
+        ui::error(&format!("write runtime/src/lib.rs: {e}"));
+    });
 
     let ui_crepus = r#"+++
 [Popup.defaults]
@@ -171,7 +183,9 @@ div flex flex-col gap-4 p-4
   div text-sm text-zinc-500
     "{description}"
 "#;
-    std::fs::write(base.join("views/ui.crepus"), ui_crepus).unwrap();
+    std::fs::write(base.join("views/ui.crepus"), ui_crepus).unwrap_or_else(|e| {
+        ui::error(&format!("write views/ui.crepus: {e}"));
+    });
 
     eprintln!(
         "\n{} created {}",
@@ -319,8 +333,12 @@ fn build_extension(app_path: &Path, dev: bool) {
     let dist = app_path.join("dist/unpacked");
     let src_dir = dist.join("src");
     let vendor_dir = dist.join("vendor");
-    std::fs::create_dir_all(&src_dir).unwrap();
-    std::fs::create_dir_all(&vendor_dir).unwrap();
+    std::fs::create_dir_all(&src_dir).unwrap_or_else(|e| {
+        ui::error(&format!("create src/ dir: {e}"));
+    });
+    std::fs::create_dir_all(&vendor_dir).unwrap_or_else(|e| {
+        ui::error(&format!("create vendor/ dir: {e}"));
+    });
 
     // ── Step 1: manifest.json ────────────────────────────────────────────────
     {
@@ -329,75 +347,59 @@ fn build_extension(app_path: &Path, dev: bool) {
         if dev {
             json = inject_dev_content_script(&json);
         }
-        std::fs::write(dist.join("manifest.json"), &json).unwrap();
+        std::fs::write(dist.join("manifest.json"), &json).unwrap_or_else(|e| {
+            ui::error(&format!("write manifest.json: {e}"));
+        });
         ui::spinner_ok(&sp, "manifest.json");
     }
 
     // ── Step 2: runtime assets ───────────────────────────────────────────────
     {
         let sp = ui::spinner("writing runtime assets");
-        std::fs::write(
-            src_dir.join("popup.html"),
-            crepuscularity_webext::extension_assets::POPUP_HTML,
-        )
-        .unwrap();
-        std::fs::write(
-            src_dir.join("popup.css"),
-            crepuscularity_webext::extension_assets::POPUP_CSS,
-        )
-        .unwrap();
-        std::fs::write(
-            src_dir.join("popup.js"),
-            crepuscularity_webext::extension_assets::POPUP_JS,
-        )
-        .unwrap();
-        std::fs::write(
-            src_dir.join("options.js"),
-            crepuscularity_webext::extension_assets::OPTIONS_JS,
-        )
-        .unwrap();
-        std::fs::write(
+        use crepuscularity_webext::extension_assets as a;
+
+        macro_rules! w {
+            ($name:expr, $path:expr, $content:expr) => {
+                std::fs::write($path, $content).unwrap_or_else(|e| {
+                    ui::error(&format!("write {}: {e}", $name));
+                });
+            };
+        }
+
+        w!("popup.html", src_dir.join("popup.html"), a::POPUP_HTML);
+        w!("popup.css", src_dir.join("popup.css"), a::POPUP_CSS);
+        w!("popup.js", src_dir.join("popup.js"), a::POPUP_JS);
+        w!("options.js", src_dir.join("options.js"), a::OPTIONS_JS);
+        w!(
+            "background.js",
             src_dir.join("background.js"),
-            crepuscularity_webext::extension_assets::BACKGROUND_JS,
-        )
-        .unwrap();
+            a::BACKGROUND_JS
+        );
         let custom_bg = app_path.join("src/background.js");
         if custom_bg.exists() {
-            std::fs::copy(&custom_bg, src_dir.join("background.js")).unwrap();
+            std::fs::copy(&custom_bg, src_dir.join("background.js")).unwrap_or_else(|e| {
+                ui::error(&format!("copy custom background.js: {e}"));
+            });
         }
-        std::fs::write(
-            src_dir.join("content.js"),
-            crepuscularity_webext::extension_assets::CONTENT_JS,
-        )
-        .unwrap();
-        std::fs::write(
-            src_dir.join("content.css"),
-            crepuscularity_webext::extension_assets::CONTENT_CSS,
-        )
-        .unwrap();
-        std::fs::write(
+        w!("content.js", src_dir.join("content.js"), a::CONTENT_JS);
+        w!("content.css", src_dir.join("content.css"), a::CONTENT_CSS);
+        w!(
+            "browser-shim.js",
             src_dir.join("browser-shim.js"),
-            crepuscularity_webext::extension_assets::BROWSER_SHIM,
-        )
-        .unwrap();
-        std::fs::write(
+            a::BROWSER_SHIM
+        );
+        w!(
+            "runtime-as-adapter.js",
             src_dir.join("runtime-as-adapter.js"),
-            crepuscularity_webext::extension_assets::RUNTIME_ADAPTER,
-        )
-        .unwrap();
+            a::RUNTIME_ADAPTER
+        );
         if dev {
-            std::fs::write(
-                src_dir.join("dev.js"),
-                crepuscularity_webext::extension_assets::DEV_JS,
-            )
-            .unwrap();
+            w!("dev.js", src_dir.join("dev.js"), a::DEV_JS);
         }
-        std::fs::write(
-            vendor_dir.join("unocss.js"),
-            crepuscularity_webext::extension_assets::UNOCSS_JS,
-        )
-        .unwrap();
-        copy_app_assets(app_path, &dist).unwrap();
+        w!("unocss.js", vendor_dir.join("unocss.js"), a::UNOCSS_JS);
+        copy_app_assets(app_path, &dist).unwrap_or_else(|e| {
+            ui::error(&format!("copy app assets: {e}"));
+        });
         render_crepus_css_assets(app_path, &dist).unwrap_or_else(|e| {
             ui::error(&format!("render extension .css.crepus assets: {e}"));
         });
@@ -424,7 +426,9 @@ fn build_extension(app_path: &Path, dev: bool) {
         let sp = ui::spinner("pre-rendering popup.html");
         match prerender_popup_html(app_path, &popup_template, &manifest) {
             Ok(html) => {
-                std::fs::write(src_dir.join("popup.html"), &html).unwrap();
+                std::fs::write(src_dir.join("popup.html"), &html).unwrap_or_else(|e| {
+                    ui::error(&format!("write popup.html: {e}"));
+                });
                 ui::spinner_ok(&sp, "popup.html (pre-rendered from popup.crepus)");
             }
             Err(e) => {

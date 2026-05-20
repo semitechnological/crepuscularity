@@ -112,7 +112,9 @@ fn main() {
         Some("build") => {
             let t0 = Instant::now();
             let release = args.iter().any(|a| a == "--release");
-            let cwd = std::env::current_dir().unwrap();
+            let cwd = std::env::current_dir().unwrap_or_else(|e| {
+                ui::error(&format!("cannot determine current directory: {e}"));
+            });
             let sp = ui::spinner(if release {
                 "cargo build --release"
             } else {
@@ -385,11 +387,13 @@ fn run_preview(path: std::path::PathBuf) {
 
         let p = path.clone();
         let c = ctx.clone();
-        cx.open_window(opts, move |_window, cx| {
+        match cx.open_window(opts, move |_window, cx| {
             let state = cx.new(|cx| HotReloadState::new(p.clone(), c.clone(), cx));
             cx.new(|_| HotReloadView::new(state))
-        })
-        .unwrap();
+        }) {
+            Ok(_) => {}
+            Err(e) => eprintln!("preview: failed to open window: {e}"),
+        }
     });
 }
 
