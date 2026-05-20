@@ -57,7 +57,8 @@ mod tests {
         assert!(CONTENT_JS.contains("enhanceCodeBlock"));
         assert!(CONTENT_JS.contains("widgetTextFromPre"));
         assert!(CONTENT_JS.contains("replaceWith"));
-        assert!(CONTENT_JS.contains("render_frontend"));
+        assert!(CONTENT_JS.contains("render_anywhere_parts"));
+        assert!(CONTENT_JS.contains("render_frame_doc"));
         assert!(!CONTENT_JS.contains("enhanceMessage"));
         assert!(!CONTENT_JS.contains("throw new Error(\"runtime.content_main is required\")"));
     }
