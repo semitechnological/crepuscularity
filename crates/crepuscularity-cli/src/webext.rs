@@ -238,17 +238,18 @@ fn auto_detect_pages(app_path: &Path, manifest: &mut crepuscularity_webext::Exte
     if manifest.chrome_url_overrides.is_empty() {
         let p = pages_dir.join("new-tab.crepus");
         if p.exists() {
-            manifest.chrome_url_overrides.insert(
-                "newtab".to_string(),
-                "pages/new-tab.crepus".to_string(),
-            );
+            manifest
+                .chrome_url_overrides
+                .insert("newtab".to_string(), "pages/new-tab.crepus".to_string());
         }
     }
 }
 
 fn auto_detect_icons(app_path: &Path, manifest: &mut crepuscularity_webext::ExtensionManifest) {
     let icons_dir = app_path.join("icons");
-    if !icons_dir.is_dir() { return; }
+    if !icons_dir.is_dir() {
+        return;
+    }
 
     if manifest.options.icons.is_empty() {
         if let Ok(entries) = std::fs::read_dir(&icons_dir) {
@@ -271,7 +272,10 @@ fn auto_detect_icons(app_path: &Path, manifest: &mut crepuscularity_webext::Exte
                 // Match action_disabled_* files
                 if name.contains("action_disabled") {
                     if let Some(size) = detect_icon_size(&name) {
-                        manifest.options.action_icons.insert(size, format!("icons/{name}"));
+                        manifest
+                            .options
+                            .action_icons
+                            .insert(size, format!("icons/{name}"));
                     }
                 }
             }
@@ -282,7 +286,11 @@ fn auto_detect_icons(app_path: &Path, manifest: &mut crepuscularity_webext::Exte
 fn detect_icon_size(filename: &str) -> Option<String> {
     // Extract digits from filename: icon128.png → "128", action_disabled_16.png → "16"
     let digits: String = filename.chars().filter(|c| c.is_ascii_digit()).collect();
-    if digits.is_empty() { None } else { Some(digits) }
+    if digits.is_empty() {
+        None
+    } else {
+        Some(digits)
+    }
 }
 
 // ── build ─────────────────────────────────────────────────────────────────────
@@ -414,7 +422,7 @@ fn build_extension(app_path: &Path, dev: bool) {
     let popup_template = app_path.join("views/popup.crepus");
     if popup_template.exists() {
         let sp = ui::spinner("pre-rendering popup.html");
-        match prerender_popup_html(&popup_template, &manifest) {
+        match prerender_popup_html(app_path, &popup_template, &manifest) {
             Ok(html) => {
                 std::fs::write(src_dir.join("popup.html"), &html).unwrap();
                 ui::spinner_ok(&sp, "popup.html (pre-rendered from popup.crepus)");
@@ -520,7 +528,7 @@ fn build_wasm_runtime(app_path: &Path, runtime_dir: &Path, vendor_dir: &Path) {
 /// step without duplicating it in the app's Rust source.
 pub const SYSTEM_PROMPT: &str = "\
 When creating charts, forms, interactive UI, or visualisations,
-wrap output in <ai-anywhere> tags for the AI Anywhere browser extension.
+wrap output in <ai-anywhere> tags for the anywhere browser extension.
 
 ── Format (crepus + data only — no JavaScript) ─────────────
 <ai-anywhere type=\"widget\" title=\"Widget Title\">
@@ -595,7 +603,22 @@ div dashboard
 /// and embed all three as sibling `<div>` elements in the returned HTML.
 /// The popup opens instantly from the pre-rendered HTML; popup.js still loads
 /// runtime WASM and requires `popup_main` for behavior wiring.
+fn load_system_prompt(app_path: &Path) -> String {
+    for path in [
+        app_path.join("resources/system_prompt.txt"),
+        app_path.join("system_prompt.txt"),
+    ] {
+        if path.is_file() {
+            if let Ok(text) = std::fs::read_to_string(&path) {
+                return text;
+            }
+        }
+    }
+    SYSTEM_PROMPT.to_string()
+}
+
 fn prerender_popup_html(
+    app_path: &Path,
     template_path: &Path,
     manifest: &crepuscularity_webext::ExtensionManifest,
 ) -> Result<String, String> {
@@ -612,7 +635,7 @@ fn prerender_popup_html(
         ctx.set("auto_render", false);
         ctx.set("show_help", show_help);
         ctx.set("show_crepus", show_crepus);
-        ctx.set("system_prompt", SYSTEM_PROMPT);
+        ctx.set("system_prompt", load_system_prompt(app_path));
         render_from_files(&files, "popup.crepus", &ctx)
     };
 
@@ -791,6 +814,26 @@ mod tests {
             ".vc-find{color:#000}"
         );
     }
+
+    #[test]
+    fn appends_extension_css_to_existing_content_stylesheet() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let app = tmp.path().join("app");
+        let dist = tmp.path().join("dist/unpacked");
+        std::fs::create_dir_all(app.join("src")).expect("src");
+        std::fs::create_dir_all(dist.join("src")).expect("dist src");
+        std::fs::write(dist.join("src/content.css"), ".framework{}").expect("framework css");
+        std::fs::write(
+            app.join("src/content.css.crepus"),
+            "motion.div\n<style>\n.app-extra{color:#123}\n</style>",
+        )
+        .expect("write crepus css");
+
+        render_crepus_css_assets(&app, &dist).expect("render css");
+        let css = std::fs::read_to_string(dist.join("src/content.css")).expect("read css");
+        assert!(css.contains(".framework{}"));
+        assert!(css.contains(".app-extra{color:#123}"));
+    }
 }
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -865,8 +908,18 @@ fn render_crepus_css_assets_in(root: &Path, dir: &Path, out_root: &Path) -> Resu
             std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
         }
         let source = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
-        std::fs::write(output, strip_indent_decorators(&source).inline_css)
-            .map_err(|e| e.to_string())?;
+        let rendered = strip_indent_decorators(&source).inline_css;
+        let css = if output.exists() {
+            let existing = std::fs::read_to_string(&output).map_err(|e| e.to_string())?;
+            if existing.trim().is_empty() {
+                rendered
+            } else {
+                format!("{existing}\n\n{rendered}")
+            }
+        } else {
+            rendered
+        };
+        std::fs::write(output, css).map_err(|e| e.to_string())?;
     }
     Ok(())
 }
@@ -891,6 +944,7 @@ fn render_crepus_pages(
     let out_dir = dist.join("pages");
     let src_dir = dist.join("src");
     std::fs::create_dir_all(&out_dir).map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(&src_dir).map_err(|e| e.to_string())?;
 
     for entry in &entries {
         let source = files
@@ -1016,8 +1070,8 @@ fn inject_dev_content_script(manifest_json: &str) -> String {
 fn watch_and_reload(app_path: &Path) {
     use console::style;
     use notify::Watcher;
-    use std::sync::mpsc::channel;
     use std::sync::atomic::{AtomicU64, Ordering};
+    use std::sync::mpsc::channel;
 
     eprintln!();
     eprintln!("  {}", style("watching for changes — Ctrl+C to stop").dim());
@@ -1027,21 +1081,30 @@ fn watch_and_reload(app_path: &Path) {
     let _ = std::fs::write(src_dir.join(".reload-id"), "1");
 
     let (tx, rx) = channel();
-    let mut watcher = match notify::recommended_watcher(move |res: Result<notify::Event, notify::Error>| {
-        if let Ok(event) = res {
-            if event.kind.is_modify() || matches!(event.kind, notify::EventKind::Create(_)) {
-                let _ = tx.send(());
+    let mut watcher =
+        match notify::recommended_watcher(move |res: Result<notify::Event, notify::Error>| {
+            if let Ok(event) = res {
+                if event.kind.is_modify() || matches!(event.kind, notify::EventKind::Create(_)) {
+                    let _ = tx.send(());
+                }
             }
-        }
-    }) {
-        Ok(w) => w,
-        Err(e) => {
-            ui::warning(&format!("file watcher failed: {e}"));
-            return;
-        }
-    };
+        }) {
+            Ok(w) => w,
+            Err(e) => {
+                ui::warning(&format!("file watcher failed: {e}"));
+                return;
+            }
+        };
 
-    let dirs = ["runtime/src", "runtime/views", "src", "pages", "views", "icons", "resources"];
+    let dirs = [
+        "runtime/src",
+        "runtime/views",
+        "src",
+        "pages",
+        "views",
+        "icons",
+        "resources",
+    ];
     for dir in &dirs {
         let d = app_path.join(dir);
         if d.exists() {
