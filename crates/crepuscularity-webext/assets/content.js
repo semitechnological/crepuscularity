@@ -72,7 +72,32 @@
 
   function widgetTextFromPre(pre) {
     const code = pre.querySelector("code");
-    return normalizeWidgetText((code ?? pre).textContent || "");
+    const el = code ?? pre;
+    let text = normalizeWidgetText(el.textContent || "");
+    if (!text.includes("ai-anywhere") && el.innerHTML) {
+      text = normalizeWidgetText(
+        el.innerHTML
+          .replace(/<br\s*\/?>/gi, "\n")
+          .replace(/<[^>]+>/g, "")
+      );
+    }
+    return stripOuterCodeFence(text);
+  }
+
+  function wasmArray(value) {
+    if (Array.isArray(value)) {
+      return value;
+    }
+    if (value && typeof value.length === "number") {
+      return Array.from(value);
+    }
+    return [];
+  }
+
+  function stripOuterCodeFence(text) {
+    const trimmed = text.trim();
+    const match = /^```[\w-]*\s*\n([\s\S]*?)\n```\s*$/i.exec(trimmed);
+    return match ? match[1].trim() : trimmed;
   }
 
   function collectWidgetPres() {
@@ -99,13 +124,15 @@
     return undefined;
   }
 
-  function extractRenderedHtml(rendered, label) {
-    const html = wasmField(rendered, "html");
-    if (typeof html !== "string") {
-      console.error(`crepuscularity: ${label} returned no html`, rendered);
-      return null;
+  function wasmPlain(value) {
+    if (value == null) return value;
+    if (value instanceof Map) {
+      return Object.fromEntries([...value.entries()].map(([k, v]) => [k, wasmPlain(v)]));
     }
-    return html;
+    if (Array.isArray(value)) {
+      return value.map((item) => wasmPlain(item));
+    }
+    return value;
   }
 
   async function runBrowserProgramData(api, program) {
@@ -162,164 +189,172 @@
     console.warn("crepuscularity: code block not connected, skip mount");
   }
 
-  function createShell(spec) {
-    let rendered;
-    try {
-      rendered = wasmModule.render_frontend({
-        entry: "views/ui.crepus#Panel",
-        props: {
-          title: spec.title,
-          format: spec.format,
-          source: spec.source,
-          warning: "Runs inside a sandboxed iframe. Review AI code before execution.",
-          payload: JSON.stringify(spec, null, 2),
-          show_source: true,
-          badges: [
-            { label: spec.format, tone: "accent" },
-            { label: spec.source, tone: "neutral" }
-          ],
-          actions: [
-            { label: "Render widget", action: "render", kind: "primary" },
-            { label: "Show source", action: "toggle-source", kind: "secondary" }
-          ]
+  function frameSrcdoc(frameDoc) {
+    const plain = wasmPlain(frameDoc);
+    if (typeof plain?.srcdoc === "string" && plain.srcdoc.length > 0) {
+      return plain.srcdoc;
+    }
+    const direct = wasmField(frameDoc, "srcdoc");
+    if (typeof direct === "string" && direct.length > 0) {
+      return direct;
+    }
+    if (frameDoc && typeof frameDoc === "object") {
+      try {
+        const reflected = Reflect.get(frameDoc, "srcdoc");
+        if (typeof reflected === "string" && reflected.length > 0) {
+          return reflected;
         }
-      });
+      } catch (_) {
+        // ignore
+      }
+    }
+    return null;
+  }
+
+  const INLINE_HOST_CSS = `
+:host {
+  display: block;
+  background: #fffdf8;
+  color: #111;
+  font-family: "IBM Plex Sans", system-ui, "Segoe UI", sans-serif;
+}
+.aa-widget-root {
+  padding: 16px;
+}
+`;
+
+  function attachFrameResize(frame) {
+    window.addEventListener("message", (event) => {
+      if (event.source !== frame.contentWindow) {
+        return;
+      }
+      if (event.data?.type !== "anywhere-resize") {
+        return;
+      }
+      const height = Number(event.data.height);
+      if (Number.isFinite(height) && height > 0) {
+        frame.style.height = `${Math.ceil(height)}px`;
+      }
+    });
+  }
+
+  function setIframeDocument(frame, srcdoc) {
+    frame.removeAttribute("src");
+    try {
+      const blob = new Blob([srcdoc], { type: "text/html;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      frame.src = url;
+      frame.addEventListener(
+        "load",
+        () => {
+          URL.revokeObjectURL(url);
+        },
+        { once: true }
+      );
+    } catch (_) {
+      frame.srcdoc = srcdoc;
+    }
+  }
+
+  function createIframeMount(renderFrameDoc) {
+    let frameDoc;
+    try {
+      frameDoc = renderFrameDoc();
     } catch (error) {
-      console.error("crepuscularity: failed to render widget shell", error);
+      console.error("crepuscularity: failed to render widget frame", error);
+      return null;
+    }
+    const srcdoc = frameSrcdoc(frameDoc);
+    if (!srcdoc) {
+      console.error("crepuscularity: frame render returned no srcdoc", frameDoc);
       return null;
     }
 
-    const html = extractRenderedHtml(rendered, "render_frontend(Panel)");
-    if (!html) return null;
-
-    const mount = document.createElement("section");
+    const mount = document.createElement("div");
     mount.className = "aa-shell";
-    mount.innerHTML = html;
-
-    const runButton = mount.querySelector("[data-action='render']");
-    const sourceButton = mount.querySelector("[data-action='toggle-source']");
-    const details = mount.querySelector("[data-role='payload']");
-    const frameHost = mount.querySelector("[data-role='frame-host']");
-
-    sourceButton?.addEventListener("click", () => {
-      if (details) {
-        details.hidden = !details.hidden;
-      }
-    });
-
-    runButton?.addEventListener("click", () => {
-      if (!frameHost || frameHost.querySelector("iframe")) {
-        return;
-      }
-      let frameDoc;
-      try {
-        frameDoc = wasmModule.render_frame_doc({ ...spec, unocss: unocssSource });
-      } catch (error) {
-        console.error("crepuscularity: failed to render widget frame", error);
-        return;
-      }
-      const srcdoc = wasmField(frameDoc, "srcdoc");
-      if (typeof srcdoc !== "string") {
-        console.error("crepuscularity: render_frame_doc returned no srcdoc", frameDoc);
-        return;
-      }
-      const frame = document.createElement("iframe");
-      frame.className = "aa-widget-frame";
-      frame.sandbox = "allow-scripts";
-      frame.srcdoc = srcdoc;
-      frameHost.append(frame);
-      runButton.setAttribute("disabled", "disabled");
-      runButton.textContent = "Rendered";
-    });
-
-    if (settings.autoRender) {
-      queueMicrotask(() => runButton?.click());
-    }
-
+    const frame = document.createElement("iframe");
+    frame.className = "aa-widget-frame";
+    frame.setAttribute("scrolling", "no");
+    frame.sandbox = "allow-scripts";
+    setIframeDocument(frame, srcdoc);
+    attachFrameResize(frame);
+    mount.append(frame);
     return mount;
   }
 
-  function createAnywhereShell(widget) {
-    const title = widget.title || widget.widget_type || "Widget";
-    const widgetType = widget.widget_type || "widget";
-
-    let rendered;
+  function createInlineAnywhereMount(widget) {
+    let parts;
     try {
-      rendered = wasmModule.render_frontend({
-        entry: "views/ui.crepus#AnywhereShell",
-        props: { title, widget_type: widgetType }
-      });
+      parts = wasmPlain(
+        wasmModule.render_anywhere_parts({ widget, unocss: unocssSource })
+      );
     } catch (error) {
-      console.error("crepuscularity: failed to render anywhere shell", error);
+      console.error("crepuscularity: failed to render anywhere parts", error);
       return null;
     }
-
-    const html = extractRenderedHtml(rendered, "render_frontend(AnywhereShell)");
-    if (!html) return null;
-
-    const mount = document.createElement("section");
-    mount.className = "aa-shell";
-    mount.innerHTML = html;
-
-    const runButton = mount.querySelector("[data-action='render']");
-    const frameHost = mount.querySelector("[data-role='frame-host']");
-
-    runButton?.addEventListener("click", () => {
-      if (!frameHost || frameHost.querySelector("iframe")) {
-        return;
-      }
-      let frameDoc;
-      try {
-        frameDoc = wasmModule.render_anywhere_frame_doc({ ...widget, unocss: unocssSource });
-      } catch (error) {
-        console.error("crepuscularity: failed to render anywhere frame", error);
-        return;
-      }
-      const srcdoc = wasmField(frameDoc, "srcdoc");
-      if (typeof srcdoc !== "string") {
-        console.error("crepuscularity: render_anywhere_frame_doc returned no srcdoc", frameDoc);
-        return;
-      }
-      const frame = document.createElement("iframe");
-      frame.className = "aa-widget-frame";
-      frame.sandbox = "allow-scripts";
-      frame.srcdoc = srcdoc;
-      frameHost.append(frame);
-      runButton.setAttribute("disabled", "disabled");
-      runButton.textContent = "Rendered";
-    });
-
-    if (settings.autoRender) {
-      queueMicrotask(() => runButton?.click());
+    const html = parts?.html;
+    if (typeof html !== "string" || html.length === 0) {
+      console.error("crepuscularity: anywhere parts returned no html", parts);
+      return null;
+    }
+    if (parts.needs_iframe || (typeof parts.js === "string" && parts.js.length > 0)) {
+      return createIframeMount(() =>
+        wasmModule.render_anywhere_frame_doc({ widget, unocss: unocssSource })
+      );
     }
 
-    return mount;
+    const host = document.createElement("div");
+    host.className = "aa-shell aa-inline-widget";
+    const shadow = host.attachShadow({ mode: "open" });
+    const style = document.createElement("style");
+    style.textContent = `${INLINE_HOST_CSS}${parts.css || ""}`;
+    const root = document.createElement("div");
+    root.className = "aa-widget-root";
+    root.innerHTML = html;
+    shadow.append(style, root);
+    return host;
+  }
+
+  function createShell(spec) {
+    const plain = wasmPlain(spec);
+    return createIframeMount(() =>
+      wasmModule.render_frame_doc({ ...plain, unocss: unocssSource })
+    );
+  }
+
+  function createAnywhereShell(widgetValue) {
+    const widget = wasmPlain(widgetValue);
+    return createInlineAnywhereMount(widget);
   }
 
   function shellForPreText(text) {
-    if (text.includes("<ai-anywhere")) {
+    const normalized = stripOuterCodeFence(normalizeWidgetText(text));
+    if (normalized.includes("<ai-anywhere")) {
       let widgets;
       try {
-        widgets = wasmModule.extract_widgets(text);
+        widgets = wasmModule.extract_widgets(normalized);
       } catch (error) {
         console.error("crepuscularity: failed to parse <ai-anywhere> tags", error);
         return null;
       }
-      if (Array.isArray(widgets) && widgets.length > 0) {
-        return createAnywhereShell(widgets[0]);
+      const widgetList = wasmArray(widgets);
+      if (widgetList.length > 0) {
+        return createAnywhereShell(wasmPlain(widgetList[0]));
       }
+      console.warn("crepuscularity: <ai-anywhere> found in text but extract_widgets returned none");
     }
 
-    if (text.includes("```")) {
+    if (normalized.includes("```")) {
       let specs;
       try {
-        specs = wasmModule.extract_specs(text);
+        specs = wasmModule.extract_specs(normalized);
       } catch (error) {
         console.error("crepuscularity: failed to parse widget blocks", error);
         return null;
       }
-      if (Array.isArray(specs) && specs.length > 0) {
-        return createShell(specs[0]);
+      const specList = wasmArray(specs);
+      if (specList.length > 0) {
+        return createShell(wasmPlain(specList[0]));
       }
     }
 

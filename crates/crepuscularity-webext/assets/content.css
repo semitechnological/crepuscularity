@@ -1,5 +1,6 @@
 .aa-shell {
-  margin-top: 16px;
+  margin: 0;
+  padding: 0;
 }
 
 .aa-mount {
@@ -11,12 +12,12 @@
 }
 
 .aa-panel-shell {
-  border: 2px solid rgba(20, 20, 20, 0.14);
-  border-radius: 16px;
-  padding: 14px 16px;
-  background: rgba(255, 255, 255, 0.92);
-  color: #141414;
-  font-family: system-ui, "Segoe UI", sans-serif;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
 }
 
 .aa-header {
@@ -94,11 +95,14 @@
 }
 
 .aa-widget-frame {
+  display: block;
   width: 100%;
-  min-height: 180px;
-  border: 1px solid rgba(20, 20, 20, 0.12);
-  border-radius: 14px;
-  background: white;
+  min-height: 80px;
+  height: 200px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  overflow: hidden;
 }
 
 .aa-warning {
