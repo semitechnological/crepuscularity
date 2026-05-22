@@ -28,6 +28,7 @@ pub use parser::{
     ComponentFile, ComponentMeta,
 };
 pub use preprocess::{
-    google_fonts_head_markup, merge_unique_font_families, strip_indent_decorators, IndentDecorators,
+    extract_head_block, google_fonts_head_markup, merge_unique_font_families,
+    strip_indent_decorators, IndentDecorators,
 };
 pub use virtual_files::lookup_virtual_file;

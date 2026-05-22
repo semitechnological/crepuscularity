@@ -217,6 +217,9 @@ fn build_children(
             Node::RawText(expr) => {
                 text_buf.push(Line::raw(value_to_str(&eval_expr(expr, &ctx))));
             }
+            Node::RawHtml(expr) => {
+                text_buf.push(Line::raw(value_to_str(&eval_expr(expr, &ctx))));
+            }
             // Structural nodes: flush buffered text first, then emit.
             Node::Element(el) => {
                 flush_text(&mut text_buf, &mut out, parent_dir, inherited);
@@ -322,7 +325,7 @@ fn build_element(
         && el
             .children
             .iter()
-            .all(|n| matches!(n, Node::Text(_) | Node::RawText(_) | Node::LetDecl(_)));
+            .all(|n| matches!(n, Node::Text(_) | Node::RawText(_) | Node::RawHtml(_) | Node::LetDecl(_)));
 
     if is_pure_text {
         build_content_element(el, &hints, ctx, constraint, style)

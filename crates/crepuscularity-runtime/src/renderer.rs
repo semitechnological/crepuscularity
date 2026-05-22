@@ -70,6 +70,12 @@ pub fn render_node(node: &Node, ctx: &TemplateContext) -> AnyElement {
                 .child(SharedString::from(value_to_str(&val)))
                 .into_any_element()
         }
+        Node::RawHtml(expr) => {
+            let val = crate::eval::eval_expr(expr, ctx);
+            div()
+                .child(SharedString::from(value_to_str(&val)))
+                .into_any_element()
+        }
         Node::Include(inc) => render_include(inc, ctx),
         Node::Embed(_) => div().into_any_element(),
     }

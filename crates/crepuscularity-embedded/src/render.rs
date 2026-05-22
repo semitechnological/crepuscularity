@@ -195,6 +195,7 @@ fn render_node(node: &Node, ctx: &TemplateContext) -> Result<EmbeddedNode, Strin
             None,
         )),
         Node::RawText(expr) => Ok(text_node(value_to_str(&eval_expr(expr, ctx)))),
+        Node::RawHtml(expr) => Ok(text_node(value_to_str(&eval_expr(expr, ctx)))),
     }
 }
 

@@ -82,6 +82,68 @@ pub fn strip_indent_decorators(raw: &str) -> IndentDecorators {
     }
 }
 
+/// If the template starts with a `head` block at indent zero, extract its indented
+/// children as raw head content and return the remaining body. Returns `(head_raw, body_raw)`.
+///
+/// ```crepus
+/// head
+///   title "Notes"
+///   meta charset="utf-8"
+///   link rel="icon" href="./static/favicon.svg"
+///
+/// div wrap
+///   ...
+/// ```
+pub fn extract_head_block(raw: &str) -> (Option<String>, String) {
+    let lines: Vec<&str> = raw.lines().collect();
+    let mut i = 0;
+    while i < lines.len() {
+        let trimmed = lines[i].trim();
+        if trimmed.is_empty() || trimmed.starts_with('#') {
+            i += 1;
+            continue;
+        }
+        let trimmed_lower = trimmed.to_lowercase();
+        if trimmed_lower == "head" || trimmed_lower.starts_with("head ") {
+            let head_indent = lines[i].len() - lines[i].trim_start().len();
+            let mut j = i + 1;
+            let mut head_lines: Vec<&str> = Vec::new();
+            while j < lines.len() {
+                let line = lines[j];
+                if line.trim().is_empty() {
+                    head_lines.push("");
+                    j += 1;
+                    continue;
+                }
+                let line_indent = line.len() - line.trim_start().len();
+                if line_indent > head_indent {
+                    let dedented = &line[head_indent+2..]; // strip one level
+                    head_lines.push(dedented);
+                    j += 1;
+                } else {
+                    break;
+                }
+            }
+            let head_raw = if head_lines.is_empty() {
+                String::new()
+            } else {
+                head_lines.join("\n")
+            };
+            let body = if j < lines.len() {
+                let mut body_lines: Vec<&str> = Vec::new();
+                body_lines.push("# head block removed"); // marker so parser knows this is the body
+                body_lines.extend(&lines[j..]);
+                body_lines.join("\n")
+            } else {
+                String::new()
+            };
+            return (if head_raw.is_empty() { None } else { Some(head_raw) }, body);
+        }
+        break;
+    }
+    (None, raw.to_string())
+}
+
 fn strip_trailing_inline_css(lines: &[&str], start: usize, mut end: usize) -> (usize, String) {
     if end <= start {
         return (end, String::new());
@@ -328,7 +390,7 @@ pub fn expand_class_aliases_in_nodes(nodes: &mut [Node], aliases: &HashMap<Strin
             Node::Include(inc) => {
                 expand_class_aliases_in_nodes(&mut inc.slot, aliases);
             }
-            Node::LetDecl(_) | Node::Text(_) | Node::RawText(_) | Node::Embed(_) => {}
+            Node::LetDecl(_) | Node::Text(_) | Node::RawText(_) | Node::RawHtml(_) | Node::Embed(_) => {}
         }
     }
 }

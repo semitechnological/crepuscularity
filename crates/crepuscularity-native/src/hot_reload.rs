@@ -170,6 +170,7 @@ fn node_compatible(old: &Node, new: &Node) -> bool {
             a.src == b.src && a.adapter == b.adapter && a.props == b.props
         }
         (Node::RawText(a), Node::RawText(b)) => a == b,
+        (Node::RawHtml(a), Node::RawHtml(b)) => a == b,
         _ => false,
     }
 }

@@ -10,6 +10,7 @@ pub enum Node {
     LetDecl(LetDecl),
     Include(IncludeNode),
     RawText(String),
+    RawHtml(String),
 }
 
 #[derive(Debug, Clone)]
