@@ -9,8 +9,8 @@ documentation = "https://docs.rs/crepuscularity-ssr"
 readme = "../../README.md"
 
 [dependencies]
-crepuscularity-web = { path = "../crepuscularity-web", version = "0.4.0" }
-crepuscularity-core = { path = "../crepuscularity-core", version = "0.4.7" }
+crepuscularity-web = { path = "../crepuscularity-web", version = "0.4.2" }
+crepuscularity-core = { path = "../crepuscularity-core", version = "0.4.8" }
 axum = { workspace = true }
 tokio = { workspace = true }
 tokio-stream = { workspace = true }

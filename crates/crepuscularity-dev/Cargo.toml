@@ -13,5 +13,5 @@ name = "crepus-dev"
 path = "src/main.rs"
 
 [dependencies]
-crepuscularity-runtime = { path = "../crepuscularity-runtime", version = "0.4.3" }
+crepuscularity-runtime = { path = "../crepuscularity-runtime", version = "0.4.5" }
 gpui = { version = "=0.2.2", default-features = false, features = ["font-kit"] }
