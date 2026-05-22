@@ -196,7 +196,14 @@ fn strip_trailing_inline_css(lines: &[&str], start: usize, mut end: usize) -> (u
     let mut css_start = end;
     while css_start > start {
         let t = lines[css_start - 1].trim();
-        if t.is_empty() || !looks_like_css_line(t) {
+        if t.is_empty() {
+            if css_start > start + 1 && looks_like_css_line(lines[css_start - 2].trim()) {
+                css_start -= 1;
+                continue;
+            }
+            break;
+        }
+        if !looks_like_css_line(t) {
             break;
         }
         css_start -= 1;
@@ -587,6 +594,35 @@ div
         let d = strip_indent_decorators(s);
         assert_eq!(d.body.trim(), "div\n  \"x\"");
         assert!(d.inline_css.contains(".animate-fade-in"));
+    }
+
+    #[test]
+    fn strips_trailing_css_blocks_separated_by_blank_lines() {
+        // Regression: multiple CSS blocks separated by blank lines must all be
+        // stripped, not just the last block.
+        let s = r#"div
+  "x"
+@keyframes sunset {
+  0% { opacity: .5; }
+  100% { opacity: 1; }
+}
+.animate-sunset {
+  animation: sunset 24s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-sunset {
+    animation: none;
+  }
+}
+"#;
+        let d = strip_indent_decorators(s);
+        assert_eq!(d.body.trim(), "div\n  \"x\"");
+        assert!(d.inline_css.contains("@keyframes sunset"));
+        assert!(d.inline_css.contains(".animate-sunset"));
+        assert!(d
+            .inline_css
+            .contains("@media (prefers-reduced-motion: reduce)"));
     }
 
     #[test]

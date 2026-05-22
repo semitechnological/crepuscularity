@@ -53,7 +53,7 @@ div min-h-screen overflow-x-hidden antialiased crepus-twilight-page
 								span text-xs crepus-t-muted leading-snug
 									"Mobile"
 						p text-sm crepus-t-muted leading-relaxed m-0 text-center sm:text-left
-							"Crepuscularity Lite now lives in this workspace under crates/crepuscularity-lite: a GPUI + V8 desktop shell with a Capacitor-shaped Rust bridge for embedding guest UI in native apps — pair it with this CLI when you want a lighter native host than a full GPUI template tree."
+							"Crepuscularity Lite: a GPUI + V8 desktop shell for hosting crepus templates as native apps."
 						a href="./docs/lite.html" no-underline text-sm font-medium crepus-t-text hover:opacity-85 border-b crepus-t-border transition-colors inline-block self-center sm:self-start
 							"Crepuscularity Lite guide →"
 				div w-full min-w-0 mx-auto lg:mx-0 lg:place-self-center order-last lg:order-none min-h-[400px]
