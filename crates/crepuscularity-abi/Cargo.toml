@@ -12,7 +12,7 @@ readme = "../../README.md"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-crepuscularity-core = { path = "../crepuscularity-core", version = "0.4.7" }
-crepuscularity-native = { path = "../crepuscularity-native", version = "0.4.2" }
+crepuscularity-core = { path = "../crepuscularity-core", version = "0.4.8" }
+crepuscularity-native = { path = "../crepuscularity-native", version = "0.4.4" }
 serde = { workspace = true }
 serde_json = { workspace = true }
