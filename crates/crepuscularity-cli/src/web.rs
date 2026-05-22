@@ -7,7 +7,8 @@
 
 use console::style;
 use crepuscularity_core::preprocess::{
-    extract_head_block, google_fonts_head_markup, merge_unique_font_families, strip_indent_decorators,
+    extract_head_block, google_fonts_head_markup, merge_unique_font_families,
+    strip_indent_decorators,
 };
 use crepuscularity_core::{DriverCache, Fingerprint};
 use serde::Deserialize;

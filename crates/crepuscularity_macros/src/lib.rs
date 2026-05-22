@@ -356,7 +356,11 @@ fn collect_ids_from_nodes(
                 collect_ids_recursive(&resolved, macro_name, seen, ids)?;
                 collect_ids_from_nodes(&inc.slot, base_dir, macro_name, seen, ids)?;
             }
-            Node::Text(_) | Node::RawText(_) | Node::RawHtml(_) | Node::LetDecl(_) | Node::Embed(_) => {}
+            Node::Text(_)
+            | Node::RawText(_)
+            | Node::RawHtml(_)
+            | Node::LetDecl(_)
+            | Node::Embed(_) => {}
         }
     }
 

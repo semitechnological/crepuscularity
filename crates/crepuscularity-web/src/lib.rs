@@ -568,7 +568,12 @@ fn render_named_component(
 #[cfg(feature = "hydration")]
 fn node_is_dynamic(node: &Node) -> bool {
     match node {
-        Node::If(_) | Node::For(_) | Node::Match(_) | Node::RawText(_) | Node::RawHtml(_) | Node::Embed(_) => true,
+        Node::If(_)
+        | Node::For(_)
+        | Node::Match(_)
+        | Node::RawText(_)
+        | Node::RawHtml(_)
+        | Node::Embed(_) => true,
         Node::Text(parts) => parts
             .iter()
             .any(|p| matches!(p, crepuscularity_core::ast::TextPart::Expr(_))),
