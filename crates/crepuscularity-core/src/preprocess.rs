@@ -117,7 +117,7 @@ pub fn extract_head_block(raw: &str) -> (Option<String>, String) {
                 }
                 let line_indent = line.len() - line.trim_start().len();
                 if line_indent > head_indent {
-                    let dedented = &line[head_indent+2..]; // strip one level
+                    let dedented = &line[head_indent + 2..]; // strip one level
                     head_lines.push(dedented);
                     j += 1;
                 } else {
@@ -137,7 +137,14 @@ pub fn extract_head_block(raw: &str) -> (Option<String>, String) {
             } else {
                 String::new()
             };
-            return (if head_raw.is_empty() { None } else { Some(head_raw) }, body);
+            return (
+                if head_raw.is_empty() {
+                    None
+                } else {
+                    Some(head_raw)
+                },
+                body,
+            );
         }
         break;
     }
@@ -390,7 +397,11 @@ pub fn expand_class_aliases_in_nodes(nodes: &mut [Node], aliases: &HashMap<Strin
             Node::Include(inc) => {
                 expand_class_aliases_in_nodes(&mut inc.slot, aliases);
             }
-            Node::LetDecl(_) | Node::Text(_) | Node::RawText(_) | Node::RawHtml(_) | Node::Embed(_) => {}
+            Node::LetDecl(_)
+            | Node::Text(_)
+            | Node::RawText(_)
+            | Node::RawHtml(_)
+            | Node::Embed(_) => {}
         }
     }
 }

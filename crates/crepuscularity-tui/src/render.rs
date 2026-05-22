@@ -322,10 +322,12 @@ fn build_element(
 
     // ── Detect pure-text vs. mixed/structural children ────────────────────────
     let is_pure_text = !el.children.is_empty()
-        && el
-            .children
-            .iter()
-            .all(|n| matches!(n, Node::Text(_) | Node::RawText(_) | Node::RawHtml(_) | Node::LetDecl(_)));
+        && el.children.iter().all(|n| {
+            matches!(
+                n,
+                Node::Text(_) | Node::RawText(_) | Node::RawHtml(_) | Node::LetDecl(_)
+            )
+        });
 
     if is_pure_text {
         build_content_element(el, &hints, ctx, constraint, style)
