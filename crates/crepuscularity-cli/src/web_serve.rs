@@ -776,7 +776,7 @@ fn serve_index_document(
     let head = load_site_head(site_dir);
     let google_fonts = merged_site_google_fonts(site_dir, &files);
     let inline_css = merged_site_inline_css(&files);
-    let mut html = render_index_html(&head, &google_fonts, &inline_css);
+    let mut html = render_index_html(&head, &google_fonts, &inline_css, "");
 
     if !html_contains_entry(&files, entry) {
         let msg = format!("file not found in virtual fs: {entry}");
@@ -821,7 +821,7 @@ fn serve_secondary_preview(
     let head = load_site_head(site_dir);
     let google_fonts = merged_site_google_fonts(site_dir, &files);
     let inline_css = merged_site_inline_css(&files);
-    let mut html = render_index_html(&head, &google_fonts, &inline_css);
+    let mut html = render_index_html(&head, &google_fonts, &inline_css, "");
 
     let needle = r#"<div id="crepus-root"></div>
   <script type="module" src="./app.js"></script>"#;

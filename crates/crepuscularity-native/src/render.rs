@@ -119,6 +119,10 @@ fn render_node(node: &Node, ctx: &TemplateContext) -> Result<ViewNode, String> {
             content: value_to_str(&eval_expr(expr, ctx)),
             style: None,
         }),
+        Node::RawHtml(expr) => Ok(ViewNode::Text {
+            content: value_to_str(&eval_expr(expr, ctx)),
+            style: None,
+        }),
     }
 }
 

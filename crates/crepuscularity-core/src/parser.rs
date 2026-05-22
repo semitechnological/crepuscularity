@@ -419,6 +419,9 @@ fn parse_nodes(
         } else if line.starts_with('"') {
             let parts = parse_text_template(line);
             nodes.push(Node::Text(parts));
+        } else if is_raw_html_expr(line) {
+            let inner = &line[2..line.len() - 1];
+            nodes.push(Node::RawHtml(inner.trim().to_string()));
         } else if is_raw_expr(line) {
             // Raw expressions — rendered as evaluated text
             nodes.push(Node::RawText(line[1..line.len() - 1].trim().to_string()));
@@ -741,6 +744,13 @@ fn try_parse_let_decl(line: &str) -> Option<LetDecl> {
 fn is_raw_expr(line: &str) -> bool {
     line.starts_with('{') && line.ends_with('}') && {
         let inner = &line[1..line.len() - 1];
+        !inner.starts_with('=') && !inner.contains('"')
+    }
+}
+
+fn is_raw_html_expr(line: &str) -> bool {
+    line.starts_with("{=") && line.ends_with('}') && {
+        let inner = &line[2..line.len() - 1];
         !inner.contains('"')
     }
 }
@@ -1272,6 +1282,16 @@ fn parse_jsx_nodes<'a>(
             rest = t;
             let (node, next) = parse_jsx_tag(norm_root, rest)?;
             nodes.push(node);
+            rest = next;
+            continue;
+        }
+        if t.starts_with("{=") {
+            rest = t;
+            let (mut expr, next) = jsx_brace_expr(norm_root, rest)?;
+            if expr.starts_with('=') {
+                expr = expr[1..].trim().to_string();
+            }
+            nodes.push(Node::RawHtml(expr));
             rest = next;
             continue;
         }

@@ -19,6 +19,21 @@ use crate::render_from_files;
 /// }
 /// ```
 pub fn render_bundle(bundle_json: &str) -> Result<String, String> {
+    let (files, entry) = parse_bundle(bundle_json)?;
+    let ctx = TemplateContext::new();
+    render_from_files(&files, &entry, &ctx)
+}
+
+/// Like `render_bundle` but allows passing a `TemplateContext` with dynamic variables.
+pub fn render_bundle_with_context(
+    bundle_json: &str,
+    ctx: &TemplateContext,
+) -> Result<String, String> {
+    let (files, entry) = parse_bundle(bundle_json)?;
+    render_from_files(&files, &entry, ctx)
+}
+
+fn parse_bundle(bundle_json: &str) -> Result<(HashMap<String, String>, String), String> {
     let root: Value = serde_json::from_str(bundle_json).map_err(|e| format!("bundle JSON: {e}"))?;
     let entry = root
         .get("entry")
@@ -40,9 +55,7 @@ pub fn render_bundle(bundle_json: &str) -> Result<String, String> {
             .to_string();
         files.insert(k.clone(), s);
     }
-
-    let ctx = TemplateContext::new();
-    render_from_files(&files, &entry, &ctx)
+    Ok((files, entry))
 }
 
 #[cfg(test)]

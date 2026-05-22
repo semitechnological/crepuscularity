@@ -11,6 +11,7 @@ pub enum Node {
     Include(IncludeNode),
     Embed(EmbedNode),
     RawText(String),
+    RawHtml(String),
 }
 
 #[derive(Debug, Clone)]

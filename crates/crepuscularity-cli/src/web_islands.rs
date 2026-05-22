@@ -64,6 +64,16 @@ pub(crate) fn build_web_islands(
     };
 
     for island in refs {
+        if island.adapter == "rust" {
+            manifest.islands.insert(
+                island.src.clone(),
+                WebIslandManifestEntry {
+                    adapter: "rust".to_string(),
+                    module: "rust".to_string(),
+                },
+            );
+            continue;
+        }
         let entry = resolve_island_entry(site_dir, &island.src)?;
         let file_name = island_output_file_name(&island.src);
         let out_file = island_out_dir.join(&file_name);
@@ -112,7 +122,7 @@ fn collect_nodes(nodes: &[Node], out: &mut BTreeMap<String, WebIslandRef>) {
                         adapter,
                     });
             }
-            Node::Text(_) | Node::LetDecl(_) | Node::RawText(_) => {}
+            Node::Text(_) | Node::LetDecl(_) | Node::RawText(_) | Node::RawHtml(_) => {}
         }
     }
 }

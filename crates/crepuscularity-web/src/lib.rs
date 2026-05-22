@@ -17,7 +17,7 @@ mod bundle;
 #[cfg(all(target_arch = "wasm32", feature = "dom"))]
 pub mod dom;
 
-pub use bundle::render_bundle;
+pub use bundle::{render_bundle, render_bundle_with_context};
 pub use crepuscularity_core::build;
 pub use crepuscularity_core::preprocess::google_fonts_head_markup;
 pub use crepuscularity_macros::crepus_refs;
@@ -211,6 +211,7 @@ fn render_node(node: &Node, ctx: &TemplateContext) -> Result<String, String> {
         Node::Include(inc) => render_include(inc, ctx),
         Node::Embed(embed) => render_embed(embed, ctx),
         Node::RawText(expr) => Ok(escape_html(&value_to_str(&eval_expr(expr, ctx)))),
+        Node::RawHtml(expr) => Ok(value_to_str(&eval_expr(expr, ctx))),
     }
 }
 
@@ -221,8 +222,13 @@ fn render_embed(embed: &EmbedNode, ctx: &TemplateContext) -> Result<String, Stri
     }
     let props_json = serde_json::Value::Object(props).to_string();
     let adapter = embed.adapter.as_deref().unwrap_or("module");
+    let scope_attr = if adapter == "rust" {
+        format!(" data-crepus-scope=\"{}\"", escape_html_attr(&embed.src))
+    } else {
+        String::new()
+    };
     Ok(format!(
-        "<div data-crepus-island=\"\" data-crepus-island-src=\"{}\" data-crepus-island-adapter=\"{}\" data-crepus-island-props=\"{}\"></div>",
+        "<div data-crepus-island=\"\" data-crepus-island-src=\"{}\" data-crepus-island-adapter=\"{}\"{scope_attr} data-crepus-island-props=\"{}\"></div>",
         escape_html_attr(&embed.src),
         escape_html_attr(adapter),
         escape_html_attr(&props_json)
@@ -562,7 +568,7 @@ fn render_named_component(
 #[cfg(feature = "hydration")]
 fn node_is_dynamic(node: &Node) -> bool {
     match node {
-        Node::If(_) | Node::For(_) | Node::Match(_) | Node::RawText(_) | Node::Embed(_) => true,
+        Node::If(_) | Node::For(_) | Node::Match(_) | Node::RawText(_) | Node::RawHtml(_) | Node::Embed(_) => true,
         Node::Text(parts) => parts
             .iter()
             .any(|p| matches!(p, crepuscularity_core::ast::TextPart::Expr(_))),

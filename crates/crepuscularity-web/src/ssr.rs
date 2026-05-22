@@ -396,6 +396,20 @@ fn render_node_ssr(
                 r#"<span style="display:contents" data-crepus-kind="raw" data-crepus-id="c{id}">{inner}</span>"#
             ))
         }
+        Node::RawHtml(expr) => {
+            let id = alloc_binding(
+                counter,
+                bind,
+                json!({
+                    "kind": "raw",
+                    "expr": expr,
+                }),
+            );
+            let inner = value_to_str(&eval_expr(expr, ctx));
+            Ok(format!(
+                r#"<span style="display:contents" data-crepus-kind="raw" data-crepus-id="c{id}">{inner}</span>"#
+            ))
+        }
     }
 }
 

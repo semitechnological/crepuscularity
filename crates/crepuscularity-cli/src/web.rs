@@ -7,7 +7,7 @@
 
 use console::style;
 use crepuscularity_core::preprocess::{
-    google_fonts_head_markup, merge_unique_font_families, strip_indent_decorators,
+    extract_head_block, google_fonts_head_markup, merge_unique_font_families, strip_indent_decorators,
 };
 use crepuscularity_core::{DriverCache, Fingerprint};
 use serde::Deserialize;
@@ -506,6 +506,16 @@ fn build_site_wasm(cli: &WebBuildArgs) {
         ));
     }
 
+    // ── head block extraction ──────────────────────────────────────────────
+    let mut template_head_html = String::new();
+    if let Some(entry_content) = files.get(&b.entry).cloned() {
+        let (head_raw, body_raw) = extract_head_block(&entry_content);
+        if let Some(head_src) = head_raw {
+            template_head_html = render_head_raw(&head_src);
+            files.insert(b.entry.clone(), body_raw);
+        }
+    }
+
     let bundle = json!({
         "entry": b.entry,
         "files": files,
@@ -539,7 +549,7 @@ fn build_site_wasm(cli: &WebBuildArgs) {
     }
 
     copy_unocss(&vendor_dir);
-    let index_html = render_index_html(&head, &google_fonts, &inline_css);
+    let index_html = render_index_html(&head, &google_fonts, &inline_css, &template_head_html);
     std::fs::write(b.out_dir.join(".nojekyll"), b"")
         .unwrap_or_else(|e| ui::error(&format!("write .nojekyll: {e}")));
     std::fs::write(b.out_dir.join("index.html"), index_html).unwrap_or_else(|e| {
@@ -855,6 +865,7 @@ pub(crate) fn render_index_html(
     head: &SiteHead,
     google_fonts: &[String],
     inline_css: &str,
+    template_head: &str,
 ) -> String {
     let og = head
         .og_image
@@ -880,12 +891,18 @@ pub(crate) fn render_index_html(
     } else {
         format!("<style>\n{}\n</style>", inline_css)
     };
-    let extra_head = if head.extra_head_html.trim().is_empty() {
-        inline_css_tag
-    } else if inline_css_tag.is_empty() {
-        head.extra_head_html.clone()
-    } else {
-        format!("{}\n{}", head.extra_head_html, inline_css_tag)
+    let extra_head = {
+        let mut parts: Vec<&str> = Vec::new();
+        if !template_head.trim().is_empty() {
+            parts.push(template_head.trim());
+        }
+        if !head.extra_head_html.trim().is_empty() {
+            parts.push(head.extra_head_html.trim());
+        }
+        if !inline_css_tag.trim().is_empty() {
+            parts.push(inline_css_tag.trim());
+        }
+        parts.join("\n")
     };
 
     WEB_INDEX_HTML
@@ -908,6 +925,63 @@ fn escape_html_attr(s: &str) -> String {
         .replace('<', "&lt;")
         .replace('>', "&gt;")
         .replace('"', "&quot;")
+}
+
+fn render_head_raw(head_raw: &str) -> String {
+    let lines: Vec<&str> = head_raw.lines().collect();
+    let mut out = String::new();
+    let mut i = 0;
+    while i < lines.len() {
+        let line = lines[i];
+        let trimmed = line.trim();
+        let indent = line.len() - line.trim_start().len();
+        if trimmed.is_empty() {
+            i += 1;
+            continue;
+        }
+
+        if let Some(tail) = trimmed.strip_prefix("title ") {
+            let text = tail.trim().trim_matches('"');
+            out.push_str(&format!("<title>{}</title>\n", text));
+            i += 1;
+        } else if let Some(tail) = trimmed.strip_prefix("meta ") {
+            out.push_str(&format!("<meta {}>\n", tail.trim()));
+            i += 1;
+        } else if let Some(tail) = trimmed.strip_prefix("link ") {
+            out.push_str(&format!("<link {}>\n", tail.trim()));
+            i += 1;
+        } else if let Some(tail) = trimmed.strip_prefix("script ") {
+            out.push_str(&format!("<script {}></script>\n", tail.trim()));
+            i += 1;
+        } else if trimmed == "style" {
+            let mut css = String::new();
+            i += 1;
+            while i < lines.len() {
+                let sub = lines[i];
+                if sub.trim().is_empty() {
+                    css.push('\n');
+                    i += 1;
+                    continue;
+                }
+                let sub_indent = sub.len() - sub.trim_start().len();
+                if sub_indent > indent {
+                    let dedented = &sub[indent + 2..];
+                    css.push_str(dedented);
+                    css.push('\n');
+                    i += 1;
+                } else {
+                    break;
+                }
+            }
+            out.push_str(&format!("<style>\n{}</style>\n", css.trim()));
+        } else if trimmed.starts_with("google-fonts:") {
+            i += 1;
+        } else {
+            // unknown — treat title-like: if it has a quoted string child
+            i += 1;
+        }
+    }
+    out.trim().to_string()
 }
 
 fn copy_unocss(vendor_dir: &Path) {

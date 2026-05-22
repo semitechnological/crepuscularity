@@ -274,6 +274,8 @@ fn parse_nodes(
         } else if line.starts_with('"') {
             let parts = parse_text_template(line);
             nodes.push(Node::Text(parts));
+        } else if is_raw_html_expr(line) {
+            nodes.push(Node::RawHtml(line[2..line.len() - 1].trim().to_string()));
         } else if is_raw_expr(line) {
             // Raw expressions — rendered as evaluated text
             nodes.push(Node::RawText(line[1..line.len() - 1].trim().to_string()));
@@ -535,6 +537,13 @@ fn try_parse_let_decl(line: &str) -> Option<LetDecl> {
 fn is_raw_expr(line: &str) -> bool {
     line.starts_with('{') && line.ends_with('}') && {
         let inner = &line[1..line.len() - 1];
+        !inner.starts_with('=') && !inner.contains('"')
+    }
+}
+
+fn is_raw_html_expr(line: &str) -> bool {
+    line.starts_with("{=") && line.ends_with('}') && {
+        let inner = &line[2..line.len() - 1];
         !inner.contains('"')
     }
 }

@@ -21,11 +21,8 @@ function setRootHtml(root, html) {
   root.replaceChildren(...doc.body.childNodes);
 }
 
-/**
- * Optional client island: element with data-slot-words="a|b|c" (pipe-separated phrases).
- * Slot-machine style blur + slide between phrases — same page can add more islands later
- * (signals, fetch, etc.) without changing the .crepus → WASM first paint.
- */
+// ── slot-rotate ──────────────────────────────────────────────────────────────
+
 function parseSlotWords(raw) {
   const t = (raw || "").trim();
   if (t.startsWith("[")) {
@@ -36,61 +33,42 @@ function parseSlotWords(raw) {
       return [];
     }
   }
-  return t
-    .split("|")
-    .map((s) => s.trim())
-    .filter(Boolean);
+  return t.split("|").map((s) => s.trim()).filter(Boolean);
 }
 
 function initSlotRotate(root) {
   const el = root.querySelector("[data-slot-words]");
   if (!el) return;
-
   const raw = el.getAttribute("data-slot-words") || "";
   const words = parseSlotWords(raw);
   if (words.length < 2) return;
-
   el.classList.add("crepus-slot");
   el.setAttribute("aria-live", "polite");
   el.innerHTML = "";
-
   const inner = document.createElement("span");
   inner.className = "crepus-slot__inner";
   inner.textContent = words[0];
   el.appendChild(inner);
-
-  el.style.display = 'inline-block';
-  el.style.width = el.offsetWidth + 'px';
-  el.style.transition = 'width 0.3s ease-in-out';
-
   let i = 0;
   const intervalAttr = el.getAttribute("data-slot-interval");
   const duration = intervalAttr ? Number(intervalAttr) || 3200 : 3200;
-
   const tick = () => {
     i = (i + 1) % words.length;
-    inner.style.transition =
-      "opacity 0.32s ease, filter 0.32s ease";
+    inner.style.transition = "opacity 0.32s ease, filter 0.32s ease";
     inner.style.opacity = "0";
     inner.style.filter = "blur(6px)";
-
     window.setTimeout(() => {
       inner.textContent = words[i];
-      el.style.width = el.offsetWidth + 'px';
       requestAnimationFrame(() => {
         inner.style.opacity = "1";
         inner.style.filter = "blur(0)";
       });
     }, 280);
   };
-
   window.setInterval(tick, duration);
 }
 
-function initInteractive(root) {
-  initSlotRotate(root);
-  initWebIslands(root);
-}
+// ── Web Islands ──────────────────────────────────────────────────────────────
 
 function parseIslandProps(el) {
   const raw = el.getAttribute("data-crepus-island-props") || "{}";
@@ -127,16 +105,34 @@ function initWebIslands(root) {
     const src = el.getAttribute("data-crepus-island-src");
     if (!src) continue;
 
+    const adapter = el.getAttribute("data-crepus-island-adapter") || "module";
     const props = parseIslandProps(el);
+
+    if (adapter === "rust") {
+      if (!el.id) {
+        el.id = "crepus-island-" + Math.random().toString(36).slice(2, 8);
+      }
+      const scopeName = el.getAttribute("data-crepus-scope") || src;
+      const renderFn = runtime["render_" + scopeName.replace(/[^a-zA-Z0-9]/g, "_")];
+      if (typeof renderFn === "function") {
+        Promise.resolve()
+          .then(() => renderFn(JSON.stringify(props)))
+          .then((html) => { if (html) el.innerHTML = html; })
+          .catch((error) => {
+            console.error(`crepus rust island render failed: ${scopeName}`, error);
+          });
+      } else {
+        console.warn(`Missing WASM export: render_${scopeName}`);
+      }
+      continue;
+    }
+
     const modulePath = resolveIslandModule(src);
     import(modulePath)
       .then((mod) => {
         const mount = typeof mod.mount === "function" ? mod.mount : mod.default;
         if (typeof mount === "function") {
           return mount(el, props, { runtime, rerender });
-        }
-        if (mount && typeof mount.mount === "function") {
-          return mount.mount(el, props, { runtime, rerender });
         }
         throw new Error(`Missing island mount export: ${src}`);
       })
@@ -151,6 +147,8 @@ function initWebIslands(root) {
   }
 }
 
+// ── Event delegation ─────────────────────────────────────────────────────────
+
 function findHandlerTarget(root, eventName, startNode) {
   const attr = `data-on${eventName}`;
   let node = startNode instanceof Element ? startNode : startNode?.parentElement;
@@ -161,6 +159,17 @@ function findHandlerTarget(root, eventName, startNode) {
     node = node.parentElement;
   }
   return root?.hasAttribute?.(attr) ? root : null;
+}
+
+function findIslandScope(startNode) {
+  let node = startNode instanceof Element ? startNode : startNode?.parentElement;
+  while (node) {
+    if (node.hasAttribute?.("data-crepus-scope")) {
+      return node;
+    }
+    node = node.parentElement;
+  }
+  return null;
 }
 
 function initDelegatedEvents(root) {
@@ -175,16 +184,75 @@ function initDelegatedEvents(root) {
       const handlerName = target.getAttribute(`data-on${eventName}`);
       const handler = handlerName ? runtime[handlerName] : null;
       if (typeof handler !== "function") {
-        console.warn(`Missing WASM handler export: ${handlerName}`);
         return;
       }
 
-      Promise.resolve()
-        .then(() => handler())
-        .then(() => rerender())
-        .catch((error) => {
-          console.error(`crepus event handler failed: ${handlerName}`, error);
-        });
+      const scopeEl = findIslandScope(event.target);
+      const scopeName = scopeEl ? scopeEl.getAttribute("data-crepus-scope") : null;
+
+      if (scopeName && scopeEl) {
+        const eventData = {};
+        if (eventName === "keydown" || eventName === "keyup") {
+          eventData["_key"] = event.key;
+          eventData["_meta"] = event.metaKey;
+          eventData["_ctrl"] = event.ctrlKey;
+          eventData["_shift"] = event.shiftKey;
+        }
+
+        // Auto-close brackets and quotes in editable scopes
+        if (eventName === "keydown" && !event.metaKey && !event.ctrlKey) {
+          const pairs = { '(': ')', '[': ']', '{': '}', '"': '"', "'": "'", '`': '`' };
+          const closeChar = pairs[event.key];
+          if (closeChar) {
+            const editable = event.target.closest?.('[contenteditable="true"]') || event.target;
+            if (editable.isContentEditable || editable.getAttribute?.("contenteditable") === "true") {
+              event.preventDefault();
+              const sel = window.getSelection();
+              if (sel.rangeCount) {
+                const range = sel.getRangeAt(0);
+                const pair = event.key + closeChar;
+                const textNode = document.createTextNode(pair);
+                range.deleteContents();
+                range.insertNode(textNode);
+                range.setStartAfter(textNode);
+                range.collapse(true);
+                // Move cursor back one character
+                const backRange = document.createRange();
+                backRange.setStart(textNode, 1);
+                backRange.collapse(true);
+                sel.removeAllRanges();
+                sel.addRange(backRange);
+              }
+              // Skip calling the WASM handler since we handled the character insertion
+              return;
+            }
+          }
+        }
+
+        for (const attr of target.attributes || []) {
+          if (attr.name.startsWith("data-") && attr.name !== "data-onclick" && attr.name !== "data-on" + eventName) {
+            eventData[attr.name] = attr.value;
+          }
+        }
+        const skipRerender = eventName !== "click";
+        Promise.resolve()
+          .then(() => handler(JSON.stringify(eventData)))
+          .then(() => {
+            if (!skipRerender) {
+              return rerenderScope(scopeEl, scopeName);
+            }
+          })
+          .catch((error) => {
+            console.error(`crepus scope handler failed: ${handlerName}`, error);
+          });
+      } else {
+        Promise.resolve()
+          .then(() => handler("{}"))
+          .then(() => rerender())
+          .catch((error) => {
+            console.error(`crepus event handler failed: ${handlerName}`, error);
+          });
+      }
     });
   }
 }
@@ -195,6 +263,32 @@ function rerender() {
   initDelegatedEvents(currentRoot);
   initInteractive(currentRoot);
 }
+
+function rerenderScope(scopeEl, scopeName) {
+  const fnName = "render_" + scopeName.replace(/[^a-zA-Z0-9]/g, "_");
+  const renderFn = runtime[fnName];
+  if (typeof renderFn !== "function") {
+    return rerender();
+  }
+  const html = renderFn("{}");
+  if (html) {
+    scopeEl.innerHTML = html;
+  }
+}
+
+function initInteractive(root) {
+  initSlotRotate(root);
+  initWebIslands(root);
+}
+
+// ── Bootstrap ────────────────────────────────────────────────────────────────
+
+window.addEventListener("crepus-rerender-editor", () => {
+  const scopeEl = currentRoot?.querySelector("[data-crepus-scope='editor']");
+  if (scopeEl) {
+    rerenderScope(scopeEl, "editor");
+  }
+});
 
 async function main() {
   await init();
@@ -211,6 +305,10 @@ async function main() {
     setRootHtml(root, runtime.crepus_render(JSON.stringify(bundle)));
     initDelegatedEvents(root);
     initInteractive(root);
+    // Force UnoCSS to re-extract after WASM render
+    if (window.__unocss_runtime) {
+      window.__unocss_runtime.extractAll();
+    }
   }
 }
 
