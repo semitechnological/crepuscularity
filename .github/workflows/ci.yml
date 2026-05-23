@@ -8,6 +8,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  WASM_BINDGEN_VERSION: 0.2.121
 
 jobs:
   test:
@@ -51,7 +52,7 @@ jobs:
     - name: WASM target and wasm-bindgen (crepus web build integration tests)
       run: |
         rustup target add wasm32-unknown-unknown
-        cargo install wasm-bindgen-cli --locked
+        cargo install wasm-bindgen-cli --version "$WASM_BINDGEN_VERSION" --locked
       shell: bash
     
     - name: Check formatting
