@@ -1,0 +1,12 @@
+[[targets]]
+type = "lvgl"
+id = "dashboard"
+path = "."
+template = "ui.crepus"
+out = "dist/dashboard.xml"
+name = "Dashboard"
+root = "component"
+
+[targets.vars]
+status = "ready"
+cpu = 68

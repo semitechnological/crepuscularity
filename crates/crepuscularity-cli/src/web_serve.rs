@@ -774,7 +774,7 @@ fn serve_index_document(
         .unwrap_or_else(std::sync::PoisonError::into_inner)
         .clone();
     let head = load_site_head(site_dir);
-    let google_fonts = merged_site_google_fonts(site_dir, &files);
+    let google_fonts = merged_site_google_fonts(site_dir, &files, None);
     let inline_css = merged_site_inline_css(&files);
     let mut html = render_index_html(&head, &google_fonts, &inline_css, "");
 
@@ -819,7 +819,7 @@ fn serve_secondary_preview(
     };
 
     let head = load_site_head(site_dir);
-    let google_fonts = merged_site_google_fonts(site_dir, &files);
+    let google_fonts = merged_site_google_fonts(site_dir, &files, None);
     let inline_css = merged_site_inline_css(&files);
     let mut html = render_index_html(&head, &google_fonts, &inline_css, "");
 

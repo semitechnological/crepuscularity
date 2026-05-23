@@ -104,9 +104,9 @@ fn scaffold_extension(name: &str) {
         ui::error(&format!("create views dir: {e}"));
     });
 
-    let webext_toml = scaffold_webext_toml(name);
-    std::fs::write(base.join("webext.toml"), webext_toml).unwrap_or_else(|e| {
-        ui::error(&format!("write webext.toml: {e}"));
+    let crepus_toml = scaffold_crepus_toml(name);
+    std::fs::write(base.join("crepus.toml"), crepus_toml).unwrap_or_else(|e| {
+        ui::error(&format!("write crepus.toml: {e}"));
     });
 
     let cargo_toml = format!(
@@ -195,7 +195,7 @@ div flex flex-col gap-4 p-4
     eprintln!();
     eprintln!("{}", style("Next steps:").dim());
     eprintln!("  cd {slug}");
-    eprintln!("  crepus webext build");
+    eprintln!("  crepus build");
     eprintln!(
         "  {}",
         style("# Load dist/unpacked/ in chrome://extensions").dim()
@@ -203,14 +203,19 @@ div flex flex-col gap-4 p-4
     ui::done_in(t0.elapsed());
 }
 
-fn scaffold_webext_toml(name: &str) -> String {
+fn scaffold_crepus_toml(name: &str) -> String {
     format!(
-        r#"[extension]
+        r#"[[targets]]
+type = "webext"
+id = "extension"
+app = "."
+
+[targets.extension]
 name = "{name}"
 version = "0.1.0"
 description = "A browser extension built with crepuscularity"
 
-[capabilities]
+[targets.capabilities]
 storage = true
 background-script = true
 content-script = true
@@ -312,19 +317,28 @@ fn detect_icon_size(filename: &str) -> Option<String> {
 fn build_extension(app_path: &Path, dev: bool) {
     let t0 = Instant::now();
 
-    let webext_toml = app_path.join("webext.toml");
-    if !webext_toml.exists() {
-        ui::error(&format!("no webext.toml found in {}", app_path.display()));
-    }
+    let mut manifest = load_extension_manifest(app_path, None);
+    build_extension_inner(app_path, &mut manifest, dev, t0);
+}
 
-    let mut manifest = match crepuscularity_webext::ExtensionManifest::load(&webext_toml) {
-        Ok(m) => m,
-        Err(e) => ui::error(&format!("failed to parse webext.toml: {e}")),
-    };
+fn build_extension_with_manifest(
+    app_path: &Path,
+    mut manifest: crepuscularity_webext::ExtensionManifest,
+    dev: bool,
+) {
+    let t0 = Instant::now();
+    build_extension_inner(app_path, &mut manifest, dev, t0);
+}
 
+fn build_extension_inner(
+    app_path: &Path,
+    manifest: &mut crepuscularity_webext::ExtensionManifest,
+    dev: bool,
+    t0: Instant,
+) {
     // Auto-detect options from project structure
-    auto_detect_pages(app_path, &mut manifest);
-    auto_detect_icons(app_path, &mut manifest);
+    auto_detect_pages(app_path, manifest);
+    auto_detect_icons(app_path, manifest);
 
     let ext_name = style(manifest.extension.name.as_str()).cyan().bold();
     eprintln!("{} building {ext_name}", style("crepus webext").dim());
@@ -403,7 +417,7 @@ fn build_extension(app_path: &Path, dev: bool) {
         render_crepus_css_assets(app_path, &dist).unwrap_or_else(|e| {
             ui::error(&format!("render extension .css.crepus assets: {e}"));
         });
-        render_crepus_pages(app_path, &dist, &manifest).unwrap_or_else(|e| {
+        render_crepus_pages(app_path, &dist, manifest).unwrap_or_else(|e| {
             ui::error(&format!("render extension .crepus pages: {e}"));
         });
         ui::spinner_ok(&sp, "runtime assets");
@@ -424,7 +438,7 @@ fn build_extension(app_path: &Path, dev: bool) {
     let popup_template = app_path.join("views/popup.crepus");
     if popup_template.exists() {
         let sp = ui::spinner("pre-rendering popup.html");
-        match prerender_popup_html(app_path, &popup_template, &manifest) {
+        match prerender_popup_html(app_path, &popup_template, manifest) {
             Ok(html) => {
                 std::fs::write(src_dir.join("popup.html"), &html).unwrap_or_else(|e| {
                     ui::error(&format!("write popup.html: {e}"));
@@ -442,7 +456,7 @@ fn build_extension(app_path: &Path, dev: bool) {
     match crepuscularity_webext::check_project_capabilities(app_path) {
         Ok(missing) if !missing.is_empty() => {
             eprintln!();
-            ui::warning("missing capabilities detected — add these to webext.toml:");
+            ui::warning("missing capabilities detected — add these to crepus.toml:");
             for cap in &missing {
                 eprintln!(
                     "  {} {}",
@@ -471,8 +485,61 @@ fn build_extension(app_path: &Path, dev: bool) {
     ui::done_in(t0.elapsed());
 }
 
+fn load_extension_manifest(
+    app_path: &Path,
+    target_id: Option<&str>,
+) -> crepuscularity_webext::ExtensionManifest {
+    let crepus_toml = app_path.join("crepus.toml");
+    if crepus_toml.is_file() {
+        let raw = std::fs::read_to_string(&crepus_toml)
+            .unwrap_or_else(|e| ui::error(&format!("read {}: {e}", crepus_toml.display())));
+        let manifest = crate::crepus_toml::CrepusManifest::parse(&raw)
+            .unwrap_or_else(|e| ui::error(&format!("parse {}: {e}", crepus_toml.display())));
+        let targets = manifest.resolved_targets(app_path);
+        let webext: Vec<_> = targets
+            .into_iter()
+            .filter(|target| target.target_type == "webext")
+            .filter(|target| target_id.map(|id| target.id == id).unwrap_or(true))
+            .collect();
+        match webext.as_slice() {
+            [target] => {
+                return target.webext.clone().unwrap_or_else(|| {
+                    ui::error(&format!(
+                        "webext target {:?} in {} needs [targets.extension]",
+                        target.id,
+                        crepus_toml.display()
+                    ))
+                });
+            }
+            [] if target_id.is_some() => ui::error(&format!(
+                "no webext target {:?} in {}",
+                target_id.unwrap(),
+                crepus_toml.display()
+            )),
+            [] => {}
+            many => ui::error(&format!(
+                "{} defines {} webext targets; pass --target ID",
+                crepus_toml.display(),
+                many.len()
+            )),
+        }
+    }
+
+    ui::error(&format!(
+        "no crepus.toml webext target found in {}",
+        app_path.display()
+    ));
+}
+
 pub(crate) fn build_app_path(app_path: &Path) {
     build_extension(app_path, false);
+}
+
+pub(crate) fn build_app_target(
+    app_path: &Path,
+    manifest: &crepuscularity_webext::ExtensionManifest,
+) {
+    build_extension_with_manifest(app_path, manifest.clone(), false);
 }
 
 fn build_wasm_runtime(app_path: &Path, runtime_dir: &Path, vendor_dir: &Path) {
@@ -679,28 +746,8 @@ fn prerender_popup_html(
 // ── manifest ──────────────────────────────────────────────────────────────────
 
 fn print_manifest(app_path: &Path) {
-    let webext_toml = app_path.join("webext.toml");
-    if !webext_toml.exists() {
-        let crex_path = app_path.join("manifest.crex");
-        if crex_path.exists() {
-            match crepuscularity_webext::ExtensionManifest::load(&crex_path) {
-                Ok(m) => {
-                    println!("{}", m.to_manifest_v3_json());
-                    return;
-                }
-                Err(e) => ui::error(&format!("failed to parse manifest.crex: {e}")),
-            }
-        }
-        ui::error(&format!(
-            "no webext.toml or manifest.crex found in {}",
-            app_path.display()
-        ));
-    }
-
-    match crepuscularity_webext::ExtensionManifest::load(&webext_toml) {
-        Ok(m) => println!("{}", m.to_manifest_v3_json()),
-        Err(e) => ui::error(&format!("failed to parse webext.toml: {e}")),
-    }
+    let manifest = load_extension_manifest(app_path, None);
+    println!("{}", manifest.to_manifest_v3_json());
 }
 
 #[cfg(test)]
@@ -708,16 +755,15 @@ mod tests {
     use super::*;
 
     #[test]
-    fn scaffold_webext_toml_uses_narrow_content_scope() {
-        let toml = scaffold_webext_toml("My Extension");
+    fn scaffold_crepus_toml_uses_narrow_content_scope() {
+        let toml = scaffold_crepus_toml("My Extension");
         assert!(!toml.contains("<all_urls>"));
 
-        let manifest: crepuscularity_webext::ExtensionManifest = toml::from_str(&toml).unwrap();
-        assert!(manifest.capabilities.content_script);
-        assert_eq!(
-            manifest.capabilities.host_permissions,
-            vec!["https://example.com/*"]
-        );
+        let manifest: crate::crepus_toml::CrepusManifest = toml::from_str(&toml).unwrap();
+        let target = manifest.targets.first().expect("target");
+        let capabilities = target.capabilities.as_ref().expect("capabilities");
+        assert!(capabilities.content_script);
+        assert_eq!(capabilities.host_permissions, vec!["https://example.com/*"]);
     }
 
     #[test]
@@ -1120,7 +1166,7 @@ fn watch_and_reload(app_path: &Path) {
         }
     }
     let _ = watcher.watch(
-        app_path.join("webext.toml").as_path(),
+        app_path.join("crepus.toml").as_path(),
         notify::RecursiveMode::NonRecursive,
     );
 

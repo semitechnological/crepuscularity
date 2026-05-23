@@ -1,8 +1,13 @@
-[extension]
+[[targets]]
+type = "webext"
+id = "benchmark-webext"
+app = "."
+
+[targets.extension]
 name = "benchmark-crepus-webext"
 version = "0.1.0"
 description = "Minimal crepus webext for benchmark"
 
-[capabilities]
+[targets.capabilities]
 storage = true
 background-script = true

@@ -77,7 +77,7 @@ Use **semver `0.y.z`**. Until `1.0`:
 
 **Web / compiler / hot-reload implementation spec (single doc for agents):** [docs/CREPUS_WEB_IMPLEMENTATION_SPEC.md](docs/CREPUS_WEB_IMPLEMENTATION_SPEC.md)
 
-**Documentation hub (Markdown):** [docs/README.md](docs/README.md). It includes the public guides for DSL, components, CLI, runtime/reactivity, GPUI, TUI, Lite, native shells, **polyglot plugins** ([docs/polyglot.md](docs/polyglot.md), [view-ir-contract](docs/view-ir-contract.md)), browser extensions, and production readiness. **`crepus web build --site docs-site`** also emits **`dist/docs/*.html`** (styled HTML from the same Markdown) for the GitHub Pages site.
+**Documentation hub (Markdown):** [docs/README.md](docs/README.md). It includes the public guides for DSL, components, CLI, runtime/reactivity, GPUI, TUI, Lite, native shells, **polyglot plugins** ([docs/polyglot.md](docs/polyglot.md), [view-ir-contract](docs/view-ir-contract.md)), browser extensions, and production readiness. **`crepus web build --manifest docs-site/crepus.toml`** also emits **`dist/docs/*.html`** (styled HTML from the same Markdown) for the GitHub Pages site.
 
 ## DSL quick reference
 

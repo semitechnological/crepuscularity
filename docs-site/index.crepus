@@ -70,7 +70,7 @@ div min-h-screen overflow-x-hidden antialiased crepus-twilight-page
 $ crepus new my-app && cargo run
 
 # WASM site (this page)
-$ crepus web build --site docs-site
+$ crepus web build --manifest docs-site/crepus.toml
 
 # Browser extension
 $ crepus webext new ext"

@@ -75,7 +75,13 @@ fn parse_args(args: &[String]) -> BuildArgs {
 fn build_target(target: &ResolvedTarget) {
     match target.target_type.as_str() {
         "web" => build_web(target),
-        "webext" => crate::webext::build_app_path(&target.dir),
+        "webext" => {
+            if let Some(manifest) = &target.webext {
+                crate::webext::build_app_target(&target.dir, manifest);
+            } else {
+                crate::webext::build_app_path(&target.dir);
+            }
+        }
         "lvgl" => build_lvgl(target),
         "native" | "ir" => build_native_ir(target),
         "embedded" => build_embedded(target),
@@ -93,6 +99,7 @@ fn build_web(target: &ResolvedTarget) {
         entry: target.entry.clone(),
         target_id: None,
         manifest: None,
+        meta: Some(target.web.clone()),
     });
 }
 

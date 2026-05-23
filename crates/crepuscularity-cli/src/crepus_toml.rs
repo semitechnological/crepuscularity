@@ -5,7 +5,7 @@
 use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 #[derive(Debug, Deserialize)]
 pub struct CrepusManifest {
@@ -59,6 +59,28 @@ pub struct ManifestTarget {
     pub width: Option<u16>,
     #[serde(default)]
     pub height: Option<u16>,
+    #[serde(default)]
+    pub description: Option<String>,
+    #[serde(default)]
+    pub head_html: Option<String>,
+    #[serde(default)]
+    pub google_fonts: Vec<String>,
+    #[serde(default)]
+    pub extension: Option<crepuscularity_webext::ExtensionInfo>,
+    #[serde(default)]
+    pub capabilities: Option<crepuscularity_webext::CapabilitiesSection>,
+    #[serde(default)]
+    pub content_scripts: Vec<crepuscularity_webext::ContentScriptEntry>,
+    #[serde(default)]
+    pub plugins: HashMap<String, crepuscularity_webext::PluginEntry>,
+    #[serde(default)]
+    pub options: Option<crepuscularity_webext::ManifestOptions>,
+    #[serde(default)]
+    pub web_accessible_resources: Option<crepuscularity_webext::WebAccessibleResourcesOptions>,
+    #[serde(default)]
+    pub commands: BTreeMap<String, crepuscularity_webext::ExtensionManifestCommand>,
+    #[serde(default)]
+    pub chrome_url_overrides: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -91,6 +113,15 @@ pub struct ResolvedWebTarget {
     pub site_dir: PathBuf,
     pub out_dir: PathBuf,
     pub entry: String,
+    pub meta: WebTargetMeta,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct WebTargetMeta {
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub head_html: Option<String>,
+    pub google_fonts: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -108,6 +139,8 @@ pub struct ResolvedTarget {
     pub root: Option<String>,
     pub width: Option<u16>,
     pub height: Option<u16>,
+    pub web: WebTargetMeta,
+    pub webext: Option<crepuscularity_webext::ExtensionManifest>,
 }
 
 type WebTargetRow = (Option<String>, String, Option<String>, Option<String>);
@@ -119,7 +152,7 @@ impl CrepusManifest {
 
     /// All `type = "web"` entries, plus `[web]` when there are no `[[targets]]` web rows.
     pub fn web_targets(&self, manifest_dir: &Path) -> Result<Vec<ResolvedWebTarget>, String> {
-        let mut raw: Vec<WebTargetRow> = Vec::new();
+        let mut raw: Vec<(WebTargetRow, WebTargetMeta)> = Vec::new();
 
         for t in &self.targets {
             if !t.target_type.eq_ignore_ascii_case("web") {
@@ -131,12 +164,23 @@ impl CrepusManifest {
                 .or_else(|| t.path.clone())
                 .or_else(|| t.app.clone())
                 .unwrap_or_else(|| ".".into());
-            raw.push((t.id.clone(), site, t.out.clone(), t.entry.clone()));
+            raw.push((
+                (t.id.clone(), site, t.out.clone(), t.entry.clone()),
+                WebTargetMeta {
+                    name: t.name.clone(),
+                    description: t.description.clone(),
+                    head_html: t.head_html.clone(),
+                    google_fonts: t.google_fonts.clone(),
+                },
+            ));
         }
 
         if raw.is_empty() {
             if let Some(w) = &self.web {
-                raw.push((None, w.site.clone(), w.out.clone(), w.entry.clone()));
+                raw.push((
+                    (None, w.site.clone(), w.out.clone(), w.entry.clone()),
+                    WebTargetMeta::default(),
+                ));
             }
         }
 
@@ -145,7 +189,7 @@ impl CrepusManifest {
         }
 
         let mut out = Vec::with_capacity(raw.len());
-        for (id, site, od, ent) in raw {
+        for ((id, site, od, ent), meta) in raw {
             let site_dir = manifest_dir.join(&site);
             let site_dir = std::fs::canonicalize(&site_dir).unwrap_or(site_dir);
             let default_out = site_dir.join("dist");
@@ -170,6 +214,7 @@ impl CrepusManifest {
                 site_dir,
                 out_dir,
                 entry,
+                meta,
             });
         }
 
@@ -212,6 +257,27 @@ impl CrepusManifest {
                     root: target.root.clone(),
                     width: target.width,
                     height: target.height,
+                    web: WebTargetMeta {
+                        name: target.name.clone(),
+                        description: target.description.clone(),
+                        head_html: target.head_html.clone(),
+                        google_fonts: target.google_fonts.clone(),
+                    },
+                    webext: target.extension.clone().map(|extension| {
+                        crepuscularity_webext::ExtensionManifest {
+                            extension,
+                            capabilities: target.capabilities.clone().unwrap_or_default(),
+                            content_scripts: target.content_scripts.clone(),
+                            plugins: target.plugins.clone(),
+                            options: target.options.clone().unwrap_or_default(),
+                            web_accessible_resources: target
+                                .web_accessible_resources
+                                .clone()
+                                .unwrap_or_default(),
+                            commands: target.commands.clone(),
+                            chrome_url_overrides: target.chrome_url_overrides.clone(),
+                        }
+                    }),
                 }
             })
             .collect()

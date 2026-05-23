@@ -1,8 +1,13 @@
-[extension]
+[[targets]]
+type = "webext"
+id = "quicknote"
+app = "."
+
+[targets.extension]
 name = "quicknote"
 version = "0.2.0"
 description = "Take quick notes on any page, stored locally in your browser."
 
-[capabilities]
+[targets.capabilities]
 storage = true
 background-script = true

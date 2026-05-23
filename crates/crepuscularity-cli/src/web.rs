@@ -187,7 +187,7 @@ fn print_web_usage() {
     eprintln!(
         "  {}  {}",
         style("new <name>                     ").green(),
-        style("scaffold index.crepus + runtime/ + web.toml").dim()
+        style("scaffold index.crepus + runtime/ + crepus.toml").dim()
     );
     eprintln!(
         "  {}  {}",
@@ -289,18 +289,19 @@ fn scaffold_site(name: &str) {
         ui::error(&format!("create dist dir: {e}"));
     });
 
-    let web_toml = format!(
-        r#"[site]
+    let crepus_toml = format!(
+        r#"[[targets]]
+type = "web"
+id = "site"
+site = "."
+out = "dist"
+entry = "index.crepus"
 name = "{name}"
-version = "0.1.0"
 description = "Crepus static site (.crepus + WASM)"
-
-# Dev:  crepus web serve --site .
-# Ship: crepus web build --site .
 "#
     );
-    std::fs::write(base.join("web.toml"), web_toml).unwrap_or_else(|e| {
-        ui::error(&format!("write web.toml: {e}"));
+    std::fs::write(base.join("crepus.toml"), crepus_toml).unwrap_or_else(|e| {
+        ui::error(&format!("write crepus.toml: {e}"));
     });
 
     let index_crepus = r#"div w-full min-h-screen bg-zinc-950 text-zinc-50 p-8 flex flex-col gap-4
@@ -353,11 +354,7 @@ pub fn crepus_render(bundle_json: &str) -> Result<String, JsValue> {
     eprintln!("{}", style("Next steps:").dim());
     eprintln!("  cd {slug}");
     eprintln!("  crepus web serve --site .");
-    eprintln!("  crepus web build --site .");
-    eprintln!(
-        "  {}",
-        style("# Optional: site.json for <title> / meta only (not page structure)").dim()
-    );
+    eprintln!("  crepus build");
     ui::done_in(t0.elapsed());
 }
 
@@ -367,6 +364,7 @@ struct WasmBuildArgs {
     site_dir: PathBuf,
     out_dir: PathBuf,
     entry: String,
+    meta: Option<crate::crepus_toml::WebTargetMeta>,
 }
 
 pub(crate) struct WebBuildArgs {
@@ -375,6 +373,7 @@ pub(crate) struct WebBuildArgs {
     pub(crate) entry: Option<String>,
     pub(crate) target_id: Option<String>,
     pub(crate) manifest: Option<PathBuf>,
+    pub(crate) meta: Option<crate::crepus_toml::WebTargetMeta>,
 }
 
 fn parse_build_args(args: &[String]) -> WebBuildArgs {
@@ -431,6 +430,7 @@ fn parse_build_args(args: &[String]) -> WebBuildArgs {
         entry,
         target_id,
         manifest,
+        meta: None,
     }
 }
 
@@ -445,6 +445,7 @@ fn resolve_wasm_build_args(args: &WebBuildArgs) -> WasmBuildArgs {
             site_dir: site_dir.clone(),
             out_dir,
             entry,
+            meta: args.meta.clone(),
         };
     }
 
@@ -458,6 +459,7 @@ fn resolve_wasm_build_args(args: &WebBuildArgs) -> WasmBuildArgs {
             site_dir: picked.site_dir,
             out_dir,
             entry,
+            meta: Some(picked.meta),
         };
     }
 
@@ -472,6 +474,7 @@ fn resolve_wasm_build_args(args: &WebBuildArgs) -> WasmBuildArgs {
         site_dir,
         out_dir,
         entry,
+        meta: args.meta.clone(),
     }
 }
 
@@ -526,7 +529,8 @@ pub(crate) fn build_site_wasm(cli: &WebBuildArgs) {
     });
 
     let head = load_site_head(&b.site_dir);
-    let google_fonts = merged_site_google_fonts(&b.site_dir, &files);
+    let head = merge_site_head_meta(head, b.meta.as_ref());
+    let google_fonts = merged_site_google_fonts(&b.site_dir, &files, b.meta.as_ref());
     let inline_css = merged_site_inline_css(&files);
     let vendor_dir = b.out_dir.join("vendor");
     let pkg_dir = b.out_dir.join("pkg");
@@ -748,12 +752,16 @@ struct ThemePartial {
     border: Option<String>,
 }
 
-/// Merge `[site].google_fonts` / top-level `google_fonts` from `web.toml` with every `google-font` pragma in bundled `.crepus` files.
+/// Merge `crepus.toml` target fonts with every `google-font` pragma in bundled `.crepus` files.
 pub(crate) fn merged_site_google_fonts(
-    site_dir: &Path,
+    _site_dir: &Path,
     files: &HashMap<String, String>,
+    meta: Option<&crate::crepus_toml::WebTargetMeta>,
 ) -> Vec<String> {
-    let mut collected = load_web_toml_google_fonts(site_dir);
+    let mut collected = Vec::new();
+    if let Some(meta) = meta {
+        collected.extend(meta.google_fonts.clone());
+    }
     for content in files.values() {
         collected.extend(strip_indent_decorators(content).google_fonts);
     }
@@ -769,34 +777,6 @@ pub(crate) fn merged_site_inline_css(files: &HashMap<String, String>) -> String 
         }
     }
     blocks.join("\n\n")
-}
-
-fn load_web_toml_google_fonts(site_dir: &Path) -> Vec<String> {
-    let path = site_dir.join("web.toml");
-    let Ok(raw) = std::fs::read_to_string(&path) else {
-        return Vec::new();
-    };
-    let Ok(v) = raw.parse::<toml::Table>() else {
-        return Vec::new();
-    };
-    let mut out = Vec::new();
-    if let Some(arr) = v.get("google_fonts").and_then(|x| x.as_array()) {
-        for x in arr {
-            if let Some(s) = x.as_str() {
-                out.push(s.to_string());
-            }
-        }
-    }
-    if let Some(site) = v.get("site").and_then(|x| x.as_table()) {
-        if let Some(arr) = site.get("google_fonts").and_then(|x| x.as_array()) {
-            for x in arr {
-                if let Some(s) = x.as_str() {
-                    out.push(s.to_string());
-                }
-            }
-        }
-    }
-    out
 }
 
 pub(crate) fn load_site_head(site_dir: &Path) -> SiteHead {
@@ -843,22 +823,25 @@ pub(crate) fn load_site_head(site_dir: &Path) -> SiteHead {
         }
     }
 
-    let web_toml = site_dir.join("web.toml");
-    if let Ok(raw) = std::fs::read_to_string(&web_toml) {
-        if let Ok(v) = raw.parse::<toml::Table>() {
-            if let Some(site) = v.get("site").and_then(|x| x.as_table()) {
-                if let Some(name) = site.get("name").and_then(|x| x.as_str()) {
-                    if head.page_title == "Crepus site" {
-                        head.page_title = name.to_string();
-                    }
-                }
-                if let Some(extra_head_html) = site.get("head_html").and_then(|x| x.as_str()) {
-                    head.extra_head_html = extra_head_html.to_string();
-                }
-            }
-        }
-    }
+    head
+}
 
+pub(crate) fn merge_site_head_meta(
+    mut head: SiteHead,
+    meta: Option<&crate::crepus_toml::WebTargetMeta>,
+) -> SiteHead {
+    let Some(meta) = meta else {
+        return head;
+    };
+    if let Some(name) = &meta.name {
+        head.page_title = name.clone();
+    }
+    if let Some(description) = &meta.description {
+        head.description = description.clone();
+    }
+    if let Some(head_html) = &meta.head_html {
+        head.extra_head_html = head_html.clone();
+    }
     head
 }
 

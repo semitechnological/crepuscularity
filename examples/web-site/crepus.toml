@@ -1,4 +1,8 @@
-[site]
+[[targets]]
+type = "web"
+id = "web-site"
+site = "."
+out = "dist"
+entry = "index.crepus"
 name = "Web site example"
-version = "0.1.0"
 description = "Example for crepus web build (WASM + .crepus)"

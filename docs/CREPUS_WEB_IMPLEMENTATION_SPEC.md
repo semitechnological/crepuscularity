@@ -49,7 +49,7 @@ Borrow **mechanisms**; do not fork Next.js or Turbopack.
 - **Local + remote cache:** hashes of inputs → skip work; **remote** shares hits across CI and laptops.  
 - **Parallel execution:** independent tasks run concurrently; DAG respects deps.
 
-**Apply to Crepuscularity:** Define tasks: `crepus:parse`, `crepus:codegen`, `cargo:check-wasm`, `cargo:check-host`, `crepus:webext-manifest`, **tests**. Document **inputs**: `**/*.crepus`, `Cargo.toml`, `webext.toml`. **Outputs**: `target/crepus-out/**`, generated `*.rs`. Wire **CI** with `TURBO_TOKEN` / team or equivalent **sccache**/GitHub Actions cache.
+**Apply to Crepuscularity:** Define tasks: `crepus:parse`, `crepus:codegen`, `cargo:check-wasm`, `cargo:check-host`, `crepus:webext-manifest`, **tests**. Document **inputs**: `**/*.crepus`, `Cargo.toml`, `crepus.toml`. **Outputs**: `target/crepus-out/**`, generated `*.rs`. Wire **CI** with `TURBO_TOKEN` / team or equivalent **sccache**/GitHub Actions cache.
 
 ### 0.4 Lessons from **Turbopack** (incremental computation)
 
@@ -464,7 +464,7 @@ CLI integration lives under **`crepus webext`** (see `docs/webext.md`).
 ### 9.4 Dev workflow for webext
 
 - **`.crepus` hot reload** on extension **pages** via same WS / virtual-map approach as web (where CSP permits).  
-- **`webext.toml`** / manifest regen on capability or version change.  
+- **`crepus.toml`** / manifest regen on capability or version change.
 - **Rust / WASM** changes: **`crepus webext build`** → incremental `cargo`; **reload extension** in `chrome://extensions` (full ext reload often required—surface in CLI output).  
 - **Parallelism:** `webext` WASM crate can build **in parallel** with other workspace members (L2).
 

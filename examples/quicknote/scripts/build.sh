@@ -28,7 +28,7 @@ mkdir -p "$DIST_VENDOR"
 cp "$VENDOR_TMP/quicknote_runtime.js"      "$DIST_VENDOR/runtime.js"
 cp "$VENDOR_TMP/quicknote_runtime_bg.wasm" "$DIST_VENDOR/runtime_bg.wasm"
 
-# --- Generate manifest.json from webext.toml ----------------------------
+# --- Generate manifest.json from crepus.toml -----------------------------
 crepus webext manifest --app "$APP_DIR" > "$DIST_DIR/manifest.json"
 
 # --- Assemble dist ------------------------------------------------------
