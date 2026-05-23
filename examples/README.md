@@ -40,5 +40,6 @@ cd examples/extensions/rs_vimium && crepus webext build
 | `gpui` | `weather`, `todo`, `text-features` |
 | `native` | `native-shells` |
 | `embedded` | `embedded-dashboard`, `embedded-stm32`, `embedded-esp32` |
+| `lvgl` | `lvgl-pro-mode`, `lvgl-stm32` |
 | `render` | `render/`, `*.crepus` demos at this level |
 | `benchmark` | [`benchmarks/`](benchmarks/) — `crepus benchmark` |

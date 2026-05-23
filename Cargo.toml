@@ -31,6 +31,7 @@ members = [
     "examples/embedded-dashboard",
     "examples/embedded-stm32/host-sim",
     "examples/lvgl-pro-mode",
+    "examples/lvgl-stm32",
 ]
 
 [profile.release]

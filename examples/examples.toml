@@ -98,6 +98,18 @@ label = "ESP32-S3 ST7789 walkthrough"
 path = "embedded-esp32"
 
 [[examples]]
+target = "lvgl"
+id = "lvgl-pro-mode"
+label = "LVGL Pro XML generator"
+path = "lvgl-pro-mode"
+
+[[examples]]
+target = "lvgl"
+id = "lvgl-stm32"
+label = "STM32 LVGL XML build-time asset"
+path = "lvgl-stm32"
+
+[[examples]]
 target = "render"
 id = "render"
 label = "CLI render demos"
