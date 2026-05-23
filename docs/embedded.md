@@ -162,7 +162,7 @@ Supported today: column/row flex, sizing (`w-full`, `h-full`, fractions, `w-[Npx
 
 Palette is generated from Tailwind v4.3 `theme.css` (`scripts/gen-tailwind-colors.mjs`). Regenerate with: `bun scripts/gen-tailwind-colors.mjs --theme /path/to/theme.css`.
 
-Not in v1: LVGL adapter, animation, input events, responsive/dark variants, grid/shadows, `no_std` parsing on device.
+Not in v1: direct LVGL runtime adapter in the framebuffer path, animation, input events, responsive/dark variants, grid/shadows, `no_std` parsing on device. Use the separate [LVGL target](lvgl.md) when you want LVGL Pro XML output.
 
 ## Lower-level API
 
