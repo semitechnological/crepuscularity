@@ -3,7 +3,7 @@
 //! COMMANDS
 //!   crepus new NAME                              scaffold a new GPUI app
 //!   crepus dev [--bin NAME] [--release] [--emit-events]  watch → rebuild → relaunch
-//!   crepus build [--release]                     cargo build wrapper
+//!   crepus build [--target ID] [--manifest FILE] build crepus.toml targets, or cargo fallback
 //!   crepus preview FILE                          live-preview a .crepus template
 //!   crepus render FILE [--ctx FILE] [--var k=v] [--component Name]
 //!   crepus web new NAME                          scaffold index.crepus + runtime/ + web.toml
@@ -45,6 +45,7 @@ mod ios;
 mod native;
 mod new;
 mod render;
+mod target_build;
 mod tui;
 pub mod ui;
 mod wasm_bundle;
@@ -110,6 +111,15 @@ fn main() {
 
         #[cfg(feature = "desktop")]
         Some("build") => {
+            let manifest_arg = manifest_arg(&args[2..]);
+            if args[2..]
+                .iter()
+                .any(|a| matches!(a.as_str(), "--target" | "-t" | "--manifest" | "--all"))
+                || target_build::has_manifest_targets(manifest_arg)
+            {
+                target_build::run(&args[2..]);
+                return;
+            }
             let t0 = Instant::now();
             let release = args.iter().any(|a| a == "--release");
             let cwd = std::env::current_dir().unwrap_or_else(|e| {
@@ -189,6 +199,17 @@ fn main() {
     }
 }
 
+fn manifest_arg(args: &[String]) -> Option<std::path::PathBuf> {
+    let mut i = 0;
+    while i < args.len() {
+        if args[i] == "--manifest" {
+            return args.get(i + 1).map(std::path::PathBuf::from);
+        }
+        i += 1;
+    }
+    None
+}
+
 fn print_usage() {
     eprintln!(
         "{} cli {}",
@@ -209,8 +230,8 @@ fn print_usage() {
     );
     eprintln!(
         "  {}  {}",
-        style("build [--release]                    ").green(),
-        style("cargo build wrapper").dim()
+        style("build [--target ID] [--manifest FILE]").green(),
+        style("build crepus.toml targets, or cargo fallback").dim()
     );
     eprintln!(
         "  {}  {}",

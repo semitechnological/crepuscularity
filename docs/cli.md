@@ -45,11 +45,52 @@ Options:
 
 ### `crepus build`
 
-Build the project:
+If the current directory or a parent has `crepus.toml` with `[[targets]]`, build those targets. With no manifest targets, this falls back to the Cargo build wrapper.
 
 ```bash
 crepus build
-crepus build --release
+crepus build --target panel
+crepus build --manifest ./crepus.toml
+```
+
+```toml
+[[targets]]
+type = "web"
+id = "site"
+site = "docs-site"
+out = "docs-site/dist"
+entry = "index.crepus"
+
+[[targets]]
+type = "webext"
+id = "extension"
+app = "examples/extensions/rs_vimium"
+
+[[targets]]
+type = "native"
+id = "fixture"
+template = "views/main.crepus"
+out = "dist/fixture.json"
+root = "pretty"
+
+[[targets]]
+type = "lvgl"
+id = "panel"
+template = "ui.crepus"
+out = "dist/panel.xml"
+name = "Panel"
+root = "screen"
+
+[targets.vars]
+device = "STM32F411"
+```
+
+Supported manifest target types today: `web`, `webext`, `native` / `ir`, `lvgl`, and `embedded`. Target-specific commands still exist for advanced flags.
+
+Rust code can use the same manifest path for render-output targets (`web`, `native`, `lvgl`):
+
+```rust
+let artifacts = crepuscularity::target::write_manifest_file("crepus.toml")?;
 ```
 
 ### `crepus preview <file.crepus>`

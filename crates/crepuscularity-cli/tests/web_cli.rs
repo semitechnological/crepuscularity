@@ -227,6 +227,51 @@ fn web_build_via_crepus_toml_target_docs_emits_wasm() {
     windows,
     ignore = "default desktop crepus.exe does not spawn reliably on Windows CI"
 )]
+fn root_build_uses_crepus_toml_lvgl_target() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let root = tmp.path();
+    std::fs::write(
+        root.join("crepus.toml"),
+        r##"
+[[targets]]
+type = "lvgl"
+id = "dash"
+template = "ui.crepus"
+out = "dist/dash.xml"
+name = "Dash"
+root = "screen"
+
+[targets.vars]
+device = "STM32F411"
+"##,
+    )
+    .expect("write manifest");
+    std::fs::write(
+        root.join("ui.crepus"),
+        r##"div #panel bg-[#101820]
+  h1 text-white
+    "{device}"
+"##,
+    )
+    .expect("write template");
+
+    let status = crepus()
+        .current_dir(root)
+        .args(["build"])
+        .status()
+        .expect("spawn crepus build");
+    assert!(status.success());
+
+    let xml = std::fs::read_to_string(root.join("dist/dash.xml")).expect("read xml");
+    assert!(xml.contains(r#"<screen name="Dash">"#));
+    assert!(xml.contains("STM32F411"));
+}
+
+#[test]
+#[cfg_attr(
+    windows,
+    ignore = "default desktop crepus.exe does not spawn reliably on Windows CI"
+)]
 fn web_build_multi_target_manifest_requires_target_flag() {
     let tmp = tempfile::tempdir().expect("tempdir");
     let root = tmp.path();

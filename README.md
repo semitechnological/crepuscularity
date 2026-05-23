@@ -41,6 +41,41 @@ crepus webext build
 # Load dist/unpacked/ in chrome://extensions
 ```
 
+## Minimal target builds
+
+Put every output in one `crepus.toml`, then run one command:
+
+```toml
+[[targets]]
+type = "web"
+id = "site"
+site = "docs-site"
+out = "docs-site/dist"
+entry = "index.crepus"
+
+[[targets]]
+type = "lvgl"
+id = "panel"
+template = "ui.crepus"
+out = "dist/panel.xml"
+name = "Panel"
+root = "screen"
+
+[targets.vars]
+device = "STM32F411"
+```
+
+```bash
+crepus build
+crepus build --target panel
+```
+
+Rust build scripts can use the same manifest for render-output targets:
+
+```rust
+let artifacts = crepuscularity::target::write_manifest_file("crepus.toml")?;
+```
+
 ## Template Syntax (or you can write React JSX)
 
 ```text
@@ -91,7 +126,7 @@ JSX/HTML tag syntax is supported as an **input format** in the core parser — t
 ```bash
 crepus new <name>                    # Scaffold GPUI app
 crepus dev [--emit-events]           # Hot-reload dev loop
-crepus build [--release]             # Build wrapper
+crepus build [--target ID]           # Build crepus.toml targets, or cargo fallback
 crepus preview <file.crepus>         # Live preview
 
 crepus webext new <name>             # Scaffold browser extension

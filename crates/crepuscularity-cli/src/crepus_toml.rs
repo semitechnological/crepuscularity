@@ -5,6 +5,7 @@
 use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
+use std::collections::HashMap;
 
 #[derive(Debug, Deserialize)]
 pub struct CrepusManifest {
@@ -32,12 +33,32 @@ pub struct ManifestTarget {
     pub target_type: String,
     #[serde(default)]
     pub id: Option<String>,
-    /// Site root directory, relative to the manifest folder.
-    pub site: String,
+    #[serde(default)]
+    pub site: Option<String>,
     #[serde(default)]
     pub out: Option<String>,
     #[serde(default)]
     pub entry: Option<String>,
+    #[serde(default)]
+    pub template: Option<String>,
+    #[serde(default)]
+    pub component: Option<String>,
+    #[serde(default)]
+    pub ctx: Option<String>,
+    #[serde(default)]
+    pub vars: HashMap<String, toml::Value>,
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(default)]
+    pub root: Option<String>,
+    #[serde(default)]
+    pub app: Option<String>,
+    #[serde(default)]
+    pub path: Option<String>,
+    #[serde(default)]
+    pub width: Option<u16>,
+    #[serde(default)]
+    pub height: Option<u16>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -72,6 +93,23 @@ pub struct ResolvedWebTarget {
     pub entry: String,
 }
 
+#[derive(Debug, Clone)]
+pub struct ResolvedTarget {
+    pub id: String,
+    pub target_type: String,
+    pub dir: PathBuf,
+    pub out: Option<PathBuf>,
+    pub entry: Option<String>,
+    pub template: Option<PathBuf>,
+    pub component: Option<String>,
+    pub ctx: Option<PathBuf>,
+    pub vars: HashMap<String, toml::Value>,
+    pub name: Option<String>,
+    pub root: Option<String>,
+    pub width: Option<u16>,
+    pub height: Option<u16>,
+}
+
 type WebTargetRow = (Option<String>, String, Option<String>, Option<String>);
 
 impl CrepusManifest {
@@ -87,7 +125,13 @@ impl CrepusManifest {
             if !t.target_type.eq_ignore_ascii_case("web") {
                 continue;
             }
-            raw.push((t.id.clone(), t.site.clone(), t.out.clone(), t.entry.clone()));
+            let site = t
+                .site
+                .clone()
+                .or_else(|| t.path.clone())
+                .or_else(|| t.app.clone())
+                .unwrap_or_else(|| ".".into());
+            raw.push((t.id.clone(), site, t.out.clone(), t.entry.clone()));
         }
 
         if raw.is_empty() {
@@ -131,6 +175,56 @@ impl CrepusManifest {
 
         Ok(out)
     }
+
+    pub fn resolved_targets(&self, manifest_dir: &Path) -> Vec<ResolvedTarget> {
+        self.targets
+            .iter()
+            .enumerate()
+            .map(|(idx, target)| {
+                let raw_dir = target
+                    .site
+                    .as_ref()
+                    .or(target.path.as_ref())
+                    .or(target.app.as_ref())
+                    .map(String::as_str)
+                    .unwrap_or(".");
+                let dir = absolutize(manifest_dir, raw_dir);
+                let id = target.id.clone().unwrap_or_else(|| {
+                    dir.file_name()
+                        .map(|s| s.to_string_lossy().into_owned())
+                        .filter(|s| !s.is_empty())
+                        .unwrap_or_else(|| format!("target-{idx}"))
+                });
+                ResolvedTarget {
+                    id,
+                    target_type: target.target_type.to_ascii_lowercase(),
+                    dir,
+                    out: target.out.as_deref().map(|p| absolutize(manifest_dir, p)),
+                    entry: target.entry.clone(),
+                    template: target
+                        .template
+                        .as_deref()
+                        .map(|p| absolutize(manifest_dir, p)),
+                    component: target.component.clone(),
+                    ctx: target.ctx.as_deref().map(|p| absolutize(manifest_dir, p)),
+                    vars: target.vars.clone(),
+                    name: target.name.clone(),
+                    root: target.root.clone(),
+                    width: target.width,
+                    height: target.height,
+                }
+            })
+            .collect()
+    }
+}
+
+fn absolutize(base: &Path, path: &str) -> PathBuf {
+    let p = PathBuf::from(path);
+    if p.is_absolute() {
+        p
+    } else {
+        base.join(p)
+    }
 }
 
 pub fn find_manifest_upward(start: &Path) -> Option<PathBuf> {
@@ -170,6 +264,39 @@ pub fn load_web_targets(manifest: Option<PathBuf>) -> Option<Vec<ResolvedWebTarg
     } else {
         Some(targets)
     }
+}
+
+pub fn load_manifest_targets(
+    manifest: Option<PathBuf>,
+) -> Result<Option<Vec<ResolvedTarget>>, String> {
+    let cwd = std::env::current_dir().map_err(|e| format!("current dir: {e}"))?;
+    let Some(mpath) = manifest.or_else(|| find_manifest_upward(&cwd)) else {
+        return Ok(None);
+    };
+    let md = mpath
+        .parent()
+        .ok_or_else(|| format!("manifest has no parent: {}", mpath.display()))?
+        .to_path_buf();
+    let raw =
+        std::fs::read_to_string(&mpath).map_err(|e| format!("read {}: {e}", mpath.display()))?;
+    let man = CrepusManifest::parse(&raw)?;
+    Ok(Some(man.resolved_targets(&md)))
+}
+
+pub fn pick_targets(
+    targets: &[ResolvedTarget],
+    id: Option<&str>,
+) -> Result<Vec<ResolvedTarget>, String> {
+    if let Some(id) = id {
+        let ids: Vec<&str> = targets.iter().map(|t| t.id.as_str()).collect();
+        return targets
+            .iter()
+            .find(|t| t.id == id)
+            .cloned()
+            .map(|t| vec![t])
+            .ok_or_else(|| format!("no target with id {id:?} (available: {ids:?})"));
+    }
+    Ok(targets.to_vec())
 }
 
 pub fn resolve_pick(
