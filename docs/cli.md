@@ -12,12 +12,27 @@ cargo install --path crates/crepuscularity-cli
 
 ## Commands
 
+### `crepus init <kind> <name>`
+
+Scaffold a new app or target workspace:
+
+```bash
+crepus init gpui my-app
+crepus init web my-site
+crepus init webext my-extension
+crepus init tui my-terminal-app
+crepus init native my-native-shell
+crepus init ios my-ios-host
+```
+
+Supported kinds are `web`, `webext`, `tui`, `native`, `ios`, and `gpui`. Existing scaffold commands remain aliases: `crepus new <name>` maps to `crepus init gpui <name>`, `crepus web new <name>` maps to `crepus init web <name>`, `crepus webext new <name>` maps to `crepus init webext <name>`, and `crepus ios new <name>` maps to `crepus init ios <name>`.
+
 ### `crepus new <name>`
 
 Scaffold a new GPUI application:
 
 ```bash
-crepus new my-app
+crepus init gpui my-app
 cd my-app
 SDKROOT=$(xcrun --show-sdk-path) cargo run
 ```
@@ -45,10 +60,12 @@ Options:
 
 ### `crepus build`
 
-If the current directory or a parent has `crepus.toml` with `[[targets]]`, build those targets. With no manifest targets, this falls back to the Cargo build wrapper.
+If the current directory or a parent has `crepus.toml` with `[[targets]]`, build all targets by default. Pass a target type or target id as the positional selector to build a subset. The existing `--target ID` selector remains supported. With no manifest targets, this falls back to the Cargo build wrapper.
 
 ```bash
 crepus build
+crepus build web
+crepus build panel
 crepus build --target panel
 crepus build --manifest ./crepus.toml
 ```
