@@ -6,7 +6,7 @@
 //!   crepus build [--target ID] [--manifest FILE] build crepus.toml targets, or cargo fallback
 //!   crepus preview FILE                          live-preview a .crepus template
 //!   crepus render FILE [--ctx FILE] [--var k=v] [--component Name]
-//!   crepus web new NAME                          scaffold index.crepus + runtime/ + web.toml
+//!   crepus web new NAME                          scaffold index.crepus + runtime/ + crepus.toml
 //!   crepus web build [--site DIR] [--out-dir DIR]   dist/ with WASM + crepus-bundle.json
 //!   crepus web site-json [--site DIR]             pretty-print site.json (deprecated)
 //!   crepus webext new NAME                       scaffold a browser extension

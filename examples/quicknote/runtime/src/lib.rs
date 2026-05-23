@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use crepuscularity_core::context::{TemplateContext, TemplateValue};
 use crepuscularity_web::render_component_file_to_html;
-use crepuscularity_webext::api::{BrowserProgram, JsExpr, StorageArea};
+use crepuscularity_webext::{BrowserProgram, JsExpr, StorageArea};
 use serde_json::{json, Value};
 use wasm_bindgen::prelude::*;
 

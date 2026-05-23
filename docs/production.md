@@ -36,7 +36,7 @@ For static web and docs-site output, also verify the WASM target and generated f
 ```bash
 rustup target add wasm32-unknown-unknown
 cargo install wasm-bindgen-cli
-cargo run -p crepuscularity-cli -- web build --site docs-site --out-dir /tmp/crepus-docs-dist
+cargo run -p crepuscularity-cli -- web build --manifest docs-site/crepus.toml --out-dir /tmp/crepus-docs-dist
 ```
 
 The generated docs should include `docs/index.html`, one HTML page for each published Markdown guide, `docs/docs-search-index.json`, `pkg/*.wasm`, and `.nojekyll` at the site root.
@@ -53,7 +53,7 @@ Keep extension page access narrow. Empty `host-permissions` stays empty in gener
 
 For `include` directives, keep component paths relative to the project’s template root. The runtime and TUI paths reject parent-directory and absolute includes; new backends should preserve that boundary.
 
-Do not put secrets in templates, `site.json`, `web.toml`, generated bundles, or extension assets. Everything copied to `dist/` is public.
+Do not put secrets in templates, `site.json`, `crepus.toml`, generated bundles, or extension assets. Everything copied to `dist/` is public.
 
 ## Performance checks
 

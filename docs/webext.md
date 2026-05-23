@@ -11,21 +11,26 @@ The `crepuscularity-webext` crate provides support for building Chrome/Firefox e
 ```bash
 crepus webext new my-extension
 cd my-extension
-crepus webext build
+crepus build
 # Load dist/unpacked/ in chrome://extensions
 ```
 
 ## Configuration
 
-Extensions are configured via `webext.toml`:
+Extensions are configured via `crepus.toml`:
 
 ```toml
-[extension]
+[[targets]]
+type = "webext"
+id = "extension"
+app = "."
+
+[targets.extension]
 name = "My Extension"
 version = "1.0.0"
 description = "A browser extension built with crepuscularity"
 
-[capabilities]
+[targets.capabilities]
 storage = true
 background-script = true
 content-script = true
@@ -51,7 +56,7 @@ host-permissions = ["https://example.com/*"]
 
 ```
 my-extension/
-├── webext.toml        # Extension configuration
+├── crepus.toml        # Extension target and configuration
 ├── runtime/           # Rust WASM runtime
 │   ├── Cargo.toml
 │   └── src/
@@ -67,7 +72,7 @@ my-extension/
 
 ## Manifest Generation
 
-The CLI generates a Chrome Manifest V3 from `webext.toml`:
+The CLI generates a Chrome Manifest V3 from `crepus.toml`:
 
 ```bash
 crepus webext manifest
@@ -163,11 +168,11 @@ println!("{}", program.to_js());
 
 ### ExtensionManifest
 
-Load and generate manifests:
+Use `crepus.toml` for project builds. The lower-level `ExtensionManifest` type remains available when you already have extension metadata in Rust:
 
 ```rust
 use crepuscularity_webext::ExtensionManifest;
 
-let manifest = ExtensionManifest::load("webext.toml")?;
+let manifest: ExtensionManifest = toml::from_str(source)?;
 println!("{}", manifest.to_manifest_v3_json());
 ```

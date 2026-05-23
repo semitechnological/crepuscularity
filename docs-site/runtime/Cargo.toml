@@ -8,6 +8,6 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 crepuscularity-web = { path = "../../crates/crepuscularity-web" }
-wasm-bindgen = "0.2"
+wasm-bindgen = "=0.2.121"
 
 [workspace]

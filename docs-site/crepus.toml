@@ -1,4 +1,10 @@
-[site]
+[[targets]]
+type = "web"
+id = "docs"
+site = "."
+out = "dist"
+entry = "index.crepus"
+
 name = "Crepuscularity"
 description = "Documentation and landing (crepus web build)"
 head_html = """

@@ -125,7 +125,7 @@ If both **Homebrew** and **rustup** ship `cargo`/`rustc`, ensure rustup’s tool
 
 ### `crepus web new <name>`
 
-Scaffolds `index.crepus`, `web.toml`, and `runtime/` (thin `#[wasm_bindgen]` shim that calls **`crepuscularity_web::render_bundle`**).
+Scaffolds `index.crepus`, `crepus.toml`, and `runtime/` (thin `#[wasm_bindgen]` shim that calls **`crepuscularity_web::render_bundle`**).
 
 ### `crepus web build`
 
@@ -195,10 +195,13 @@ Keep minimal sites on default features and opt in only when the runtime needs DO
 
 ### HTMX and Alpine in the shell
 
-`crepus web build` copies `static/` into `dist/static/`. To vendor HTMX or Alpine without blocking WASM-first paint, add the script file under `static/vendor/` and inject it from `web.toml`:
+`crepus web build` copies `static/` into `dist/static/`. To vendor HTMX or Alpine without blocking WASM-first paint, add the script file under `static/vendor/` and inject it from `crepus.toml`:
 
 ```toml
-[site]
+[[targets]]
+type = "web"
+site = "."
+entry = "index.crepus"
 head_html = """
   <script defer src="./static/vendor/htmx.min.js"></script>
   <script defer src="./static/vendor/alpine.min.js"></script>
@@ -292,11 +295,11 @@ Scaffold a new browser extension:
 ```bash
 crepus webext new my-extension
 cd my-extension
-crepus webext build
+crepus build
 ```
 
 Creates:
-- `webext.toml` — extension configuration
+- `crepus.toml` — extension target and configuration
 - `runtime/` — Rust WASM runtime crate
 - `views/` — `.crepus` templates
 
