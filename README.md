@@ -30,12 +30,12 @@ cargo install --path crates/crepuscularity-cli
 # (Rustup normally prepends this for login shells; some terminals omit it.)
 
 # Create a new GPUI app
-crepus new my-app
+crepus init gpui my-app
 cd my-app
 SDKROOT=$(xcrun --show-sdk-path) cargo run
 
 # Or create a browser extension
-crepus webext new my-extension
+crepus init webext my-extension
 cd my-extension
 crepus build
 # Load dist/unpacked/ in chrome://extensions
@@ -67,6 +67,8 @@ device = "STM32F411"
 
 ```bash
 crepus build
+crepus build web
+crepus build panel
 crepus build --target panel
 ```
 
@@ -125,16 +127,18 @@ JSX/HTML tag syntax is supported as an **input format** in the core parser — t
 ## CLI Commands
 
 ```bash
-crepus new <name>                    # Scaffold GPUI app
+crepus init <kind> <name>            # Scaffold web, webext, tui, native, ios, or gpui apps
+crepus new <name>                    # Alias for crepus init gpui <name>
 crepus dev [--emit-events]           # Hot-reload dev loop
-crepus build [--target ID]           # Build crepus.toml targets, or cargo fallback
+crepus build [type-or-id] [--target ID]  # Build crepus.toml targets, selected type/id, or cargo fallback
 crepus preview <file.crepus>         # Live preview
 
-crepus webext new <name>             # Scaffold browser extension
+crepus web new <name>                # Alias for crepus init web <name>
+crepus webext new <name>             # Alias for crepus init webext <name>
 crepus webext build [--app PATH]     # Build to dist/unpacked/ (WASM + manifest + popup pre-render)
 crepus webext manifest               # Print manifest.json
 
-crepus ios new <name>                # XcodeGen + SwiftPM NativeShell (View IR) host app
+crepus ios new <name>                # Alias for crepus init ios <name>
 crepus ios generate [--dir]          # Run xcodegen (finds crepus.toml [ios] upward)
 crepus ios build [--dir] [...]       # Simulator build via xcodebuild
 
