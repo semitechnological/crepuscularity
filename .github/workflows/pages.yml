@@ -13,6 +13,9 @@ concurrency:
   group: pages
   cancel-in-progress: true
 
+env:
+  WASM_BINDGEN_VERSION: 0.2.121
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -25,7 +28,7 @@ jobs:
       - name: WASM + wasm-bindgen
         run: |
           rustup target add wasm32-unknown-unknown
-          cargo install wasm-bindgen-cli --locked
+          cargo install wasm-bindgen-cli --version "$WASM_BINDGEN_VERSION" --locked
 
       - name: Build docs site
         run: |
