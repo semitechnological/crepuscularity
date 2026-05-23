@@ -272,6 +272,151 @@ device = "STM32F411"
     windows,
     ignore = "default desktop crepus.exe does not spawn reliably on Windows CI"
 )]
+fn root_build_type_selects_only_matching_targets() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let root = tmp.path();
+    std::fs::write(
+        root.join("crepus.toml"),
+        r##"
+[[targets]]
+type = "lvgl"
+id = "panel"
+template = "panel.crepus"
+out = "dist/panel.xml"
+name = "Panel"
+root = "screen"
+
+[targets.vars]
+label = "Panel"
+
+[[targets]]
+type = "native"
+id = "shell"
+template = "shell.crepus"
+out = "dist/shell.json"
+
+[targets.vars]
+label = "Shell"
+
+[[targets]]
+type = "lvgl"
+id = "tile"
+template = "tile.crepus"
+out = "dist/tile.xml"
+name = "Tile"
+root = "component"
+
+[targets.vars]
+label = "Tile"
+"##,
+    )
+    .expect("write manifest");
+    std::fs::write(
+        root.join("panel.crepus"),
+        r##"div #panel
+  h1
+    "{label}"
+"##,
+    )
+    .expect("write panel template");
+    std::fs::write(
+        root.join("shell.crepus"),
+        r##"div #shell
+  h1
+    "{label}"
+"##,
+    )
+    .expect("write shell template");
+    std::fs::write(
+        root.join("tile.crepus"),
+        r##"div #tile
+  span
+    "{label}"
+"##,
+    )
+    .expect("write tile template");
+
+    let out = crepus()
+        .current_dir(root)
+        .args(["build", "lvgl"])
+        .output()
+        .expect("spawn crepus build lvgl");
+    assert!(
+        out.status.success(),
+        "crepus build lvgl failed\nstdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let panel = std::fs::read_to_string(root.join("dist/panel.xml")).expect("read panel xml");
+    let tile = std::fs::read_to_string(root.join("dist/tile.xml")).expect("read tile xml");
+    assert!(panel.contains(r#"<screen name="Panel">"#));
+    assert!(panel.contains("Panel"));
+    assert!(tile.contains(r#"<component name="Tile">"#));
+    assert!(tile.contains("Tile"));
+    assert!(
+        !root.join("dist/shell.json").exists(),
+        "crepus build lvgl should not build native targets"
+    );
+}
+
+#[test]
+#[cfg_attr(
+    windows,
+    ignore = "default desktop crepus.exe does not spawn reliably on Windows CI"
+)]
+fn init_webext_scaffolds_same_shape_as_webext_new() {
+    fn collect_files(dir: &std::path::Path) -> Vec<(String, String)> {
+        let mut files = Vec::new();
+        let mut stack = vec![dir.to_path_buf()];
+        while let Some(path) = stack.pop() {
+            for entry in std::fs::read_dir(&path).expect("read dir") {
+                let entry = entry.expect("dir entry");
+                let path = entry.path();
+                if path.is_dir() {
+                    stack.push(path);
+                } else if path.is_file() {
+                    let rel = path
+                        .strip_prefix(dir)
+                        .expect("strip prefix")
+                        .to_string_lossy()
+                        .replace('\\', "/");
+                    let body = std::fs::read_to_string(&path).expect("read scaffold file");
+                    files.push((rel, body));
+                }
+            }
+        }
+        files.sort_by(|a, b| a.0.cmp(&b.0));
+        files
+    }
+
+    let direct = tempfile::tempdir().expect("direct tempdir");
+    let init = tempfile::tempdir().expect("init tempdir");
+
+    let direct_status = crepus()
+        .current_dir(direct.path())
+        .args(["webext", "new", "Acme Extension"])
+        .status()
+        .expect("spawn crepus webext new");
+    assert!(direct_status.success());
+
+    let init_status = crepus()
+        .current_dir(init.path())
+        .args(["init", "webext", "Acme Extension"])
+        .status()
+        .expect("spawn crepus init webext");
+    assert!(init_status.success());
+
+    let direct_files = collect_files(&direct.path().join("acme-extension"));
+    let init_files = collect_files(&init.path().join("acme-extension"));
+    assert_eq!(direct_files, init_files);
+}
+
+#[test]
+#[cfg_attr(
+    windows,
+    ignore = "default desktop crepus.exe does not spawn reliably on Windows CI"
+)]
 fn web_build_multi_target_manifest_requires_target_flag() {
     let tmp = tempfile::tempdir().expect("tempdir");
     let root = tmp.path();
