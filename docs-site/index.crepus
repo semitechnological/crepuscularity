@@ -20,7 +20,7 @@ div min-h-screen overflow-x-hidden antialiased crepus-twilight-page
 						code text-sm sm:text-base crepus-t-text opacity-90
 							".crepus"
 						span
-							" — indentation or JSX-style input, same AST — and target native GPUI, static WASM sites, HTML, or Manifest V3 extensions from one CLI."
+							" — indentation or JSX-style input, same AST — and target native GPUI, static WASM sites, HTML, Manifest V3 extensions, or RGB565 embedded displays from one CLI."
 					div flex flex-wrap gap-3 items-start flex-col sm:flex-row sm:items-center mb-6 sm:mb-0
 						a href="./docs/index.html" no-underline inline-flex items-center gap-2 px-5 py-2.5 rounded-lg crepus-t-btn-primary text-sm font-semibold
 							"Browse documentation"
@@ -31,7 +31,7 @@ div min-h-screen overflow-x-hidden antialiased crepus-twilight-page
 					div mt-4 sm:mt-8 flex flex-col items-stretch w-full max-w-xl gap-4 sm:gap-5
 						p text-xs font-semibold uppercase tracking-widest crepus-t-muted m-0 text-center sm:text-left
 							"One toolchain"
-						div grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-5 text-center
+						div grid grid-cols-2 sm:grid-cols-5 gap-3 sm:gap-5 text-center
 							div flex flex-col items-center gap-2
 								span material-symbols-outlined crepus-toolchain-icon text-[var(--cp-accent)]
 									"computer"
@@ -52,6 +52,11 @@ div min-h-screen overflow-x-hidden antialiased crepus-twilight-page
 									"smartphone"
 								span text-xs crepus-t-muted leading-snug
 									"Mobile"
+							div flex flex-col items-center gap-2
+								span material-symbols-outlined crepus-toolchain-icon text-[var(--cp-accent)]
+									"developer_board"
+								span text-xs crepus-t-muted leading-snug
+									"Embedded"
 						p text-sm crepus-t-muted leading-relaxed m-0 text-center sm:text-left
 							"Crepuscularity Lite: a GPUI + V8 desktop shell for hosting crepus templates as native apps."
 						a href="./docs/lite.html" no-underline text-sm font-medium crepus-t-text hover:opacity-85 border-b crepus-t-border transition-colors inline-block self-center sm:self-start
@@ -160,6 +165,11 @@ $ crepus webext new ext"
 							"Thin wasm32 runtimes, optional reactive layer, and HTML output for SSR and extensions."
 					div rounded-xl p-4 sm:p-5 crepus-t-card
 						h3 text-sm font-semibold crepus-t-text mb-2
+							"Embedded framebuffer"
+						p text-xs crepus-t-muted leading-relaxed m-0
+							"Render templates into RGB565 buffers for SPI panels, LTDC framebuffers, host snapshots, and touch hit-testing."
+					div rounded-xl p-4 sm:p-5 crepus-t-card
+						h3 text-sm font-semibold crepus-t-text mb-2
 							"Tailwind on GPUI"
 						p text-xs crepus-t-muted leading-relaxed m-0
 							"Class strings map to native styles — layout, color, type, and more (see README)."
@@ -239,6 +249,13 @@ $ crepus webext new ext"
 						"Aurorality"
 					span text-xs crepus-t-muted mt-1 block
 						"SwiftUI engine"
+				a href="./docs/embedded.html" doc-card no-underline crepus-t-text hover:opacity-95
+					span text-xs font-mono crepus-t-muted
+						"embedded.md"
+					span text-base font-semibold mt-2 block
+						"Embedded"
+					span text-xs crepus-t-muted mt-1 block
+						"RGB565 framebuffer"
 				a href="./docs/ide-extensions.html" doc-card no-underline crepus-t-text hover:opacity-95
 					span text-xs font-mono crepus-t-muted
 						"ide-extensions.md"
