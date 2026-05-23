@@ -266,19 +266,45 @@ $ crepus webext new ext"
 				a href="https://github.com/tschk/crepuscularity" no-underline crepus-t-muted hover:text-[var(--cp-fg)] transition-colors rel="noopener noreferrer" target="_blank"
 					"GitHub"
 
-@keyframes sunset {
-	0% { background: linear-gradient(to bottom right, #1f1f23, #121217, #08080b); }
-	25% { background: linear-gradient(to bottom right, #2a1a1d, #3a2020, #1a1115); }
-	50% { background: linear-gradient(to bottom right, #4a251f, #7a3b1f, #2a1420); }
-	75% { background: linear-gradient(to bottom right, #3a1d33, #522a54, #1d1126); }
-	100% { background: linear-gradient(to bottom right, #1f1f23, #14141a, #09090d); }
-}
 .animate-sunset {
-	animation: sunset 24s ease-in-out infinite;
+	position: relative;
+	overflow: hidden;
+	background: linear-gradient(to bottom right, #1f1f23, #121217, #08080b);
+}
+.animate-sunset::before,
+.animate-sunset::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	border-radius: inherit;
+	pointer-events: none;
+	opacity: 0;
+}
+.animate-sunset::before {
+	background: linear-gradient(to bottom right, #4a251f, #7a3b1f, #2a1420);
+	animation: sunset-warm 24s ease-in-out infinite;
+}
+.animate-sunset::after {
+	background: linear-gradient(to bottom right, #3a1d33, #522a54, #1d1126);
+	animation: sunset-violet 24s ease-in-out infinite;
+}
+.animate-sunset > * {
+	position: relative;
+	z-index: 1;
+}
+@keyframes sunset-warm {
+	0%, 100% { opacity: 0; }
+	22%, 46% { opacity: 1; }
+	68% { opacity: 0; }
+}
+@keyframes sunset-violet {
+	0%, 46%, 100% { opacity: 0; }
+	68%, 88% { opacity: 1; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-	.animate-sunset {
+	.animate-sunset::before,
+	.animate-sunset::after {
 		animation: none;
 	}
 }
