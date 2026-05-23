@@ -133,7 +133,59 @@ Scaffolds `index.crepus`, `crepus.toml`, and `runtime/` (thin `#[wasm_bindgen]` 
 crepus web build --site ./my-site --out-dir ./dist
 ```
 
-Optional **`site.json`**: SEO (`seo.title`, `seo.description`, `ogImage`) and **CSS variables** in the HTML shell only — not page structure.
+`crepus.toml` is the source of truth for web target metadata, including SEO. The build writes title, description, canonical, robots, keywords, author, theme color, Open Graph, Twitter card, alternate links, JSON-LD, and optionally `robots.txt` / `sitemap.xml`.
+
+```toml
+[[targets]]
+type = "web"
+id = "site"
+site = "."
+out = "dist"
+entry = "index.crepus"
+name = "Acme Labs"
+description = "A concise fallback description."
+
+[targets.seo]
+title = "Acme Labs"
+description = "A search and social description for Acme Labs."
+canonical = "https://example.com/"
+site_name = "Acme Labs"
+locale = "en_US"
+type = "website"
+image = "https://example.com/og.png"
+image_alt = "Acme Labs dashboard preview"
+keywords = ["rust", "wasm", "ui"]
+author = "Acme Labs"
+robots = "index,follow"
+theme_color = "#101820"
+application_name = "Acme Labs"
+generator = "crepuscularity"
+twitter_card = "summary_large_image"
+twitter_site = "@acme"
+twitter_creator = "@acme"
+json_ld = [
+  """{"@context":"https://schema.org","@type":"WebSite","name":"Acme Labs","url":"https://example.com/"}"""
+]
+
+[[targets.seo.alternates]]
+href = "https://example.com/fr/"
+hreflang = "fr"
+
+[targets.seo.robots_txt]
+enabled = true
+allow = ["/"]
+disallow = ["/internal"]
+sitemap = "https://example.com/sitemap.xml"
+
+[targets.seo.sitemap]
+enabled = true
+base_url = "https://example.com"
+paths = ["/", "/docs/"]
+changefreq = "weekly"
+priority = 0.8
+```
+
+Optional **`site.json`** remains accepted for older sites that already use `seo.title`, `seo.description`, `ogImage`, and theme CSS variables. New projects should keep metadata in `crepus.toml`.
 
 ### Interactivity (Svelte-style flexibility)
 

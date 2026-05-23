@@ -298,6 +298,12 @@ out = "dist"
 entry = "index.crepus"
 name = "{name}"
 description = "Crepus static site (.crepus + WASM)"
+
+[targets.seo]
+title = "{name}"
+description = "Crepus static site (.crepus + WASM)"
+robots = "index,follow"
+twitter_card = "summary"
 "#
     );
     std::fs::write(base.join("crepus.toml"), crepus_toml).unwrap_or_else(|e| {
@@ -560,6 +566,7 @@ pub(crate) fn build_site_wasm(cli: &WebBuildArgs) {
     std::fs::write(b.out_dir.join("index.html"), index_html).unwrap_or_else(|e| {
         ui::error(&format!("write index.html: {e}"));
     });
+    write_seo_files(&b.out_dir, &head);
     std::fs::write(b.out_dir.join("app.js"), WEB_APP_JS).unwrap_or_else(|e| {
         ui::error(&format!("write app.js: {e}"));
     });
@@ -687,6 +694,7 @@ pub(crate) struct SiteHead {
     pub(crate) og_image: Option<String>,
     pub(crate) extra_head_html: String,
     pub(crate) theme: ThemeCss,
+    pub(crate) seo: crate::crepus_toml::SeoConfig,
 }
 
 impl Default for SiteHead {
@@ -697,6 +705,7 @@ impl Default for SiteHead {
             og_image: None,
             extra_head_html: String::new(),
             theme: ThemeCss::default(),
+            seo: crate::crepus_toml::SeoConfig::default(),
         }
     }
 }
@@ -795,8 +804,11 @@ pub(crate) fn load_site_head(site_dir: &Path) -> SiteHead {
             if let Some(seo) = &partial.seo {
                 if let Some(d) = &seo.description {
                     head.description = d.clone();
+                    head.seo.description = Some(d.clone());
                 }
                 head.og_image = seo.og_image.clone();
+                head.seo.title = seo.title.clone();
+                head.seo.image = seo.og_image.clone();
             }
             if let Some(t) = &partial.theme {
                 let mut th = ThemeCss::default();
@@ -842,6 +854,18 @@ pub(crate) fn merge_site_head_meta(
     if let Some(head_html) = &meta.head_html {
         head.extra_head_html = head_html.clone();
     }
+    if let Some(seo) = &meta.seo {
+        head.seo = seo.clone();
+        if let Some(title) = &seo.title {
+            head.page_title = title.clone();
+        }
+        if let Some(description) = &seo.description {
+            head.description = description.clone();
+        }
+        if let Some(image) = &seo.image {
+            head.og_image = Some(image.clone());
+        }
+    }
     head
 }
 
@@ -851,16 +875,7 @@ pub(crate) fn render_index_html(
     inline_css: &str,
     template_head: &str,
 ) -> String {
-    let og = head
-        .og_image
-        .as_ref()
-        .map(|u| {
-            format!(
-                r#"  <meta property="og:image" content="{}">"#,
-                escape_html_attr(u)
-            )
-        })
-        .unwrap_or_default();
+    let seo = render_seo_head(head);
     let font_markup = google_fonts_head_markup(google_fonts);
     let body_font_css = google_fonts
         .first()
@@ -889,10 +904,13 @@ pub(crate) fn render_index_html(
         parts.join("\n")
     };
 
+    let html_title = head.seo.title.as_deref().unwrap_or(&head.page_title);
+    let html_description = head.seo.description.as_deref().unwrap_or(&head.description);
+
     WEB_INDEX_HTML
-        .replace("__CREPUS_TITLE__", &escape_html_attr(&head.page_title))
-        .replace("__CREPUS_DESC__", &escape_html_attr(&head.description))
-        .replace("__CREPUS_OG__", &og)
+        .replace("__CREPUS_TITLE__", &escape_html_attr(html_title))
+        .replace("__CREPUS_DESC__", &escape_html_attr(html_description))
+        .replace("__CREPUS_OG__", &seo)
         .replace("__CREPUS_GOOGLE_FONTS__", &font_markup)
         .replace("__CREPUS_EXTRA_HEAD__", &extra_head)
         .replace("__CREPUS_BODY_FONT__", &body_font_css)
@@ -904,11 +922,274 @@ pub(crate) fn render_index_html(
         .replace("__THEME_BORDER__", &escape_html_attr(&t.border))
 }
 
+fn render_seo_head(head: &SiteHead) -> String {
+    let seo = &head.seo;
+    let title = seo.title.as_deref().unwrap_or(&head.page_title);
+    let description = seo.description.as_deref().unwrap_or(&head.description);
+    let og_type = seo.og_type.as_deref().unwrap_or("website");
+    let image = seo.image.as_ref().or(head.og_image.as_ref());
+    let twitter_card = seo.twitter_card.as_deref().unwrap_or_else(|| {
+        if image.is_some() {
+            "summary_large_image"
+        } else {
+            "summary"
+        }
+    });
+    let mut lines = Vec::new();
+
+    if let Some(canonical) = &seo.canonical {
+        lines.push(format!(
+            r#"  <link rel="canonical" href="{}">"#,
+            escape_html_attr(canonical)
+        ));
+    }
+    if !seo.keywords.is_empty() {
+        lines.push(format!(
+            r#"  <meta name="keywords" content="{}">"#,
+            escape_html_attr(&seo.keywords.join(", "))
+        ));
+    }
+    if let Some(author) = &seo.author {
+        lines.push(format!(
+            r#"  <meta name="author" content="{}">"#,
+            escape_html_attr(author)
+        ));
+    }
+    if let Some(robots) = &seo.robots {
+        lines.push(format!(
+            r#"  <meta name="robots" content="{}">"#,
+            escape_html_attr(robots)
+        ));
+    }
+    if let Some(theme_color) = &seo.theme_color {
+        lines.push(format!(
+            r#"  <meta name="theme-color" content="{}">"#,
+            escape_html_attr(theme_color)
+        ));
+    }
+    if let Some(application_name) = &seo.application_name {
+        lines.push(format!(
+            r#"  <meta name="application-name" content="{}">"#,
+            escape_html_attr(application_name)
+        ));
+    }
+    if let Some(generator) = &seo.generator {
+        if !generator.trim().is_empty() {
+            lines.push(format!(
+                r#"  <meta name="generator" content="{}">"#,
+                escape_html_attr(generator)
+            ));
+        }
+    }
+
+    lines.push(format!(
+        r#"  <meta property="og:title" content="{}">"#,
+        escape_html_attr(title)
+    ));
+    lines.push(format!(
+        r#"  <meta property="og:description" content="{}">"#,
+        escape_html_attr(description)
+    ));
+    lines.push(format!(
+        r#"  <meta property="og:type" content="{}">"#,
+        escape_html_attr(og_type)
+    ));
+    if let Some(canonical) = &seo.canonical {
+        lines.push(format!(
+            r#"  <meta property="og:url" content="{}">"#,
+            escape_html_attr(canonical)
+        ));
+    }
+    if let Some(site_name) = &seo.site_name {
+        lines.push(format!(
+            r#"  <meta property="og:site_name" content="{}">"#,
+            escape_html_attr(site_name)
+        ));
+    }
+    if let Some(locale) = &seo.locale {
+        lines.push(format!(
+            r#"  <meta property="og:locale" content="{}">"#,
+            escape_html_attr(locale)
+        ));
+    }
+    if let Some(image) = image {
+        lines.push(format!(
+            r#"  <meta property="og:image" content="{}">"#,
+            escape_html_attr(image)
+        ));
+    }
+    if let Some(image_alt) = &seo.image_alt {
+        lines.push(format!(
+            r#"  <meta property="og:image:alt" content="{}">"#,
+            escape_html_attr(image_alt)
+        ));
+    }
+
+    lines.push(format!(
+        r#"  <meta name="twitter:card" content="{}">"#,
+        escape_html_attr(twitter_card)
+    ));
+    lines.push(format!(
+        r#"  <meta name="twitter:title" content="{}">"#,
+        escape_html_attr(title)
+    ));
+    lines.push(format!(
+        r#"  <meta name="twitter:description" content="{}">"#,
+        escape_html_attr(description)
+    ));
+    if let Some(image) = image {
+        lines.push(format!(
+            r#"  <meta name="twitter:image" content="{}">"#,
+            escape_html_attr(image)
+        ));
+    }
+    if let Some(image_alt) = &seo.image_alt {
+        lines.push(format!(
+            r#"  <meta name="twitter:image:alt" content="{}">"#,
+            escape_html_attr(image_alt)
+        ));
+    }
+    if let Some(site) = &seo.twitter_site {
+        lines.push(format!(
+            r#"  <meta name="twitter:site" content="{}">"#,
+            escape_html_attr(site)
+        ));
+    }
+    if let Some(creator) = &seo.twitter_creator {
+        lines.push(format!(
+            r#"  <meta name="twitter:creator" content="{}">"#,
+            escape_html_attr(creator)
+        ));
+    }
+
+    for alt in &seo.alternates {
+        let mut attrs = vec![
+            r#"rel="alternate""#.to_string(),
+            format!(r#"href="{}""#, escape_html_attr(&alt.href)),
+        ];
+        if let Some(hreflang) = &alt.hreflang {
+            attrs.push(format!(r#"hreflang="{}""#, escape_html_attr(hreflang)));
+        }
+        if let Some(media) = &alt.media {
+            attrs.push(format!(r#"media="{}""#, escape_html_attr(media)));
+        }
+        if let Some(title) = &alt.title {
+            attrs.push(format!(r#"title="{}""#, escape_html_attr(title)));
+        }
+        if let Some(mime_type) = &alt.mime_type {
+            attrs.push(format!(r#"type="{}""#, escape_html_attr(mime_type)));
+        }
+        lines.push(format!("  <link {}>", attrs.join(" ")));
+    }
+
+    for json in &seo.json_ld {
+        if !json.trim().is_empty() {
+            lines.push(format!(
+                r#"  <script type="application/ld+json">{}</script>"#,
+                json.trim()
+            ));
+        }
+    }
+
+    lines.join("\n")
+}
+
+fn write_seo_files(out_dir: &Path, head: &SiteHead) {
+    let seo = &head.seo;
+    if let Some(sitemap) = &seo.sitemap {
+        if sitemap.enabled {
+            if let Some(xml) = render_sitemap_xml(sitemap) {
+                std::fs::write(out_dir.join("sitemap.xml"), xml)
+                    .unwrap_or_else(|e| ui::error(&format!("write sitemap.xml: {e}")));
+            }
+        }
+    }
+    if let Some(robots) = &seo.robots_txt {
+        if robots.enabled {
+            let txt = render_robots_txt(robots, seo);
+            std::fs::write(out_dir.join("robots.txt"), txt)
+                .unwrap_or_else(|e| ui::error(&format!("write robots.txt: {e}")));
+        }
+    }
+}
+
+fn render_robots_txt(
+    robots: &crate::crepus_toml::RobotsTxtConfig,
+    seo: &crate::crepus_toml::SeoConfig,
+) -> String {
+    let mut lines = Vec::new();
+    lines.push(format!(
+        "User-agent: {}",
+        robots.user_agent.as_deref().unwrap_or("*")
+    ));
+    for allow in &robots.allow {
+        lines.push(format!("Allow: {allow}"));
+    }
+    for disallow in &robots.disallow {
+        lines.push(format!("Disallow: {disallow}"));
+    }
+    if let Some(sitemap) = &robots.sitemap {
+        lines.push(format!("Sitemap: {sitemap}"));
+    } else if let Some(sitemap) = &seo.sitemap {
+        if sitemap.enabled {
+            if let Some(base_url) = &sitemap.base_url {
+                lines.push(format!(
+                    "Sitemap: {}/sitemap.xml",
+                    base_url.trim_end_matches('/')
+                ));
+            }
+        }
+    }
+    lines.push(String::new());
+    lines.join("\n")
+}
+
+fn render_sitemap_xml(sitemap: &crate::crepus_toml::SitemapConfig) -> Option<String> {
+    let base = sitemap.base_url.as_ref()?.trim_end_matches('/').to_string();
+    let paths = if sitemap.paths.is_empty() {
+        vec!["/".to_string()]
+    } else {
+        sitemap.paths.clone()
+    };
+    let mut out = String::from(
+        r#"<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+"#,
+    );
+    for path in paths {
+        let loc = if path.starts_with("http://") || path.starts_with("https://") {
+            path
+        } else {
+            format!("{base}/{}", path.trim_start_matches('/'))
+        };
+        out.push_str("  <url>\n");
+        out.push_str(&format!("    <loc>{}</loc>\n", escape_xml_text(&loc)));
+        if let Some(changefreq) = &sitemap.changefreq {
+            out.push_str(&format!(
+                "    <changefreq>{}</changefreq>\n",
+                escape_xml_text(changefreq)
+            ));
+        }
+        if let Some(priority) = sitemap.priority {
+            out.push_str(&format!("    <priority>{priority:.1}</priority>\n"));
+        }
+        out.push_str("  </url>\n");
+    }
+    out.push_str("</urlset>\n");
+    Some(out)
+}
+
 fn escape_html_attr(s: &str) -> String {
     s.replace('&', "&amp;")
         .replace('<', "&lt;")
         .replace('>', "&gt;")
         .replace('"', "&quot;")
+}
+
+fn escape_xml_text(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
 }
 
 fn render_head_raw(head_raw: &str) -> String {
@@ -1164,4 +1445,97 @@ fn run_build_full(args: &BuildFullArgs) {
 
     ui::success(&format!("{} files rendered", results.len()));
     ui::done_in(t0.elapsed());
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn seo_head() -> SiteHead {
+        let mut head = SiteHead {
+            page_title: "Fallback title".into(),
+            description: "Fallback description".into(),
+            ..SiteHead::default()
+        };
+        head.seo = crate::crepus_toml::SeoConfig {
+            title: Some("SEO title".into()),
+            description: Some("SEO description".into()),
+            canonical: Some("https://example.com/".into()),
+            image: Some("https://example.com/og.png".into()),
+            image_alt: Some("Preview".into()),
+            site_name: Some("Example".into()),
+            locale: Some("en_US".into()),
+            og_type: Some("website".into()),
+            twitter_card: Some("summary_large_image".into()),
+            twitter_site: Some("@example".into()),
+            twitter_creator: Some("@author".into()),
+            keywords: vec!["rust".into(), "ui".into()],
+            author: Some("AJ".into()),
+            robots: Some("index,follow".into()),
+            theme_color: Some("#101820".into()),
+            application_name: Some("Example App".into()),
+            generator: Some("crepuscularity".into()),
+            alternates: vec![crate::crepus_toml::SeoAlternate {
+                href: "https://example.com/fr/".into(),
+                hreflang: Some("fr".into()),
+                media: None,
+                title: None,
+                mime_type: None,
+            }],
+            json_ld: vec![r#"{"@context":"https://schema.org","@type":"WebSite"}"#.into()],
+            robots_txt: None,
+            sitemap: None,
+        };
+        head
+    }
+
+    #[test]
+    fn render_index_html_emits_full_seo_head() {
+        let html = render_index_html(&seo_head(), &[], "", "");
+        assert!(html.contains(r#"<title>SEO title</title>"#));
+        assert!(html.contains(r#"<meta name="description" content="SEO description">"#));
+        assert!(html.contains(r#"<link rel="canonical" href="https://example.com/">"#));
+        assert!(html.contains(r#"<meta name="keywords" content="rust, ui">"#));
+        assert!(html.contains(r#"<meta name="author" content="AJ">"#));
+        assert!(html.contains(r#"<meta name="robots" content="index,follow">"#));
+        assert!(html.contains(r##"<meta name="theme-color" content="#101820">"##));
+        assert!(html.contains(r#"<meta property="og:title" content="SEO title">"#));
+        assert!(html.contains(r#"<meta property="og:image" content="https://example.com/og.png">"#));
+        assert!(html.contains(r#"<meta name="twitter:creator" content="@author">"#));
+        assert!(
+            html.contains(r#"<link rel="alternate" href="https://example.com/fr/" hreflang="fr">"#)
+        );
+        assert!(html.contains(r#"<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite"}</script>"#));
+    }
+
+    #[test]
+    fn render_seo_auxiliary_files_from_config() {
+        let mut head = seo_head();
+        head.seo.robots_txt = Some(crate::crepus_toml::RobotsTxtConfig {
+            enabled: true,
+            user_agent: None,
+            allow: vec!["/".into()],
+            disallow: vec!["/private".into()],
+            sitemap: None,
+        });
+        head.seo.sitemap = Some(crate::crepus_toml::SitemapConfig {
+            enabled: true,
+            base_url: Some("https://example.com".into()),
+            paths: vec!["/".into(), "/docs/".into()],
+            changefreq: Some("weekly".into()),
+            priority: Some(0.8),
+        });
+        let tmp = tempfile::tempdir().expect("tempdir");
+        write_seo_files(tmp.path(), &head);
+        let robots = std::fs::read_to_string(tmp.path().join("robots.txt")).expect("robots");
+        assert!(robots.contains("User-agent: *"));
+        assert!(robots.contains("Allow: /"));
+        assert!(robots.contains("Disallow: /private"));
+        assert!(robots.contains("Sitemap: https://example.com/sitemap.xml"));
+        let sitemap = std::fs::read_to_string(tmp.path().join("sitemap.xml")).expect("sitemap");
+        assert!(sitemap.contains("<loc>https://example.com/</loc>"));
+        assert!(sitemap.contains("<loc>https://example.com/docs/</loc>"));
+        assert!(sitemap.contains("<changefreq>weekly</changefreq>"));
+        assert!(sitemap.contains("<priority>0.8</priority>"));
+    }
 }

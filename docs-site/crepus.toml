@@ -92,3 +92,39 @@ head_html = """
 .crepus-e6 { animation-delay: 0.35s; }
 </style>
 """
+
+[targets.seo]
+title = "Crepuscularity"
+description = "A multi-target UI framework for GPUI, web, browser extensions, terminal UIs, embedded displays, and native shells."
+canonical = "https://crepuscularity.undivisible.dev/"
+site_name = "Crepuscularity"
+locale = "en_US"
+type = "website"
+image = "https://crepuscularity.undivisible.dev/static/favicon.svg"
+image_alt = "Crepuscularity logo"
+keywords = ["Rust UI", "GPUI", "WASM", "browser extensions", "Ratatui", "embedded UI", "LVGL"]
+author = "AJ Stafford"
+robots = "index,follow"
+theme_color = "#0c0612"
+application_name = "Crepuscularity"
+generator = "crepuscularity"
+twitter_card = "summary"
+json_ld = [
+  """{"@context":"https://schema.org","@type":"SoftwareSourceCode","name":"Crepuscularity","codeRepository":"https://github.com/tschk/crepuscularity","programmingLanguage":"Rust","url":"https://crepuscularity.undivisible.dev/"}"""
+]
+
+[[targets.seo.alternates]]
+href = "https://crepuscularity.undivisible.dev/"
+hreflang = "en"
+
+[targets.seo.robots_txt]
+enabled = true
+allow = ["/"]
+sitemap = "https://crepuscularity.undivisible.dev/sitemap.xml"
+
+[targets.seo.sitemap]
+enabled = true
+base_url = "https://crepuscularity.undivisible.dev"
+paths = ["/", "/docs/", "/docs/cli.html", "/docs/dsl.html", "/docs/webext.html", "/docs/embedded.html", "/docs/lvgl.html"]
+changefreq = "weekly"
+priority = 0.8

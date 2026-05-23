@@ -99,6 +99,7 @@ div w-full h-full bg-zinc-950 text-white flex flex-col p-8
 - **Expressions** — arithmetic, comparison, logical operators, property access
 - **Components** — single-file and multi-component files with slot support
 - **Hot reload** — live template updates via the runtime renderer
+- **Web SEO metadata** — `crepus.toml` web targets generate document head tags, social cards, `robots.txt`, and `sitemap.xml`
 - **Browser extensions** — `crepus webext` commands for MV3 extensions; popup pre-rendered at build time; no JS bundler needed
 - **IDE integration** — structured JSON events with `--emit-events`
 
