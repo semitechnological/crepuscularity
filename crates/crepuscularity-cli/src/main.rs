@@ -2,8 +2,9 @@
 //!
 //! COMMANDS
 //!   crepus new NAME                              scaffold a new GPUI app
+//!   crepus init KIND NAME                        scaffold web, webext, tui, native, ios, or gpui
 //!   crepus dev [--bin NAME] [--release] [--emit-events]  watch → rebuild → relaunch
-//!   crepus build [--target ID] [--manifest FILE] build crepus.toml targets, or cargo fallback
+//!   crepus build [TYPE|ID] [--target ID] [--manifest FILE] build crepus.toml targets, or cargo fallback
 //!   crepus preview FILE                          live-preview a .crepus template
 //!   crepus render FILE [--ctx FILE] [--var k=v] [--component Name]
 //!   crepus web new NAME                          scaffold index.crepus + runtime/ + crepus.toml
@@ -88,6 +89,10 @@ fn main() {
             new::run(name);
         }
 
+        Some("init") => {
+            run_init(&args[2..]);
+        }
+
         #[cfg(feature = "desktop")]
         Some("dev") => {
             let mut bin: Option<String> = None;
@@ -115,6 +120,9 @@ fn main() {
             if args[2..]
                 .iter()
                 .any(|a| matches!(a.as_str(), "--target" | "-t" | "--manifest" | "--all"))
+                || args[2..]
+                    .iter()
+                    .any(|a| !a.starts_with('-') && a.as_str() != "release")
                 || target_build::has_manifest_targets(manifest_arg)
             {
                 target_build::run(&args[2..]);
@@ -210,6 +218,32 @@ fn manifest_arg(args: &[String]) -> Option<std::path::PathBuf> {
     None
 }
 
+fn run_init(args: &[String]) {
+    let kind = args
+        .first()
+        .map(|s| s.as_str())
+        .unwrap_or_else(|| ui::error("Usage: crepus init <kind> <name>"));
+    let name = args
+        .get(1)
+        .map(|s| s.as_str())
+        .unwrap_or_else(|| ui::error("Usage: crepus init <kind> <name>"));
+    if args.len() > 2 {
+        ui::error("Usage: crepus init <kind> <name>");
+    }
+    let sub_args = vec!["new".to_string(), name.to_string()];
+    match kind {
+        "web" => web::run(&sub_args),
+        "webext" | "extension" | "browser-extension" => webext::run(&sub_args),
+        "tui" => tui::run(&sub_args),
+        "native" => native::run(&sub_args),
+        "ios" => ios::run(&sub_args),
+        "gpui" | "app" | "desktop" => new::run(name),
+        other => ui::error(&format!(
+            "unknown init kind {other:?}; expected web, webext, tui, native, ios, or gpui"
+        )),
+    }
+}
+
 fn print_usage() {
     eprintln!(
         "{} cli {}",
@@ -225,12 +259,17 @@ fn print_usage() {
     );
     eprintln!(
         "  {}  {}",
+        style("init <kind> <name>                    ").green(),
+        style("scaffold web, webext, tui, native, ios, or gpui").dim()
+    );
+    eprintln!(
+        "  {}  {}",
         style("dev [--bin NAME] [--release]         ").green(),
         style("hot-reload dev loop").dim()
     );
     eprintln!(
         "  {}  {}",
-        style("build [--target ID] [--manifest FILE]").green(),
+        style("build [TYPE|ID] [--target ID] [--manifest FILE]").green(),
         style("build crepus.toml targets, or cargo fallback").dim()
     );
     eprintln!(
