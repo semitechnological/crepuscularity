@@ -73,6 +73,7 @@ Use **semver `0.y.z`**. Until `1.0`:
 | `examples/weather` | Full weather-app example using the runtime |
 | `examples/native-shells` | SwiftPM (**`ios/`**) + Gradle (**`android/`**) apps decoding View IR; shared [`fixture.json`](examples/native-shells/fixture.json) |
 | `examples/lvgl-pro-mode` | Host example that converts a `.crepus` dashboard template into LVGL Pro XML |
+| `examples/lvgl-stm32` | STM32-oriented build-time example that converts `.crepus` into embedded LVGL XML |
 
 **Web / compiler / hot-reload implementation spec (single doc for agents):** [docs/CREPUS_WEB_IMPLEMENTATION_SPEC.md](docs/CREPUS_WEB_IMPLEMENTATION_SPEC.md)
 
