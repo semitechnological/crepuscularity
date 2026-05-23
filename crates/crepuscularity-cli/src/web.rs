@@ -369,12 +369,12 @@ struct WasmBuildArgs {
     entry: String,
 }
 
-struct WebBuildArgs {
-    site_dir: Option<PathBuf>,
-    out_dir: Option<PathBuf>,
-    entry: Option<String>,
-    target_id: Option<String>,
-    manifest: Option<PathBuf>,
+pub(crate) struct WebBuildArgs {
+    pub(crate) site_dir: Option<PathBuf>,
+    pub(crate) out_dir: Option<PathBuf>,
+    pub(crate) entry: Option<String>,
+    pub(crate) target_id: Option<String>,
+    pub(crate) manifest: Option<PathBuf>,
 }
 
 fn parse_build_args(args: &[String]) -> WebBuildArgs {
@@ -475,7 +475,7 @@ fn resolve_wasm_build_args(args: &WebBuildArgs) -> WasmBuildArgs {
     }
 }
 
-fn build_site_wasm(cli: &WebBuildArgs) {
+pub(crate) fn build_site_wasm(cli: &WebBuildArgs) {
     let t0 = Instant::now();
     let b = resolve_wasm_build_args(cli);
     let runtime_dir = b.site_dir.join("runtime");

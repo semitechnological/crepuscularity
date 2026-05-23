@@ -471,6 +471,10 @@ fn build_extension(app_path: &Path, dev: bool) {
     ui::done_in(t0.elapsed());
 }
 
+pub(crate) fn build_app_path(app_path: &Path) {
+    build_extension(app_path, false);
+}
+
 fn build_wasm_runtime(app_path: &Path, runtime_dir: &Path, vendor_dir: &Path) {
     {
         let sp = ui::spinner("compiling WASM runtime");

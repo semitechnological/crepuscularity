@@ -8,5 +8,4 @@ publish = false
 [dependencies]
 
 [build-dependencies]
-crepuscularity-core = { path = "../../crates/crepuscularity-core" }
-crepuscularity-lvgl = { path = "../../crates/crepuscularity-lvgl" }
+crepuscularity = { path = "../../crates/crepuscularity" }

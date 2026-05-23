@@ -4,9 +4,13 @@
 //! APIs plus the HTML/WASM renderer for applications that want one dependency.
 pub use crepuscularity_core as core;
 pub use crepuscularity_core::build;
+pub use crepuscularity_lvgl as lvgl;
+pub use crepuscularity_native as native;
 pub use crepuscularity_web as html;
 pub use crepuscularity_web as web;
 pub use crepuscularity_web::crepus_refs;
+
+pub mod target;
 
 /// Pragma line for indent `.crepus` source: load one family from Google Fonts when the site shell is built.
 pub fn google_font(family: &str) -> String {

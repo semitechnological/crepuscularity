@@ -50,7 +50,7 @@ Use **semver `0.y.z`**. Until `1.0`:
 
 | Crate | Purpose |
 |---|---|
-| `crates/crepuscularity` | Main library re-exporting `view!` macro + prelude |
+| `crates/crepuscularity` | Main library re-exporting `view!` macro, prelude, and unified target manifest API |
 | `crates/crepuscularity-core` | Shared AST, parser, evaluator, component-file model, class aliases, and template context |
 | `crates/crepuscularity_macros` | Proc-macro: compiles `.crepus` DSL strings at build time |
 | `crates/crepuscularity-gpui` | GPUI facade/prelude and primary native desktop renderer integration |
