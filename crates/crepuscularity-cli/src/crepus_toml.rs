@@ -66,6 +66,8 @@ pub struct ManifestTarget {
     #[serde(default)]
     pub google_fonts: Vec<String>,
     #[serde(default)]
+    pub seo: Option<SeoConfig>,
+    #[serde(default)]
     pub extension: Option<crepuscularity_webext::ExtensionInfo>,
     #[serde(default)]
     pub capabilities: Option<crepuscularity_webext::CapabilitiesSection>,
@@ -122,6 +124,98 @@ pub struct WebTargetMeta {
     pub description: Option<String>,
     pub head_html: Option<String>,
     pub google_fonts: Vec<String>,
+    pub seo: Option<SeoConfig>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct SeoConfig {
+    #[serde(default)]
+    pub title: Option<String>,
+    #[serde(default)]
+    pub description: Option<String>,
+    #[serde(default)]
+    pub canonical: Option<String>,
+    #[serde(default)]
+    pub image: Option<String>,
+    #[serde(default)]
+    pub image_alt: Option<String>,
+    #[serde(default)]
+    pub site_name: Option<String>,
+    #[serde(default)]
+    pub locale: Option<String>,
+    #[serde(rename = "type", default)]
+    pub og_type: Option<String>,
+    #[serde(default)]
+    pub twitter_card: Option<String>,
+    #[serde(default)]
+    pub twitter_site: Option<String>,
+    #[serde(default)]
+    pub twitter_creator: Option<String>,
+    #[serde(default)]
+    pub keywords: Vec<String>,
+    #[serde(default)]
+    pub author: Option<String>,
+    #[serde(default)]
+    pub robots: Option<String>,
+    #[serde(default)]
+    pub theme_color: Option<String>,
+    #[serde(default)]
+    pub application_name: Option<String>,
+    #[serde(default)]
+    pub generator: Option<String>,
+    #[serde(default)]
+    pub alternates: Vec<SeoAlternate>,
+    #[serde(default)]
+    pub json_ld: Vec<String>,
+    #[serde(default)]
+    pub robots_txt: Option<RobotsTxtConfig>,
+    #[serde(default)]
+    pub sitemap: Option<SitemapConfig>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct SeoAlternate {
+    pub href: String,
+    #[serde(default)]
+    pub hreflang: Option<String>,
+    #[serde(default)]
+    pub media: Option<String>,
+    #[serde(default)]
+    pub title: Option<String>,
+    #[serde(rename = "type", default)]
+    pub mime_type: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct RobotsTxtConfig {
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    #[serde(default)]
+    pub user_agent: Option<String>,
+    #[serde(default)]
+    pub allow: Vec<String>,
+    #[serde(default)]
+    pub disallow: Vec<String>,
+    #[serde(default)]
+    pub sitemap: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct SitemapConfig {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default)]
+    pub base_url: Option<String>,
+    #[serde(default)]
+    pub paths: Vec<String>,
+    #[serde(default)]
+    pub changefreq: Option<String>,
+    #[serde(default)]
+    pub priority: Option<f32>,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 #[derive(Debug, Clone)]
@@ -171,6 +265,7 @@ impl CrepusManifest {
                     description: t.description.clone(),
                     head_html: t.head_html.clone(),
                     google_fonts: t.google_fonts.clone(),
+                    seo: t.seo.clone(),
                 },
             ));
         }
@@ -262,6 +357,7 @@ impl CrepusManifest {
                         description: target.description.clone(),
                         head_html: target.head_html.clone(),
                         google_fonts: target.google_fonts.clone(),
+                        seo: target.seo.clone(),
                     },
                     webext: target.extension.clone().map(|extension| {
                         crepuscularity_webext::ExtensionManifest {

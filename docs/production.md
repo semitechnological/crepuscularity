@@ -45,7 +45,7 @@ The generated docs should include `docs/index.html`, one HTML page for each publ
 
 Crepuscularity templates are source code, not an untrusted markup sandbox. Do not render attacker-controlled `.crepus` source unless you wrap it in a separate policy layer.
 
-Runtime template values are escaped before they become HTML text nodes or attribute values. Use raw HTML only from trusted sources, and keep `site.json` `head_html` limited to assets you intentionally ship.
+Runtime template values are escaped before they become HTML text nodes or attribute values. Use raw HTML only from trusted sources, and keep `crepus.toml` `head_html` limited to assets you intentionally ship.
 
 For browser extensions, keep the generated Manifest V3 CSP strict. The extension runtime needs `wasm-unsafe-eval` for WebAssembly; do not add remote script origins or broad inline-script allowances.
 
