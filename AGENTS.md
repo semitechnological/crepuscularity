@@ -66,11 +66,13 @@ Use **semver `0.y.z`**. Until `1.0`:
 | `plugins/` | Reference language plugins (Python, Go, Zig, …) — subprocess JSON + optional ABI wrappers; see `docs/polyglot.md` |
 | `crates/crepuscularity-tui` | Ratatui backend for `.crepus` terminal UIs, file-backed templates, includes, slots, and `template_refs!` handles |
 | `crates/crepuscularity-embedded` | **UNSTABLE** — RGB565 framebuffer + `Ui`; optional features `mipidsi`, `embassy-stm32`, `esp-idf` in `panel/`; see `docs/embedded.md`, `examples/embedded-dashboard`, `embedded-stm32`, `embedded-esp32` |
+| `crates/crepuscularity-lvgl` | LVGL Pro XML generator for `.crepus` templates; emits `component` / `screen` XML for runtime registration or LVGL Pro workflows |
 | `crates/crepuscularity-lite` | GPUI desktop shell with embedded V8, TypeScript/TSX guest transpilation, native plugin bridge, workers, and host command queue |
 | `crates/crepuscularity-lite-macros` | Proc-macros for lite bridge/plugin bindings |
 | `examples/text-features` | GPUI demo for letter-spacing and text-transform (vendored gpui) |
 | `examples/weather` | Full weather-app example using the runtime |
 | `examples/native-shells` | SwiftPM (**`ios/`**) + Gradle (**`android/`**) apps decoding View IR; shared [`fixture.json`](examples/native-shells/fixture.json) |
+| `examples/lvgl-pro-mode` | Host example that converts a `.crepus` dashboard template into LVGL Pro XML |
 
 **Web / compiler / hot-reload implementation spec (single doc for agents):** [docs/CREPUS_WEB_IMPLEMENTATION_SPEC.md](docs/CREPUS_WEB_IMPLEMENTATION_SPEC.md)
 

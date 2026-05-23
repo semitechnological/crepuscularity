@@ -8,6 +8,7 @@ members = [
     "crates/crepuscularity-native",
     "crates/crepuscularity-embedded",
     "crates/crepuscularity-embedded-macros",
+    "crates/crepuscularity-lvgl",
     "crates/crepuscularity-abi",
     "crates/crepuscularity-gpui",
     "crates/crepuscularity-web",
@@ -29,6 +30,7 @@ members = [
     "examples/todo",
     "examples/embedded-dashboard",
     "examples/embedded-stm32/host-sim",
+    "examples/lvgl-pro-mode",
 ]
 
 [profile.release]
