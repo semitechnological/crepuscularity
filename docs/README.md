@@ -20,6 +20,7 @@ Guides and references for the `.crepus` DSL, tooling, and browser extensions.
 | [IDE extensions](ide-extensions.md) | Editor integration sketch (CLI tasks, `aurorality dev`, diagnostics) |
 | [TUI mode](tui.md) | Terminal user interfaces |
 | [Embedded / framebuffer](embedded.md) | **UNSTABLE** — RGB565 `Ui`; in development, largely untested on hardware |
+| [LVGL](lvgl.md) | LVGL Pro XML generator for panels and embedded UI workflows |
 
 Implementation details for compilers and agents live in-repo at [`CREPUS_WEB_IMPLEMENTATION_SPEC.md`](CREPUS_WEB_IMPLEMENTATION_SPEC.md) (not published on the docs site).
 
