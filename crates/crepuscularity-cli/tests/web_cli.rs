@@ -220,6 +220,12 @@ fn web_build_via_crepus_toml_target_docs_emits_wasm() {
         .flatten()
         .any(|e| e.path().extension().map(|x| x == "wasm").unwrap_or(false));
     assert!(has_wasm);
+    let docs_index =
+        std::fs::read_to_string(out.path().join("docs/index.html")).expect("docs index");
+    assert!(
+        docs_index.contains("doc-grid") && docs_index.contains("Documentation"),
+        "root --target docs should run the configured docs hook"
+    );
 }
 
 #[test]

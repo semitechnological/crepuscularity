@@ -116,6 +116,11 @@ json_ld = [
   """{"@context":"https://schema.org","@type":"SoftwareSourceCode","name":"Crepuscularity","codeRepository":"https://github.com/tschk/crepuscularity","programmingLanguage":"Rust","url":"https://crepuscularity.undivisible.dev/"}"""
 ]
 
+[targets.docs]
+command = "cargo"
+args = ["run", "--quiet", "--manifest-path", "docs-renderer/Cargo.toml", "--"]
+src = "../docs"
+
 [[targets.seo.alternates]]
 href = "https://crepuscularity.undivisible.dev/"
 hreflang = "en"

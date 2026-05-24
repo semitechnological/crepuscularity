@@ -39,7 +39,7 @@ lto = "thin"
 codegen-units = 1
 
 [workspace.package]
-version = "0.4.2"
+version = "0.4.3"
 edition = "2021"
 license = "MPL-2.0"
 
