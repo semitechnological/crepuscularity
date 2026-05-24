@@ -903,20 +903,6 @@ fn render_doc_shell(
       color: var(--accent);
     }}
     .doc-nav-toggle--main {{ display: none; }}
-    .doc-nav-toggle--sidebar {{ display: inline-flex; }}
-    aside.desktop-collapsed {{
-      width: 72px;
-      padding-inline: 0.75rem;
-    }}
-    aside.desktop-collapsed .doc-nav,
-    aside.desktop-collapsed .doc-toc,
-    aside.desktop-collapsed .doc-search-trigger,
-    aside.desktop-collapsed .doc-footer {{
-      display: none;
-    }}
-    aside.desktop-collapsed .doc-sidebar-header {{
-      justify-content: center;
-    }}
     .doc-main {{ min-width: 0; }}
     .doc-search-trigger {{ min-width: 0; }}
     @media (max-width: 860px) {{
@@ -927,6 +913,9 @@ fn render_doc_shell(
         top: 0.9rem;
         left: 0.9rem;
         z-index: 180;
+      }}
+      aside.mobile-expanded + .doc-main .doc-nav-toggle--main {{
+        left: min(calc(84vw + 0.65rem), 328px);
       }}
       aside {{
         position: fixed;
@@ -948,9 +937,8 @@ fn render_doc_shell(
       aside.mobile-expanded .doc-search-trigger,
       aside.mobile-expanded .doc-footer {{ display: block; }}
       aside.mobile-expanded .doc-search-trigger {{ display: flex; }}
-      .doc-nav-toggle--sidebar {{ display: none; }}
       .doc-search-trigger {{ width: 100%; }}
-      .doc-main {{ padding: 1.25rem 1rem 3rem; }}
+      .doc-main {{ padding: 4.25rem 1rem 3rem; }}
     }}
   </style>
 </head>
@@ -959,7 +947,6 @@ fn render_doc_shell(
     <aside>
       <div class="doc-sidebar-header">
         <a class="brand" href="../index.html">{esc_site}</a>
-        <button class="doc-nav-toggle doc-nav-toggle--sidebar" type="button" aria-label="Toggle navigation" onclick="toggleDocNav()">☰</button>
       </div>
       <button type="button" class="doc-search-trigger" id="doc-search-open" aria-label="Open documentation search">
         <span>Search…</span>
@@ -989,11 +976,7 @@ fn render_doc_shell(
   <script>
     function toggleDocNav() {{
       var aside = document.querySelector('aside');
-      if (window.innerWidth <= 860) {{
-        aside.classList.toggle('mobile-expanded');
-      }} else {{
-        aside.classList.toggle('desktop-collapsed');
-      }}
+      aside.classList.toggle('mobile-expanded');
     }}
   </script>
 </body>
@@ -1060,8 +1043,11 @@ mod tests {
         assert!(html.contains(".doc-nav-toggle {\n      appearance: none;\n      border: 0;"));
         assert!(html.contains("background: transparent;"));
         assert!(html.contains("z-index: 180;"));
-        assert!(html.contains(".doc-nav-toggle--sidebar { display: inline-flex; }"));
+        assert!(html.contains(".doc-nav-toggle--main { display: none; }"));
         assert!(html.contains("@media (max-width: 860px)"));
-        assert!(html.contains(".doc-nav-toggle--sidebar { display: none; }"));
+        assert!(html.contains("aside.mobile-expanded + .doc-main .doc-nav-toggle--main"));
+        assert!(html.contains(".doc-main { padding: 4.25rem 1rem 3rem; }"));
+        assert!(!html.contains("doc-nav-toggle--sidebar"));
+        assert!(!html.contains("desktop-collapsed"));
     }
 }
