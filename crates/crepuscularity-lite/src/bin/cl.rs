@@ -569,7 +569,7 @@ fn init_project(path: &str) -> Result<(), String> {
     println!("initialized crepus project in {}", project_dir.display());
     println!("framework detected: {framework}");
     println!("next:");
-    println!("  1) bun install (or npm install)");
+    println!("  1) bun install");
     println!("  2) cl build .");
     println!("  3) cl serve .");
     Ok(())

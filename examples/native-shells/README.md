@@ -43,7 +43,7 @@ SwiftPM writes **`ios/.build/`** locally; it is listed in [`.gitignore`](.gitign
 Alternatively, scaffold a fresh app (XcodeGen + app target) from anywhere you have the CLI installed:
 
 ```bash
-brew install xcodegen
+wax install xcodegen
 crepus ios new my-native-demo
 cd my-native-demo
 crepus ios generate

@@ -68,6 +68,8 @@ pub struct ManifestTarget {
     #[serde(default)]
     pub seo: Option<SeoConfig>,
     #[serde(default)]
+    pub docs: Option<DocsHookConfig>,
+    #[serde(default)]
     pub extension: Option<crepuscularity_webext::ExtensionInfo>,
     #[serde(default)]
     pub capabilities: Option<crepuscularity_webext::CapabilitiesSection>,
@@ -125,6 +127,16 @@ pub struct WebTargetMeta {
     pub head_html: Option<String>,
     pub google_fonts: Vec<String>,
     pub seo: Option<SeoConfig>,
+    pub docs: Option<DocsHookConfig>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct DocsHookConfig {
+    pub command: String,
+    #[serde(default)]
+    pub args: Vec<String>,
+    #[serde(default)]
+    pub src: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -266,6 +278,7 @@ impl CrepusManifest {
                     head_html: t.head_html.clone(),
                     google_fonts: t.google_fonts.clone(),
                     seo: t.seo.clone(),
+                    docs: t.docs.clone(),
                 },
             ));
         }
@@ -358,6 +371,7 @@ impl CrepusManifest {
                         head_html: target.head_html.clone(),
                         google_fonts: target.google_fonts.clone(),
                         seo: target.seo.clone(),
+                        docs: target.docs.clone(),
                     },
                     webext: target.extension.clone().map(|extension| {
                         crepuscularity_webext::ExtensionManifest {

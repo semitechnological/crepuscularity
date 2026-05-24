@@ -1,16 +1,18 @@
 //! Emit static HTML from repository `docs/*.md` when running `crepus web build`.
 
 use std::collections::HashMap;
+use std::env;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use pulldown_cmark::{html, Options, Parser};
+use serde::Deserialize;
 use serde_json::json;
 
-const DOCS_SEARCH_JS: &str = include_str!("../assets/web/docs_search.js");
+const DOCS_SEARCH_JS: &str = include_str!("docs_search.js");
 
 /// Theme variables mirrored from `site.json` for doc shells.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct DocsSiteTheme {
     pub accent: String,
     pub accent_soft: String,
@@ -31,6 +33,45 @@ struct OutlineItem {
     level: u8,
     text: String,
     id: String,
+}
+
+fn main() {
+    let mut docs_src = None;
+    let mut out_dir = None;
+    let mut site_name = None;
+    let mut theme_json = None;
+
+    let mut args = env::args().skip(1);
+    while let Some(arg) = args.next() {
+        match arg.as_str() {
+            "--docs-src" => docs_src = args.next().map(PathBuf::from),
+            "--out-dir" => out_dir = args.next().map(PathBuf::from),
+            "--site-name" => site_name = args.next(),
+            "--theme-json" => theme_json = args.next(),
+            _ => {}
+        }
+    }
+
+    let docs_src = docs_src.unwrap_or_else(|| usage());
+    let out_dir = out_dir.unwrap_or_else(|| usage());
+    let site_name = site_name.unwrap_or_else(|| usage());
+    let theme_json = theme_json.unwrap_or_else(|| usage());
+    let theme: DocsSiteTheme = serde_json::from_str(&theme_json).unwrap_or_else(|e| {
+        eprintln!("parse --theme-json: {e}");
+        std::process::exit(1);
+    });
+
+    if let Err(e) = emit_markdown_docs(&docs_src, &out_dir, &theme, &site_name) {
+        eprintln!("emit docs HTML: {e}");
+        std::process::exit(1);
+    }
+}
+
+fn usage() -> ! {
+    eprintln!(
+        "usage: docs-site-renderer --docs-src DIR --out-dir DIR --site-name NAME --theme-json JSON"
+    );
+    std::process::exit(2);
 }
 
 /// Writes `out_docs_dir/*.html` plus `out_docs_dir/index.html`. No-op if `docs_src` is missing.
@@ -843,10 +884,10 @@ fn render_doc_shell(
     }}
     .doc-nav-toggle {{
       appearance: none;
-      border: 1px solid var(--border);
-      background: color-mix(in srgb, var(--surface) 78%, white 22%);
+      border: 0;
+      background: transparent;
       color: var(--text);
-      border-radius: 8px;
+      border-radius: 999px;
       width: 2.25rem;
       height: 2.25rem;
       display: inline-flex;
@@ -856,9 +897,10 @@ fn render_doc_shell(
       flex: 0 0 auto;
       padding: 0;
       line-height: 1;
+      font-size: 1.45rem;
     }}
     .doc-nav-toggle:hover {{
-      border-color: color-mix(in srgb, var(--text) 25%, var(--border));
+      color: var(--accent);
     }}
     .doc-nav-toggle--main {{ display: none; }}
     .doc-nav-toggle--sidebar {{ display: inline-flex; }}
@@ -884,7 +926,7 @@ fn render_doc_shell(
         position: fixed;
         top: 0.9rem;
         left: 0.9rem;
-        z-index: 101;
+        z-index: 180;
       }}
       aside {{
         position: fixed;
@@ -906,7 +948,7 @@ fn render_doc_shell(
       aside.mobile-expanded .doc-search-trigger,
       aside.mobile-expanded .doc-footer {{ display: block; }}
       aside.mobile-expanded .doc-search-trigger {{ display: flex; }}
-      .doc-nav-toggle--sidebar {{ display: inline-flex; }}
+      .doc-nav-toggle--sidebar {{ display: none; }}
       .doc-search-trigger {{ width: 100%; }}
       .doc-main {{ padding: 1.25rem 1rem 3rem; }}
     }}
@@ -928,7 +970,7 @@ fn render_doc_shell(
       </nav>
       {page_toc}
       <footer class="doc-footer">
-        <strong>crepuscularity-web</strong> renders these pages from Markdown.<br>
+        <strong>docs-site</strong> renders these pages from Markdown.<br>
         Press <kbd style="font-size:0.65rem;padding:0.1rem 0.3rem;border:1px solid var(--border);border-radius:3px;">⌘K</kbd> or <kbd style="font-size:0.65rem;padding:0.1rem 0.3rem;border:1px solid var(--border);border-radius:3px;">Ctrl+K</kbd> to search.
       </footer>
     </aside>
@@ -986,4 +1028,40 @@ fn escape_html(s: &str) -> String {
 
 fn escape_html_attr(s: &str) -> String {
     escape_html(s)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn theme() -> DocsSiteTheme {
+        DocsSiteTheme {
+            accent: "#ffb070".to_string(),
+            accent_soft: "#e8c4ff".to_string(),
+            surface: "#0c0612".to_string(),
+            text: "#f4ebff".to_string(),
+            muted: "#9a8ab8".to_string(),
+            border: "#4c4168".to_string(),
+        }
+    }
+
+    #[test]
+    fn mobile_docs_nav_uses_single_borderless_overlay_toggle() {
+        let html = render_doc_shell(
+            "Crepuscularity",
+            "Docs",
+            &theme(),
+            "<ul class=\"doc-nav\"><li><a href=\"index.html\">Docs</a></li></ul>",
+            "",
+            "<article class=\"prose\"><h1>Docs</h1></article>",
+            false,
+        );
+
+        assert!(html.contains(".doc-nav-toggle {\n      appearance: none;\n      border: 0;"));
+        assert!(html.contains("background: transparent;"));
+        assert!(html.contains("z-index: 180;"));
+        assert!(html.contains(".doc-nav-toggle--sidebar { display: inline-flex; }"));
+        assert!(html.contains("@media (max-width: 860px)"));
+        assert!(html.contains(".doc-nav-toggle--sidebar { display: none; }"));
+    }
 }
