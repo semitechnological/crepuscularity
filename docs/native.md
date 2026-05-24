@@ -55,7 +55,7 @@ If you want a generated Xcode project (rather than a SwiftPM package), use the
 iOS-specific scaffolder:
 
 ```bash
-brew install xcodegen
+wax install xcodegen
 crepus ios new my-ios-app
 cd my-ios-app
 crepus ios generate

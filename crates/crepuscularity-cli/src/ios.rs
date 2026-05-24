@@ -206,7 +206,7 @@ fn print_ios_usage() {
     );
     eprintln!();
     eprintln!("{}", style("SETUP").dim());
-    eprintln!("  {}", style("brew install xcodegen").dim());
+    eprintln!("  {}", style("wax install xcodegen").dim());
 }
 
 fn scaffold_ios_app(name: &str) {
@@ -280,7 +280,7 @@ fn scaffold_ios_app(name: &str) {
     );
     eprintln!();
     eprintln!("{}", style("Next:").dim());
-    eprintln!("  brew install xcodegen   # once");
+    eprintln!("  wax install xcodegen   # once");
     eprintln!("  cd {name}");
     eprintln!("  crepus ios generate");
     eprintln!("  open {app_target}.xcodeproj");
@@ -434,7 +434,7 @@ Generated with `crepus ios new {name}`.
 `crepus.toml` stores the Xcode scheme and simulator destination; run commands from this directory (or any subfolder).
 
 ```bash
-brew install xcodegen
+wax install xcodegen
 crepus ios generate
 open {app_target}.xcodeproj
 ```
@@ -465,7 +465,7 @@ fn run_xcodegen(dir: &Path, spec: &str) {
     cmd.arg("generate").args(["--spec", spec]);
     let status = cmd.status().unwrap_or_else(|e| {
         ui::error(&format!(
-            "failed to run `xcodegen`: {e}\nInstall: brew install xcodegen"
+            "failed to run `xcodegen`: {e}\nInstall: wax install xcodegen"
         ));
     });
     if !status.success() {

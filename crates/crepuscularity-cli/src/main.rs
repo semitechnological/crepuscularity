@@ -51,7 +51,7 @@ mod tui;
 pub mod ui;
 mod wasm_bundle;
 mod web;
-mod web_docs;
+mod web_docs_hook;
 mod web_islands;
 mod web_serve;
 mod webext;

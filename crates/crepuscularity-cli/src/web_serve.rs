@@ -41,11 +41,12 @@ use serde_json::json;
 use crepuscularity_core::context::TemplateContext;
 use crepuscularity_web::render_from_files;
 
+use crate::crepus_toml::WebTargetMeta;
 use crate::web::{
     ensure_web_dev_artifacts, load_site_head, merged_site_google_fonts, merged_site_inline_css,
     render_index_html,
 };
-use crate::web_docs::{emit_markdown_docs, DocsSiteTheme};
+use crate::web_docs_hook::{docs_src_path, run_docs_hook, DocsHookTheme};
 
 /// Watcher event: template source or site `runtime/` (WASM crate).
 enum WatchEvent {
@@ -94,6 +95,7 @@ pub struct ServeOptions {
     pub port: u16,
     /// Entry-point template relative to `site_dir` (default `"index.crepus"`).
     pub entry: String,
+    pub meta: Option<WebTargetMeta>,
 }
 
 // ── Hot-reload script ────────────────────────────────────────────────────────
@@ -222,21 +224,18 @@ pub fn run(opts: ServeOptions) {
     let dev_root = site_dir.join(crate::web::WEB_DEV_ARTIFACT_DIR);
 
     let head = load_site_head(&site_dir);
-    let docs_theme = DocsSiteTheme {
-        accent: head.theme.accent.clone(),
-        accent_soft: head.theme.accent_soft.clone(),
-        surface: head.theme.surface.clone(),
-        text: head.theme.text.clone(),
-        muted: head.theme.muted.clone(),
-        border: head.theme.border.clone(),
-    };
-    let docs_src = site_dir
-        .parent()
-        .map(|p| p.join("docs"))
-        .filter(|p| p.is_dir());
-    if let Some(ref src) = docs_src {
+    if let Some(docs) = opts.meta.as_ref().and_then(|meta| meta.docs.as_ref()) {
+        let docs_theme = DocsHookTheme {
+            accent: head.theme.accent.clone(),
+            accent_soft: head.theme.accent_soft.clone(),
+            surface: head.theme.surface.clone(),
+            text: head.theme.text.clone(),
+            muted: head.theme.muted.clone(),
+            border: head.theme.border.clone(),
+        };
+        let docs_src = docs_src_path(&site_dir, docs);
         let docs_out = dev_root.join("docs");
-        match emit_markdown_docs(src, &docs_out, &docs_theme, &head.page_title) {
+        match run_docs_hook(&site_dir, &docs_out, docs, &head.page_title, &docs_theme) {
             Ok(()) => eprintln!(
                 "  {} docs → {} (serve at /docs/)",
                 console::style("✓").green(),
@@ -249,7 +248,9 @@ pub fn run(opts: ServeOptions) {
             ),
         }
         start_docs_markdown_watcher(
-            src.clone(),
+            site_dir.clone(),
+            docs.clone(),
+            docs_src,
             docs_out,
             docs_theme.clone(),
             head.page_title.clone(),
@@ -559,9 +560,11 @@ fn start_watcher(
 }
 
 fn start_docs_markdown_watcher(
+    site_dir: PathBuf,
+    hook: crate::crepus_toml::DocsHookConfig,
     docs_src: PathBuf,
     docs_out: PathBuf,
-    theme: DocsSiteTheme,
+    theme: DocsHookTheme,
     site_name: String,
 ) {
     let (tx, rx) = mpsc::channel::<PathBuf>();
@@ -612,7 +615,8 @@ fn start_docs_markdown_watcher(
                 Err(mpsc::RecvTimeoutError::Timeout) => {
                     if !pending.is_empty() && last_event.elapsed() >= Duration::from_millis(200) {
                         pending.clear();
-                        if let Err(e) = emit_markdown_docs(&docs_src, &docs_out, &theme, &site_name)
+                        if let Err(e) =
+                            run_docs_hook(&site_dir, &docs_out, &hook, &site_name, &theme)
                         {
                             eprintln!(
                                 "  {} docs rebuild failed: {}",
@@ -633,7 +637,7 @@ fn start_docs_markdown_watcher(
 fn serve_docs_path(stream: &mut TcpStream, url_path: &str, dev_root: &Path) {
     let base = dev_root.join("docs");
     if !base.is_dir() {
-        let msg = "No mirrored docs/ yet. Run crepus web serve from a site folder whose parent contains a docs/ directory (for example repo-root/docs-site with repo-root/docs), or open documentation after build.";
+        let msg = "No generated docs output yet. If this site has a [targets.docs] hook, check the hook command and rebuild or restart crepus web serve.";
         let body = format!(
             "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>Docs</title></head>\
              <body style=\"font-family:system-ui,sans-serif;padding:2rem;max-width:40rem;line-height:1.5\">\

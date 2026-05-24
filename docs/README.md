@@ -26,4 +26,4 @@ Implementation details for compilers and agents live in-repo at [`CREPUS_WEB_IMP
 
 **Published HTML**
 
-When you run `crepus web build --manifest docs-site/crepus.toml`, Markdown in this directory is turned into styled pages under `docs-site/dist/docs/` (for example `dsl.html`). The project’s GitHub Pages workflow uses that output for the public documentation site.
+When you run `crepus web build --manifest docs-site/crepus.toml`, the `docs-site` target runs its local `docs-renderer` hook to turn Markdown in this directory into styled pages under `docs-site/dist/docs/` (for example `dsl.html`). The project’s GitHub Pages workflow uses that output for the public documentation site.

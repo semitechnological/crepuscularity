@@ -138,7 +138,7 @@ Author pages in `.crepus` (same virtual-file semantics as `crepus web serve`). P
 - `rustup target add wasm32-unknown-unknown`
 - `cargo install wasm-bindgen-cli`
 
-If both **Homebrew** and **rustup** ship `cargo`/`rustc`, ensure rustup’s toolchain wins for WASM (the CLI prepends `~/.cargo/bin` to `PATH` for nested builds).
+If both a system package manager and **rustup** ship `cargo`/`rustc`, ensure rustup’s toolchain wins for WASM (the CLI prepends `~/.cargo/bin` to `PATH` for nested builds).
 
 ### `crepus web new <name>`
 
@@ -305,7 +305,7 @@ Deprecated pretty-printer for `site.json`.
 
 ## iOS host apps (`crepus ios`)
 
-Scaffold an **XcodeGen** + **SwiftPM** app with a local **`NativeShell`** package that renders **View IR** JSON (same contract as **`crepuscularity-native`**). Prerequisite: [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen`).
+Scaffold an **XcodeGen** + **SwiftPM** app with a local **`NativeShell`** package that renders **View IR** JSON (same contract as **`crepuscularity-native`**). Prerequisite: [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`wax install xcodegen`).
 
 ```bash
 crepus ios new my-native-demo

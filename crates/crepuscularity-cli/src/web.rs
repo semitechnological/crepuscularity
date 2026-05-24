@@ -92,6 +92,7 @@ fn parse_serve_args(args: &[String]) -> ServeOptions {
     let mut entry = "index.crepus".to_string();
     let mut explicit_site = false;
     let mut entry_from_args = false;
+    let mut meta = None;
 
     let mut i = 0;
     while i < args.len() {
@@ -121,7 +122,18 @@ fn parse_serve_args(args: &[String]) -> ServeOptions {
         i += 1;
     }
 
-    if !explicit_site {
+    if explicit_site {
+        if let Some(targets) =
+            crate::crepus_toml::load_web_targets(Some(site_dir.join("crepus.toml")))
+        {
+            let picked = crate::crepus_toml::resolve_pick(&targets, target_id.as_deref())
+                .unwrap_or_else(|m| ui::error(&m));
+            if !entry_from_args {
+                entry = picked.entry;
+            }
+            meta = Some(picked.meta);
+        }
+    } else {
         if let Some(targets) = crate::crepus_toml::load_web_targets(manifest) {
             let picked = crate::crepus_toml::resolve_pick(&targets, target_id.as_deref())
                 .unwrap_or_else(|m| ui::error(&m));
@@ -129,6 +141,7 @@ fn parse_serve_args(args: &[String]) -> ServeOptions {
             if !entry_from_args {
                 entry = picked.entry;
             }
+            meta = Some(picked.meta);
         }
     }
 
@@ -136,6 +149,7 @@ fn parse_serve_args(args: &[String]) -> ServeOptions {
         site_dir,
         port,
         entry,
+        meta,
     }
 }
 
@@ -442,16 +456,30 @@ fn parse_build_args(args: &[String]) -> WebBuildArgs {
 
 fn resolve_wasm_build_args(args: &WebBuildArgs) -> WasmBuildArgs {
     if let Some(site_dir) = &args.site_dir {
+        let local_targets =
+            crate::crepus_toml::load_web_targets(Some(site_dir.join("crepus.toml")));
+        let picked = local_targets.as_ref().and_then(|targets| {
+            crate::crepus_toml::resolve_pick(targets, args.target_id.as_deref()).ok()
+        });
         let out_dir = args
             .out_dir
             .clone()
+            .or_else(|| picked.as_ref().map(|target| target.out_dir.clone()))
             .unwrap_or_else(|| site_dir.join("dist"));
-        let entry = args.entry.clone().unwrap_or_else(|| "index.crepus".into());
+        let entry = args
+            .entry
+            .clone()
+            .or_else(|| picked.as_ref().map(|target| target.entry.clone()))
+            .unwrap_or_else(|| "index.crepus".into());
+        let meta = args
+            .meta
+            .clone()
+            .or_else(|| picked.as_ref().map(|target| target.meta.clone()));
         return WasmBuildArgs {
             site_dir: site_dir.clone(),
             out_dir,
             entry,
-            meta: args.meta.clone(),
+            meta,
         };
     }
 
@@ -571,25 +599,23 @@ pub(crate) fn build_site_wasm(cli: &WebBuildArgs) {
         ui::error(&format!("write app.js: {e}"));
     });
 
-    if let Some(repo_root) = b.site_dir.parent() {
-        let docs_path = repo_root.join("docs");
-        if docs_path.is_dir() {
-            let theme = crate::web_docs::DocsSiteTheme {
-                accent: head.theme.accent.clone(),
-                accent_soft: head.theme.accent_soft.clone(),
-                surface: head.theme.surface.clone(),
-                text: head.theme.text.clone(),
-                muted: head.theme.muted.clone(),
-                border: head.theme.border.clone(),
-            };
-            if let Err(e) = crate::web_docs::emit_markdown_docs(
-                &docs_path,
-                &b.out_dir.join("docs"),
-                &theme,
-                &head.page_title,
-            ) {
-                ui::error(&format!("emit docs HTML: {e}"));
-            }
+    if let Some(docs) = b.meta.as_ref().and_then(|meta| meta.docs.as_ref()) {
+        let theme = crate::web_docs_hook::DocsHookTheme {
+            accent: head.theme.accent.clone(),
+            accent_soft: head.theme.accent_soft.clone(),
+            surface: head.theme.surface.clone(),
+            text: head.theme.text.clone(),
+            muted: head.theme.muted.clone(),
+            border: head.theme.border.clone(),
+        };
+        if let Err(e) = crate::web_docs_hook::run_docs_hook(
+            &b.site_dir,
+            &b.out_dir.join("docs"),
+            docs,
+            &head.page_title,
+            &theme,
+        ) {
+            ui::error(&format!("run docs hook: {e}"));
         }
     }
 
