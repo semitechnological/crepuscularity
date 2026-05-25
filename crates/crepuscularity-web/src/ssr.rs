@@ -27,7 +27,7 @@ use crepuscularity_core::analysis::{classify_node, Region};
 use crepuscularity_core::ast::*;
 use crepuscularity_core::context::{value_to_str, TemplateContext, TemplateValue};
 use crepuscularity_core::eval::eval_expr;
-use crepuscularity_core::parser::{parse_component_file, parse_template};
+use crepuscularity_core::parser::parse_component_file;
 use crepuscularity_core::preprocess::{slot_rotate_child_phrases, slot_rotate_words_json_attr};
 
 /// Options for [`render_ssr_document`].
@@ -60,7 +60,7 @@ pub fn render_template_to_html_with_ssr(
     if !markers {
         return crate::render_template_to_html(template, ctx);
     }
-    let nodes = parse_template(template)?;
+    let nodes = crepuscularity_core::ast_cache::parse_content(template)?;
     let counter = Cell::new(0u32);
     let mut bind = BindMap::new();
     let mut html = render_nodes_ssr(&nodes, ctx, &counter, &mut bind, true)?;
@@ -671,7 +671,8 @@ fn render_include_ssr(
     } else {
         let file_path = crate::resolve_include_path(ctx.base_dir.as_deref(), &inc.path)?;
         let content = crate::read_file(ctx, &file_path)?;
-        let nodes = parse_template(&content).map_err(|e| format!("include parse error: {e}"))?;
+        let nodes = crepuscularity_core::ast_cache::parse_content(&content)
+            .map_err(|e| format!("include parse error: {e}"))?;
         let mut child_ctx = TemplateContext::new();
         child_ctx.base_dir = file_path.parent().map(|p| p.to_path_buf());
         child_ctx.virtual_files = ctx.virtual_files.clone();

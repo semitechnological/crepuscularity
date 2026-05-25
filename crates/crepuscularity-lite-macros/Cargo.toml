@@ -15,7 +15,7 @@ proc-macro = true
 path = "src/lib.rs"
 
 [dependencies]
-crepuscularity-core = { path = "../crepuscularity-core", version = "0.4.8" }
+crepuscularity-core = { path = "../crepuscularity-core", version = "0.4.9" }
 proc-macro2 = { workspace = true }
 quote = { workspace = true }
 syn = { workspace = true }

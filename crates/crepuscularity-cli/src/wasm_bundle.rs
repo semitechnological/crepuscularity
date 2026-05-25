@@ -83,6 +83,12 @@ fn cargo_executable() -> std::ffi::OsString {
     "cargo".into()
 }
 
+/// Enable incremental compilation and sccache caching for wasm32-unknown-unknown.
+///
+/// - `CARGO_BUILD_INCREMENTAL=true` avoids full re-link on small changes.
+/// - `SCCACHE` is detected on `PATH` and enabled automatically for crate-level
+///   reuse across builds (more effective than the `cargo`-level `--quiet` flag).
+///
 /// Prefer rustup's `cargo` when `PATH` points at a non-rustup toolchain (e.g. Homebrew rustc
 /// without wasm std). Uses `CARGO` if set, else `~/.cargo/bin/cargo` when present.
 pub fn cargo_build_wasm32(runtime_dir: &Path) -> Result<(), String> {
@@ -90,6 +96,18 @@ pub fn cargo_build_wasm32(runtime_dir: &Path) -> Result<(), String> {
     let mut cmd = Command::new(cargo_exe);
     prepend_rustup_bin_to_path(&mut cmd);
     cmd.env_remove("CARGO_TARGET_DIR");
+    cmd.env("CARGO_BUILD_INCREMENTAL", "true");
+
+    // Detect sccache on PATH and enable it automatically for crate-level reuse.
+    let sccache_available = std::process::Command::new("sccache")
+        .arg("--version")
+        .output()
+        .ok()
+        .is_some_and(|o| o.status.success());
+    if sccache_available && std::env::var_os("RUSTC_WRAPPER").is_none() {
+        cmd.env("RUSTC_WRAPPER", "sccache");
+    }
+
     let out = cmd
         .args([
             "build",

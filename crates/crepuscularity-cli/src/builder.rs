@@ -52,7 +52,8 @@ pub fn cargo_build(cwd: &Path, release: bool, hud: Option<Arc<Mutex<HudState>>>)
         .arg("--message-format=json-diagnostic-rendered-ansi")
         .current_dir(cwd)
         .stdout(Stdio::piped())
-        .stderr(Stdio::null()); // diagnostics come through JSON stdout
+        .stderr(Stdio::null()) // diagnostics come through JSON stdout
+        .env("CARGO_BUILD_INCREMENTAL", "true");
 
     if release {
         cmd.arg("--release");

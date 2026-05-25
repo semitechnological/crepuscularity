@@ -35,7 +35,6 @@ use notify::Watcher;
 
 use crate::ast::Node;
 use crate::context::TemplateContext;
-use crate::parser::parse_template;
 use crate::renderer::render_nodes;
 use crate::watcher::create_watcher;
 
@@ -136,10 +135,8 @@ impl Drop for HotReloadState {
     }
 }
 
-fn load_template(path: &PathBuf) -> Result<Vec<Node>, String> {
-    let content =
-        std::fs::read_to_string(path).map_err(|e| format!("Could not read {:?}: {}", path, e))?;
-    parse_template(&content)
+fn load_template(path: &std::path::Path) -> Result<Vec<Node>, String> {
+    crepuscularity_core::ast_cache::parse_file(path)
 }
 
 /// A GPUI view that renders a hot-reloaded template.

@@ -38,6 +38,22 @@ members = [
 lto = "thin"
 codegen-units = 1
 
+# PGO-optimised release — use via scripts/pgo-build.sh:
+#
+#   scripts/pgo-build.sh pgo-gen   # step 1 & 2: instrumented build + profile run
+#   scripts/pgo-build.sh pgo-use   # step 3:      rebuild with collected profiles
+#
+# Manual equivalent:
+#   RUSTFLAGS="-Cprofile-generate=$(pwd)/target/pgo-profiles" \
+#     cargo build --profile pgo -p crepuscularity-cli
+#   # run crepus on a representative benchmark
+#   RUSTFLAGS="-Cprofile-use=$(pwd)/target/pgo-profiles" \
+#     cargo build --profile pgo -p crepuscularity-cli
+[profile.pgo]
+inherits = "release"
+lto = "fat"
+codegen-units = 1
+
 [workspace.package]
 version = "0.4.3"
 edition = "2021"
