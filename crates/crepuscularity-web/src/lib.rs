@@ -9,7 +9,7 @@ use crepuscularity_core::ast::*;
 use crepuscularity_core::context::{value_to_str, TemplateContext, TemplateValue};
 use crepuscularity_core::eval::eval_expr;
 pub use crepuscularity_core::include_paths::resolve_include_path;
-use crepuscularity_core::parser::{parse_component_file, parse_template};
+use crepuscularity_core::parser::parse_component_file;
 use crepuscularity_core::preprocess::{slot_rotate_child_phrases, slot_rotate_words_json_attr};
 use crepuscularity_core::virtual_files::lookup_virtual_file;
 
@@ -143,7 +143,7 @@ pub fn par_render_component_file(
 /// virtual file map used by WASM and static-site builds.
 #[tracing::instrument(skip(template, ctx), fields(template_len = template.len()))]
 pub fn render_template_to_html(template: &str, ctx: &TemplateContext) -> Result<String, String> {
-    let nodes = parse_template(template)?;
+    let nodes = crepuscularity_core::ast_cache::parse_content(template)?;
     render_nodes_to_html(&nodes, ctx)
 }
 
@@ -513,7 +513,8 @@ fn render_include(inc: &IncludeNode, ctx: &TemplateContext) -> Result<String, St
 
     let file_path = resolve_include_path(ctx.base_dir.as_deref(), &inc.path)?;
     let content = read_file(ctx, &file_path)?;
-    let nodes = parse_template(&content).map_err(|e| format!("include parse error: {}", e))?;
+    let nodes = crepuscularity_core::ast_cache::parse_content(&content)
+        .map_err(|e| format!("include parse error: {}", e))?;
 
     let mut child_ctx = TemplateContext::new();
     child_ctx.base_dir = file_path.parent().map(|p| p.to_path_buf());
@@ -602,7 +603,7 @@ pub fn render_template_to_html_with_hydration(
 ) -> Result<String, String> {
     use std::sync::atomic::AtomicU32;
 
-    let nodes = parse_template(template)?;
+    let nodes = crepuscularity_core::ast_cache::parse_content(template)?;
 
     // Counter for data-crepus-id assignment.
     let counter = AtomicU32::new(0);

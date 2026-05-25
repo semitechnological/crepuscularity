@@ -1432,10 +1432,10 @@ fn run_build_full(args: &BuildFullArgs) {
         ui::step(&format!(
             "spawning cargo build --target wasm32-unknown-unknown -p {target}"
         ));
-        match std::process::Command::new("cargo")
-            .args(["build", "--target", "wasm32-unknown-unknown", "-p", &target])
-            .spawn()
-        {
+        let mut wcmd = std::process::Command::new("cargo");
+        wcmd.args(["build", "--target", "wasm32-unknown-unknown", "-p", &target])
+            .env("CARGO_BUILD_INCREMENTAL", "true");
+        match wcmd.spawn() {
             Ok(child) => wasm_child = Some(child),
             Err(e) => ui::warning(&format!("could not spawn wasm build: {e}")),
         }
@@ -1444,10 +1444,10 @@ fn run_build_full(args: &BuildFullArgs) {
     if args.server {
         let target = format!("{site_name}-server");
         ui::step(&format!("spawning cargo build -p {target}"));
-        match std::process::Command::new("cargo")
-            .args(["build", "-p", &target])
-            .spawn()
-        {
+        let mut scmd = std::process::Command::new("cargo");
+        scmd.args(["build", "-p", &target])
+            .env("CARGO_BUILD_INCREMENTAL", "true");
+        match scmd.spawn() {
             Ok(child) => server_child = Some(child),
             Err(e) => ui::warning(&format!("could not spawn server build: {e}")),
         }

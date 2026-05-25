@@ -330,21 +330,9 @@ fn render_include(inc: &IncludeNode, ctx: &TemplateContext) -> AnyElement {
         }
     };
 
-    let content = match std::fs::read_to_string(&file_path) {
-        Ok(c) => c,
-        Err(e) => {
-            let msg = format!("include error: {:?}: {}", file_path, e);
-            return div()
-                .text_color(rgb(0xff4444))
-                .child(SharedString::from(msg))
-                .into_any_element();
-        }
-    };
-
-    let nodes = match crate::parser::parse_template(&content) {
+    let nodes = match crepuscularity_core::ast_cache::parse_file(&file_path) {
         Ok(n) => n,
-        Err(e) => {
-            let msg = format!("include parse error: {}", e);
+        Err(msg) => {
             return div()
                 .text_color(rgb(0xff4444))
                 .child(SharedString::from(msg))
