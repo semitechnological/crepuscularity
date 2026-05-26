@@ -295,9 +295,9 @@ div x-data="{ n: 0 }"
 
 Use `x-on:*` for Alpine inside `.crepus`; Crepus reserves `@event=...` for Rust/WASM handler wiring.
 
-### `crepus web serve`
+### `crepus web dev`
 
-Dev server with hot reload — see `crepus web --help`.
+Dev server with hot reload (also available as `crepus web serve`). See `crepus web --help`.
 
 ### `crepus web site-json`
 

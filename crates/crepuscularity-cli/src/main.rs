@@ -299,8 +299,8 @@ fn print_usage() {
     );
     eprintln!(
         "  {}  {}",
-        style("web serve [--site DIR] [--port N]    ").green(),
-        style("live-reload dev server for .crepus files").dim()
+        style("web dev [--site DIR] [--port N]      ").green(),
+        style("live-reload dev server (alias: serve)").dim()
     );
     eprintln!();
     eprintln!(

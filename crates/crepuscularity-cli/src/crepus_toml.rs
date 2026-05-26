@@ -110,7 +110,7 @@ pub(crate) fn default_ios_destination() -> String {
     "platform=iOS Simulator,name=iPhone 16,OS=latest".into()
 }
 
-/// Resolved web site for `crepus web build` / `serve`.
+/// Resolved web site for `crepus web build` / `dev`.
 #[derive(Debug, Clone)]
 pub struct ResolvedWebTarget {
     pub id: String,
