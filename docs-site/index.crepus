@@ -80,7 +80,7 @@ div min-h-screen overflow-x-hidden antialiased crepus-twilight-page
 $ crepus new my-app && crepus dev
 
 # WASM site (this page)
-$ crepus web new my-web && crepus web serve
+$ crepus web new my-web && crepus web dev
 
 # Browser extension
 $ crepus webext new my-ext && crepus webext dev
