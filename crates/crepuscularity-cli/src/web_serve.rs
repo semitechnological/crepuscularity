@@ -1,4 +1,4 @@
-//! `crepus web serve` — hot-reload dev server for `.crepus` templates.
+//! `crepus web dev` — hot-reload dev server for `.crepus` templates.
 //!
 //! # How it works
 //!
@@ -87,7 +87,7 @@ fn runtime_build_error_sse(message: &str) -> String {
 
 // ── Options ──────────────────────────────────────────────────────────────────
 
-/// Configuration for `crepus web serve`.
+/// Configuration for `crepus web dev`.
 pub struct ServeOptions {
     /// Root directory containing `.crepus` source files.
     pub site_dir: PathBuf,
@@ -278,12 +278,12 @@ pub fn run(opts: ServeOptions) {
     // Bind TCP listener.
     let addr = format!("127.0.0.1:{}", opts.port);
     let listener = TcpListener::bind(&addr).unwrap_or_else(|e| {
-        eprintln!("crepus web serve: cannot bind {addr}: {e}");
+        eprintln!("crepus web dev: cannot bind {addr}: {e}");
         std::process::exit(1);
     });
 
     eprintln!(
-        "\n  {} crepus web serve\n  {} http://localhost:{}\n  {} edit .crepus or runtime/ — templates hot-reload; Rust changes rebuild WASM\n",
+        "\n  {} crepus web dev\n  {} http://localhost:{}\n  {} edit .crepus or runtime/ — templates hot-reload; Rust changes rebuild WASM\n",
         console::style("▶").green().bold(),
         console::style("→").dim(),
         opts.port,
@@ -306,7 +306,7 @@ pub fn run(opts: ServeOptions) {
                 });
             }
             Err(e) => {
-                eprintln!("crepus web serve: accept error: {e}");
+                eprintln!("crepus web dev: accept error: {e}");
             }
         }
     }
@@ -431,11 +431,11 @@ fn start_watcher(
                     eprintln!("  {} watcher error: {e}", console::style("⚠").yellow());
                 }
             })
-            .expect("crepus web serve: cannot create file watcher");
+            .expect("crepus web dev: cannot create file watcher");
 
         watcher
             .watch(&watch_dir, RecursiveMode::Recursive)
-            .expect("crepus web serve: cannot watch site dir");
+            .expect("crepus web dev: cannot watch site dir");
 
         // Keep watcher alive.
         loop {
@@ -591,11 +591,11 @@ fn start_docs_markdown_watcher(
                     eprintln!("  {} docs watcher error: {e}", console::style("⚠").yellow());
                 }
             })
-            .expect("crepus web serve: docs watcher");
+            .expect("crepus web dev: docs watcher");
 
         watcher
             .watch(&docs_src_watch, RecursiveMode::Recursive)
-            .expect("crepus web serve: watch docs/");
+            .expect("crepus web dev: watch docs/");
 
         loop {
             std::thread::sleep(Duration::from_secs(3600));
@@ -637,7 +637,7 @@ fn start_docs_markdown_watcher(
 fn serve_docs_path(stream: &mut TcpStream, url_path: &str, dev_root: &Path) {
     let base = dev_root.join("docs");
     if !base.is_dir() {
-        let msg = "No generated docs output yet. If this site has a [targets.docs] hook, check the hook command and rebuild or restart crepus web serve.";
+        let msg = "No generated docs output yet. If this site has a [targets.docs] hook, check the hook command and rebuild or restart crepus web dev.";
         let body = format!(
             "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>Docs</title></head>\
              <body style=\"font-family:system-ui,sans-serif;padding:2rem;max-width:40rem;line-height:1.5\">\
@@ -832,7 +832,7 @@ fn serve_secondary_preview(
     if let Some(pos) = html.find(needle) {
         let replacement = format!(
             r#"<div id="crepus-root">{inner}</div>
-  <!-- crepus web serve: preview only (entry is WASM on /) -->"#
+  <!-- crepus web dev: preview only (entry is WASM on /) -->"#
         );
         html.replace_range(pos..pos + needle.len(), &replacement);
     } else {

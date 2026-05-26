@@ -616,7 +616,7 @@ fn main() {
             let dir = dir.unwrap();
             match detect_project_type(&dir) {
                 Ok(ProjectType::Full) => {
-                    eprintln!("cl: you are working in a full crepuscularity project; use 'crepus serve' or 'cre web serve' instead");
+                    eprintln!("cl: you are working in a full crepuscularity project; use 'crepus dev' or 'cre web dev' instead");
                     std::process::exit(1);
                 }
                 Ok(ProjectType::Lite) => {

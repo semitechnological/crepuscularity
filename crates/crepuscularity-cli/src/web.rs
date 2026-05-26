@@ -1,5 +1,7 @@
 //! `crepus web` — `.crepus`-first static sites (WASM runtime) + dev server.
 //!
+//! Commands: new, build, dev (alias: serve), site-json, build-full.
+//!
 //! Production builds mirror `crepus webext`: compile the site `runtime/` crate to
 //! `wasm32-unknown-unknown`, run `wasm-bindgen`, ship `crepus-bundle.json` + a thin HTML shell.
 //! The default WASM entrypoint calls `crepuscularity_web::render_bundle`; sites that need Rust
@@ -45,8 +47,8 @@ pub fn run(args: &[String]) {
             print_site_json(&site_dir);
         }
 
-        Some("serve") => {
-            let opts = parse_serve_args(&args[1..]);
+        Some("dev") | Some("serve") => {
+            let opts = parse_dev_args(&args[1..]);
             crate::web_serve::run(opts);
         }
 
@@ -84,7 +86,7 @@ fn parse_target_and_manifest(args: &[String]) -> (Option<String>, Option<PathBuf
     (target, manifest)
 }
 
-fn parse_serve_args(args: &[String]) -> ServeOptions {
+fn parse_dev_args(args: &[String]) -> ServeOptions {
     let (target_id, manifest) = parse_target_and_manifest(args);
 
     let mut site_dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
@@ -215,8 +217,8 @@ fn print_web_usage() {
     );
     eprintln!(
         "  {}  {}",
-        style("serve [--site DIR] [--port N]  ").green(),
-        style("live-reload dev server for .crepus files").dim()
+        style("dev [--site DIR] [--port N]     ").green(),
+        style("live-reload dev server (alias: serve)").dim()
     );
     eprintln!(
         "  {}  {}",
@@ -224,7 +226,7 @@ fn print_web_usage() {
         style("parallel .crepus render + optional wasm/server cargo builds").dim()
     );
     eprintln!();
-    eprintln!("{}", style("SERVE ARGS").dim());
+    eprintln!("{}", style("DEV ARGS").dim());
     eprintln!(
         "  {}  {}",
         style("--site DIR             ").green(),
@@ -328,7 +330,7 @@ twitter_card = "summary"
  div text-3xl font-bold
   "Hello from .crepus"
  div text-zinc-400 max-w-xl
-  "This page is rendered in the browser by the same pipeline as crepus web serve — wasm32 + crepus-bundle.json."
+  "This page is rendered in the browser by the same pipeline as crepus web dev — wasm32 + crepus-bundle.json."
 "#;
     std::fs::write(base.join("index.crepus"), index_crepus).unwrap_or_else(|e| {
         ui::error(&format!("write index.crepus: {e}"));
@@ -373,7 +375,7 @@ pub fn crepus_render(bundle_json: &str) -> Result<String, JsValue> {
     eprintln!();
     eprintln!("{}", style("Next steps:").dim());
     eprintln!("  cd {slug}");
-    eprintln!("  crepus web serve --site .");
+    eprintln!("  crepus web dev --site .");
     eprintln!("  crepus build");
     ui::done_in(t0.elapsed());
 }
@@ -1284,7 +1286,7 @@ fn copy_unocss(vendor_dir: &Path) {
     }
 }
 
-/// Directory under a site root where `crepus web serve` caches UnoCSS, `app.js`, and wasm-bindgen output.
+/// Directory under a site root where `crepus web dev` caches UnoCSS, `app.js`, and wasm-bindgen output.
 pub(crate) const WEB_DEV_ARTIFACT_DIR: &str = ".crepus-dev";
 
 /// Build site `runtime/` to WASM once and populate `.crepus-dev/` with the same assets as a `crepus web build` dist folder.
