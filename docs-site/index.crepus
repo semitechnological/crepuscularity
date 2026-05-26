@@ -77,16 +77,14 @@ div min-h-screen overflow-x-hidden antialiased crepus-twilight-page
 								"terminal"
 						pre font-mono text-[11px] sm:text-[13px] leading-relaxed p-3 sm:p-4 m-0 crepus-t-pre whitespace-pre overflow-x-visible
 							"# New desktop app
-$ crepus new my-app && cargo run
+$ crepus new my-app && crepus dev
 
 # WASM site (this page)
-$ crepus web build --manifest docs-site/crepus.toml
+$ crepus web new my-web && crepus web serve
 
 # Browser extension
-$ crepus webext new ext
-
-# LVGL panel XML
-$ crepus build lvgl"
+$ crepus webext new my-ext && crepus webext dev
+"
 
 		section py-10 sm:py-14 border-t crepus-t-border crepus-entrance crepus-e3
 			div flex flex-col lg:flex-row lg:items-stretch gap-5 sm:gap-6 lg:gap-8
