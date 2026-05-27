@@ -84,6 +84,9 @@ $ crepus web new my-web && crepus web dev
 
 # Browser extension
 $ crepus webext new my-ext && crepus webext dev
+
+# SwiftUI apps (macOS / iOS)
+$ crepus aurora new my-ios && crepus aurora dev
 "
 
 		section py-10 sm:py-14 border-t crepus-t-border crepus-entrance crepus-e3

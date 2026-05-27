@@ -355,6 +355,22 @@ crepus embedded snapshot ui.crepus --component Card --ctx context.json --var cpu
 
 See [Embedded / framebuffer](embedded.md).
 
+## Aurorality — SwiftUI for macOS/iOS (`crepus aurora`)
+
+Aurorality targets SwiftUI apps from `.crepus` templates. Requires the `aurorality` binary (`cargo install aurorality-cli`).
+
+```bash
+crepus aurora dev --watch views           # hot-reload dev server (WebSocket)
+crepus aurora dev --watch views --port 8080
+crepus aurora build --watch views --out generated/ir
+crepus aurora new my-aurora-project
+crepus aurora swiftgen --view main.crepus --out Generated --view-name AppView
+crepus aurora bundle --views views --out generated/ir --js-entry plugins/main.js --js-out bundle/main.js
+crepus aurora bindgen --input plugins --output generated
+```
+
+All arguments are forwarded to `aurorality`. Run `aurorality --help` for full options.
+
 ## Browser Extension Commands
 
 ### `crepus webext new <name>`

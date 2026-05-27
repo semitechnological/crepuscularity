@@ -28,8 +28,13 @@
 //!   crepus native run android                    install Android app
 //!   crepus embedded check FILE
 //!   crepus embedded snapshot FILE --width W --height H --out path.ppm
+//!   crepus aurora dev [--watch DIR] [--port N]
+//!   crepus aurora build --watch DIR --out DIR
+//!   crepus aurora new NAME
+//!   crepus aurora swiftgen --view FILE --out DIR --view-name NAME
 //!   crepus benchmark [all|run|check] [flags…]    benchmark.toml run or prereq check (examples/benchmarks)
 
+mod aurora;
 mod benchmark;
 mod benchmark_tui;
 #[cfg(feature = "desktop")]
@@ -189,6 +194,10 @@ fn main() {
 
         Some("native") => {
             native::run(&args[2..]);
+        }
+
+        Some("aurora") => {
+            aurora::run(&args[2..]);
         }
 
         Some("embedded") => {
@@ -377,6 +386,16 @@ fn print_usage() {
         "  {}  {}",
         style("embedded snapshot <file> -W -H --out ppm").green(),
         style("debug PPM only (use Rust API in firmware)").dim()
+    );
+    eprintln!(
+        "  {}  {}",
+        style("aurora dev [--watch DIR]           ").green(),
+        style("hot-reload preview window (SwiftUI Runner).").dim()
+    );
+    eprintln!(
+        "  {}  {}",
+        style("aurora run [PROJECT] [--macos|--ios]").green(),
+        style("build & launch a SwiftUI project.").dim()
     );
     eprintln!(
         "  {}  {}",
