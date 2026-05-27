@@ -7,6 +7,7 @@ use std::time::Instant;
 
 use crate::ui;
 use crate::wasm_bundle::{cargo_build_wasm32, find_wasm_file, run_wasm_bindgen, wasm_release_dirs};
+use crepuscularity_webext::BrowserTarget;
 
 // ── Entry point ──────────────────────────────────────────────────────────────
 
@@ -20,22 +21,34 @@ pub fn run(args: &[String]) {
         }
 
         Some("build") => {
-            let app_path = parse_app_path(&args[1..]);
-            build_extension(&app_path, false);
+            let opts = parse_webext_options(&args[1..]);
+            build_extension(&opts.app_path, false, opts.browser);
         }
 
         Some("dev") => {
-            let app_path = parse_app_path(&args[1..]);
-            build_extension(&app_path, true);
-            watch_and_reload(&app_path);
+            let opts = parse_webext_options(&args[1..]);
+            build_extension(&opts.app_path, true, opts.browser);
+            watch_and_reload(&opts.app_path, opts.browser);
         }
 
         Some("manifest") => {
-            let app_path = parse_app_path(&args[1..]);
-            print_manifest(&app_path);
+            let opts = parse_webext_options(&args[1..]);
+            print_manifest(&opts.app_path, opts.browser);
         }
 
         _ => print_webext_usage(),
+    }
+}
+
+struct WebextOptions {
+    app_path: PathBuf,
+    browser: Option<BrowserTarget>,
+}
+
+fn parse_webext_options(args: &[String]) -> WebextOptions {
+    WebextOptions {
+        app_path: parse_app_path(args),
+        browser: parse_browser_target(args),
     }
 }
 
@@ -54,6 +67,24 @@ fn parse_app_path(args: &[String]) -> PathBuf {
     })
 }
 
+fn parse_browser_target(args: &[String]) -> Option<BrowserTarget> {
+    let mut i = 0;
+    while i < args.len() {
+        if args[i] == "--browser" {
+            let Some(value) = args.get(i + 1) else {
+                ui::error("Usage: --browser <chromium|firefox>");
+            };
+            return BrowserTarget::parse(value).or_else(|| {
+                ui::error(&format!(
+                    "unknown browser target {value:?}; expected chromium or firefox"
+                ));
+            });
+        }
+        i += 1;
+    }
+    None
+}
+
 fn print_webext_usage() {
     eprintln!("{}", style("crepus webext").cyan().bold());
     eprintln!("{}", style("Browser extension commands").dim());
@@ -66,17 +97,17 @@ fn print_webext_usage() {
     );
     eprintln!(
         "  {}  {}",
-        style("build [--app PATH]    ").green(),
-        style("build extension to dist/unpacked/").dim()
+        style("build [--app PATH] [--browser chromium|firefox]").green(),
+        style("build extension to dist/unpacked/ or dist/<browser>/").dim()
     );
     eprintln!(
         "  {}  {}",
-        style("dev [--app PATH]      ").green(),
+        style("dev [--app PATH] [--browser chromium|firefox]  ").green(),
         style("build, watch, and hot-reload").dim()
     );
     eprintln!(
         "  {}  {}",
-        style("manifest [--app PATH] ").green(),
+        style("manifest [--app PATH] [--browser chromium|firefox]").green(),
         style("print generated manifest.json").dim()
     );
 }
@@ -314,20 +345,21 @@ fn detect_icon_size(filename: &str) -> Option<String> {
 
 // ── build ─────────────────────────────────────────────────────────────────────
 
-fn build_extension(app_path: &Path, dev: bool) {
+fn build_extension(app_path: &Path, dev: bool, browser: Option<BrowserTarget>) {
     let t0 = Instant::now();
 
     let mut manifest = load_extension_manifest(app_path, None);
-    build_extension_inner(app_path, &mut manifest, dev, t0);
+    build_extension_inner(app_path, &mut manifest, dev, t0, browser);
 }
 
 fn build_extension_with_manifest(
     app_path: &Path,
     mut manifest: crepuscularity_webext::ExtensionManifest,
     dev: bool,
+    browser: Option<BrowserTarget>,
 ) {
     let t0 = Instant::now();
-    build_extension_inner(app_path, &mut manifest, dev, t0);
+    build_extension_inner(app_path, &mut manifest, dev, t0, browser);
 }
 
 fn build_extension_inner(
@@ -335,6 +367,7 @@ fn build_extension_inner(
     manifest: &mut crepuscularity_webext::ExtensionManifest,
     dev: bool,
     t0: Instant,
+    browser: Option<BrowserTarget>,
 ) {
     // Auto-detect options from project structure
     auto_detect_pages(app_path, manifest);
@@ -344,7 +377,10 @@ fn build_extension_inner(
     eprintln!("{} building {ext_name}", style("crepus webext").dim());
     eprintln!();
 
-    let dist = app_path.join("dist/unpacked");
+    let dist = match browser {
+        Some(target) => app_path.join("dist").join(target.dist_dir()),
+        None => app_path.join("dist/unpacked"),
+    };
     let src_dir = dist.join("src");
     let vendor_dir = dist.join("vendor");
     std::fs::create_dir_all(&src_dir).unwrap_or_else(|e| {
@@ -357,7 +393,10 @@ fn build_extension_inner(
     // ── Step 1: manifest.json ────────────────────────────────────────────────
     {
         let sp = ui::spinner("generating manifest.json");
-        let mut json = manifest.to_manifest_v3_json();
+        let mut json = match browser {
+            Some(target) => manifest.to_manifest_v3_json_for_browser(target),
+            None => manifest.to_manifest_v3_json(),
+        };
         if dev {
             json = inject_dev_content_script(&json);
         }
@@ -476,12 +515,20 @@ fn build_extension_inner(
         ui::ok(),
         style(dist.display().to_string()).cyan()
     );
-    eprintln!(
-        "  {} load {} in {}",
-        ui::dim("→"),
-        style(dist.display().to_string()).underlined(),
-        style("chrome://extensions").cyan()
-    );
+    match browser {
+        Some(BrowserTarget::Firefox) => eprintln!(
+            "  {} load {} in {}",
+            ui::dim("→"),
+            style(dist.join("manifest.json").display().to_string()).underlined(),
+            style("about:debugging#/runtime/this-firefox").cyan()
+        ),
+        _ => eprintln!(
+            "  {} load {} in {}",
+            ui::dim("→"),
+            style(dist.display().to_string()).underlined(),
+            style("chrome://extensions").cyan()
+        ),
+    }
     ui::done_in(t0.elapsed());
 }
 
@@ -532,14 +579,14 @@ fn load_extension_manifest(
 }
 
 pub(crate) fn build_app_path(app_path: &Path) {
-    build_extension(app_path, false);
+    build_extension(app_path, false, None);
 }
 
 pub(crate) fn build_app_target(
     app_path: &Path,
     manifest: &crepuscularity_webext::ExtensionManifest,
 ) {
-    build_extension_with_manifest(app_path, manifest.clone(), false);
+    build_extension_with_manifest(app_path, manifest.clone(), false, None);
 }
 
 fn build_wasm_runtime(app_path: &Path, runtime_dir: &Path, vendor_dir: &Path) {
@@ -745,9 +792,12 @@ fn prerender_popup_html(
 
 // ── manifest ──────────────────────────────────────────────────────────────────
 
-fn print_manifest(app_path: &Path) {
+fn print_manifest(app_path: &Path, browser: Option<BrowserTarget>) {
     let manifest = load_extension_manifest(app_path, None);
-    println!("{}", manifest.to_manifest_v3_json());
+    match browser {
+        Some(target) => println!("{}", manifest.to_manifest_v3_json_for_browser(target)),
+        None => println!("{}", manifest.to_manifest_v3_json()),
+    }
 }
 
 #[cfg(test)]
@@ -1121,7 +1171,7 @@ fn inject_dev_content_script(manifest_json: &str) -> String {
     manifest_json.to_string()
 }
 
-fn watch_and_reload(app_path: &Path) {
+fn watch_and_reload(app_path: &Path, browser: Option<BrowserTarget>) {
     use console::style;
     use notify::Watcher;
     use std::sync::atomic::{AtomicU64, Ordering};
@@ -1131,7 +1181,10 @@ fn watch_and_reload(app_path: &Path) {
     eprintln!("  {}", style("watching for changes — Ctrl+C to stop").dim());
 
     let reload_id = AtomicU64::new(1);
-    let src_dir = app_path.join("dist/unpacked/src");
+    let src_dir = match browser {
+        Some(target) => app_path.join("dist").join(target.dist_dir()).join("src"),
+        None => app_path.join("dist/unpacked/src"),
+    };
     let _ = std::fs::write(src_dir.join(".reload-id"), "1");
 
     let (tx, rx) = channel();
@@ -1180,7 +1233,7 @@ fn watch_and_reload(app_path: &Path) {
         eprintln!();
         let sp = ui::spinner("rebuilding");
         let t0 = std::time::Instant::now();
-        build_extension(app_path, true);
+        build_extension(app_path, true, browser);
         sp.finish_and_clear();
 
         let id = reload_id.fetch_add(1, Ordering::SeqCst);
