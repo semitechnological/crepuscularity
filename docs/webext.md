@@ -4,7 +4,7 @@
 
 > **Repository-only detail:** Extended web + webext notes for compiler authors live in [`CREPUS_WEB_IMPLEMENTATION_SPEC.md` on GitHub](https://github.com/tschk/crepuscularity/blob/main/docs/CREPUS_WEB_IMPLEMENTATION_SPEC.md) (see **§9** for MV3). This file is not part of the published docs site.
 
-The `crepuscularity-webext` crate provides support for building Chrome/Firefox extensions with Manifest V3.
+The `crepuscularity-webext` crate provides support for building Chromium and Firefox extensions with Manifest V3.
 
 ## Quick Start
 
@@ -13,6 +13,9 @@ crepus webext new my-extension
 cd my-extension
 crepus build
 # Load dist/unpacked/ in chrome://extensions
+
+crepus webext build --browser firefox
+# Load dist/firefox/manifest.json in about:debugging#/runtime/this-firefox
 ```
 
 ## Configuration
@@ -76,6 +79,7 @@ The CLI generates a Chrome Manifest V3 from `crepus.toml`:
 
 ```bash
 crepus webext manifest
+crepus webext manifest --browser firefox
 ```
 
 Output:
@@ -100,6 +104,14 @@ Output:
   }
 }
 ```
+
+`crepus webext build --browser chromium` writes `dist/chromium/`; `--browser firefox` writes `dist/firefox/`. Without `--browser`, the default remains `dist/unpacked/` for the existing Chromium load flow.
+
+## Positioning
+
+Crepuscularity is not trying to be only an extension framework. Treat webext as the browser-extension target inside a broader `.crepus` systems UI pipeline: the same source language can also target GPUI, Ratatui, web output, View IR for native shells, embedded framebuffers, and LVGL Pro.
+
+Oxichrome is stronger when the job is “write the whole extension as a Leptos-style Rust app with proc-macro entrypoints.” Crepuscularity should compete where the target is “React Native on steroids”: one compact UI language, Rust-owned build/runtime plumbing, and multiple non-browser surfaces from the same template model. The webext target should keep improving around typed browser APIs, generated entrypoint glue, and browser-specific bundles while preserving least-privilege manifests.
 
 ## WASM Runtime
 

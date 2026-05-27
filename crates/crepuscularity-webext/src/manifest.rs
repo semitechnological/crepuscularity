@@ -7,6 +7,37 @@ use serde::{Deserialize, Serialize};
 
 use crate::capabilities::{Capability, CapabilitySet};
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum BrowserTarget {
+    #[default]
+    Chromium,
+    Firefox,
+}
+
+impl BrowserTarget {
+    pub fn parse(value: &str) -> Option<Self> {
+        match value {
+            "chromium" | "chrome" | "edge" | "brave" | "opera" => Some(Self::Chromium),
+            "firefox" | "gecko" => Some(Self::Firefox),
+            _ => None,
+        }
+    }
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Chromium => "chromium",
+            Self::Firefox => "firefox",
+        }
+    }
+
+    pub fn dist_dir(self) -> &'static str {
+        match self {
+            Self::Chromium => "chromium",
+            Self::Firefox => "firefox",
+        }
+    }
+}
+
 /// Error type for manifest operations.
 #[derive(Debug)]
 pub enum ManifestError {
@@ -256,6 +287,8 @@ pub struct ManifestV3 {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub background: Option<BackgroundSpec>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub browser_specific_settings: Option<BrowserSpecificSettings>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub action: Option<ActionSpec>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub options_page: Option<String>,
@@ -315,9 +348,22 @@ pub struct ContentSecurityPolicy {
 /// Background service worker specification.
 #[derive(Clone, Debug, Serialize)]
 pub struct BackgroundSpec {
-    pub service_worker: String,
-    #[serde(rename = "type")]
-    pub kind: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub service_worker: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub scripts: Vec<String>,
+    #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
+    pub kind: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct BrowserSpecificSettings {
+    pub gecko: GeckoSettings,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct GeckoSettings {
+    pub id: String,
 }
 
 /// Browser action (toolbar button) specification.
@@ -354,6 +400,10 @@ pub struct WebAccessibleResources {
 impl ManifestV3 {
     /// Create a ManifestV3 from an ExtensionManifest.
     pub fn from_manifest(manifest: &ExtensionManifest) -> Self {
+        Self::from_manifest_for_browser(manifest, BrowserTarget::Chromium)
+    }
+
+    pub fn from_manifest_for_browser(manifest: &ExtensionManifest, browser: BrowserTarget) -> Self {
         let caps = manifest.to_capability_set();
         let opts = &manifest.options;
 
@@ -446,14 +496,23 @@ impl ManifestV3 {
         };
 
         // Background
+        let background_script = opts
+            .background_script
+            .clone()
+            .unwrap_or_else(|| "src/background.js".to_string());
         let background = if manifest.capabilities.background_script {
-            Some(BackgroundSpec {
-                service_worker: opts
-                    .background_script
-                    .clone()
-                    .unwrap_or_else(|| "src/background.js".to_string()),
-                kind: "module".to_string(),
-            })
+            match browser {
+                BrowserTarget::Chromium => Some(BackgroundSpec {
+                    service_worker: Some(background_script),
+                    scripts: Vec::new(),
+                    kind: Some("module".to_string()),
+                }),
+                BrowserTarget::Firefox => Some(BackgroundSpec {
+                    service_worker: None,
+                    scripts: vec![background_script],
+                    kind: None,
+                }),
+            }
         } else {
             None
         };
@@ -526,6 +585,17 @@ impl ManifestV3 {
                     .to_string(),
             }),
             background,
+            browser_specific_settings: match browser {
+                BrowserTarget::Chromium => None,
+                BrowserTarget::Firefox => Some(BrowserSpecificSettings {
+                    gecko: GeckoSettings {
+                        id: format!(
+                            "{}@crepuscularity.dev",
+                            gecko_slug(&manifest.extension.name)
+                        ),
+                    },
+                }),
+            },
             action,
             options_page: if opts.options_ui.is_some() {
                 None
@@ -547,6 +617,28 @@ impl ManifestV3 {
     /// Serialize to pretty-printed JSON.
     pub fn to_json(&self) -> String {
         serde_json::to_string_pretty(self).expect("ManifestV3 serialization failed")
+    }
+}
+
+fn gecko_slug(name: &str) -> String {
+    let mut out = String::new();
+    let mut last_dash = false;
+    for ch in name.chars().flat_map(char::to_lowercase) {
+        if ch.is_ascii_alphanumeric() {
+            out.push(ch);
+            last_dash = false;
+        } else if !last_dash && !out.is_empty() {
+            out.push('-');
+            last_dash = true;
+        }
+    }
+    while out.ends_with('-') {
+        out.pop();
+    }
+    if out.is_empty() {
+        "extension".to_string()
+    } else {
+        out
     }
 }
 
@@ -710,9 +802,17 @@ impl ExtensionManifest {
         ManifestV3::from_manifest(self)
     }
 
+    pub fn to_manifest_v3_for_browser(&self, browser: BrowserTarget) -> ManifestV3 {
+        ManifestV3::from_manifest_for_browser(self, browser)
+    }
+
     /// Generate a full MV3 manifest as JSON string.
     pub fn to_manifest_v3_json(&self) -> String {
         self.to_manifest_v3().to_json()
+    }
+
+    pub fn to_manifest_v3_json_for_browser(&self, browser: BrowserTarget) -> String {
+        self.to_manifest_v3_for_browser(browser).to_json()
     }
 }
 
@@ -964,6 +1064,37 @@ alarms = true
         let mv3 = manifest.to_manifest_v3();
         assert!(mv3.permissions.contains(&"nativeMessaging".to_string()));
         assert!(mv3.permissions.contains(&"alarms".to_string()));
+    }
+
+    #[test]
+    fn firefox_manifest_uses_scripts_background_and_gecko_id() {
+        let manifest = ExtensionManifest {
+            extension: ExtensionInfo {
+                name: "Test Extension".to_string(),
+                version: "1.0.0".to_string(),
+                description: None,
+                author: None,
+                homepage: None,
+                minimum_chrome_version: None,
+            },
+            capabilities: CapabilitiesSection {
+                background_script: true,
+                ..Default::default()
+            },
+            content_scripts: vec![],
+            plugins: HashMap::new(),
+            options: ManifestOptions::default(),
+            web_accessible_resources: WebAccessibleResourcesOptions::default(),
+            commands: BTreeMap::new(),
+            chrome_url_overrides: BTreeMap::new(),
+        };
+
+        let json = manifest.to_manifest_v3_json_for_browser(BrowserTarget::Firefox);
+        assert!(json.contains("\"scripts\": ["));
+        assert!(json.contains("\"src/background.js\""));
+        assert!(json.contains("\"browser_specific_settings\""));
+        assert!(json.contains("\"test-extension@crepuscularity.dev\""));
+        assert!(!json.contains("\"service_worker\""));
     }
 
     #[test]
