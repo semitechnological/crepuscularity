@@ -2,7 +2,7 @@
 
 > **Stability:** This project is **unstable** and in active development. APIs, CLI flags, and template semantics may change without a semver-major release until **1.0**. Pin exact dependency versions and expect occasional breakage.
 
-The first GPUI component and runtime system with hot reloading, and the first non-web-language, plug-and-play browser extension framework. It also ships a Ratatui terminal backend and a GPUI desktop shell with an embedded V8 bridge for Capacitor-shaped native plugins.
+A GPUI component and runtime system with hot reloading, plus a Rust-owned template pipeline that also targets browser extensions, Ratatui terminal UIs, web output, native mobile shells, embedded panels, and LVGL Pro. It also ships a GPUI desktop shell with an embedded V8 bridge for Capacitor-shaped native plugins.
 
 Write UI in a concise, indentation-based template DSL (`.crepus` files). Templates compile at build time via the `view!` macro or render at runtime with full hot-reload support. The same `.crepus` syntax drives native desktop (GPUI), terminal UIs (Ratatui), browser extensions (MV3), HTML output, and React/JSX — and is the foundation for native mobile backends targeting SwiftUI and Jetpack Compose.
 
@@ -11,7 +11,7 @@ Use [Aurorality](https://github.com/tschk/aurorality) for united SwiftUI macOS +
 ## Why Crepuscularity
 
 - **First GPUI component system with hot reload** — live template updates without recompiling; no other GPUI framework offers this
-- **First plug-and-play browser extension framework in Rust** — write your popup/background/content scripts in `.crepus`, get a MV3-compliant extension bundle out; no JavaScript framework or bundler required
+- **Rust-owned MV3 extension target** — write popup, background, and content-script surfaces in `.crepus`, then emit a compliant extension bundle without adopting a JavaScript framework or app bundler as the primary authoring model
 - **One syntax, multiple backends** — the same template works across GPUI (native desktop), HTML, React/JSX, and browser extensions today; **`crepuscularity-native`** lowers `.crepus` to JSON **View IR** for SwiftUI / Jetpack Compose shells (see [`examples/native-shells`](examples/native-shells/README.md))
 - **Polyglot plugin contract** — host languages consume View IR JSON through `crepus native ir` or the optional `crepuscularity-abi` C session API, then create UI from the typed node tree; drop-in reference packages and native workspace files live under [`plugins/`](plugins/README.md)
 - **Terminal UIs without a second UI language** — **`crepuscularity-tui`** maps `.crepus` elements, includes, slots, control flow, and Tailwind-style terminal classes onto Ratatui frames
