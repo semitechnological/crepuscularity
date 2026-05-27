@@ -596,7 +596,6 @@ pub(crate) fn build_site_wasm(cli: &WebBuildArgs) {
     std::fs::write(b.out_dir.join("index.html"), index_html).unwrap_or_else(|e| {
         ui::error(&format!("write index.html: {e}"));
     });
-    write_seo_files(&b.out_dir, &head);
     std::fs::write(b.out_dir.join("app.js"), WEB_APP_JS).unwrap_or_else(|e| {
         ui::error(&format!("write app.js: {e}"));
     });
@@ -631,6 +630,8 @@ pub(crate) fn build_site_wasm(cli: &WebBuildArgs) {
     if let Err(e) = crate::web_islands::build_web_islands(&b.site_dir, &b.out_dir, &files) {
         ui::error(&e);
     }
+
+    write_seo_files(&b.out_dir, &head);
 
     {
         let sp = ui::spinner("compiling site WASM (wasm32-unknown-unknown)");
@@ -1126,7 +1127,8 @@ fn write_seo_files(out_dir: &Path, head: &SiteHead) {
     let seo = &head.seo;
     if let Some(sitemap) = &seo.sitemap {
         if sitemap.enabled {
-            if let Some(xml) = render_sitemap_xml(sitemap) {
+            let discovered_paths = discover_html_sitemap_paths(out_dir);
+            if let Some(xml) = render_sitemap_xml(sitemap, &discovered_paths) {
                 std::fs::write(out_dir.join("sitemap.xml"), xml)
                     .unwrap_or_else(|e| ui::error(&format!("write sitemap.xml: {e}")));
             }
@@ -1172,13 +1174,21 @@ fn render_robots_txt(
     lines.join("\n")
 }
 
-fn render_sitemap_xml(sitemap: &crate::crepus_toml::SitemapConfig) -> Option<String> {
+fn render_sitemap_xml(
+    sitemap: &crate::crepus_toml::SitemapConfig,
+    discovered_paths: &[String],
+) -> Option<String> {
     let base = sitemap.base_url.as_ref()?.trim_end_matches('/').to_string();
-    let paths = if sitemap.paths.is_empty() {
+    let mut paths = if sitemap.paths.is_empty() {
         vec!["/".to_string()]
     } else {
         sitemap.paths.clone()
     };
+    for path in discovered_paths {
+        if !paths.iter().any(|known| known == path) {
+            paths.push(path.clone());
+        }
+    }
     let mut out = String::from(
         r#"<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
@@ -1205,6 +1215,43 @@ fn render_sitemap_xml(sitemap: &crate::crepus_toml::SitemapConfig) -> Option<Str
     }
     out.push_str("</urlset>\n");
     Some(out)
+}
+
+fn discover_html_sitemap_paths(out_dir: &Path) -> Vec<String> {
+    let mut paths = Vec::new();
+    collect_html_sitemap_paths(out_dir, out_dir, &mut paths);
+    paths.sort();
+    paths
+}
+
+fn collect_html_sitemap_paths(base: &Path, dir: &Path, paths: &mut Vec<String>) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            collect_html_sitemap_paths(base, &path, paths);
+            continue;
+        }
+        if path.extension().and_then(|ext| ext.to_str()) != Some("html") {
+            continue;
+        }
+        let Ok(rel) = path.strip_prefix(base) else {
+            continue;
+        };
+        let rel = rel.to_string_lossy().replace('\\', "/");
+        let route = if rel == "index.html" {
+            "/".to_string()
+        } else if let Some(prefix) = rel.strip_suffix("/index.html") {
+            format!("/{prefix}/")
+        } else {
+            format!("/{rel}")
+        };
+        if !paths.iter().any(|known| known == &route) {
+            paths.push(route);
+        }
+    }
 }
 
 fn escape_html_attr(s: &str) -> String {
@@ -1565,5 +1612,26 @@ mod tests {
         assert!(sitemap.contains("<loc>https://example.com/docs/</loc>"));
         assert!(sitemap.contains("<changefreq>weekly</changefreq>"));
         assert!(sitemap.contains("<priority>0.8</priority>"));
+    }
+
+    #[test]
+    fn sitemap_includes_discovered_html_when_enabled() {
+        let mut head = seo_head();
+        head.seo.sitemap = Some(crate::crepus_toml::SitemapConfig {
+            enabled: true,
+            base_url: Some("https://example.com".into()),
+            paths: vec!["/".into()],
+            changefreq: None,
+            priority: None,
+        });
+        let tmp = tempfile::tempdir().expect("tempdir");
+        std::fs::create_dir_all(tmp.path().join("docs")).expect("docs dir");
+        std::fs::write(tmp.path().join("docs/cli.html"), "").expect("cli");
+        std::fs::write(tmp.path().join("docs/runtime.html"), "").expect("runtime");
+        write_seo_files(tmp.path(), &head);
+        let sitemap = std::fs::read_to_string(tmp.path().join("sitemap.xml")).expect("sitemap");
+        assert!(sitemap.contains("<loc>https://example.com/</loc>"));
+        assert!(sitemap.contains("<loc>https://example.com/docs/cli.html</loc>"));
+        assert!(sitemap.contains("<loc>https://example.com/docs/runtime.html</loc>"));
     }
 }

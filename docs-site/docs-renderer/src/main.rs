@@ -10,6 +10,8 @@ use serde::Deserialize;
 use serde_json::json;
 
 const DOCS_SEARCH_JS: &str = include_str!("docs_search.js");
+const SITE_BASE_URL: &str = "https://crepuscularity.undivisible.dev";
+const SITE_IMAGE_URL: &str = "https://crepuscularity.undivisible.dev/static/og.png";
 
 /// Theme variables mirrored from `site.json` for doc shells.
 #[derive(Clone, Debug, Deserialize)]
@@ -26,6 +28,14 @@ struct DocNavItem {
     stem: String,
     title: String,
     href: String,
+}
+
+struct DocShellMeta<'a> {
+    page_title: &'a str,
+    description: &'a str,
+    canonical_url: &'a str,
+    article: bool,
+    wide: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -119,14 +129,21 @@ pub fn emit_markdown_docs(
     }
 
     let index_body = render_docs_landing_body(site_name, &items);
+    let index_description =
+        "Guides and references for the .crepus DSL, native and WASM renderers, and the crepus CLI.";
     let index_html = render_doc_shell(
         site_name,
-        "Documentation",
+        DocShellMeta {
+            page_title: "Documentation",
+            description: index_description,
+            canonical_url: &format!("{SITE_BASE_URL}/docs/"),
+            article: false,
+            wide: true,
+        },
         theme,
         &render_nav_list(&items, Some("index.html")),
         "",
         &index_body,
-        true,
     );
     fs::write(out_docs_dir.join("index.html"), index_html)?;
 
@@ -140,6 +157,8 @@ pub fn emit_markdown_docs(
         let raw = fs::read_to_string(path)?;
         let plain = strip_markdown_plain(&raw);
         let text: String = plain.chars().take(480).collect();
+        let description = first_markdown_description(&raw, doc_blurb_plain(&item.stem));
+        let canonical_url = format!("{SITE_BASE_URL}/docs/{}", item.href);
         search_entries.push(json!({
             "title": &item.title,
             "href": &item.href,
@@ -153,12 +172,17 @@ pub fn emit_markdown_docs(
         let nav = render_nav_list(&items, Some(&item.href));
         let doc_html = render_doc_shell(
             site_name,
-            &item.title,
+            DocShellMeta {
+                page_title: &item.title,
+                description: &description,
+                canonical_url: &canonical_url,
+                article: true,
+                wide: false,
+            },
             theme,
             &nav,
             &toc,
             &format!(r#"<article class="prose">{body_html}</article>"#),
-            false,
         );
         fs::write(out_docs_dir.join(&item.href), doc_html)?;
     }
@@ -218,7 +242,11 @@ fn render_docs_landing_body(site_name: &str, items: &[DocNavItem]) -> String {
 }
 
 fn doc_blurb(stem: &str) -> String {
-    escape_html(match stem {
+    escape_html(doc_blurb_plain(stem))
+}
+
+fn doc_blurb_plain(stem: &str) -> &'static str {
+    match stem {
         "dsl" => "Indent and JSX-style syntax, control flow, attributes, animations.",
         "components" => "include, slots, defaults, and multi-component files.",
         "cli" => "new, dev, build, web, webext, preview, and more.",
@@ -229,7 +257,7 @@ fn doc_blurb(stem: &str) -> String {
         "native" => "SwiftUI and Jetpack Compose shells from View IR.",
         "tui" => "terminal UI rendering from .crepus templates.",
         _ => "Documentation page.",
-    })
+    }
 }
 
 fn first_markdown_title(md: &str) -> Option<String> {
@@ -243,6 +271,70 @@ fn first_markdown_title(md: &str) -> Option<String> {
         }
     }
     None
+}
+
+fn first_markdown_description(md: &str, fallback: &str) -> String {
+    let mut paragraph = Vec::new();
+    let mut in_fence = false;
+    for line in md.lines() {
+        let t = line.trim();
+        if t.starts_with("```") {
+            in_fence = !in_fence;
+            continue;
+        }
+        if in_fence {
+            continue;
+        }
+        if t.is_empty() {
+            if !paragraph.is_empty() {
+                break;
+            }
+            continue;
+        }
+        if t.starts_with('#') {
+            continue;
+        }
+        let cleaned = clean_markdown_inline(t);
+        if cleaned.starts_with("Also:") {
+            continue;
+        }
+        paragraph.push(t);
+    }
+    let raw = if paragraph.is_empty() {
+        fallback.to_string()
+    } else {
+        paragraph.join(" ")
+    };
+    clean_markdown_inline(&raw)
+}
+
+fn clean_markdown_inline(s: &str) -> String {
+    let mut out = String::new();
+    let mut chars = s.chars().peekable();
+    while let Some(c) = chars.next() {
+        match c {
+            '`' | '*' | '_' => {}
+            '[' => {
+                let mut text = String::new();
+                for next in chars.by_ref() {
+                    if next == ']' {
+                        break;
+                    }
+                    text.push(next);
+                }
+                if chars.peek() == Some(&'(') {
+                    for next in chars.by_ref() {
+                        if next == ')' {
+                            break;
+                        }
+                    }
+                }
+                out.push_str(&text);
+            }
+            _ => out.push(c),
+        }
+    }
+    out.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
 fn prettify_stem(stem: &str) -> String {
@@ -443,16 +535,40 @@ fn render_nav_list(items: &[DocNavItem], active_href: Option<&str>) -> String {
 
 fn render_doc_shell(
     site_name: &str,
-    page_title: &str,
+    meta: DocShellMeta<'_>,
     theme: &DocsSiteTheme,
     nav: &str,
     page_toc: &str,
     main_inner: &str,
-    wide: bool,
 ) -> String {
     let esc_site = escape_html(site_name);
-    let esc_page = escape_html(page_title);
-    let main_cls = if wide {
+    let esc_page = escape_html(meta.page_title);
+    let full_title = format!("{} — {site_name}", meta.page_title);
+    let esc_full_title = escape_html(&full_title);
+    let esc_description = escape_html_attr(meta.description);
+    let esc_canonical = escape_html_attr(meta.canonical_url);
+    let schema_type = if meta.article {
+        "TechArticle"
+    } else {
+        "CollectionPage"
+    };
+    let og_type = if meta.article { "article" } else { "website" };
+    let json_ld = json!({
+        "@context": "https://schema.org",
+        "@type": schema_type,
+        "headline": meta.page_title,
+        "name": meta.page_title,
+        "description": meta.description,
+        "url": meta.canonical_url,
+        "image": SITE_IMAGE_URL,
+        "isPartOf": {
+            "@type": "WebSite",
+            "name": site_name,
+            "url": SITE_BASE_URL
+        }
+    })
+    .to_string();
+    let main_cls = if meta.wide {
         "doc-main doc-main--wide"
     } else {
         "doc-main"
@@ -461,10 +577,26 @@ fn render_doc_shell(
         r#"<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{esc_page} — {esc_site}</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
+	  <meta charset="utf-8">
+	  <meta name="viewport" content="width=device-width, initial-scale=1">
+	  <title>{esc_page} — {esc_site}</title>
+	  <meta name="description" content="{esc_description}">
+	  <link rel="canonical" href="{esc_canonical}">
+	  <meta name="robots" content="index,follow">
+	  <meta name="theme-color" content="{s}">
+	  <meta property="og:title" content="{esc_full_title}">
+	  <meta property="og:description" content="{esc_description}">
+	  <meta property="og:type" content="{og_type}">
+	  <meta property="og:url" content="{esc_canonical}">
+	  <meta property="og:site_name" content="{esc_site}">
+	  <meta property="og:image" content="{SITE_IMAGE_URL}">
+	  <meta property="og:image:alt" content="Crepuscularity interface preview">
+	  <meta name="twitter:card" content="summary_large_image">
+	  <meta name="twitter:title" content="{esc_full_title}">
+	  <meta name="twitter:description" content="{esc_description}">
+	  <meta name="twitter:image" content="{SITE_IMAGE_URL}">
+	  <script type="application/ld+json">{json_ld}</script>
+	  <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
@@ -1029,15 +1161,46 @@ mod tests {
     }
 
     #[test]
+    fn emitted_docs_pages_include_page_specific_seo() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let docs_src = tmp.path().join("docs");
+        let out_docs = tmp.path().join("dist/docs");
+        fs::create_dir_all(&docs_src).expect("mkdir docs");
+        fs::write(
+            docs_src.join("cli.md"),
+            "# CLI Guide\n\n**Also:** [Documentation home](README.md) · [DSL](dsl.md)\n\nBuild static WASM sites, browser extensions, native IR, and docs from one Crepuscularity manifest.\n\n## Usage\n\nRun `crepus web build`.",
+        )
+        .expect("write doc");
+
+        emit_markdown_docs(&docs_src, &out_docs, &theme(), "Crepuscularity").expect("emit docs");
+
+        let html = fs::read_to_string(out_docs.join("cli.html")).expect("cli html");
+        assert!(html.contains(r#"<title>CLI Guide — Crepuscularity</title>"#));
+        assert!(html.contains(r#"<meta name="description" content="Build static WASM sites, browser extensions, native IR, and docs from one Crepuscularity manifest.">"#));
+        assert!(html.contains(
+            r#"<link rel="canonical" href="https://crepuscularity.undivisible.dev/docs/cli.html">"#
+        ));
+        assert!(html.contains(r#"<meta property="og:title" content="CLI Guide — Crepuscularity">"#));
+        assert!(html.contains(r#"<meta property="og:url" content="https://crepuscularity.undivisible.dev/docs/cli.html">"#));
+        assert!(html.contains(r#"<meta name="twitter:card" content="summary_large_image">"#));
+        assert!(html.contains(r#""@type":"TechArticle""#));
+    }
+
+    #[test]
     fn mobile_docs_nav_uses_single_borderless_overlay_toggle() {
         let html = render_doc_shell(
             "Crepuscularity",
-            "Docs",
+            DocShellMeta {
+                page_title: "Docs",
+                description: "Documentation for Crepuscularity.",
+                canonical_url: "https://crepuscularity.undivisible.dev/docs/",
+                article: false,
+                wide: false,
+            },
             &theme(),
             "<ul class=\"doc-nav\"><li><a href=\"index.html\">Docs</a></li></ul>",
             "",
             "<article class=\"prose\"><h1>Docs</h1></article>",
-            false,
         );
 
         assert!(html.contains(".doc-nav-toggle {\n      appearance: none;\n      border: 0;"));
