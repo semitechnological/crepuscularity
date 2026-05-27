@@ -138,6 +138,10 @@ crepus webext new <name>             # Alias for crepus init webext <name>
 crepus webext build [--app PATH]     # Build to dist/unpacked/ (WASM + manifest + popup pre-render)
 crepus webext manifest               # Print manifest.json
 
+crepus aurora dev [--watch DIR]      # SwiftUI hot-reload dev server (via Aurorality)
+crepus aurora build [--watch DIR]    # Compile .crepus → View IR JSON
+crepus aurora new <name>             # Scaffold SwiftUI + Rust project
+
 crepus ios new <name>                # Alias for crepus init ios <name>
 crepus ios generate [--dir]          # Run xcodegen (finds crepus.toml [ios] upward)
 crepus ios build [--dir] [...]       # Simulator build via xcodebuild
