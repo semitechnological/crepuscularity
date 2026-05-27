@@ -3,7 +3,7 @@ use std::process::{exit, Command};
 use console::style;
 
 pub fn run(args: &[String]) {
-    if args.is_empty() || args.first().map_or(false, |a| a == "--help" || a == "-h") {
+    if args.is_empty() || args.first().is_some_and(|a| a == "--help" || a == "-h") {
         print_usage();
         return;
     }

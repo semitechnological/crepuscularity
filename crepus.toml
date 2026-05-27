@@ -103,15 +103,15 @@ canonical = "https://crepuscularity.undivisible.dev/"
 site_name = "Crepuscularity"
 locale = "en_US"
 type = "website"
-image = "https://crepuscularity.undivisible.dev/static/favicon.svg"
-image_alt = "Crepuscularity logo"
+image = "https://crepuscularity.undivisible.dev/static/og.png"
+image_alt = "Crepuscularity UI templates preview"
 keywords = ["Rust UI", "GPUI", "WASM", "browser extensions", "Ratatui", "embedded UI", "LVGL"]
 author = "AJ Stafford"
 robots = "index,follow"
 theme_color = "#0c0612"
 application_name = "Crepuscularity"
 generator = "crepuscularity"
-twitter_card = "summary"
+twitter_card = "summary_large_image"
 json_ld = [
   """{"@context":"https://schema.org","@type":"SoftwareSourceCode","name":"Crepuscularity","codeRepository":"https://github.com/tschk/crepuscularity","programmingLanguage":"Rust","url":"https://crepuscularity.undivisible.dev/"}"""
 ]
