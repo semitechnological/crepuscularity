@@ -20,7 +20,10 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use crate::ui;
-use crate::wasm_bundle::{cargo_build_wasm32, find_wasm_file, run_wasm_bindgen, wasm_release_dirs};
+use crate::wasm_bundle::{
+    cargo_build_wasm32, find_wasm_file, run_wasm_bindgen, run_wasm_opt, wasm_release_dirs,
+    WasmOptStatus,
+};
 use crate::web_serve::ServeOptions;
 
 const WEB_INDEX_HTML: &str = include_str!("../assets/web/index.html");
@@ -665,6 +668,24 @@ pub(crate) fn build_site_wasm(cli: &WebBuildArgs) {
                     ui::error("wasm-bindgen not found — install: cargo install wasm-bindgen-cli");
                 }
                 ui::error(&format!("wasm-bindgen: {err}"));
+            }
+        }
+    }
+
+    {
+        let wasm = pkg_dir.join("runtime_bg.wasm");
+        if wasm.is_file() {
+            let sp = ui::spinner("optimizing release WASM");
+            match run_wasm_opt(&wasm) {
+                Ok(WasmOptStatus::Optimized) => ui::spinner_ok(&sp, "release WASM optimized"),
+                Ok(WasmOptStatus::NotInstalled) => {
+                    sp.finish_and_clear();
+                    ui::warning("wasm-opt not found — install Binaryen to optimize release WASM");
+                }
+                Err(err) => {
+                    sp.finish_and_clear();
+                    ui::warning(&format!("wasm-opt failed: {err}"));
+                }
             }
         }
     }

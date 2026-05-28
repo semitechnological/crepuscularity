@@ -6,7 +6,10 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use crate::ui;
-use crate::wasm_bundle::{cargo_build_wasm32, find_wasm_file, run_wasm_bindgen, wasm_release_dirs};
+use crate::wasm_bundle::{
+    cargo_build_wasm32, find_wasm_file, run_wasm_bindgen, run_wasm_opt, wasm_release_dirs,
+    WasmOptStatus,
+};
 use crepuscularity_webext::BrowserTarget;
 
 // ── Entry point ──────────────────────────────────────────────────────────────
@@ -465,7 +468,7 @@ fn build_extension_inner(
     // ── Step 3: WASM runtime ─────────────────────────────────────────────────
     let runtime_dir = app_path.join("runtime");
     if runtime_dir.exists() {
-        build_wasm_runtime(app_path, &runtime_dir, &vendor_dir);
+        build_wasm_runtime(app_path, &runtime_dir, &vendor_dir, !dev);
     } else {
         ui::warning("no runtime/ directory — skipping WASM compile");
         ui::warning("run `crepus webext new` to scaffold a full project");
@@ -589,7 +592,7 @@ pub(crate) fn build_app_target(
     build_extension_with_manifest(app_path, manifest.clone(), false, None);
 }
 
-fn build_wasm_runtime(app_path: &Path, runtime_dir: &Path, vendor_dir: &Path) {
+fn build_wasm_runtime(app_path: &Path, runtime_dir: &Path, vendor_dir: &Path, optimize: bool) {
     {
         let sp = ui::spinner("compiling WASM runtime");
         match cargo_build_wasm32(runtime_dir) {
@@ -639,6 +642,24 @@ fn build_wasm_runtime(app_path: &Path, runtime_dir: &Path, vendor_dir: &Path) {
                         eprintln!("    {}", style(line).dim());
                     }
                     ui::warning("install wasm-bindgen-cli: cargo install wasm-bindgen-cli");
+                }
+            }
+        }
+    }
+
+    if optimize {
+        let wasm = vendor_dir.join("runtime_bg.wasm");
+        if wasm.is_file() {
+            let sp = ui::spinner("optimizing release WASM");
+            match run_wasm_opt(&wasm) {
+                Ok(WasmOptStatus::Optimized) => ui::spinner_ok(&sp, "release WASM optimized"),
+                Ok(WasmOptStatus::NotInstalled) => {
+                    sp.finish_and_clear();
+                    ui::warning("wasm-opt not found — install Binaryen to optimize release WASM");
+                }
+                Err(err) => {
+                    sp.finish_and_clear();
+                    ui::warning(&format!("wasm-opt failed: {err}"));
                 }
             }
         }

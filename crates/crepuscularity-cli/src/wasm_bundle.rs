@@ -149,3 +149,35 @@ pub fn run_wasm_bindgen(wasm_path: &Path, out_dir: &Path, out_name: &str) -> Res
         Err(String::from_utf8_lossy(&out.stderr).into_owned())
     }
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WasmOptStatus {
+    Optimized,
+    NotInstalled,
+}
+
+pub fn run_wasm_opt(wasm_path: &Path) -> Result<WasmOptStatus, String> {
+    let available = Command::new("wasm-opt")
+        .arg("--version")
+        .output()
+        .ok()
+        .is_some_and(|o| o.status.success());
+    if !available {
+        return Ok(WasmOptStatus::NotInstalled);
+    }
+
+    let tmp = wasm_path.with_extension("wasm.opt");
+    let out = Command::new("wasm-opt")
+        .args(["-O2", "--enable-bulk-memory"])
+        .arg(wasm_path)
+        .arg("-o")
+        .arg(&tmp)
+        .output()
+        .map_err(|e| format!("wasm-opt: {e}"))?;
+    if !out.status.success() {
+        let _ = std::fs::remove_file(&tmp);
+        return Err(String::from_utf8_lossy(&out.stderr).into_owned());
+    }
+    std::fs::rename(&tmp, wasm_path).map_err(|e| format!("replace optimized wasm: {e}"))?;
+    Ok(WasmOptStatus::Optimized)
+}

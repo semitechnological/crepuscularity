@@ -2,7 +2,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use serde_json::Value;
 use wasm_bindgen::prelude::*;
 
-use super::core::{self, Result};
+use super::core::{self, BrowserError, Result};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum StorageAreaName {
@@ -54,6 +54,24 @@ pub fn managed() -> StorageArea {
     StorageArea {
         name: StorageAreaName::Managed,
     }
+}
+
+pub async fn get<T>(key: &str) -> Result<Option<T>>
+where
+    T: DeserializeOwned,
+{
+    local().get_key(key).await
+}
+
+pub async fn set<T>(key: &str, value: &T) -> Result<()>
+where
+    T: Serialize,
+{
+    local().set_key(key, value).await
+}
+
+pub async fn remove(key: &str) -> Result<()> {
+    local().remove(&key).await
 }
 
 impl StorageArea {
@@ -127,6 +145,31 @@ impl StorageArea {
 
     pub async fn get_json(&self, keys: Value) -> Result<Value> {
         self.get(&keys).await
+    }
+
+    pub async fn get_key<T>(&self, key: &str) -> Result<Option<T>>
+    where
+        T: DeserializeOwned,
+    {
+        let values: Value = self.get(&key).await?;
+        match values.get(key) {
+            Some(value) if !value.is_null() => serde_json::from_value(value.clone())
+                .map(Some)
+                .map_err(|error| BrowserError::Serde(error.to_string())),
+            _ => Ok(None),
+        }
+    }
+
+    pub async fn set_key<T>(&self, key: &str, value: &T) -> Result<()>
+    where
+        T: Serialize,
+    {
+        let mut values = serde_json::Map::new();
+        values.insert(
+            key.to_string(),
+            serde_json::to_value(value).map_err(|error| BrowserError::Serde(error.to_string()))?,
+        );
+        self.set(&Value::Object(values)).await
     }
 }
 

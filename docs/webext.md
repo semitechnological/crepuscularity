@@ -130,9 +130,10 @@ pub fn process_data(input: &str) -> String {
 
 Build with:
 ```bash
-cd runtime
-wasm-pack build --target web
+crepus webext build
 ```
+
+Production builds run `wasm-bindgen` and then run `wasm-opt -O2` on `runtime_bg.wasm` when Binaryen is installed. Dev extension builds skip `wasm-opt` so reloads stay fast.
 
 ## Templates
 
@@ -161,6 +162,46 @@ for cap in usage.suggested {
 ```
 
 ## API Reference
+
+### Browser APIs
+
+With the `wasm` feature enabled, `crepuscularity_webext::wasm` exposes async Rust wrappers around the browser namespace. The reference target is the same practical surface Oxichrome documents today: storage, runtime messaging, and tabs.
+
+```rust
+use crepuscularity_webext::wasm::{runtime, storage, tabs};
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize)]
+struct Settings {
+    theme: String,
+}
+
+async fn load_settings() -> crepuscularity_webext::wasm::Result<Option<Settings>> {
+    storage::get("settings").await
+}
+
+async fn save_settings(settings: &Settings) -> crepuscularity_webext::wasm::Result<()> {
+    storage::set("settings", settings).await
+}
+
+async fn open_docs() -> crepuscularity_webext::wasm::Result<()> {
+    let _tab = tabs::create(&tabs::CreateProperties {
+        url: Some(runtime::get_url("docs.html")?),
+        active: Some(true),
+        ..Default::default()
+    })
+    .await?;
+    Ok(())
+}
+```
+
+Use area-specific storage when needed:
+
+```rust
+let count: Option<i32> = storage::sync().get_key("count").await?;
+storage::session().set_key("draft", &serde_json::json!({"open": true})).await?;
+storage::remove("settings").await?;
+```
 
 ### BrowserProgram
 
