@@ -9,6 +9,7 @@ use std::sync::{Arc, Mutex};
 
 use serde::Deserialize;
 
+use crate::build_options::BuildOptions;
 use crate::hud::{BuildError, DevStatus, HudState};
 
 // ── Cargo JSON schema ──────────────────────────────────────────────────────
@@ -46,7 +47,11 @@ pub struct BuildOutcome {
 /// Diagnostics are streamed to stderr immediately (ANSI rendered).
 /// Errors are also collected in the returned `BuildOutcome` for the HUD.
 /// `hud` is optional — pass `None` when running outside the dev loop.
-pub fn cargo_build(cwd: &Path, release: bool, hud: Option<Arc<Mutex<HudState>>>) -> BuildOutcome {
+pub fn cargo_build(
+    cwd: &Path,
+    options: BuildOptions,
+    hud: Option<Arc<Mutex<HudState>>>,
+) -> BuildOutcome {
     let mut cmd = Command::new("cargo");
     cmd.arg("build")
         .arg("--message-format=json-diagnostic-rendered-ansi")
@@ -55,7 +60,7 @@ pub fn cargo_build(cwd: &Path, release: bool, hud: Option<Arc<Mutex<HudState>>>)
         .stderr(Stdio::null()) // diagnostics come through JSON stdout
         .env("CARGO_BUILD_INCREMENTAL", "true");
 
-    if release {
+    if options.release() {
         cmd.arg("--release");
     }
 

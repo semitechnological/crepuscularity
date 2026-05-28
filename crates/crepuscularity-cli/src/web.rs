@@ -19,9 +19,10 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
+use crate::build_options::BuildOptions;
 use crate::ui;
 use crate::wasm_bundle::{
-    cargo_build_wasm32, find_wasm_file, run_wasm_bindgen, run_wasm_opt, wasm_release_dirs,
+    cargo_build_wasm32, find_wasm_file, run_wasm_bindgen, run_wasm_opt, wasm_profile_dirs,
     WasmOptStatus,
 };
 use crate::web_serve::ServeOptions;
@@ -210,7 +211,7 @@ fn print_web_usage() {
     );
     eprintln!(
         "  {}  {}",
-        style("build [--site DIR] ...         ").green(),
+        style("build [--site DIR] [--release]").green(),
         style("emit dist/ (HTML shell + WASM + crepus-bundle.json)").dim()
     );
     eprintln!(
@@ -281,6 +282,16 @@ fn print_web_usage() {
         "  {}  {}",
         style("--manifest FILE         ").green(),
         style("crepus.toml path").dim()
+    );
+    eprintln!(
+        "  {}  {}",
+        style("--debug | --dev | --release").green(),
+        style("build mode (default: --debug)").dim()
+    );
+    eprintln!(
+        "  {}  {}",
+        style("--opt-level LEVEL       ").green(),
+        style("none, fast, size, or aggressive").dim()
     );
 }
 
@@ -390,6 +401,7 @@ struct WasmBuildArgs {
     out_dir: PathBuf,
     entry: String,
     meta: Option<crate::crepus_toml::WebTargetMeta>,
+    options: BuildOptions,
 }
 
 pub(crate) struct WebBuildArgs {
@@ -399,6 +411,7 @@ pub(crate) struct WebBuildArgs {
     pub(crate) target_id: Option<String>,
     pub(crate) manifest: Option<PathBuf>,
     pub(crate) meta: Option<crate::crepus_toml::WebTargetMeta>,
+    pub(crate) options: BuildOptions,
 }
 
 fn parse_build_args(args: &[String]) -> WebBuildArgs {
@@ -412,6 +425,7 @@ fn parse_build_args(args: &[String]) -> WebBuildArgs {
     }
 
     let (target_id, manifest) = parse_target_and_manifest(args);
+    let options = BuildOptions::parse_or_exit(args);
 
     let mut site_dir = None;
     let mut out_dir = None;
@@ -456,6 +470,7 @@ fn parse_build_args(args: &[String]) -> WebBuildArgs {
         target_id,
         manifest,
         meta: None,
+        options,
     }
 }
 
@@ -485,6 +500,7 @@ fn resolve_wasm_build_args(args: &WebBuildArgs) -> WasmBuildArgs {
             out_dir,
             entry,
             meta,
+            options: args.options,
         };
     }
 
@@ -499,6 +515,7 @@ fn resolve_wasm_build_args(args: &WebBuildArgs) -> WasmBuildArgs {
             out_dir,
             entry,
             meta: Some(picked.meta),
+            options: args.options,
         };
     }
 
@@ -514,6 +531,7 @@ fn resolve_wasm_build_args(args: &WebBuildArgs) -> WasmBuildArgs {
         out_dir,
         entry,
         meta: args.meta.clone(),
+        options: args.options,
     }
 }
 
@@ -528,9 +546,14 @@ pub(crate) fn build_site_wasm(cli: &WebBuildArgs) {
         ));
     }
 
+    let label = if b.options.release() {
+        "crepus web release"
+    } else {
+        "crepus web debug"
+    };
     eprintln!(
         "{} building WASM site → {}",
-        style("crepus web").dim(),
+        style(label).dim(),
         style(b.out_dir.display().to_string()).cyan()
     );
     eprintln!();
@@ -638,7 +661,7 @@ pub(crate) fn build_site_wasm(cli: &WebBuildArgs) {
 
     {
         let sp = ui::spinner("compiling site WASM (wasm32-unknown-unknown)");
-        match cargo_build_wasm32(&runtime_dir) {
+        match cargo_build_wasm32(&runtime_dir, b.options) {
             Ok(()) => ui::spinner_ok(&sp, "WASM compiled"),
             Err(stderr) => {
                 sp.finish_and_clear();
@@ -651,11 +674,14 @@ pub(crate) fn build_site_wasm(cli: &WebBuildArgs) {
         }
     }
 
-    let (workspace_target, local_target) = wasm_release_dirs(&b.site_dir, &runtime_dir);
+    let (workspace_target, local_target) = wasm_profile_dirs(&b.site_dir, &runtime_dir, b.options);
     let wasm_path = find_wasm_file(&workspace_target)
         .or_else(|| find_wasm_file(&local_target))
         .unwrap_or_else(|| {
-            ui::error("built .wasm not found under target/wasm32-unknown-unknown/release/");
+            ui::error(&format!(
+                "built .wasm not found under target/wasm32-unknown-unknown/{}/",
+                b.options.cargo_profile()
+            ));
         });
 
     {
@@ -672,15 +698,15 @@ pub(crate) fn build_site_wasm(cli: &WebBuildArgs) {
         }
     }
 
-    {
+    if b.options.optimize_artifacts() {
         let wasm = pkg_dir.join("runtime_bg.wasm");
         if wasm.is_file() {
-            let sp = ui::spinner("optimizing release WASM");
-            match run_wasm_opt(&wasm) {
-                Ok(WasmOptStatus::Optimized) => ui::spinner_ok(&sp, "release WASM optimized"),
+            let sp = ui::spinner("optimizing WASM");
+            match run_wasm_opt(&wasm, b.options.optimization) {
+                Ok(WasmOptStatus::Optimized) => ui::spinner_ok(&sp, "WASM optimized"),
                 Ok(WasmOptStatus::NotInstalled) => {
                     sp.finish_and_clear();
-                    ui::warning("wasm-opt not found — install Binaryen to optimize release WASM");
+                    ui::warning("wasm-opt not found — install Binaryen to optimize WASM");
                 }
                 Err(err) => {
                     sp.finish_and_clear();
@@ -1359,6 +1385,7 @@ pub(crate) const WEB_DEV_ARTIFACT_DIR: &str = ".crepus-dev";
 
 /// Build site `runtime/` to WASM once and populate `.crepus-dev/` with the same assets as a `crepus web build` dist folder.
 pub(crate) fn ensure_web_dev_artifacts(site_dir: &Path) -> Result<(), String> {
+    let options = BuildOptions::debug();
     let runtime_dir = site_dir.join("runtime");
     if !runtime_dir.join("Cargo.toml").is_file() {
         return Err(format!(
@@ -1380,13 +1407,15 @@ pub(crate) fn ensure_web_dev_artifacts(site_dir: &Path) -> Result<(), String> {
     load_all_crepus(site_dir, site_dir, &mut files);
     crate::web_islands::build_web_islands(site_dir, &dev, &files)?;
 
-    cargo_build_wasm32(&runtime_dir)?;
-    let (workspace_target, local_target) = wasm_release_dirs(site_dir, &runtime_dir);
+    cargo_build_wasm32(&runtime_dir, options)?;
+    let (workspace_target, local_target) = wasm_profile_dirs(site_dir, &runtime_dir, options);
     let wasm_path = find_wasm_file(&workspace_target)
         .or_else(|| find_wasm_file(&local_target))
         .ok_or_else(|| {
-            "built .wasm not found under target/wasm32-unknown-unknown/release/ (install wasm32 target and fix runtime errors)"
-                .to_string()
+            format!(
+                "built .wasm not found under target/wasm32-unknown-unknown/{}/ (install wasm32 target and fix runtime errors)",
+                options.cargo_profile()
+            )
         })?;
     run_wasm_bindgen(&wasm_path, &pkg_dir, "runtime")?;
     Ok(())

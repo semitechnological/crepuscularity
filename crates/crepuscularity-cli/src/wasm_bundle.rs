@@ -3,6 +3,8 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use crate::build_options::{BuildOptions, OptimizationLevel};
+
 /// Locate the first `*.wasm` artifact in a release directory (ignores `.d.wasm`).
 pub fn find_wasm_file(dir: &Path) -> Option<PathBuf> {
     let Ok(entries) = std::fs::read_dir(dir) else {
@@ -22,9 +24,16 @@ pub fn find_wasm_file(dir: &Path) -> Option<PathBuf> {
     None
 }
 
-pub fn wasm_release_dirs(app_path: &Path, runtime_dir: &Path) -> (PathBuf, PathBuf) {
-    let workspace_target = app_path.join("target/wasm32-unknown-unknown/release");
-    let local_target = runtime_dir.join("target/wasm32-unknown-unknown/release");
+pub fn wasm_profile_dirs(
+    app_path: &Path,
+    runtime_dir: &Path,
+    options: BuildOptions,
+) -> (PathBuf, PathBuf) {
+    let profile = options.cargo_profile();
+    let workspace_target = app_path.join("target/wasm32-unknown-unknown").join(profile);
+    let local_target = runtime_dir
+        .join("target/wasm32-unknown-unknown")
+        .join(profile);
     (workspace_target, local_target)
 }
 
@@ -91,7 +100,7 @@ fn cargo_executable() -> std::ffi::OsString {
 ///
 /// Prefer rustup's `cargo` when `PATH` points at a non-rustup toolchain (e.g. Homebrew rustc
 /// without wasm std). Uses `CARGO` if set, else `~/.cargo/bin/cargo` when present.
-pub fn cargo_build_wasm32(runtime_dir: &Path) -> Result<(), String> {
+pub fn cargo_build_wasm32(runtime_dir: &Path, options: BuildOptions) -> Result<(), String> {
     let cargo_exe = cargo_executable();
     let mut cmd = Command::new(cargo_exe);
     prepend_rustup_bin_to_path(&mut cmd);
@@ -108,14 +117,12 @@ pub fn cargo_build_wasm32(runtime_dir: &Path) -> Result<(), String> {
         cmd.env("RUSTC_WRAPPER", "sccache");
     }
 
+    cmd.args(["build", "--target", "wasm32-unknown-unknown"]);
+    if options.release() {
+        cmd.arg("--release");
+    }
     let out = cmd
-        .args([
-            "build",
-            "--target",
-            "wasm32-unknown-unknown",
-            "--release",
-            "--quiet",
-        ])
+        .arg("--quiet")
         .current_dir(runtime_dir)
         .output()
         .map_err(|e| format!("cargo: {e}"))?;
@@ -156,7 +163,13 @@ pub enum WasmOptStatus {
     NotInstalled,
 }
 
-pub fn run_wasm_opt(wasm_path: &Path) -> Result<WasmOptStatus, String> {
+pub fn run_wasm_opt(
+    wasm_path: &Path,
+    optimization: OptimizationLevel,
+) -> Result<WasmOptStatus, String> {
+    let Some(level) = optimization.wasm_opt_flag() else {
+        return Ok(WasmOptStatus::Optimized);
+    };
     let available = Command::new("wasm-opt")
         .arg("--version")
         .output()
@@ -168,7 +181,7 @@ pub fn run_wasm_opt(wasm_path: &Path) -> Result<WasmOptStatus, String> {
 
     let tmp = wasm_path.with_extension("wasm.opt");
     let out = Command::new("wasm-opt")
-        .args(["-O2", "--enable-bulk-memory"])
+        .args([level, "--enable-bulk-memory"])
         .arg(wasm_path)
         .arg("-o")
         .arg(&tmp)

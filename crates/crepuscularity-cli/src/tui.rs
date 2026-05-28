@@ -9,6 +9,7 @@ use std::process::Command;
 
 use console::style;
 
+use crate::build_options::{strip_build_options_or_exit, BuildOptions};
 use crate::ui;
 
 /// Caret-style version requirement injected into scaffolded TUI apps for
@@ -25,24 +26,16 @@ pub fn run(args: &[String]) {
             scaffold_tui_app(name);
         }
         Some("build") => {
-            let release = args.iter().any(|a| a == "--release");
-            let extra = args
-                .iter()
-                .skip(1)
-                .filter(|a| !matches!(a.as_str(), "--release"))
-                .cloned()
-                .collect::<Vec<_>>();
-            build_tui_app(release, &extra);
+            let options = BuildOptions::parse_or_exit(args);
+            let stripped = strip_build_options_or_exit(args);
+            let extra = stripped.into_iter().skip(1).collect::<Vec<_>>();
+            build_tui_app(options, &extra);
         }
         Some("run") => {
-            let release = args.iter().any(|a| a == "--release");
-            let extra = args
-                .iter()
-                .skip(1)
-                .filter(|a| !matches!(a.as_str(), "--release"))
-                .cloned()
-                .collect::<Vec<_>>();
-            run_tui_app(release, &extra);
+            let options = BuildOptions::parse_or_exit(args);
+            let stripped = strip_build_options_or_exit(args);
+            let extra = stripped.into_iter().skip(1).collect::<Vec<_>>();
+            run_tui_app(options, &extra);
         }
         Some("preview") => {
             let path = args.get(1).map(PathBuf::from).unwrap_or_else(|| {
@@ -157,22 +150,22 @@ fn run(terminal: &mut Terminal<impl Backend>, hot: &mut HotTemplate) -> anyhow::
     eprintln!("Run 'cd {} && cargo run' to start the app", name);
 }
 
-fn build_tui_app(release: bool, extra: &[String]) {
+fn build_tui_app(options: BuildOptions, extra: &[String]) {
     ensure_cargo_project_for_tui();
     let mut cmd = Command::new("cargo");
     cmd.arg("build");
-    if release {
+    if options.release() {
         cmd.arg("--release");
     }
     cmd.args(extra);
     delegate_to_cargo(cmd, "build");
 }
 
-fn run_tui_app(release: bool, extra: &[String]) {
+fn run_tui_app(options: BuildOptions, extra: &[String]) {
     ensure_cargo_project_for_tui();
     let mut cmd = Command::new("cargo");
     cmd.arg("run");
-    if release {
+    if options.release() {
         cmd.arg("--release");
     }
     if !extra.is_empty() {
@@ -220,7 +213,7 @@ fn print_tui_usage() {
     );
     eprintln!(
         "  {}  {}",
-        style("build [--release]").green(),
+        style("build [--debug|--dev|--release] [--opt-level LEVEL]").green(),
         style("build the TUI app").dim()
     );
     eprintln!(

@@ -25,6 +25,7 @@ use crepuscularity_native::{
 use serde::Deserialize;
 use serde_json::Value;
 
+use crate::build_options::{strip_build_options_or_exit, BuildOptions};
 use crate::ui;
 
 pub fn run(args: &[String]) {
@@ -40,12 +41,22 @@ pub fn run(args: &[String]) {
         }
         Some("build") => match args.get(1).map(|s| s.as_str()) {
             Some("ios") => {
-                let dir = parse_dir_arg(&args[2..]);
-                build_ios(&dir);
+                let options = BuildOptions::parse_or_exit(&args[2..]);
+                let stripped = strip_build_options_or_exit(&args[2..]);
+                let dir = parse_dir_arg(&stripped);
+                build_ios(&dir, options);
             }
             Some("android") => {
-                let dir = parse_dir_arg(&args[2..]);
-                let flavor = parse_flavor(&args[2..]).unwrap_or_else(|| "Debug".to_string());
+                let options = BuildOptions::parse_or_exit(&args[2..]);
+                let stripped = strip_build_options_or_exit(&args[2..]);
+                let dir = parse_dir_arg(&stripped);
+                let flavor = parse_flavor(&stripped).unwrap_or_else(|| {
+                    if options.release() {
+                        "Release".to_string()
+                    } else {
+                        "Debug".to_string()
+                    }
+                });
                 build_android(&dir, &flavor);
             }
             _ => ui::error("Usage: crepus native build ios|android [--dir <path>]"),
@@ -56,8 +67,16 @@ pub fn run(args: &[String]) {
                 run_ios_help(&dir);
             }
             Some("android") => {
-                let dir = parse_dir_arg(&args[2..]);
-                let flavor = parse_flavor(&args[2..]).unwrap_or_else(|| "Debug".to_string());
+                let options = BuildOptions::parse_or_exit(&args[2..]);
+                let stripped = strip_build_options_or_exit(&args[2..]);
+                let dir = parse_dir_arg(&stripped);
+                let flavor = parse_flavor(&stripped).unwrap_or_else(|| {
+                    if options.release() {
+                        "Release".to_string()
+                    } else {
+                        "Debug".to_string()
+                    }
+                });
                 run_android(&dir, &flavor);
             }
             _ => ui::error("Usage: crepus native run ios|android [--dir <path>]"),
@@ -471,7 +490,7 @@ fn parse_flavor(args: &[String]) -> Option<String> {
     None
 }
 
-fn build_ios(dir: &Path) {
+fn build_ios(dir: &Path, options: BuildOptions) {
     let ios_dir = dir.join("ios");
     if !ios_dir.join("Package.swift").exists() {
         ui::error(&format!(
@@ -481,6 +500,11 @@ fn build_ios(dir: &Path) {
     }
     let mut cmd = Command::new("swift");
     cmd.arg("build").current_dir(&ios_dir);
+    if options.release() {
+        cmd.args(["-c", "release"]);
+    } else {
+        cmd.args(["-c", "debug"]);
+    }
     delegate(cmd, "swift build");
 }
 

@@ -263,7 +263,7 @@ device = "STM32F411"
 
     let status = crepus()
         .current_dir(root)
-        .args(["build"])
+        .args(["build", "--release", "--opt-level", "size"])
         .status()
         .expect("spawn crepus build");
     assert!(status.success());

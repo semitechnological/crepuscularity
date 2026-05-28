@@ -37,6 +37,7 @@
 mod aurora;
 mod benchmark;
 mod benchmark_tui;
+mod build_options;
 #[cfg(feature = "desktop")]
 mod builder;
 mod crepus_toml;
@@ -100,8 +101,8 @@ fn main() {
 
         #[cfg(feature = "desktop")]
         Some("dev") => {
+            let options = build_options::BuildOptions::parse_or_exit(&args[2..]);
             let mut bin: Option<String> = None;
-            let mut release = false;
             let mut emit_events = false;
             let mut i = 2;
             while i < args.len() {
@@ -110,22 +111,26 @@ fn main() {
                         i += 1;
                         bin = args.get(i).cloned();
                     }
-                    "--release" => release = true,
+                    "--debug" | "--dev" | "--release" => {}
+                    "--opt-level" => i += 1,
+                    arg if arg.starts_with("--opt-level=") => {}
                     "--emit-events" => emit_events = true,
                     _ => {}
                 }
                 i += 1;
             }
-            dev::run(bin, release, emit_events);
+            dev::run(bin, options, emit_events);
         }
 
         #[cfg(feature = "desktop")]
         Some("build") => {
-            let manifest_arg = manifest_arg(&args[2..]);
-            if args[2..]
+            let options = build_options::BuildOptions::parse_or_exit(&args[2..]);
+            let build_args = build_options::strip_build_options_or_exit(&args[2..]);
+            let manifest_arg = manifest_arg(&build_args);
+            if build_args
                 .iter()
                 .any(|a| matches!(a.as_str(), "--target" | "-t" | "--manifest" | "--all"))
-                || args[2..]
+                || build_args
                     .iter()
                     .any(|a| !a.starts_with('-') && a.as_str() != "release")
                 || target_build::has_manifest_targets(manifest_arg)
@@ -134,16 +139,15 @@ fn main() {
                 return;
             }
             let t0 = Instant::now();
-            let release = args.iter().any(|a| a == "--release");
             let cwd = std::env::current_dir().unwrap_or_else(|e| {
                 ui::error(&format!("cannot determine current directory: {e}"));
             });
-            let sp = ui::spinner(if release {
+            let sp = ui::spinner(if options.release() {
                 "cargo build --release"
             } else {
                 "cargo build"
             });
-            let outcome = builder::cargo_build(&cwd, release, None);
+            let outcome = builder::cargo_build(&cwd, options, None);
             if outcome.success {
                 ui::spinner_ok(&sp, "build succeeded");
                 ui::done_in(t0.elapsed());
@@ -273,12 +277,12 @@ fn print_usage() {
     );
     eprintln!(
         "  {}  {}",
-        style("dev [--bin NAME] [--release]         ").green(),
+        style("dev [--bin NAME] [--debug|--dev|--release]").green(),
         style("hot-reload dev loop").dim()
     );
     eprintln!(
         "  {}  {}",
-        style("build [TYPE|ID] [--target ID] [--manifest FILE]").green(),
+        style("build [TYPE|ID] [--debug|--dev|--release]").green(),
         style("build crepus.toml targets, or cargo fallback").dim()
     );
     eprintln!(
@@ -298,7 +302,7 @@ fn print_usage() {
     );
     eprintln!(
         "  {}  {}",
-        style("web build [--site] [--out-dir]       ").green(),
+        style("web build [--site] [--release]       ").green(),
         style("static dist/ — HTML shell + WASM bundle").dim()
     );
     eprintln!(
@@ -319,7 +323,7 @@ fn print_usage() {
     );
     eprintln!(
         "  {}  {}",
-        style("webext build [--app PATH]            ").green(),
+        style("webext build [--app PATH] [--release]").green(),
         style("build extension to dist/unpacked/").dim()
     );
     eprintln!(
@@ -339,7 +343,7 @@ fn print_usage() {
     );
     eprintln!(
         "  {}  {}",
-        style("ios build [--dir] [--scheme] [...]     ").green(),
+        style("ios build [--dir] [--scheme] [--release]").green(),
         style("xcodegen + xcodebuild; toml = defaults").dim()
     );
     eprintln!(
@@ -349,7 +353,7 @@ fn print_usage() {
     );
     eprintln!(
         "  {}  {}",
-        style("tui build [--release]                   ").green(),
+        style("tui build [--debug|--dev|--release]     ").green(),
         style("build TUI app").dim()
     );
     eprintln!(
