@@ -1,6 +1,6 @@
 [package]
 name = "crepuscularity-cli"
-version = "0.7.22"
+version = "0.7.23"
 edition = "2021"
 license = "MPL-2.0"
 description = "crepus CLI — scaffolding and builds for Crepuscularity (UNSTABLE; in active development)."
@@ -41,7 +41,7 @@ crepuscularity-core = { path = "../crepuscularity-core", version = "0.4.9" }
 crepuscularity-runtime = { path = "../crepuscularity-runtime", version = "0.4.6", optional = true }
 crepuscularity-tui = { path = "../crepuscularity-tui", version = "0.4.4" }
 crepuscularity-web = { path = "../crepuscularity-web", version = "0.4.3", features = ["parallel"] }
-crepuscularity-webext  = { path = "../crepuscularity-webext", version = "0.2.6" }
+crepuscularity-webext  = { path = "../crepuscularity-webext", version = "0.2.7" }
 crepuscularity-native = { path = "../crepuscularity-native", version = "0.4.4" }
 crepuscularity-embedded = { path = "../crepuscularity-embedded", version = "0.1.9" }
 crepuscularity-lvgl = { path = "../crepuscularity-lvgl", version = "0.1.0" }
