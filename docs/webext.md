@@ -133,7 +133,7 @@ Build with:
 crepus webext build
 ```
 
-Production builds run `wasm-bindgen` and then run `wasm-opt -O2` on `runtime_bg.wasm` when Binaryen is installed. Dev extension builds skip `wasm-opt` so reloads stay fast.
+Debug builds run `wasm-bindgen` and skip `wasm-opt` by default. Release builds run `wasm-opt -O2` on `runtime_bg.wasm` when Binaryen is installed; use `--opt-level none|fast|size|aggressive` to override the post-build optimization level.
 
 ## Templates
 

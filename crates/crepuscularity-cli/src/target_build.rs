@@ -11,6 +11,7 @@ use crepuscularity_native::{
     render_component_file_to_ir, render_template_to_ir, to_json, to_json_pretty,
 };
 
+use crate::build_options::{strip_build_options_or_exit, BuildOptions};
 use crate::crepus_toml::{pick_targets, ResolvedTarget};
 use crate::ui;
 
@@ -22,7 +23,9 @@ pub(crate) fn has_manifest_targets(manifest: Option<PathBuf>) -> bool {
 }
 
 pub(crate) fn run(args: &[String]) {
-    let parsed = parse_args(args);
+    let options = BuildOptions::parse_or_exit(args);
+    let stripped = strip_build_options_or_exit(args);
+    let parsed = parse_args(&stripped);
     let targets = crate::crepus_toml::load_manifest_targets(parsed.manifest)
         .unwrap_or_else(|e| ui::error(&e))
         .unwrap_or_else(|| ui::error("no crepus.toml found"));
@@ -35,7 +38,7 @@ pub(crate) fn run(args: &[String]) {
         pick_targets(&targets, parsed.target_id.as_deref()).unwrap_or_else(|e| ui::error(&e))
     };
     for target in picked {
-        build_target(&target);
+        build_target(&target, options);
     }
 }
 
@@ -68,7 +71,6 @@ fn parse_args(args: &[String]) -> BuildArgs {
                 }
             }
             "--all" => all = true,
-            "--release" => {}
             other if other.starts_with('-') => ui::error(&format!("unknown option: {other}")),
             other => {
                 if selector.replace(other.to_string()).is_some() {
@@ -122,14 +124,14 @@ fn normalize_selector(selector: &str) -> &str {
     }
 }
 
-fn build_target(target: &ResolvedTarget) {
+fn build_target(target: &ResolvedTarget, options: BuildOptions) {
     match target.target_type.as_str() {
-        "web" => build_web(target),
+        "web" => build_web(target, options),
         "webext" => {
             if let Some(manifest) = &target.webext {
-                crate::webext::build_app_target(&target.dir, manifest);
+                crate::webext::build_app_target(&target.dir, manifest, options);
             } else {
-                crate::webext::build_app_path(&target.dir);
+                crate::webext::build_app_path(&target.dir, options);
             }
         }
         "lvgl" => build_lvgl(target),
@@ -142,7 +144,7 @@ fn build_target(target: &ResolvedTarget) {
     }
 }
 
-fn build_web(target: &ResolvedTarget) {
+fn build_web(target: &ResolvedTarget, options: BuildOptions) {
     crate::web::build_site_wasm(&crate::web::WebBuildArgs {
         site_dir: Some(target.dir.clone()),
         out_dir: target.out.clone(),
@@ -150,6 +152,7 @@ fn build_web(target: &ResolvedTarget) {
         target_id: None,
         manifest: None,
         meta: Some(target.web.clone()),
+        options,
     });
 }
 

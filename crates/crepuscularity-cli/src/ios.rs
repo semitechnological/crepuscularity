@@ -13,6 +13,7 @@ use std::time::Instant;
 
 use console::style;
 
+use crate::build_options::{strip_build_options_or_exit, BuildOptions};
 use crate::crepus_toml;
 use crate::ui;
 
@@ -37,10 +38,12 @@ pub fn run(args: &[String]) {
             run_xcodegen(&root, &spec);
         }
         Some("build") => {
-            let explicit_dir = parse_optional_dir(&args[1..]);
-            let spec_ov = parse_spec_override(&args[1..]);
-            let scheme_ov = parse_scheme_override(&args[1..]);
-            let dest_ov = parse_destination_override(&args[1..]);
+            let options = BuildOptions::parse_or_exit(&args[1..]);
+            let stripped = strip_build_options_or_exit(&args[1..]);
+            let explicit_dir = parse_optional_dir(&stripped);
+            let spec_ov = parse_spec_override(&stripped);
+            let scheme_ov = parse_scheme_override(&stripped);
+            let dest_ov = parse_destination_override(&stripped);
 
             let (root, cfg) = resolve_ios_root_and_config(&explicit_dir);
             let spec = spec_ov.unwrap_or(cfg.xcodegen_spec.clone());
@@ -48,7 +51,7 @@ pub fn run(args: &[String]) {
             let destination = dest_ov.unwrap_or(cfg.ios_destination);
 
             run_xcodegen(&root, &spec);
-            run_xcodebuild(&root, &scheme, &destination);
+            run_xcodebuild(&root, &scheme, &destination, options);
         }
         _ => print_ios_usage(),
     }
@@ -201,7 +204,7 @@ fn print_ios_usage() {
     );
     eprintln!(
         "  {}  {}",
-        style("build [--dir] [--spec] [--scheme] ...").green(),
+        style("build [--dir] [--scheme] [--release]").green(),
         style("xcodegen + xcodebuild; scheme/dest from toml").dim()
     );
     eprintln!();
@@ -474,7 +477,7 @@ fn run_xcodegen(dir: &Path, spec: &str) {
     eprintln!("{}", style("xcodegen: ok").green());
 }
 
-fn run_xcodebuild(dir: &Path, scheme: &str, destination: &str) {
+fn run_xcodebuild(dir: &Path, scheme: &str, destination: &str, options: BuildOptions) {
     let proj = find_xcodeproj(dir).unwrap_or_else(|| {
         ui::error(&format!(
             "no .xcodeproj in {} — run `crepus ios generate` first",
@@ -491,6 +494,12 @@ fn run_xcodebuild(dir: &Path, scheme: &str, destination: &str) {
             scheme,
             "-destination",
             destination,
+            "-configuration",
+            if options.release() {
+                "Release"
+            } else {
+                "Debug"
+            },
             "build",
         ])
         .status()

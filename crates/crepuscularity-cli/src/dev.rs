@@ -17,12 +17,13 @@ use std::time::{Duration, Instant};
 
 use notify::{recommended_watcher, Event, EventKind, RecursiveMode, Watcher};
 
+use crate::build_options::BuildOptions;
 use crate::builder::{cargo_build, find_bin_name, kill_child};
 use crate::events::CompilerEvent;
 use crate::hud::{open_hud_window, DevStatus, HudState};
 use crate::ui;
 
-pub fn run(bin_override: Option<String>, release: bool, emit_events: bool) {
+pub fn run(bin_override: Option<String>, options: BuildOptions, emit_events: bool) {
     let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
 
     let bin_name = find_bin_name(&cwd, bin_override.as_deref()).unwrap_or_else(|| {
@@ -48,7 +49,7 @@ pub fn run(bin_override: Option<String>, release: bool, emit_events: bool) {
         let cwd = cwd.clone();
         let bin_name = bin_name.clone();
         std::thread::spawn(move || {
-            background_loop(shared, shutdown, cwd, bin_name, release, emit_events)
+            background_loop(shared, shutdown, cwd, bin_name, options, emit_events)
         });
     }
 
@@ -72,7 +73,7 @@ fn background_loop(
     shutdown: Arc<AtomicBool>,
     cwd: PathBuf,
     bin_name: String,
-    release: bool,
+    options: BuildOptions,
     emit_events: bool,
 ) {
     let (tx, rx) = std::sync::mpsc::channel::<PathBuf>();
@@ -107,7 +108,7 @@ fn background_loop(
         .ok();
 
     // Initial build + launch
-    let mut child = do_build_launch(&shared, &cwd, &bin_name, release, None, emit_events);
+    let mut child = do_build_launch(&shared, &cwd, &bin_name, options, None, emit_events);
 
     loop {
         if shutdown.load(Ordering::Relaxed) {
@@ -134,7 +135,7 @@ fn background_loop(
                     std::thread::sleep(Duration::from_millis(30));
                 }
                 eprintln!("  {} change detected — rebuilding…", crate::ui::arrow());
-                child = do_build_launch(&shared, &cwd, &bin_name, release, child, emit_events);
+                child = do_build_launch(&shared, &cwd, &bin_name, options, child, emit_events);
             }
             Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
                 // Check whether child exited on its own
@@ -194,7 +195,7 @@ fn do_build_launch(
     shared: &Arc<Mutex<HudState>>,
     cwd: &PathBuf,
     bin_name: &str,
-    release: bool,
+    options: BuildOptions,
     old_child: Option<Child>,
     emit_events: bool,
 ) -> Option<Child> {
@@ -219,22 +220,20 @@ fn do_build_launch(
     }
 
     let t0 = Instant::now();
-    let outcome = cargo_build(cwd, release, Some(shared.clone()));
+    let outcome = cargo_build(cwd, options, Some(shared.clone()));
     let elapsed_ms = t0.elapsed().as_millis() as u64;
 
     if outcome.success {
         // Emit compilation success
         if emit_events {
-            let profile = if release { "release" } else { "debug" };
-            let output = locate_binary(cwd, profile, bin_name);
+            let output = locate_binary(cwd, options.cargo_profile(), bin_name);
             CompilerEvent::compilation_success(elapsed_ms, output).emit();
         }
 
         if let Ok(mut s) = shared.lock() {
             s.status = DevStatus::Running { elapsed_ms };
         }
-        let profile = if release { "release" } else { "debug" };
-        let bin_path = locate_binary(cwd, profile, bin_name);
+        let bin_path = locate_binary(cwd, options.cargo_profile(), bin_name);
 
         eprintln!(
             "  {} built in {elapsed_ms} ms — launching {bin_name}",

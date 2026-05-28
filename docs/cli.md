@@ -55,7 +55,8 @@ crepus dev --emit-events  # IDE integration
 
 Options:
 - `--bin NAME` — specify which binary to run (for workspaces)
-- `--release` — build in release mode
+- `--debug`, `--dev`, `--release` — choose the build mode; default is `--debug`
+- `--opt-level none|fast|size|aggressive` — shared optimization level; release defaults to `fast`, debug/dev default to `none`
 - `--emit-events` — emit structured JSON events to stdout
 
 ### `crepus build`
@@ -68,6 +69,7 @@ crepus build web
 crepus build panel
 crepus build --target panel
 crepus build --manifest ./crepus.toml
+crepus build --release --opt-level size
 ```
 
 ```toml
@@ -102,7 +104,7 @@ root = "screen"
 device = "STM32F411"
 ```
 
-Supported manifest target types today: `web`, `webext`, `native` / `ir`, `lvgl`, and `embedded`. Target-specific commands still exist for advanced flags.
+Supported manifest target types today: `web`, `webext`, `native` / `ir`, `lvgl`, and `embedded`. Build mode flags are shared across all target types. `web` and `webext` map `--release` to Cargo release WASM builds and run post-build WASM optimization when the effective optimization level is not `none`; render-only targets accept the same flags for manifest consistency.
 
 Rust code can use the same manifest path for render-output targets (`web`, `native`, `lvgl`):
 
@@ -131,7 +133,7 @@ logged_in = true
 
 ## Static web sites (`crepus web`)
 
-Author pages in `.crepus` (same virtual-file semantics as `crepus web serve`). Production **`crepus web build`** compiles the site’s `runtime/` crate to **`wasm32-unknown-unknown`**, runs **wasm-bindgen**, and writes a **`dist/`** folder: thin **`index.html`**, **`app.js`**, **`crepus-bundle.json`** (all `*.crepus` sources), **`vendor/unocss.js`**, and **`pkg/runtime.js`** + **`runtime_bg.wasm`**. Copy and dynamic data live in **`.crepus`** (quoted text nodes) and, when you need typed Rust context, in **`runtime/src/lib.rs`** via **`crepuscularity_web::render_from_files`** (same pattern as extension runtimes calling into `crepuscularity-web`).
+Author pages in `.crepus` (same virtual-file semantics as `crepus web serve`). **`crepus web build`** compiles the site’s `runtime/` crate to **`wasm32-unknown-unknown`**, runs **wasm-bindgen**, and writes a **`dist/`** folder: thin **`index.html`**, **`app.js`**, **`crepus-bundle.json`** (all `*.crepus` sources), **`vendor/unocss.js`**, and **`pkg/runtime.js`** + **`runtime_bg.wasm`**. Copy and dynamic data live in **`.crepus`** (quoted text nodes) and, when you need typed Rust context, in **`runtime/src/lib.rs`** via **`crepuscularity_web::render_from_files`** (same pattern as extension runtimes calling into `crepuscularity-web`). The default web build is debug; use `--release` for release-profile WASM and post-build optimization.
 
 ### Prerequisites
 

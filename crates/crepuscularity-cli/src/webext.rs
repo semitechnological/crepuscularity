@@ -5,9 +5,10 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
+use crate::build_options::BuildOptions;
 use crate::ui;
 use crate::wasm_bundle::{
-    cargo_build_wasm32, find_wasm_file, run_wasm_bindgen, run_wasm_opt, wasm_release_dirs,
+    cargo_build_wasm32, find_wasm_file, run_wasm_bindgen, run_wasm_opt, wasm_profile_dirs,
     WasmOptStatus,
 };
 use crepuscularity_webext::BrowserTarget;
@@ -25,13 +26,13 @@ pub fn run(args: &[String]) {
 
         Some("build") => {
             let opts = parse_webext_options(&args[1..]);
-            build_extension(&opts.app_path, false, opts.browser);
+            build_extension(&opts.app_path, false, opts.browser, opts.build);
         }
 
         Some("dev") => {
             let opts = parse_webext_options(&args[1..]);
-            build_extension(&opts.app_path, true, opts.browser);
-            watch_and_reload(&opts.app_path, opts.browser);
+            build_extension(&opts.app_path, true, opts.browser, opts.build);
+            watch_and_reload(&opts.app_path, opts.browser, opts.build);
         }
 
         Some("manifest") => {
@@ -46,12 +47,14 @@ pub fn run(args: &[String]) {
 struct WebextOptions {
     app_path: PathBuf,
     browser: Option<BrowserTarget>,
+    build: BuildOptions,
 }
 
 fn parse_webext_options(args: &[String]) -> WebextOptions {
     WebextOptions {
         app_path: parse_app_path(args),
         browser: parse_browser_target(args),
+        build: BuildOptions::parse_or_exit(args),
     }
 }
 
@@ -100,12 +103,12 @@ fn print_webext_usage() {
     );
     eprintln!(
         "  {}  {}",
-        style("build [--app PATH] [--browser chromium|firefox]").green(),
+        style("build [--app PATH] [--browser ...] [--release]").green(),
         style("build extension to dist/unpacked/ or dist/<browser>/").dim()
     );
     eprintln!(
         "  {}  {}",
-        style("dev [--app PATH] [--browser chromium|firefox]  ").green(),
+        style("dev [--app PATH] [--browser ...] [--debug]    ").green(),
         style("build, watch, and hot-reload").dim()
     );
     eprintln!(
@@ -348,11 +351,16 @@ fn detect_icon_size(filename: &str) -> Option<String> {
 
 // ── build ─────────────────────────────────────────────────────────────────────
 
-fn build_extension(app_path: &Path, dev: bool, browser: Option<BrowserTarget>) {
+fn build_extension(
+    app_path: &Path,
+    dev: bool,
+    browser: Option<BrowserTarget>,
+    options: BuildOptions,
+) {
     let t0 = Instant::now();
 
     let mut manifest = load_extension_manifest(app_path, None);
-    build_extension_inner(app_path, &mut manifest, dev, t0, browser);
+    build_extension_inner(app_path, &mut manifest, dev, t0, browser, options);
 }
 
 fn build_extension_with_manifest(
@@ -360,9 +368,10 @@ fn build_extension_with_manifest(
     mut manifest: crepuscularity_webext::ExtensionManifest,
     dev: bool,
     browser: Option<BrowserTarget>,
+    options: BuildOptions,
 ) {
     let t0 = Instant::now();
-    build_extension_inner(app_path, &mut manifest, dev, t0, browser);
+    build_extension_inner(app_path, &mut manifest, dev, t0, browser, options);
 }
 
 fn build_extension_inner(
@@ -371,13 +380,19 @@ fn build_extension_inner(
     dev: bool,
     t0: Instant,
     browser: Option<BrowserTarget>,
+    options: BuildOptions,
 ) {
     // Auto-detect options from project structure
     auto_detect_pages(app_path, manifest);
     auto_detect_icons(app_path, manifest);
 
     let ext_name = style(manifest.extension.name.as_str()).cyan().bold();
-    eprintln!("{} building {ext_name}", style("crepus webext").dim());
+    let label = if options.release() {
+        "crepus webext release"
+    } else {
+        "crepus webext debug"
+    };
+    eprintln!("{} building {ext_name}", style(label).dim());
     eprintln!();
 
     let dist = match browser {
@@ -468,7 +483,7 @@ fn build_extension_inner(
     // ── Step 3: WASM runtime ─────────────────────────────────────────────────
     let runtime_dir = app_path.join("runtime");
     if runtime_dir.exists() {
-        build_wasm_runtime(app_path, &runtime_dir, &vendor_dir, !dev);
+        build_wasm_runtime(app_path, &runtime_dir, &vendor_dir, options);
     } else {
         ui::warning("no runtime/ directory — skipping WASM compile");
         ui::warning("run `crepus webext new` to scaffold a full project");
@@ -581,21 +596,27 @@ fn load_extension_manifest(
     ));
 }
 
-pub(crate) fn build_app_path(app_path: &Path) {
-    build_extension(app_path, false, None);
+pub(crate) fn build_app_path(app_path: &Path, options: BuildOptions) {
+    build_extension(app_path, false, None, options);
 }
 
 pub(crate) fn build_app_target(
     app_path: &Path,
     manifest: &crepuscularity_webext::ExtensionManifest,
+    options: BuildOptions,
 ) {
-    build_extension_with_manifest(app_path, manifest.clone(), false, None);
+    build_extension_with_manifest(app_path, manifest.clone(), false, None, options);
 }
 
-fn build_wasm_runtime(app_path: &Path, runtime_dir: &Path, vendor_dir: &Path, optimize: bool) {
+fn build_wasm_runtime(
+    app_path: &Path,
+    runtime_dir: &Path,
+    vendor_dir: &Path,
+    options: BuildOptions,
+) {
     {
         let sp = ui::spinner("compiling WASM runtime");
-        match cargo_build_wasm32(runtime_dir) {
+        match cargo_build_wasm32(runtime_dir, options) {
             Ok(()) => {
                 ui::spinner_ok(&sp, "WASM compiled");
             }
@@ -616,11 +637,14 @@ fn build_wasm_runtime(app_path: &Path, runtime_dir: &Path, vendor_dir: &Path, op
         }
     }
 
-    let (workspace_target, local_target) = wasm_release_dirs(app_path, runtime_dir);
+    let (workspace_target, local_target) = wasm_profile_dirs(app_path, runtime_dir, options);
     let wasm_file = find_wasm_file(&workspace_target).or_else(|| find_wasm_file(&local_target));
 
     let Some(wasm_path) = wasm_file else {
-        ui::warning("built .wasm not found in target/wasm32-unknown-unknown/release/");
+        ui::warning(&format!(
+            "built .wasm not found in target/wasm32-unknown-unknown/{}/",
+            options.cargo_profile()
+        ));
         return;
     };
 
@@ -647,15 +671,15 @@ fn build_wasm_runtime(app_path: &Path, runtime_dir: &Path, vendor_dir: &Path, op
         }
     }
 
-    if optimize {
+    if options.optimize_artifacts() {
         let wasm = vendor_dir.join("runtime_bg.wasm");
         if wasm.is_file() {
-            let sp = ui::spinner("optimizing release WASM");
-            match run_wasm_opt(&wasm) {
-                Ok(WasmOptStatus::Optimized) => ui::spinner_ok(&sp, "release WASM optimized"),
+            let sp = ui::spinner("optimizing WASM");
+            match run_wasm_opt(&wasm, options.optimization) {
+                Ok(WasmOptStatus::Optimized) => ui::spinner_ok(&sp, "WASM optimized"),
                 Ok(WasmOptStatus::NotInstalled) => {
                     sp.finish_and_clear();
-                    ui::warning("wasm-opt not found — install Binaryen to optimize release WASM");
+                    ui::warning("wasm-opt not found — install Binaryen to optimize WASM");
                 }
                 Err(err) => {
                     sp.finish_and_clear();
@@ -1192,7 +1216,7 @@ fn inject_dev_content_script(manifest_json: &str) -> String {
     manifest_json.to_string()
 }
 
-fn watch_and_reload(app_path: &Path, browser: Option<BrowserTarget>) {
+fn watch_and_reload(app_path: &Path, browser: Option<BrowserTarget>, options: BuildOptions) {
     use console::style;
     use notify::Watcher;
     use std::sync::atomic::{AtomicU64, Ordering};
@@ -1254,7 +1278,7 @@ fn watch_and_reload(app_path: &Path, browser: Option<BrowserTarget>) {
         eprintln!();
         let sp = ui::spinner("rebuilding");
         let t0 = std::time::Instant::now();
-        build_extension(app_path, true, browser);
+        build_extension(app_path, true, browser, options);
         sp.finish_and_clear();
 
         let id = reload_id.fetch_add(1, Ordering::SeqCst);
