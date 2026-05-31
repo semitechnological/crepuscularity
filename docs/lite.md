@@ -10,7 +10,7 @@ Lite now lives in this repository at `crates/crepuscularity-lite`, with its plug
 
 ```toml
 [dependencies]
-crepuscularity-lite = "0.4.0"
+crepuscularity-lite = "0.4.3"
 ```
 
 The crate builds V8 and GPUI. On macOS, use the Metal helper when Cargo cannot find Xcode's downloaded Metal toolchain:

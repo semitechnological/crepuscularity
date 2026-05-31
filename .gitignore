@@ -1,4 +1,5 @@
 /target
+zig-out/
 vendor/gpui/target/
 Cargo.lock
 .DS_Store

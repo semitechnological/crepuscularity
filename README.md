@@ -10,7 +10,7 @@ Use [Aurorality](https://github.com/tschk/aurorality) for united SwiftUI macOS +
 
 ## Why Crepuscularity
 
-- **First GPUI component system with hot reload** — live template updates without recompiling; no other GPUI framework offers this
+- **GPUI component workflow with hot reload** — live template updates without recompiling app code
 - **Rust-owned MV3 extension target** — write popup, background, and content-script surfaces in `.crepus`, then emit Chromium or Firefox bundles without adopting a JavaScript framework or app bundler as the primary authoring model
 - **One syntax, multiple backends** — the same template works across GPUI (native desktop), HTML, React/JSX, and browser extensions today; **`crepuscularity-native`** lowers `.crepus` to JSON **View IR** for SwiftUI / Jetpack Compose shells (see [`examples/native-shells`](examples/native-shells/README.md))
 - **Polyglot plugin contract** — host languages consume View IR JSON through `crepus native ir` or the optional `crepuscularity-abi` C session API, then create UI from the typed node tree; drop-in reference packages and native workspace files live under [`plugins/`](plugins/README.md)

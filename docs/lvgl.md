@@ -9,7 +9,7 @@
 ```toml
 [dependencies]
 crepuscularity = "0.4"
-crepuscularity-lvgl = "0.1"
+crepuscularity-lvgl = "0.1.0"
 ```
 
 Workspace examples use the umbrella crate:

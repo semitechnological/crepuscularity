@@ -5,8 +5,10 @@ use base64::{engine::general_purpose::STANDARD, Engine as _};
 use crepuscularity_core::TemplateContext;
 use crepuscularity_web::render_template_to_html_with_hydration;
 
+use serde_json::Value;
+
 fn hydration_context_json(html: &str) -> String {
-    let needle = "id=\"__crepus_ctx__\"";
+    let needle = "id=\"__crepus_hydration__\"";
     let start = html.find(needle).expect("hydration context script");
     let after = &html[start..];
     let b64_start = after.find('>').expect("script open") + 1;
@@ -27,8 +29,8 @@ fn hydration_injects_root_marker() {
         "expected data-crepus-root, got: {html}"
     );
     assert!(
-        html.contains("id=\"__crepus_ctx__\""),
-        "expected __crepus_ctx__, got: {html}"
+        html.contains("id=\"__crepus_hydration__\""),
+        "expected __crepus_hydration__, got: {html}"
     );
     assert!(
         html.contains("type=\"application/json\""),
@@ -59,13 +61,14 @@ fn hydration_ctx_json_contains_vars() {
     ctx.set("temp", 14i64);
     let html = render_template_to_html_with_hydration(tpl, &ctx).unwrap();
     let json = hydration_context_json(&html);
+    let value: Value = serde_json::from_str(&json).expect("hydration json");
     assert!(
-        json.contains("\"city\""),
-        "expected city key in ctx JSON, got: {json}"
+        value["ctx"].get("city").is_some(),
+        "expected city key in ctx JSON, got: {value}"
     );
     assert!(
-        json.contains("\"London\""),
-        "expected London value in ctx JSON, got: {json}"
+        value["ctx"]["city"] == "London",
+        "expected London value in ctx JSON, got: {value}"
     );
 }
 

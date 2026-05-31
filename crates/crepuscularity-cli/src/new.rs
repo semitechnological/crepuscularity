@@ -49,7 +49,7 @@ path = "src/main.rs"
 
 [dependencies]
 gpui = {{ version = "0.2", default-features = false, features = ["font-kit"] }}
-crepuscularity-gpui = {{ version = "0.3" }}
+crepuscularity-gpui = {{ version = "0.4.1" }}
 "#
     )
 }
