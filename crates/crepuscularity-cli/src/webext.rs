@@ -969,9 +969,41 @@ fn render_crepus_pages(
         let js_vendor_prefix = page_script_prefix(entry);
         let js = format!(
             r#"import init, * as runtime from "{prefix}vendor/runtime.js";
-const wasmBytes = await fetch("{prefix}vendor/runtime_bg.wasm").then(r => r.arrayBuffer());
-await init({{ module_or_path: wasmBytes }});
-if (typeof runtime.{fn}_main === "function") runtime.{fn}_main();"#,
+try {{
+  const wasmBytes = await fetch("{prefix}vendor/runtime_bg.wasm").then(r => r.arrayBuffer());
+  await init({{ module_or_path: wasmBytes }});
+  const main = runtime.{fn}_main;
+  if (typeof main === "function") {{
+    await main();
+  }} else {{
+    const render = runtime.render_{fn};
+    if (typeof render === "function") {{
+      const output = await render({{}});
+      const root = document.getElementById("root");
+      if (root) {{
+        if (typeof output === "string") {{
+          root.innerHTML = output;
+        }} else {{
+          const html = output?.html ?? output?.get?.("html");
+          const cssText = output?.css ?? output?.get?.("css");
+          if (typeof html === "string") {{
+            const css = cssText ? `<style>${{cssText}}</style>` : "";
+            root.innerHTML = `${{css}}${{html}}`;
+          }} else {{
+            root.textContent = JSON.stringify(output ?? null);
+          }}
+        }}
+      }}
+    }}
+  }}
+}} catch (error) {{
+  const root = document.getElementById("root");
+  if (root) {{
+    root.textContent = String(error?.stack ?? error);
+  }} else {{
+    throw error;
+  }}
+}}"#,
             prefix = js_vendor_prefix,
             fn = fn_name
         );
@@ -1286,6 +1318,10 @@ mod tests {
         assert!(html.contains("<section id=\"root\">"));
         assert!(html.contains("#root{color:#000}"));
         assert!(html.contains("../src/options.js"));
+        let js = std::fs::read_to_string(dist.join("src/options.js")).expect("read js");
+        assert!(js.contains("runtime.options_main"));
+        assert!(js.contains("runtime.render_options"));
+        assert!(js.contains(r#"document.getElementById("root")"#));
     }
 
     #[test]
