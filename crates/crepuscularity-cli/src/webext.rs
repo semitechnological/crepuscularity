@@ -845,146 +845,6 @@ fn print_manifest(app_path: &Path, browser: Option<BrowserTarget>) {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn scaffold_crepus_toml_uses_narrow_content_scope() {
-        let toml = scaffold_crepus_toml("My Extension");
-        assert!(!toml.contains("<all_urls>"));
-
-        let manifest: crate::crepus_toml::CrepusManifest = toml::from_str(&toml).unwrap();
-        let target = manifest.targets.first().expect("target");
-        let capabilities = target.capabilities.as_ref().expect("capabilities");
-        assert!(capabilities.content_script);
-        assert_eq!(capabilities.host_permissions, vec!["https://example.com/*"]);
-    }
-
-    #[test]
-    fn copy_app_assets_overlays_app_owned_directories_only() {
-        let tmp = tempfile::tempdir().expect("tempdir");
-        let app = tmp.path().join("app");
-        let dist = tmp.path().join("dist/unpacked");
-
-        std::fs::create_dir_all(app.join("src")).expect("app src");
-        std::fs::create_dir_all(app.join("pages")).expect("app pages");
-        std::fs::create_dir_all(app.join("icons")).expect("app icons");
-        std::fs::create_dir_all(app.join("resources")).expect("app resources");
-        std::fs::create_dir_all(dist.join("src")).expect("dist src");
-        std::fs::create_dir_all(dist.join("vendor")).expect("dist vendor");
-
-        std::fs::write(app.join("src/content.js"), "custom content").expect("write app src");
-        std::fs::write(app.join("pages/options.html"), "options").expect("write page");
-        std::fs::write(app.join("icons/icon16.png"), b"icon").expect("write icon");
-        std::fs::write(app.join("resources/tlds.txt"), "com").expect("write resource");
-        std::fs::write(dist.join("src/content.js"), "runtime content").expect("write runtime src");
-        std::fs::write(dist.join("vendor/runtime_bg.wasm"), b"wasm").expect("write wasm");
-
-        copy_app_assets(&app, &dist).expect("copy app assets");
-
-        assert_eq!(
-            std::fs::read_to_string(dist.join("src/content.js")).expect("read content"),
-            "custom content"
-        );
-        assert_eq!(
-            std::fs::read_to_string(dist.join("pages/options.html")).expect("read page"),
-            "options"
-        );
-        assert_eq!(
-            std::fs::read(dist.join("icons/icon16.png")).expect("read icon"),
-            b"icon"
-        );
-        assert_eq!(
-            std::fs::read_to_string(dist.join("resources/tlds.txt")).expect("read resource"),
-            "com"
-        );
-        assert_eq!(
-            std::fs::read(dist.join("vendor/runtime_bg.wasm")).expect("read wasm"),
-            b"wasm"
-        );
-    }
-
-    #[test]
-    fn renders_extension_pages_from_crepus_sources() {
-        let tmp = tempfile::tempdir().expect("tempdir");
-        let app = tmp.path().join("app");
-        let dist = tmp.path().join("dist/unpacked");
-        std::fs::create_dir_all(app.join("pages")).expect("pages");
-
-        std::fs::write(
-            app.join("pages/options.crepus"),
-            "section #root\n  h1\n    \"Options\"\n<style>\n#root{color:#000}\n</style>",
-        )
-        .expect("write crepus");
-
-        let manifest = crepuscularity_webext::ExtensionManifest {
-            extension: crepuscularity_webext::ExtensionInfo {
-                name: "Test Extension".to_string(),
-                version: "1.0.0".to_string(),
-                description: None,
-                author: None,
-                homepage: None,
-                minimum_chrome_version: None,
-            },
-            capabilities: Default::default(),
-            content_scripts: Vec::new(),
-            plugins: HashMap::new(),
-            options: Default::default(),
-            web_accessible_resources: Default::default(),
-            commands: Default::default(),
-            chrome_url_overrides: Default::default(),
-        };
-
-        render_crepus_pages(&app, &dist, &manifest).expect("render pages");
-        let html = std::fs::read_to_string(dist.join("pages/options.html")).expect("read html");
-        assert!(html.contains("<title>Test Extension Options</title>"));
-        assert!(html.contains("<section id=\"root\">"));
-        assert!(html.contains("#root{color:#000}"));
-        assert!(html.contains("../src/options.js"));
-    }
-
-    #[test]
-    fn renders_extension_css_from_crepus_sources() {
-        let tmp = tempfile::tempdir().expect("tempdir");
-        let app = tmp.path().join("app");
-        let dist = tmp.path().join("dist/unpacked");
-        std::fs::create_dir_all(app.join("src")).expect("src");
-
-        std::fs::write(
-            app.join("src/content.css.crepus"),
-            "div\n<style>\n.vc-find{color:#000}\n</style>",
-        )
-        .expect("write crepus css");
-
-        render_crepus_css_assets(&app, &dist).expect("render css");
-        assert_eq!(
-            std::fs::read_to_string(dist.join("src/content.css")).expect("read css"),
-            ".vc-find{color:#000}"
-        );
-    }
-
-    #[test]
-    fn appends_extension_css_to_existing_content_stylesheet() {
-        let tmp = tempfile::tempdir().expect("tempdir");
-        let app = tmp.path().join("app");
-        let dist = tmp.path().join("dist/unpacked");
-        std::fs::create_dir_all(app.join("src")).expect("src");
-        std::fs::create_dir_all(dist.join("src")).expect("dist src");
-        std::fs::write(dist.join("src/content.css"), ".framework{}").expect("framework css");
-        std::fs::write(
-            app.join("src/content.css.crepus"),
-            "motion.div\n<style>\n.app-extra{color:#123}\n</style>",
-        )
-        .expect("write crepus css");
-
-        render_crepus_css_assets(&app, &dist).expect("render css");
-        let css = std::fs::read_to_string(dist.join("src/content.css")).expect("read css");
-        assert!(css.contains(".framework{}"));
-        assert!(css.contains(".app-extra{color:#123}"));
-    }
-}
-
 // ── helpers ───────────────────────────────────────────────────────────────────
 
 fn copy_app_assets(app_path: &Path, dist: &Path) -> std::io::Result<()> {
@@ -1177,7 +1037,8 @@ fn render_crepus_page_html(
     } else {
         format!("{} {}", manifest.extension.name, title_suffix)
     };
-    let script = format!(r#"<script type="module" src="../src/{stem}.js"></script>"#);
+    let script_prefix = page_script_prefix(entry);
+    let script = format!(r#"<script type="module" src="{script_prefix}src/{stem}.js"></script>"#);
     let fonts = google_fonts_head_markup(&decorators.google_fonts);
     let style = if decorators.inline_css.is_empty() {
         String::new()
@@ -1302,4 +1163,189 @@ fn title_case(value: &str) -> String {
         })
         .collect::<Vec<_>>()
         .join(" ")
+}
+
+fn page_script_prefix(entry: &str) -> String {
+    let parent_depth = Path::new(entry)
+        .parent()
+        .map(|parent| parent.components().count())
+        .unwrap_or(0);
+    "../".repeat(parent_depth + 1)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn scaffold_crepus_toml_uses_narrow_content_scope() {
+        let toml = scaffold_crepus_toml("My Extension");
+        assert!(!toml.contains("<all_urls>"));
+
+        let manifest: crate::crepus_toml::CrepusManifest = toml::from_str(&toml).unwrap();
+        let target = manifest.targets.first().expect("target");
+        let capabilities = target.capabilities.as_ref().expect("capabilities");
+        assert!(capabilities.content_script);
+        assert_eq!(capabilities.host_permissions, vec!["https://example.com/*"]);
+    }
+
+    #[test]
+    fn copy_app_assets_overlays_app_owned_directories_only() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let app = tmp.path().join("app");
+        let dist = tmp.path().join("dist/unpacked");
+
+        std::fs::create_dir_all(app.join("src")).expect("app src");
+        std::fs::create_dir_all(app.join("pages")).expect("app pages");
+        std::fs::create_dir_all(app.join("icons")).expect("app icons");
+        std::fs::create_dir_all(app.join("resources")).expect("app resources");
+        std::fs::create_dir_all(dist.join("src")).expect("dist src");
+        std::fs::create_dir_all(dist.join("vendor")).expect("dist vendor");
+
+        std::fs::write(app.join("src/content.js"), "custom content").expect("write app src");
+        std::fs::write(app.join("pages/options.html"), "options").expect("write page");
+        std::fs::write(app.join("icons/icon16.png"), b"icon").expect("write icon");
+        std::fs::write(app.join("resources/tlds.txt"), "com").expect("write resource");
+        std::fs::write(dist.join("src/content.js"), "runtime content").expect("write runtime src");
+        std::fs::write(dist.join("vendor/runtime_bg.wasm"), b"wasm").expect("write wasm");
+
+        copy_app_assets(&app, &dist).expect("copy app assets");
+
+        assert_eq!(
+            std::fs::read_to_string(dist.join("src/content.js")).expect("read content"),
+            "custom content"
+        );
+        assert_eq!(
+            std::fs::read_to_string(dist.join("pages/options.html")).expect("read page"),
+            "options"
+        );
+        assert_eq!(
+            std::fs::read(dist.join("icons/icon16.png")).expect("read icon"),
+            b"icon"
+        );
+        assert_eq!(
+            std::fs::read_to_string(dist.join("resources/tlds.txt")).expect("read resource"),
+            "com"
+        );
+        assert_eq!(
+            std::fs::read(dist.join("vendor/runtime_bg.wasm")).expect("read wasm"),
+            b"wasm"
+        );
+    }
+
+    #[test]
+    fn renders_extension_pages_from_crepus_sources() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let app = tmp.path().join("app");
+        let dist = tmp.path().join("dist/unpacked");
+        std::fs::create_dir_all(app.join("pages")).expect("pages");
+
+        std::fs::write(
+            app.join("pages/options.crepus"),
+            "section #root\n  h1\n    \"Options\"\n<style>\n#root{color:#000}\n</style>",
+        )
+        .expect("write crepus");
+
+        let manifest = crepuscularity_webext::ExtensionManifest {
+            extension: crepuscularity_webext::ExtensionInfo {
+                name: "Test Extension".to_string(),
+                version: "1.0.0".to_string(),
+                description: None,
+                author: None,
+                homepage: None,
+                minimum_chrome_version: None,
+            },
+            capabilities: Default::default(),
+            content_scripts: Vec::new(),
+            plugins: HashMap::new(),
+            options: Default::default(),
+            web_accessible_resources: Default::default(),
+            commands: Default::default(),
+            chrome_url_overrides: Default::default(),
+        };
+
+        render_crepus_pages(&app, &dist, &manifest).expect("render pages");
+        let html = std::fs::read_to_string(dist.join("pages/options.html")).expect("read html");
+        assert!(html.contains("<title>Test Extension Options</title>"));
+        assert!(html.contains("<section id=\"root\">"));
+        assert!(html.contains("#root{color:#000}"));
+        assert!(html.contains("../src/options.js"));
+    }
+
+    #[test]
+    fn renders_nested_extension_pages_with_correct_script_path() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let app = tmp.path().join("app");
+        let dist = tmp.path().join("dist/unpacked");
+        std::fs::create_dir_all(app.join("pages/settings")).expect("pages");
+
+        std::fs::write(
+            app.join("pages/settings/options.crepus"),
+            "section #root\n  h1\n    \"Options\"",
+        )
+        .expect("write crepus");
+
+        let manifest = crepuscularity_webext::ExtensionManifest {
+            extension: crepuscularity_webext::ExtensionInfo {
+                name: "Test Extension".to_string(),
+                version: "1.0.0".to_string(),
+                description: None,
+                author: None,
+                homepage: None,
+                minimum_chrome_version: None,
+            },
+            capabilities: Default::default(),
+            content_scripts: Vec::new(),
+            plugins: HashMap::new(),
+            options: Default::default(),
+            web_accessible_resources: Default::default(),
+            commands: Default::default(),
+            chrome_url_overrides: Default::default(),
+        };
+
+        render_crepus_pages(&app, &dist, &manifest).expect("render pages");
+        let html =
+            std::fs::read_to_string(dist.join("pages/settings/options.html")).expect("read html");
+        assert!(html.contains("../../src/options.js"));
+    }
+
+    #[test]
+    fn renders_extension_css_from_crepus_sources() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let app = tmp.path().join("app");
+        let dist = tmp.path().join("dist/unpacked");
+        std::fs::create_dir_all(app.join("src")).expect("src");
+
+        std::fs::write(
+            app.join("src/content.css.crepus"),
+            "div\n<style>\n.vc-find{color:#000}\n</style>",
+        )
+        .expect("write crepus css");
+
+        render_crepus_css_assets(&app, &dist).expect("render css");
+        assert_eq!(
+            std::fs::read_to_string(dist.join("src/content.css")).expect("read css"),
+            ".vc-find{color:#000}"
+        );
+    }
+
+    #[test]
+    fn appends_extension_css_to_existing_content_stylesheet() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let app = tmp.path().join("app");
+        let dist = tmp.path().join("dist/unpacked");
+        std::fs::create_dir_all(app.join("src")).expect("src");
+        std::fs::create_dir_all(dist.join("src")).expect("dist src");
+        std::fs::write(dist.join("src/content.css"), ".framework{}").expect("framework css");
+        std::fs::write(
+            app.join("src/content.css.crepus"),
+            "motion.div\n<style>\n.app-extra{color:#123}\n</style>",
+        )
+        .expect("write crepus css");
+
+        render_crepus_css_assets(&app, &dist).expect("render css");
+        let css = std::fs::read_to_string(dist.join("src/content.css")).expect("read css");
+        assert!(css.contains(".framework{}"));
+        assert!(css.contains(".app-extra{color:#123}"));
+    }
 }
