@@ -147,6 +147,7 @@ crepus ios generate [--dir]          # Run xcodegen (finds crepus.toml [ios] upw
 crepus ios build [--dir] [...]       # Simulator build via xcodebuild
 
 crepus native ir <file.crepus>       # Emit View IR JSON for plugins and native shells
+crepus native sync <file.crepus> --dir <app> [--out FILE]  # Write View IR fixtures into native containers
 
 crepus embedded check <file.crepus>  # UNSTABLE: validate template for firmware CI
 crepus embedded snapshot … --out x.ppm  # UNSTABLE: debug PPM only (use Ui + rgb565() on device)

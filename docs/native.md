@@ -49,6 +49,14 @@ cd android && gradle wrapper --gradle-version 8.10
 connected device/emulator and prints the `adb shell am start` line you need to
 launch the app.
 
+The scaffold includes `views/main.crepus` as the Crepus-authored UI source.
+When the template changes, sync the shared View IR fixture into the native
+containers:
+
+```bash
+crepus native sync views/main.crepus --dir . --out desktop/share/dashboard.view-ir.json --var name=Ada --pretty
+```
+
 ### iOS-only scaffold with XcodeGen + a real `.xcodeproj`
 
 If you want a generated Xcode project (rather than a SwiftPM package), use the
@@ -73,6 +81,7 @@ Convert `.crepus` templates to View IR JSON:
 
 ```bash
 crepus native ir views/main.crepus --ctx context.json --pretty
+crepus native sync views/main.crepus --dir my-mobile-app --out desktop/share/dashboard.view-ir.json --var name=Ada --pretty
 ```
 
 ```rust

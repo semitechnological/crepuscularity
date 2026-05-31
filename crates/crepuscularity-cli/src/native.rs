@@ -39,6 +39,11 @@ pub fn run(args: &[String]) {
         Some("ir") => {
             run_ir(&args[1..]);
         }
+        Some("sync") => {
+            if let Err(e) = sync_native_fixture_inner(&args[1..]) {
+                ui::error(&e);
+            }
+        }
         Some("build") => match args.get(1).map(|s| s.as_str()) {
             Some("ios") => {
                 let options = BuildOptions::parse_or_exit(&args[2..]);
@@ -106,6 +111,17 @@ struct IrArgs {
     stdin: bool,
     stdin_json: bool,
     base_dir: Option<PathBuf>,
+}
+
+struct SyncArgs {
+    template: PathBuf,
+    dir: PathBuf,
+    outputs: Vec<PathBuf>,
+    defaults: bool,
+    component: Option<String>,
+    ctx_file: Option<PathBuf>,
+    vars: Vec<(String, String)>,
+    pretty: bool,
 }
 
 fn run_ir(args: &[String]) {
@@ -331,6 +347,189 @@ fn stringify_ir(ir: &crepuscularity_native::ViewIr, pretty: bool) -> Result<Stri
     }
 }
 
+fn sync_native_fixture_inner(args: &[String]) -> Result<(), String> {
+    let parsed = parse_sync_args(args)?;
+    if !parsed.dir.exists() {
+        return Err(format!(
+            "native scaffold dir not found: {}",
+            parsed.dir.display()
+        ));
+    }
+    let root = fs::canonicalize(&parsed.dir).unwrap_or(parsed.dir);
+    let template_path = resolve_template_path(&root, &parsed.template);
+    let template = fs::read_to_string(&template_path)
+        .map_err(|e| format!("read {}: {e}", template_path.display()))?;
+
+    let mut ctx = TemplateContext::new();
+    if let Some(path) = &parsed.ctx_file {
+        load_json_ctx(path, &mut ctx)?;
+    }
+    for (key, raw) in parsed.vars {
+        ctx.set(key, parse_var_value(&raw));
+    }
+    ctx.base_dir = template_path.parent().map(Path::to_path_buf);
+
+    let ir = if let Some(component) = parsed.component {
+        render_component_file_to_ir(&template, &component, &ctx)?
+    } else {
+        render_template_to_ir(&template, &ctx)?
+    };
+    let mut json = stringify_ir(&ir, parsed.pretty)?;
+    if !json.ends_with('\n') {
+        json.push('\n');
+    }
+
+    let mut written = 0;
+    if parsed.defaults {
+        for path in default_fixture_output_paths(&root) {
+            if let Some(parent) = path.parent() {
+                if parent.exists() {
+                    fs::write(&path, &json)
+                        .map_err(|e| format!("write {}: {e}", path.display()))?;
+                    written += 1;
+                }
+            }
+        }
+    }
+    for path in explicit_fixture_output_paths(&root, &parsed.outputs) {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).map_err(|e| format!("create {}: {e}", parent.display()))?;
+        }
+        fs::write(&path, &json).map_err(|e| format!("write {}: {e}", path.display()))?;
+        written += 1;
+    }
+    if written == 0 {
+        return Err(format!(
+            "no native fixture directories found under {}",
+            root.display()
+        ));
+    }
+    ui::success(&format!(
+        "synced View IR fixture from {}",
+        template_path.display()
+    ));
+    Ok(())
+}
+
+fn parse_sync_args(args: &[String]) -> Result<SyncArgs, String> {
+    let mut template = None;
+    let mut dir = PathBuf::from(".");
+    let mut outputs = Vec::new();
+    let mut defaults = true;
+    let mut component = None;
+    let mut ctx_file = None;
+    let mut vars = Vec::new();
+    let mut pretty = false;
+    let mut i = 0;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--dir" => {
+                i += 1;
+                dir = args
+                    .get(i)
+                    .map(PathBuf::from)
+                    .ok_or_else(|| "--dir expects a path".to_string())?;
+            }
+            "--component" => {
+                i += 1;
+                component = args.get(i).cloned();
+                if component.is_none() {
+                    return Err("--component expects a name".to_string());
+                }
+            }
+            "--out" => {
+                i += 1;
+                outputs.push(
+                    args.get(i)
+                        .map(PathBuf::from)
+                        .ok_or_else(|| "--out expects a file path".to_string())?,
+                );
+            }
+            "--ctx" => {
+                i += 1;
+                ctx_file = args.get(i).map(PathBuf::from);
+                if ctx_file.is_none() {
+                    return Err("--ctx expects a file path".to_string());
+                }
+            }
+            "--var" => {
+                i += 1;
+                let Some(raw) = args.get(i) else {
+                    return Err("--var expects key=value".to_string());
+                };
+                let Some((key, value)) = raw.split_once('=') else {
+                    return Err(format!("--var expects key=value, got: {raw}"));
+                };
+                vars.push((key.to_string(), value.to_string()));
+            }
+            "--pretty" => pretty = true,
+            "--no-defaults" => defaults = false,
+            other => {
+                if other.starts_with("--dir=") {
+                    dir = PathBuf::from(other.trim_start_matches("--dir="));
+                } else if other.starts_with("--out=") {
+                    outputs.push(PathBuf::from(other.trim_start_matches("--out=")));
+                } else if other.starts_with('-') {
+                    return Err(format!("unknown option: {other}"));
+                } else if template.is_some() {
+                    return Err(format!("unexpected argument: {other}"));
+                } else {
+                    template = Some(PathBuf::from(other));
+                }
+            }
+        }
+        i += 1;
+    }
+
+    let template = template.ok_or_else(|| {
+        "Usage: crepus native sync <file.crepus> [--dir <project>] [--out FILE] [--no-defaults] [--ctx FILE] [--var k=v] [--pretty]".to_string()
+    })?;
+    Ok(SyncArgs {
+        template,
+        dir,
+        outputs,
+        defaults,
+        component,
+        ctx_file,
+        vars,
+        pretty,
+    })
+}
+
+fn resolve_template_path(root: &Path, template: &Path) -> PathBuf {
+    if template.is_absolute() {
+        return template.to_path_buf();
+    }
+    let rooted = root.join(template);
+    if rooted.exists() {
+        rooted
+    } else {
+        template.to_path_buf()
+    }
+}
+
+fn default_fixture_output_paths(root: &Path) -> Vec<PathBuf> {
+    vec![
+        root.join("fixture.json"),
+        root.join("ios/Sources/NativeShell/fixture.json"),
+        root.join("NativeShell/Sources/NativeShell/fixture.json"),
+        root.join("android/app/src/main/assets/fixture.json"),
+    ]
+}
+
+fn explicit_fixture_output_paths(root: &Path, explicit: &[PathBuf]) -> Vec<PathBuf> {
+    explicit
+        .iter()
+        .map(|path| {
+            if path.is_absolute() {
+                path.to_path_buf()
+            } else {
+                root.join(path)
+            }
+        })
+        .collect()
+}
+
 /// Each entry is `(relative path within the scaffold root, file content)`.
 ///
 /// Embedding via `include_str!` keeps the templates next to the published
@@ -338,6 +537,10 @@ fn stringify_ir(ir: &crepuscularity_native::ViewIr, pretty: bool) -> Result<Stri
 /// publish` walks the source tree by default and picks them up.
 const TEMPLATE_FILES: &[(&str, &str)] = &[
     ("README.md", include_str!("../templates/native/README.md")),
+    (
+        "views/main.crepus",
+        include_str!("../templates/native/views/main.crepus"),
+    ),
     ("fixture.json", include_str!("../templates/native/fixture.json")),
     ("ios/Package.swift", include_str!("../templates/native/ios/Package.swift")),
     (
@@ -625,6 +828,11 @@ fn print_native_usage() {
     );
     eprintln!(
         "  {}  {}",
+        style("sync <file.crepus> [--dir P] [--out FILE]").green(),
+        style("write View IR fixture JSON into a native scaffold").dim()
+    );
+    eprintln!(
+        "  {}  {}",
         style("build ios [--dir <path>]    ").green(),
         style("swift build inside <dir>/ios").dim()
     );
@@ -647,6 +855,7 @@ fn print_native_usage() {
     eprintln!("{}", style("EXAMPLES").dim());
     eprintln!("  crepus native new my-mobile-app");
     eprintln!("  crepus native ir views/main.crepus --ctx context.json --pretty");
+    eprintln!("  crepus native sync views/main.crepus --dir my-mobile-app --out app/Resources/dashboard.view-ir.json --no-defaults --var name=Ada --pretty");
     eprintln!("  crepus native build ios --dir my-mobile-app");
     eprintln!("  crepus native build android --dir my-mobile-app --flavor Debug");
     eprintln!("  crepus native run android --dir my-mobile-app");
@@ -689,6 +898,76 @@ mod tests {
         assert_eq!(parse_flavor(&v), Some("Debug".to_string()));
         let v: Vec<String> = vec![];
         assert_eq!(parse_flavor(&v), None);
+    }
+
+    #[test]
+    fn sync_fixture_writes_native_shell_outputs() {
+        let temp = tempfile::tempdir().unwrap();
+        let root = temp.path().join("app");
+        fs::create_dir_all(root.join("views")).unwrap();
+        fs::create_dir_all(root.join("ios/Sources/NativeShell")).unwrap();
+        fs::create_dir_all(root.join("android/app/src/main/assets")).unwrap();
+        fs::write(
+            root.join("views/main.crepus"),
+            "div flex flex-col\n  span\n    \"Hello {name}\"",
+        )
+        .unwrap();
+
+        sync_native_fixture_inner(&[
+            "views/main.crepus".to_string(),
+            "--dir".to_string(),
+            root.display().to_string(),
+            "--var".to_string(),
+            "name=Acme".to_string(),
+            "--out".to_string(),
+            "linux/share/dashboard.view-ir.json".to_string(),
+            "--pretty".to_string(),
+        ])
+        .unwrap();
+
+        let root_fixture = fs::read_to_string(root.join("fixture.json")).unwrap();
+        let ios_fixture =
+            fs::read_to_string(root.join("ios/Sources/NativeShell/fixture.json")).unwrap();
+        let android_fixture =
+            fs::read_to_string(root.join("android/app/src/main/assets/fixture.json")).unwrap();
+        let linux_fixture =
+            fs::read_to_string(root.join("linux/share/dashboard.view-ir.json")).unwrap();
+
+        assert_eq!(root_fixture, ios_fixture);
+        assert_eq!(root_fixture, android_fixture);
+        assert_eq!(root_fixture, linux_fixture);
+        assert!(root_fixture.contains("Hello Acme"));
+        assert!(root_fixture.contains("\"kind\": \"stack\""));
+    }
+
+    #[test]
+    fn sync_fixture_can_write_only_explicit_outputs() {
+        let temp = tempfile::tempdir().unwrap();
+        let root = temp.path().join("app");
+        fs::create_dir_all(root.join("views")).unwrap();
+        fs::write(
+            root.join("views/main.crepus"),
+            "div flex flex-col\n  span\n    \"Hello {name}\"",
+        )
+        .unwrap();
+
+        sync_native_fixture_inner(&[
+            "views/main.crepus".to_string(),
+            "--dir".to_string(),
+            root.display().to_string(),
+            "--no-defaults".to_string(),
+            "--out".to_string(),
+            "desktop/dashboard.view-ir.json".to_string(),
+            "--var".to_string(),
+            "name=Acme".to_string(),
+            "--pretty".to_string(),
+        ])
+        .unwrap();
+
+        let desktop_fixture =
+            fs::read_to_string(root.join("desktop/dashboard.view-ir.json")).unwrap();
+        assert!(!root.join("fixture.json").exists());
+        assert!(desktop_fixture.contains("Hello Acme"));
     }
 
     #[test]

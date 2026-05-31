@@ -324,7 +324,7 @@ crepus ios build
 
 `crepus ios generate` and `crepus ios build` **walk up** from the current directory until they find **`crepus.toml`** with an **`[ios]`** section — you normally do not need `--dir` or `--scheme`. Optional overrides: `crepus ios build --dir . --scheme Foo --destination 'platform=iOS Simulator,name=iPhone 15'`.
 
-To refresh bundled fixtures after template changes, regenerate IR with **`crepuscularity-native`** (`render_template_to_ir` / `to_json_pretty`) and replace `NativeShell/Sources/NativeShell/fixture.json`. See [`examples/native-shells/README.md`](../examples/native-shells/README.md).
+To refresh bundled fixtures after template changes, regenerate IR with **`crepuscularity-native`** (`render_template_to_ir` / `to_json_pretty`) and replace `NativeShell/Sources/NativeShell/fixture.json`. For `crepus native new` scaffolds, `crepus native sync views/main.crepus --dir . --out desktop/share/dashboard.view-ir.json --var name=Ada --pretty` writes the same View IR JSON into the root, iOS, Android, and explicit host fixture locations. Add `--no-defaults` when only the explicit `--out` files should be written. See [`examples/native-shells/README.md`](../examples/native-shells/README.md).
 
 ## Examples
 
@@ -338,6 +338,7 @@ Emit the same **View IR** JSON contract used by native shells and polyglot plugi
 crepus native ir views/main.crepus --ctx context.json --pretty
 crepus native ir views/ui.crepus --component Card --var title=Hello
 cat views/main.crepus | crepus native ir --stdin --base-dir views
+crepus native sync views/main.crepus --dir my-mobile-app --out desktop/share/dashboard.view-ir.json --no-defaults --var name=Ada --pretty
 ```
 
 For tool integrations, `crepus native ir --stdin-json` accepts an envelope with `entry`, `files`, `template`, `context`, and `pretty`. Successful output is JSON on stdout only; failures are JSON on stderr. See [Polyglot plugins](polyglot.md).

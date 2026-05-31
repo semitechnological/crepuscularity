@@ -8,7 +8,7 @@ This directory is the **in-repo** counterpart to the old **`crepuscularity-nativ
 
 ## Shared fixture
 
-[`fixture.json`](fixture.json) matches the golden output for:
+[`fixture.json`](fixture.json) matches the golden output for [`views/main.crepus`](views/main.crepus):
 
 ```text
 div flex flex-col gap-4
@@ -18,6 +18,7 @@ div flex flex-col gap-4
 
 with `name = Ada`. Keep these copies in sync when you change the sample:
 
+- [`views/main.crepus`](views/main.crepus) (Crepus-authored source)
 - [`fixture.json`](fixture.json) (repo root of this example)
 - [`ios/Sources/NativeShell/fixture.json`](ios/Sources/NativeShell/fixture.json) (SwiftPM resource)
 - [`android/app/src/main/assets/fixture.json`](android/app/src/main/assets/fixture.json)
@@ -60,7 +61,7 @@ CLI build (simulator), from inside the app tree:
 crepus ios build
 ```
 
-After changing templates, refresh **`NativeShell/Sources/NativeShell/fixture.json`** in the scaffolded app using **`crepuscularity-native`** (see **Rust ↔ JSON** below).
+After changing templates, refresh scaffolded fixtures with `crepus native sync views/main.crepus --dir . --var name=Ada --pretty`, or write **`NativeShell/Sources/NativeShell/fixture.json`** directly using **`crepuscularity-native`** (see **Rust ↔ JSON** below).
 
 ## Android
 
