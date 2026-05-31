@@ -185,12 +185,7 @@ fn append_hydration_payload(
     bind: &BindMap,
 ) -> Result<(), String> {
     let ctx_val = serialize_ctx_for_ssr(ctx)?;
-    let payload = json!({
-        "v": 1,
-        "ctx": ctx_val,
-        "bind": Value::Object(bind.clone()),
-    });
-    let raw = serde_json::to_vec(&payload).map_err(|e| e.to_string())?;
+    let raw = crate::hydration_payload_bytes(ctx_val, Value::Object(bind.clone()))?;
     let b64 = base64::engine::general_purpose::STANDARD.encode(raw);
     let script = format!(
         r#"<script type="application/json" id="__crepus_hydration__" data-crepus-encoding="base64">{b64}</script>"#

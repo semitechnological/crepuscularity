@@ -966,16 +966,21 @@ fn render_crepus_pages(
         // WASM exports use underscore, not hyphen
         let fn_name = stem.replace('-', "_");
 
-        // Generate JS bootstrapper for every page stem
+        let js_vendor_prefix = page_script_prefix(entry);
         let js = format!(
-            r#"import init, * as runtime from "../vendor/runtime.js";
-const wasmBytes = await fetch("../vendor/runtime_bg.wasm").then(r => r.arrayBuffer());
+            r#"import init, * as runtime from "{prefix}vendor/runtime.js";
+const wasmBytes = await fetch("{prefix}vendor/runtime_bg.wasm").then(r => r.arrayBuffer());
 await init({{ module_or_path: wasmBytes }});
 if (typeof runtime.{fn}_main === "function") runtime.{fn}_main();"#,
+            prefix = js_vendor_prefix,
             fn = fn_name
         );
-        std::fs::write(src_dir.join(format!("{stem}.js")), &js)
-            .map_err(|e| format!("write {stem}.js: {e}"))?;
+        let js_output = src_dir.join(page_script_relative_path(entry));
+        if let Some(parent) = js_output.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+        }
+        std::fs::write(&js_output, &js)
+            .map_err(|e| format!("write {}: {e}", js_output.display()))?;
 
         let html = render_crepus_page_html(source, &files, entry, manifest)?;
         let output = out_dir
@@ -1037,8 +1042,8 @@ fn render_crepus_page_html(
     } else {
         format!("{} {}", manifest.extension.name, title_suffix)
     };
-    let script_prefix = page_script_prefix(entry);
-    let script = format!(r#"<script type="module" src="{script_prefix}src/{stem}.js"></script>"#);
+    let script_src = page_script_src(entry);
+    let script = format!(r#"<script type="module" src="{script_src}"></script>"#);
     let fonts = google_fonts_head_markup(&decorators.google_fonts);
     let style = if decorators.inline_css.is_empty() {
         String::new()
@@ -1165,12 +1170,23 @@ fn title_case(value: &str) -> String {
         .join(" ")
 }
 
+fn page_script_src(entry: &str) -> String {
+    let relative = page_script_relative_path(entry)
+        .to_string_lossy()
+        .replace('\\', "/");
+    format!("{}src/{relative}", page_script_prefix(entry))
+}
+
 fn page_script_prefix(entry: &str) -> String {
     let parent_depth = Path::new(entry)
         .parent()
         .map(|parent| parent.components().count())
         .unwrap_or(0);
     "../".repeat(parent_depth + 1)
+}
+
+fn page_script_relative_path(entry: &str) -> PathBuf {
+    Path::new(entry).with_extension("js")
 }
 
 #[cfg(test)]
@@ -1306,7 +1322,60 @@ mod tests {
         render_crepus_pages(&app, &dist, &manifest).expect("render pages");
         let html =
             std::fs::read_to_string(dist.join("pages/settings/options.html")).expect("read html");
-        assert!(html.contains("../../src/options.js"));
+        assert!(html.contains("../../src/settings/options.js"));
+    }
+
+    #[test]
+    fn renders_duplicate_page_stems_without_js_collision() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let app = tmp.path().join("app");
+        let dist = tmp.path().join("dist/unpacked");
+        std::fs::create_dir_all(app.join("pages/admin")).expect("admin pages");
+        std::fs::create_dir_all(app.join("pages/settings")).expect("settings pages");
+
+        std::fs::write(
+            app.join("pages/admin/options.crepus"),
+            "section #admin\n  h1\n    \"Admin\"",
+        )
+        .expect("write admin crepus");
+        std::fs::write(
+            app.join("pages/settings/options.crepus"),
+            "section #settings\n  h1\n    \"Settings\"",
+        )
+        .expect("write settings crepus");
+
+        let manifest = crepuscularity_webext::ExtensionManifest {
+            extension: crepuscularity_webext::ExtensionInfo {
+                name: "Test Extension".to_string(),
+                version: "1.0.0".to_string(),
+                description: None,
+                author: None,
+                homepage: None,
+                minimum_chrome_version: None,
+            },
+            capabilities: Default::default(),
+            content_scripts: Vec::new(),
+            plugins: HashMap::new(),
+            options: Default::default(),
+            web_accessible_resources: Default::default(),
+            commands: Default::default(),
+            chrome_url_overrides: Default::default(),
+        };
+
+        render_crepus_pages(&app, &dist, &manifest).expect("render pages");
+        let admin_html =
+            std::fs::read_to_string(dist.join("pages/admin/options.html")).expect("admin html");
+        let settings_html = std::fs::read_to_string(dist.join("pages/settings/options.html"))
+            .expect("settings html");
+
+        assert!(admin_html.contains("../../src/admin/options.js"));
+        assert!(settings_html.contains("../../src/settings/options.js"));
+        let admin_js =
+            std::fs::read_to_string(dist.join("src/admin/options.js")).expect("admin js");
+        let settings_js =
+            std::fs::read_to_string(dist.join("src/settings/options.js")).expect("settings js");
+        assert!(admin_js.contains(r#"from "../../vendor/runtime.js""#));
+        assert!(settings_js.contains(r#"from "../../vendor/runtime.js""#));
     }
 
     #[test]

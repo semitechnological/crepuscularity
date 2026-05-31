@@ -613,13 +613,7 @@ pub fn render_template_to_html_with_hydration(
     // Serialize context vars to JSON.
     use base64::{engine::general_purpose::STANDARD, Engine as _};
 
-    let payload = serde_json::json!({
-        "v": 1,
-        "ctx": serde_json::from_str::<serde_json::Value>(&serialize_ctx_to_json(ctx))
-            .unwrap_or_else(|_| serde_json::json!({})),
-        "bind": {},
-    });
-    let raw = serde_json::to_vec(&payload).map_err(|e| e.to_string())?;
+    let raw = hydration_payload_bytes(serialize_ctx_to_value(ctx), serde_json::json!({}))?;
     let ctx_b64 = STANDARD.encode(raw);
     let script = format!(
         r#"<script id="__crepus_hydration__" type="application/json" data-crepus-encoding="base64">{ctx_b64}</script>"#
@@ -762,14 +756,27 @@ fn render_element_with_hydration(
     Ok(out)
 }
 
+#[cfg(any(feature = "hydration", feature = "ssr"))]
+pub(crate) fn hydration_payload_bytes(
+    ctx: serde_json::Value,
+    bind: serde_json::Value,
+) -> Result<Vec<u8>, String> {
+    let payload = serde_json::json!({
+        "v": 1,
+        "ctx": ctx,
+        "bind": bind,
+    });
+    serde_json::to_vec(&payload).map_err(|e| e.to_string())
+}
+
 #[cfg(feature = "hydration")]
-fn serialize_ctx_to_json(ctx: &TemplateContext) -> String {
+fn serialize_ctx_to_value(ctx: &TemplateContext) -> serde_json::Value {
     use serde_json::{Map, Value};
     let mut map = Map::new();
     for (key, val) in &ctx.vars {
         map.insert(key.clone(), template_value_to_json(val));
     }
-    serde_json::to_string(&Value::Object(map)).unwrap_or_else(|_| "{}".to_string())
+    Value::Object(map)
 }
 
 pub(crate) fn escape_html(input: &str) -> String {

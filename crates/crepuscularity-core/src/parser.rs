@@ -2038,7 +2038,7 @@ div
         let file = parse_component_file(source).expect("frontmatter should parse");
         let panel = file.components.get("Panel").expect("Panel component");
         assert_eq!(
-            panel.meta.defaults.get("warning").map(|e| format!("{e}")),
+            panel.meta.defaults.get("warning").map(|e| e.to_string()),
             Some("\"sandboxed\"".to_string())
         );
     }

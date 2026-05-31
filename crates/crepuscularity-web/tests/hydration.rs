@@ -17,6 +17,10 @@ fn hydration_context_json(html: &str) -> String {
     String::from_utf8(STANDARD.decode(b64).expect("base64 context")).expect("utf-8 context")
 }
 
+fn hydration_context_value(html: &str) -> Value {
+    serde_json::from_str(&hydration_context_json(html)).expect("hydration json")
+}
+
 #[test]
 fn hydration_injects_root_marker() {
     let tpl = r#"div p-4
@@ -60,8 +64,7 @@ fn hydration_ctx_json_contains_vars() {
     ctx.set("city", "London");
     ctx.set("temp", 14i64);
     let html = render_template_to_html_with_hydration(tpl, &ctx).unwrap();
-    let json = hydration_context_json(&html);
-    let value: Value = serde_json::from_str(&json).expect("hydration json");
+    let value = hydration_context_value(&html);
     assert!(
         value["ctx"].get("city").is_some(),
         "expected city key in ctx JSON, got: {value}"
@@ -70,6 +73,23 @@ fn hydration_ctx_json_contains_vars() {
         value["ctx"]["city"] == "London",
         "expected London value in ctx JSON, got: {value}"
     );
+}
+
+#[test]
+fn hydration_payload_uses_canonical_manifest_shape() {
+    let tpl = r#"button @click="increment"
+  "Count: {count}""#;
+    let mut ctx = TemplateContext::new();
+    ctx.set("count", 1i64);
+
+    let html = render_template_to_html_with_hydration(tpl, &ctx).unwrap();
+    let value = hydration_context_value(&html);
+
+    assert_eq!(value["v"], 1);
+    assert!(value["ctx"].is_object());
+    assert!(value["bind"].is_object());
+    assert_eq!(value["ctx"]["count"], 1);
+    assert!(html.contains("data-onclick=\"increment\""));
 }
 
 #[test]
