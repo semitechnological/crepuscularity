@@ -63,7 +63,6 @@ mod web_serve;
 mod webext;
 
 use console::style;
-#[cfg(feature = "desktop")]
 use std::time::Instant;
 
 fn main() {
@@ -122,7 +121,6 @@ fn main() {
             dev::run(bin, options, emit_events);
         }
 
-        #[cfg(feature = "desktop")]
         Some("build") => {
             let options = build_options::BuildOptions::parse_or_exit(&args[2..]);
             let build_args = build_options::strip_build_options_or_exit(&args[2..]);
@@ -147,7 +145,10 @@ fn main() {
             } else {
                 "cargo build"
             });
+            #[cfg(feature = "desktop")]
             let outcome = builder::cargo_build(&cwd, options, None);
+            #[cfg(not(feature = "desktop"))]
+            let outcome = cargo_build_fallback(&cwd, options);
             if outcome.success {
                 ui::spinner_ok(&sp, "build succeeded");
                 ui::done_in(t0.elapsed());
@@ -229,6 +230,25 @@ fn manifest_arg(args: &[String]) -> Option<std::path::PathBuf> {
         i += 1;
     }
     None
+}
+
+#[cfg(not(feature = "desktop"))]
+struct CargoBuildOutcome {
+    success: bool,
+}
+
+#[cfg(not(feature = "desktop"))]
+fn cargo_build_fallback(
+    cwd: &std::path::Path,
+    options: build_options::BuildOptions,
+) -> CargoBuildOutcome {
+    let mut cmd = std::process::Command::new("cargo");
+    cmd.arg("build").current_dir(cwd);
+    if options.release() {
+        cmd.arg("--release");
+    }
+    let success = cmd.status().map(|status| status.success()).unwrap_or(false);
+    CargoBuildOutcome { success }
 }
 
 fn run_init(args: &[String]) {

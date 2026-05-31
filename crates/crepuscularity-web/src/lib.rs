@@ -613,10 +613,16 @@ pub fn render_template_to_html_with_hydration(
     // Serialize context vars to JSON.
     use base64::{engine::general_purpose::STANDARD, Engine as _};
 
-    let ctx_json = serialize_ctx_to_json(ctx);
-    let ctx_b64 = STANDARD.encode(ctx_json.as_bytes());
+    let payload = serde_json::json!({
+        "v": 1,
+        "ctx": serde_json::from_str::<serde_json::Value>(&serialize_ctx_to_json(ctx))
+            .unwrap_or_else(|_| serde_json::json!({})),
+        "bind": {},
+    });
+    let raw = serde_json::to_vec(&payload).map_err(|e| e.to_string())?;
+    let ctx_b64 = STANDARD.encode(raw);
     let script = format!(
-        r#"<script id="__crepus_ctx__" type="application/json" data-encoding="base64">{ctx_b64}</script>"#
+        r#"<script id="__crepus_hydration__" type="application/json" data-crepus-encoding="base64">{ctx_b64}</script>"#
     );
 
     Ok(format!("{rendered}{script}"))
@@ -761,39 +767,7 @@ fn serialize_ctx_to_json(ctx: &TemplateContext) -> String {
     use serde_json::{Map, Value};
     let mut map = Map::new();
     for (key, val) in &ctx.vars {
-        let json_val = match val {
-            TemplateValue::Str(s) => Value::String(s.clone()),
-            TemplateValue::Int(n) => Value::Number((*n).into()),
-            TemplateValue::Float(f) => serde_json::Number::from_f64(*f)
-                .map(Value::Number)
-                .unwrap_or(Value::Null),
-            TemplateValue::Bool(b) => Value::Bool(*b),
-            TemplateValue::Null => Value::Null,
-            TemplateValue::List(items) => Value::Array(
-                items
-                    .iter()
-                    .map(|item_ctx| {
-                        let mut item_map = Map::new();
-                        for (k, v) in &item_ctx.vars {
-                            item_map.insert(
-                                k.clone(),
-                                match v {
-                                    TemplateValue::Str(s) => Value::String(s.clone()),
-                                    TemplateValue::Int(n) => Value::Number((*n).into()),
-                                    TemplateValue::Float(f) => serde_json::Number::from_f64(*f)
-                                        .map(Value::Number)
-                                        .unwrap_or(Value::Null),
-                                    TemplateValue::Bool(b) => Value::Bool(*b),
-                                    _ => Value::Null,
-                                },
-                            );
-                        }
-                        Value::Object(item_map)
-                    })
-                    .collect(),
-            ),
-        };
-        map.insert(key.clone(), json_val);
+        map.insert(key.clone(), template_value_to_json(val));
     }
     serde_json::to_string(&Value::Object(map)).unwrap_or_else(|_| "{}".to_string())
 }

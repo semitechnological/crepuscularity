@@ -111,7 +111,7 @@ Output:
 
 Crepuscularity is not trying to be only an extension framework. Treat webext as the browser-extension target inside a broader `.crepus` systems UI pipeline: the same source language can also target GPUI, Ratatui, web output, View IR for native shells, embedded framebuffers, and LVGL Pro.
 
-Oxichrome is stronger when the job is “write the whole extension as a Leptos-style Rust app with proc-macro entrypoints.” Crepuscularity should compete where the target is “React Native on steroids”: one compact UI language, Rust-owned build/runtime plumbing, and multiple non-browser surfaces from the same template model. The webext target should keep improving around typed browser APIs, generated entrypoint glue, and browser-specific bundles while preserving least-privilege manifests.
+Oxichrome is stronger when the job is “write the whole extension as a Leptos-style Rust app with proc-macro entrypoints.” Crepuscularity should compete where the target is one compact UI language, Rust-owned build/runtime plumbing, and multiple non-browser surfaces from the same template model. The webext target should keep improving around typed browser APIs, generated entrypoint glue, and browser-specific bundles while preserving least-privilege manifests.
 
 ## WASM Runtime
 

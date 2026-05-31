@@ -27,18 +27,31 @@ fn decode_ctx_payload(raw: &str, encoding: Option<&str>) -> HashMap<String, Valu
             .and_then(|bytes| String::from_utf8(bytes).ok()),
         _ => Some(raw.to_string()),
     };
-    json.and_then(|s| serde_json::from_str(&s).ok())
+    json.and_then(|s| serde_json::from_str::<Value>(&s).ok())
+        .and_then(|value| {
+            if let Some(ctx) = value.get("ctx").and_then(Value::as_object) {
+                return Some(ctx.clone().into_iter().collect());
+            }
+            value
+                .as_object()
+                .cloned()
+                .map(|obj| obj.into_iter().collect())
+        })
         .unwrap_or_default()
 }
 
 #[cfg(target_arch = "wasm32")]
 fn read_ctx() -> HashMap<String, Value> {
     let doc = web_sys::window().unwrap().document().unwrap();
-    let Some(el) = doc.get_element_by_id("__crepus_ctx__") else {
-        return Default::default();
-    };
-    let encoding = el.get_attribute("data-encoding");
-    decode_ctx_payload(&el.text_content().unwrap_or_default(), encoding.as_deref())
+    if let Some(el) = doc.get_element_by_id("__crepus_hydration__") {
+        let encoding = el.get_attribute("data-crepus-encoding");
+        return decode_ctx_payload(&el.text_content().unwrap_or_default(), encoding.as_deref());
+    }
+    if let Some(el) = doc.get_element_by_id("__crepus_ctx__") {
+        let encoding = el.get_attribute("data-encoding");
+        return decode_ctx_payload(&el.text_content().unwrap_or_default(), encoding.as_deref());
+    }
+    Default::default()
 }
 
 #[cfg(test)]
@@ -48,6 +61,15 @@ mod tests {
 
     #[test]
     fn decodes_base64_context_payload() {
+        let encoded = base64::engine::general_purpose::STANDARD
+            .encode(r#"{"v":1,"ctx":{"name":"Ada","n":2},"bind":{}}"#);
+        let ctx = decode_ctx_payload(&encoded, Some("base64"));
+        assert_eq!(ctx["name"], "Ada");
+        assert_eq!(ctx["n"], 2);
+    }
+
+    #[test]
+    fn keeps_legacy_base64_context_payload_compatible() {
         let encoded = base64::engine::general_purpose::STANDARD.encode(r#"{"name":"Ada","n":2}"#);
         let ctx = decode_ctx_payload(&encoded, Some("base64"));
         assert_eq!(ctx["name"], "Ada");

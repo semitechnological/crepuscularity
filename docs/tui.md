@@ -8,7 +8,7 @@ The TUI backend renders `.crepus` templates into [Ratatui](https://ratatui.rs) f
 
 ```toml
 [dependencies]
-crepuscularity-tui = "0.2"
+crepuscularity-tui = "0.4.4"
 ratatui = "0.29"
 ```
 

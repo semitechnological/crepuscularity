@@ -60,10 +60,10 @@ text_effect.dispose();
 `crepuscularity-web` emits hydration context as base64 JSON inside a non-executable `application/json` script:
 
 ```html
-<script id="__crepus_ctx__" type="application/json" data-encoding="base64">...</script>
+<script id="__crepus_hydration__" type="application/json" data-crepus-encoding="base64">...</script>
 ```
 
-`hydrate_root` decodes that payload and keeps raw JSON compatibility for older output.
+The canonical SSR payload is now `__crepus_hydration__`, which wraps `{ "v": 1, "ctx": ..., "bind": ... }` and uses `data-crepus-encoding="base64"`. `hydrate_root` reads that payload first and keeps `__crepus_ctx__` plus raw JSON compatibility for older output.
 
 ## GPUI and Metal
 

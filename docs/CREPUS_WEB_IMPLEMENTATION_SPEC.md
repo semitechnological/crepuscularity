@@ -2,7 +2,7 @@
 
 **Also:** [Documentation home](README.md) · [DSL](dsl.md) · [Web extensions](webext.md)
 
-**Audience:** Engineers or AI agents shipping the **`.crepus` runtime**, **web + webext** targets, **compiler driver**, and **dev/prod toolchains**.  
+**Audience:** Engineers or AI agents shipping the **`.crepus` runtime**, **web + webext** targets, **compiler driver**, and **dev/prod toolchains**.
 **Product intent:** **Maximum practical speed**—fast dev feedback, fast SSR/SSG, fast client updates, fast CI—using the same techniques as the best stacks (fine-grained reactivity, incremental compilation, aggressive caching, parallel task graphs).
 
 **How to read this doc**
@@ -36,17 +36,17 @@ Borrow **mechanisms**; do not fork Next.js or Turbopack.
 
 ### 0.2 Architectural pillars (must all land)
 
-1. **Single AST core** (`crepuscularity-core`) — parsers + eval; no forked template semantics per target.  
-2. **Incremental **driver**** — treat compile pipeline like a **query system**: parse → bind analysis → per-target emit; **invalidate minimal** subgraph when a file or section changes (Turbopack **lesson**, §0.4).  
-3. **Static vs dynamic split** — every template → **frozen shape** + **binding sites** (Dioxus `Template` + Svelte **lesson**).  
-4. **Reactive client graph** — signals / memos / effects (Leptos / Solid **lesson**); effects batch DOM writes.  
-5. **Hydration contract** — HTML markers + **serialized server context** (`hydration_context` **lesson**).  
+1. **Single AST core** (`crepuscularity-core`) — parsers + eval; no forked template semantics per target.
+2. **Incremental **driver**** — treat compile pipeline like a **query system**: parse → bind analysis → per-target emit; **invalidate minimal** subgraph when a file or section changes (Turbopack **lesson**, §0.4).
+3. **Static vs dynamic split** — every template → **frozen shape** + **binding sites** (Dioxus `Template` + Svelte **lesson**).
+4. **Reactive client graph** — signals / memos / effects (Leptos / Solid **lesson**); effects batch DOM writes.
+5. **Hydration contract** — HTML markers + **serialized server context** (`hydration_context` **lesson**).
 6. **Task graph for the repo** — `core` before `web` before apps; **optional `turbo.json`** (or `cargo` + custom driver) with explicit `dependsOn`, `inputs`, `outputs` (Turborepo **lesson**, §0.4).
 
 ### 0.3 Lessons from **Turborepo** (monorepo task orchestration)
 
-- **`turbo.json` pipeline:** tasks declare **`dependsOn`** (`^build` = upstream package build first), **`inputs`** (globs that bust cache), **`outputs`** (artifacts to restore), **`env`** (cache key).  
-- **Local + remote cache:** hashes of inputs → skip work; **remote** shares hits across CI and laptops.  
+- **`turbo.json` pipeline:** tasks declare **`dependsOn`** (`^build` = upstream package build first), **`inputs`** (globs that bust cache), **`outputs`** (artifacts to restore), **`env`** (cache key).
+- **Local + remote cache:** hashes of inputs → skip work; **remote** shares hits across CI and laptops.
 - **Parallel execution:** independent tasks run concurrently; DAG respects deps.
 
 **Apply to Crepuscularity:** Define tasks: `crepus:parse`, `crepus:codegen`, `cargo:check-wasm`, `cargo:check-host`, `crepus:webext-manifest`, **tests**. Document **inputs**: `**/*.crepus`, `Cargo.toml`, `crepus.toml`. **Outputs**: `target/crepus-out/**`, generated `*.rs`. Wire **CI** with `TURBO_TOKEN` / team or equivalent **sccache**/GitHub Actions cache.
@@ -67,25 +67,25 @@ Source: [Inside Turbopack: incremental computation](https://nextjs.org/blog/turb
 
 ### 0.5 Lessons from **Next.js** (App Router, caching, server-first UI)
 
-- **Server by default:** RSC / server components → **minimal JS** to client; interactivity opt-in (`"use client"`). **Analog:** `.crepus` defaults **static HTML + islands**; reactive WASM only where declared.  
-- **Layered caches (mental model):** (1) **request memo** — dedupe work inside one render; (2) **data cache** — persisted fetch (our: memoize **external props** / API); (3) **full route cache** — SSG HTML + payload (our: **pre-render** + disk); (4) **client router cache** — instant back/forward (our: optional **in-memory** fragment cache).  
-- **Segments & layouts:** shared shell, nested invalidation. **Analog:** **multi-component files** + **include** graph → invalidate **subtree** not whole site.  
+- **Server by default:** RSC / server components → **minimal JS** to client; interactivity opt-in (`"use client"`). **Analog:** `.crepus` defaults **static HTML + islands**; reactive WASM only where declared.
+- **Layered caches (mental model):** (1) **request memo** — dedupe work inside one render; (2) **data cache** — persisted fetch (our: memoize **external props** / API); (3) **full route cache** — SSG HTML + payload (our: **pre-render** + disk); (4) **client router cache** — instant back/forward (our: optional **in-memory** fragment cache).
+- **Segments & layouts:** shared shell, nested invalidation. **Analog:** **multi-component files** + **include** graph → invalidate **subtree** not whole site.
 - **Bundling:** Turbopack as default dev/build engine—**Rust** incremental bundler **lesson** already in §0.4.
 
 **Apply:** Document **cache tags** per template/route for **on-demand** rebuild (like `revalidateTag` concept)—even if v1 is coarse “file changed.”
 
 ### 0.6 Delivery principles (optimization “stuff” checklist)
 
-- **Profile before exotic:** `cargo build --timings`, `tracing` spans, browser Performance panel.  
-- **Tokio:** never block the SSR executor on disk; **spawn_blocking** or async fs where needed.  
-- **`mold`/`lld`**, **`CARGO_BUILD_JOBS`**, **workspace split** (stable core crate vs churny generated).  
-- **CI cache:** **`sccache`** (or Turborepo remote cache, §0.3) so cold agents reuse codegen.  
-- **Tests:** **`cargo nextest`** for faster parallel scheduling in CI.  
-- **PGO / BOLT** optional on **release** WASM/host after baseline stable.  
-- **WASM load:** **`instantiateStreaming`** + correct **`Content-Type`**; **`wasm-opt`** for **speed** preset when tuning guest code.  
-- **HTML hot path:** if profiling shows escape dominates, consider **vectorized** escape libs; **arena / bump allocator** per request render (Zig-lesson: bound alloc lifetime).  
-- **Binary DOM mutation protocol** under load (Dioxus **Sledgehammer** lesson, §5.3).  
-- **`resolver = "2"`** workspace for WASM members.  
+- **Profile before exotic:** `cargo build --timings`, `tracing` spans, browser Performance panel.
+- **Tokio:** never block the SSR executor on disk; **spawn_blocking** or async fs where needed.
+- **`mold`/`lld`**, **`CARGO_BUILD_JOBS`**, **workspace split** (stable core crate vs churny generated).
+- **CI cache:** **`sccache`** (or Turborepo remote cache, §0.3) so cold agents reuse codegen.
+- **Tests:** **`cargo nextest`** for faster parallel scheduling in CI.
+- **PGO / BOLT** optional on **release** WASM/host after baseline stable.
+- **WASM load:** **`instantiateStreaming`** + correct **`Content-Type`**; **`wasm-opt`** for **speed** preset when tuning guest code.
+- **HTML hot path:** if profiling shows escape dominates, consider **vectorized** escape libs; **arena / bump allocator** per request render (Zig-lesson: bound alloc lifetime).
+- **Binary DOM mutation protocol** under load (Dioxus **Sledgehammer** lesson, §5.3).
+- **`resolver = "2"`** workspace for WASM members.
 - **Correctness = speed:** golden HTML / hydration tests catch regressions before slow human QA.
 
 ### 0.7 Index — frameworks & techniques (coverage audit)
@@ -145,7 +145,7 @@ If a row points only to **§8.12**, see the subsection below for the one-paragra
 | `crates/crepuscularity-dev` | `crepus-dev` — dev server / hot reload direction |
 | `crates/crepuscularity-webext` | MV3 manifest types, **capability scan** of `.crepus`, **`widgets`**: `json_to_template`, `build_frame_doc` for sandboxed iframe `srcdoc`; see [webext.md](./webext.md) |
 
-**Gap:** Web path is **string SSR/SSG** without a first-class **reactive client graph**, **hydration contract**, or unified **build driver** that overlaps WASM + host SSR with **per-component** invalidation. **Webext** reuses render helpers but does not yet share one **pipeline** with web for codegen, hot reload, and reactive islands inside extension UIs.
+**Gap:** Web path now has string SSR/SSG, host-side parallel rendering, bundle rendering, dev-server hot reload, static/dynamic analysis helpers, a reactive crate, and an SSR hydration payload. The remaining work is to make those pieces one profiled pipeline: canonical hydration across all render entrypoints, per-file/stage cache writes, measured reactive DOM updates, overlapped WASM + host builds, and shared web/webext cache + reload behavior.
 
 ---
 
@@ -243,19 +243,19 @@ Primary sources: `DioxusLabs/dioxus` **`notes/architecture/*.md`** (especially `
 
 ### 5.4 Hot reload (`07-HOTRELOAD`) — two systems
 
-**A. Subsecond (Rust logic)**  
+**A. Subsecond (Rust logic)**
 - **Jump table indirection:** calls go through **`APP_JUMP_TABLE`**; patch loads dylib, updates pointers; **ASLR** handled via anchor symbol offset.
 - **Thin builds** recompile only changed functions into a patch library.
 - Limits: struct layout changes, TLS quirks, workspace scope—**WASM module reload** is limited.
 
-**B. RSX template hot reload**  
+**B. RSX template hot reload**
 - **Conservative gate:** strip/compare RSX bodies—if **Rust** changed, **full rebuild**; if only **literals/template** changed, **template diff**.
 - **Dynamic pools** for text segments, dynamic nodes, dynamic attrs; **greedy reuse** scoring.
 
 **Devtools:** WebSocket **`DevserverMsg`** (`HotReload`, `FullReloadCommand`, etc.), PID/build id filtering.
 
-**Lesson for Crepuscularity:** Mirror the **split**:  
-- **`.crepus` hot** = parse + AST swap + re-render/patch (like RSX path).  
+**Lesson for Crepuscularity:** Mirror the **split**:
+- **`.crepus` hot** = parse + AST swap + re-render/patch (like RSX path).
 - **Rust hot** = `cargo incremental` (full Subsecond-style patching is **optional advanced**).
 
 ### 5.5 Crate graph (`00-OVERVIEW`)
@@ -407,12 +407,12 @@ Official deep-dive: [Inside Turbopack: Building Faster by Building Less](https:/
 
 Listed in **§0.7** for traceability; expand here only as needed for implementation spikes.
 
-- **Vue 3:** **compile-time** strips static hoisting; **runtime** `ref`/`reactive` tracks deps—**same split** as our “analyze `.crepus` → codegen static shell + signal hooks for dynamic nodes.”  
-- **React (contrast):** default **reconcile Virtual DOM**—**expensive** vs fine-grained; we **do not** adopt VDOM as the default client model.  
-- **htmx / Hotwire Turbo:** server returns **HTML fragments**; browser swaps partials—aligns with **SSR-first** `.crepus` and **optional** small clients (no big WASM).  
-- **Actix:** often **multi-worker** / thread model for HTTP at peak RPS—if **SSR** is compute-heavy, benchmark vs Axum; **lesson** is **thread/worker** layout, not “rewrite in Actix.”  
-- **Blacksheep** (Python): another **ASGI** perf-oriented stack—**same** lessons as Sanic (async loop, thin handlers, compiled routing).  
-- **Remix / SvelteKit / Nuxt:** **nested routes**, **loaders**, **shared layouts**—map to **include graph** + **segment invalidation** (§0.5 Next analogy).  
+- **Vue 3:** **compile-time** strips static hoisting; **runtime** `ref`/`reactive` tracks deps—**same split** as our “analyze `.crepus` → codegen static shell + signal hooks for dynamic nodes.”
+- **React (contrast):** default **reconcile Virtual DOM**—**expensive** vs fine-grained; we **do not** adopt VDOM as the default client model.
+- **htmx / Hotwire Turbo:** server returns **HTML fragments**; browser swaps partials—aligns with **SSR-first** `.crepus` and **optional** small clients (no big WASM).
+- **Actix:** often **multi-worker** / thread model for HTTP at peak RPS—if **SSR** is compute-heavy, benchmark vs Axum; **lesson** is **thread/worker** layout, not “rewrite in Actix.”
+- **Blacksheep** (Python): another **ASGI** perf-oriented stack—**same** lessons as Sanic (async loop, thin handlers, compiled routing).
+- **Remix / SvelteKit / Nuxt:** **nested routes**, **loaders**, **shared layouts**—map to **include graph** + **segment invalidation** (§0.5 Next analogy).
 - **Deno Fresh:** **islands** with server-driven composition—reinforces **static + opt-in client** (§8.7 Astro overlap).
 
 ---
@@ -436,10 +436,10 @@ Extensions are **first-class** for this spec: same **`.crepus`**, same **core AS
 
 Source: `crates/crepuscularity-webext/`
 
-- **`manifest`**: `ManifestV3`, JSON emit, capabilities section.  
-- **`scanner`**: **`scan_crepus_for_capabilities`** — static scan of `.crepus` for needed API usage.  
-- **`watcher`**: **`CapabilityWatcher`** — dev-time **file watch** / suggestion of missing capabilities.  
-- **`widgets`**: **`build_frame_doc`**, **`json_to_template`** — glue between JS host and `crepuscularity-core` values.  
+- **`manifest`**: `ManifestV3`, JSON emit, capabilities section.
+- **`scanner`**: **`scan_crepus_for_capabilities`** — static scan of `.crepus` for needed API usage.
+- **`watcher`**: **`CapabilityWatcher`** — dev-time **file watch** / suggestion of missing capabilities.
+- **`widgets`**: **`build_frame_doc`**, **`json_to_template`** — glue between JS host and `crepuscularity-core` values.
 - **`api`**: Browser-facing AST for policies (storage, messaging, etc.).
 
 CLI integration lives under **`crepus webext`** (see `docs/webext.md`).
@@ -457,20 +457,20 @@ CLI integration lives under **`crepus webext`** (see `docs/webext.md`).
         └─────────── shared: virtual file map, parse cache, codegen ───┘
 ```
 
-- **Popup / options / side panel:** Same **client** story as §10 (reactive graph + batched DOM) when feasible.  
-- **Service worker:** Prefer **thin** message router + **offscreen** document or **WASM** for heavy work if **wake time** budget demands.  
+- **Popup / options / side panel:** Same **client** story as §10 (reactive graph + batched DOM) when feasible.
+- **Service worker:** Prefer **thin** message router + **offscreen** document or **WASM** for heavy work if **wake time** budget demands.
 - **Content scripts:** **String/html** render or **minimal** patch; **scan** for capability declarations.
 
 ### 9.4 Dev workflow for webext
 
-- **`.crepus` hot reload** on extension **pages** via same WS / virtual-map approach as web (where CSP permits).  
+- **`.crepus` hot reload** on extension **pages** via same WS / virtual-map approach as web (where CSP permits).
 - **`crepus.toml`** / manifest regen on capability or version change.
-- **Rust / WASM** changes: **`crepus webext build`** → incremental `cargo`; **reload extension** in `chrome://extensions` (full ext reload often required—surface in CLI output).  
+- **Rust / WASM** changes: **`crepus webext build`** → incremental `cargo`; **reload extension** in `chrome://extensions` (full ext reload often required—surface in CLI output).
 - **Parallelism:** `webext` WASM crate can build **in parallel** with other workspace members (L2).
 
 ### 9.5 Prod workflow for webext
 
-- **Speed-first:** `-O3`, same as web WASM; **threads** only if extension policy + `crossOriginIsolated` story allows in that context.  
+- **Speed-first:** `-O3`, same as web WASM; **threads** only if extension policy + `crossOriginIsolated` story allows in that context.
 - **Precompile** template hotspots to Rust in **published** builds if QPS inside iframe widgets matters.
 
 ---
@@ -564,53 +564,63 @@ Execute **in order**. Each phase has **acceptance criteria** so the runtime/fram
 
 ---
 
-**Phase 0 — Observability baseline**  
-- Add **`tracing`** spans: `parse_template`, `eval_expr` (sampled), `render_html`, `dev_request_total`.  
-- **`cargo build --timings`** documented for one reference app.  
+**Phase 0 — Observability baseline**
+- **Status:** partial. Some render/build paths emit events and timing output, but the core parse/eval/render spans and one documented SSR timing profile are still missing.
+- Add **`tracing`** spans: `parse_template`, `eval_expr` (sampled), `render_html`, `dev_request_total`.
+- **`cargo build --timings`** documented for one reference app.
 - **Acceptance:** flamegraph / timing doc can answer “where did the ms go?” for one SSR request.
 
-**Phase 1 — Unified watch + `.crepus` hot reload**  
-- Filesystem watch → **virtual file map** → `crepuscularity-web` / runtime re-render.  
-- **WS** (or Veb-style **HTML inject**) to refresh browser; **debounce** bursts.  
+**Phase 1 — Unified watch + `.crepus` hot reload**
+- **Status:** mostly implemented for `crepus web dev` through a virtual file map, SSE/browser reload, and debounce behavior.
+- Finish sharing the same watch semantics with webext and runtime-hosted surfaces.
 - **Acceptance:** edit `.crepus` → visible update **without** `rustc`; Rust edit still requires **cargo**.
 
-**Phase 2 — Binding analysis + driver fingerprints**  
-- AST pass: **static regions** vs **binding sites**; emit **metadata** (JSON or Rust).  
-- **Fingerprint** `(file, section?, stage)` → cache under **`.crepus-cache/`**; **skip write** if output hash unchanged (Turbopack-style).  
+**Phase 2 — Binding analysis + driver fingerprints**
+- **Status:** partial. Static/dynamic analysis and fingerprints exist, and web builds write bundle metadata, but there is no complete per-stage cache skip policy yet.
+- AST pass: **static regions** vs **binding sites**; emit **metadata** (JSON or Rust).
+- **Fingerprint** `(file, section?, stage)` → cache under **`.crepus-cache/`**; **skip write** if output hash unchanged (Turbopack-style).
 - **Acceptance:** second save with no logical change does **not** touch generated glue / does not force full rustc rebuild.
 
-**Phase 3 — Reactive client MVP (WASM)**  
-- Minimal **signal / effect** graph; one **text** + one **class** binding; **`web_sys`** batching.  
+**Phase 3 — Reactive client MVP (WASM)**
+- **Status:** partial. `crepuscularity-reactive` provides signal/memo/effect helpers and hydration entrypoints, but the profiled DOM binding acceptance case is not complete.
+- Minimal **signal / effect** graph; one **text** + one **class** binding; **`web_sys`** batching.
 - **Acceptance:** click increments counter with **no** full-template `String` rebuild in hot path (profiled).
 
-**Phase 4 — SSR hydration**  
-- **Markers** in HTML + **serialized props/context** slice; client **`hydrate_root`**.  
+**Phase 4 — SSR hydration**
+- **Status:** partial. SSR marker tests and the canonical `__crepus_hydration__` payload exist, with legacy context fallback preserved; event reattachment and a browser-level golden DOM test remain.
+- **Markers** in HTML + **serialized props/context** slice; client **`hydrate_root`**.
 - **Acceptance:** server HTML + hydration → **event** works; golden DOM test.
 
-**Phase 5 — Parallel driver + overlapped targets**  
-- **Rayon** batch parse/codegen (L1); **`cargo -p client --target wasm32`** ∥ **`cargo -p server`** (L2).  
+**Phase 5 — Parallel driver + overlapped targets**
+- **Status:** partial. Host-side Rayon rendering and target manifest builds exist; overlapped client/server Cargo orchestration and CI proof are still missing.
+- **Rayon** batch parse/codegen (L1); **`cargo -p client --target wasm32`** ∥ **`cargo -p server`** (L2).
 - **Acceptance:** documented `crepus build` flags; CI runs both artifacts.
 
-**Phase 6 — Production hardening**  
-- Streamed SSR where wins; **release** profile **`-O3`**, LTO optional; DOM **mutation batch** under stress.  
+**Phase 6 — Production hardening**
+- **Status:** partial. Release build knobs and benchmark harnesses exist; streamed SSR, mutation stress, and a baseline comparison table remain.
+- Streamed SSR where wins; **release** profile **`-O3`**, LTO optional; DOM **mutation batch** under stress.
 - **Acceptance:** benchmark table vs Phase 1 string-only baseline (even if crude).
 
-**Phase 7 — Webext unified pipeline**  
-- Shared **`.crepus-cache/`** with web; **`crepus webext dev`**; CSP-safe reload story.  
+**Phase 7 — Webext unified pipeline**
+- **Status:** partial. `crepus webext dev` and extension reload ids exist; shared cache, web parity, and CSP-safe hot reload validation remain.
+- Shared **`.crepus-cache/`** with web; **`crepus webext dev`**; CSP-safe reload story.
 - **Acceptance:** one sample extension: popup **hot** `.crepus`, full reload message when manifest/capability changes.
 
-**Phase 8 — Extension tests & policy**  
-- Golden **manifest**, **scanner**, **`build_frame_doc`** tests; SW wake notes.  
-- **Acceptance:** CI covers `crepuscularity-webext` crate.
+**Phase 8 — Extension tests & policy**
+- **Status:** mostly implemented at crate-test level. Remaining work is browser-policy validation for MV3 lifecycle, CSP, generated assets, and store-facing manifest checks.
+- Golden **manifest**, **scanner**, **`build_frame_doc`** tests; SW wake notes.
+- **Acceptance:** CI covers `crepuscularity-webext` crate plus policy-grade browser validation.
 
-**Phase 9 — Monorepo task graph (Turborepo-style)**  
-- Add **`turbo.json`** (or documented equivalent) with tasks: `crepus-codegen`, `build:wasm`, `build:server`, `test`, **`inputs`/`outputs`** for `.crepus` and `target/crepus-out`.  
-- Wire **remote cache** (Vercel Turborepo or **custom** S3/GitHub Actions cache) for **codegen** artifacts.  
+**Phase 9 — Monorepo task graph (Turborepo-style)**
+- **Status:** not started. No task-graph config or equivalent documented cache contract exists yet.
+- Add **`turbo.json`** (or documented equivalent) with tasks: `crepus-codegen`, `build:wasm`, `build:server`, `test`, **`inputs`/`outputs`** for `.crepus` and `target/crepus-out`.
+- Wire **remote cache** (Vercel Turborepo or **custom** S3/GitHub Actions cache) for **codegen** artifacts.
 - **Acceptance:** clean CI on second run is **mostly cache hits** for unchanged templates.
 
-**Phase 10 — Advanced incremental (optional)**  
-- **Demand-driven** driver: only active **route/entry** recomputes in `crepus dev` (Turbopack **active query**).  
-- **Tag-based** invalidation for data deps (Next **revalidateTag** analogue).  
+**Phase 10 — Advanced incremental (optional)**
+- **Status:** optional and not started.
+- **Demand-driven** driver: only active **route/entry** recomputes in `crepus dev` (Turbopack **active query**).
+- **Tag-based** invalidation for data deps (Next **revalidateTag** analogue).
 - **Acceptance:** doc + prototype on one multi-route example.
 
 ---
@@ -619,40 +629,40 @@ Execute **in order**. Each phase has **acceptance criteria** so the runtime/fram
 
 ### Frameworks & libraries (direct mechanics)
 
-- Leptos `reactive_graph`: https://github.com/leptos-rs/leptos/tree/main/reactive_graph  
-- Leptos `hydration_context`: https://github.com/leptos-rs/leptos/tree/main/hydration_context  
-- Dioxus architecture notes: https://github.com/DioxusLabs/dioxus/tree/main/notes/architecture  
-- Reactively (reactive algorithm): https://github.com/modderme123/reactively  
-- **Svelte** compiler docs: https://svelte.dev/docs/svelte/svelte-compiler  
-- **Solid** docs (reactivity): https://docs.solidjs.com/advanced-concepts/fine-grained-reactivity  
-- **Bun**: https://bun.sh/docs — runtime + `Bun.serve`  
-- **Hono**: https://hono.dev/docs  
-- **V / Veb** module docs: https://docs.vlang.io/veb.html — source `github.com/vlang/v` → `vlib/veb/`  
-- **Sanic**: https://sanic.dev/  
-- **Phoenix** (incl. LiveView): https://www.phoenixframework.org/docs  
-- **Next.js** — Turbopack / incremental: https://nextjs.org/blog/turbopack-incremental-computation  
-- **Next.js** — caching journey / concepts: https://nextjs.org/blog/our-journey-with-caching  
-- **Turborepo** (tasks, caching, CI): https://turbo.build/repo/docs  
-- **Turbopack** API / architecture hub: https://turbo.build/pack/docs  
+- Leptos `reactive_graph`: https://github.com/leptos-rs/leptos/tree/main/reactive_graph
+- Leptos `hydration_context`: https://github.com/leptos-rs/leptos/tree/main/hydration_context
+- Dioxus architecture notes: https://github.com/DioxusLabs/dioxus/tree/main/notes/architecture
+- Reactively (reactive algorithm): https://github.com/modderme123/reactively
+- **Svelte** compiler docs: https://svelte.dev/docs/svelte/svelte-compiler
+- **Solid** docs (reactivity): https://docs.solidjs.com/advanced-concepts/fine-grained-reactivity
+- **Bun**: https://bun.sh/docs — runtime + `Bun.serve`
+- **Hono**: https://hono.dev/docs
+- **V / Veb** module docs: https://docs.vlang.io/veb.html — source `github.com/vlang/v` → `vlib/veb/`
+- **Sanic**: https://sanic.dev/
+- **Phoenix** (incl. LiveView): https://www.phoenixframework.org/docs
+- **Next.js** — Turbopack / incremental: https://nextjs.org/blog/turbopack-incremental-computation
+- **Next.js** — caching journey / concepts: https://nextjs.org/blog/our-journey-with-caching
+- **Turborepo** (tasks, caching, CI): https://turbo.build/repo/docs
+- **Turbopack** API / architecture hub: https://turbo.build/pack/docs
 
 ### Cross-language & systems (patterns)
 
-- nginx architecture (worker/event): official **beginner’s guide** / docs — https://nginx.org/en/docs/  
-- Netty user guide (ByteBuf, threading): https://netty.io/wiki/user-guide-for-4.x.html  
-- Valyala **fasthttp** (Go, `[]byte`-oriented HTTP): https://github.com/valyala/fasthttp  
-- OpenResty: https://openresty.org/  
-- Phoenix framework: https://www.phoenixframework.org/  
-- Cloudflare blog (**V8 isolates** / Workers model): search `workers.dev` “isolates” for architecture posts  
-- MDN **Manifest V3** overview: https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/manifest.json/manifest_version  
-- Chrome **MV3 migration** guidance: https://developer.chrome.com/docs/extensions/develop/migrate  
+- nginx architecture (worker/event): official **beginner’s guide** / docs — https://nginx.org/en/docs/
+- Netty user guide (ByteBuf, threading): https://netty.io/wiki/user-guide-for-4.x.html
+- Valyala **fasthttp** (Go, `[]byte`-oriented HTTP): https://github.com/valyala/fasthttp
+- OpenResty: https://openresty.org/
+- Phoenix framework: https://www.phoenixframework.org/
+- Cloudflare blog (**V8 isolates** / Workers model): search `workers.dev` “isolates” for architecture posts
+- MDN **Manifest V3** overview: https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/manifest.json/manifest_version
+- Chrome **MV3 migration** guidance: https://developer.chrome.com/docs/extensions/develop/migrate
 
 ---
 
 ## 16. Other documentation
 
-- **`docs/webext.md`** — User-facing browser extension setup; **MV3 implementation** is **§9** here.  
-- **`docs/dsl.md`**, **`docs/components.md`**, **`docs/cli.md`** — DSL and CLI reference.  
-- **Execution:** **§0** (master plan) + **§14** (phases 0–10).  
+- **`docs/webext.md`** — User-facing browser extension setup; **MV3 implementation** is **§9** here.
+- **`docs/dsl.md`**, **`docs/components.md`**, **`docs/cli.md`** — DSL and CLI reference.
+- **Execution:** **§0** (master plan) + **§14** (phases 0–10).
 
 ---
 
