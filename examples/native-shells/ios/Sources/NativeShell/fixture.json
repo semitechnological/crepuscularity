@@ -4,7 +4,10 @@
     {
       "kind": "stack",
       "axis": "column",
-      "spacing": 16,
+      "spacing": 16.0,
+      "style": {
+        "flexDirection": "column"
+      },
       "children": [
         {
           "kind": "text",

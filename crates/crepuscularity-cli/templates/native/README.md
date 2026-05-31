@@ -8,7 +8,8 @@ Android (Gradle) apps that decode **View IR** produced by the Rust crate
 
 | Path | What it is |
 |---|---|
-| `fixture.json` | Shared View IR fixture used by both shells. Regenerate with `crepuscularity-native::render_template_to_ir` after editing your template. |
+| `views/main.crepus` | Starter Crepuscularity template that owns the UI source. |
+| `fixture.json` | Shared View IR fixture used by both shells. Regenerate with `crepus native sync views/main.crepus --dir . --pretty` after editing your template. |
 | `ios/` | Swift Package (open `Package.swift` in Xcode, or `swift build` from this directory). |
 | `android/` | Gradle module (open in Android Studio, or run `./gradlew :app:assembleDebug` after generating the Gradle wrapper). |
 
@@ -42,7 +43,13 @@ Or open `android/` in Android Studio — it regenerates the wrapper on import.
 
 ## Regenerating the fixture from a template
 
-From a Rust crate that depends on `crepuscularity-native`:
+From the scaffold root:
+
+```bash
+crepus native sync views/main.crepus --dir . --out desktop/share/dashboard.view-ir.json --var name=Ada --pretty
+```
+
+Or from a Rust crate that depends on `crepuscularity-native`:
 
 ```rust
 use crepuscularity_core::TemplateContext;
@@ -58,7 +65,10 @@ std::fs::write("fixture.json", to_json_pretty(&ir)?)?;
 ```
 
 Then mirror the file into both `ios/Sources/NativeShell/fixture.json` and
-`android/app/src/main/assets/fixture.json` so each shell sees the same IR.
+`android/app/src/main/assets/fixture.json` so each shell sees the same IR. The
+CLI sync command handles this mirroring for scaffolded projects. Use repeated
+`--out FILE` flags for extra host resources such as desktop app bundles, and
+add `--no-defaults` when only explicit host resources should be written.
 
 ## Build via the `crepus` CLI
 
