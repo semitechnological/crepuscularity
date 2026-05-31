@@ -81,4 +81,14 @@ mod tests {
         let ctx = decode_ctx_payload(r#"{"name":"Grace"}"#, None);
         assert_eq!(ctx["name"], "Grace");
     }
+
+    #[test]
+    fn canonical_payload_decodes_ctx_and_ignores_bind_metadata() {
+        let ctx = decode_ctx_payload(
+            r#"{"v":1,"ctx":{"count":3},"bind":{"0":{"kind":"text"}}}"#,
+            None,
+        );
+        assert_eq!(ctx["count"], 3);
+        assert!(!ctx.contains_key("bind"));
+    }
 }

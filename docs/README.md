@@ -8,6 +8,7 @@ Guides and references for the `.crepus` DSL, tooling, and browser extensions.
 | [Components](components.md) | `include`, slots, defaults, multi-component files |
 | [CLI](cli.md) | `crepus` commands for apps, web, and extensions |
 | [Production readiness](production.md) | build gates, security boundaries, and performance checks |
+| [Observability](observability.md) | timing, tracing, and flamegraph workflow |
 | [Runtime and reactivity](runtime.md) | state model, update lifecycle, hydration, and Metal setup |
 | [Browser extensions](webext.md) | Manifest V3 apps with `crepus webext` |
 | [GPUI integration](gpui.md) | Desktop apps with GPUI |

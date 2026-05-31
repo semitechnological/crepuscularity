@@ -62,7 +62,7 @@ jobs:
       run: cargo test --workspace
 
     - name: Run clippy
-      run: cargo clippy --workspace -- -D warnings
+      run: cargo clippy --workspace --all-targets -- -D warnings
       if: matrix.os == 'ubuntu-latest'
 
   build-examples:
