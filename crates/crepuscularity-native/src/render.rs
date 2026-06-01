@@ -184,6 +184,29 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<ViewNode, Strin
         });
     }
 
+    if el.tag == "dropzone" {
+        let label = collect_primary_text(&el.children, ctx).unwrap_or_default();
+        let accept = el
+            .bindings
+            .iter()
+            .find(|b| b.prop == "accept")
+            .map(|b| value_to_str(&eval_expr(&b.value, ctx)));
+        let on_drop = el
+            .event_handlers
+            .iter()
+            .find(|e| e.event == "drop")
+            .map(|e| e.handler.clone());
+        let hints = style::extract_stack_hints(&classes, Some(ctx));
+        let children = render_nodes_list(&el.children, ctx)?;
+        return Ok(ViewNode::Dropzone {
+            label,
+            accept,
+            on_drop,
+            style: hints.style.opt(),
+            children,
+        });
+    }
+
     if el.tag == "input" {
         let bind = el
             .bindings

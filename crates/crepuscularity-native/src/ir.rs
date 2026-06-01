@@ -329,6 +329,17 @@ pub enum ViewNode {
         #[serde(skip_serializing_if = "Option::is_none")]
         style: Option<ViewStyle>,
     },
+    #[serde(rename = "dropzone")]
+    Dropzone {
+        label: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        accept: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        on_drop: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        style: Option<ViewStyle>,
+        children: Vec<ViewNode>,
+    },
     #[serde(rename = "image")]
     Image {
         src: String,
