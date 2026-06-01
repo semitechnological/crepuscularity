@@ -329,6 +329,82 @@ pub enum ViewNode {
         #[serde(skip_serializing_if = "Option::is_none")]
         style: Option<ViewStyle>,
     },
+    #[serde(rename = "toggle")]
+    Toggle {
+        label: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        bind: Option<String>,
+        checked: bool,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        on_change: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        style: Option<ViewStyle>,
+    },
+    #[serde(rename = "checkbox")]
+    Checkbox {
+        label: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        bind: Option<String>,
+        checked: bool,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        on_change: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        style: Option<ViewStyle>,
+    },
+    #[serde(rename = "slider")]
+    Slider {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        label: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        bind: Option<String>,
+        value: f32,
+        min: f32,
+        max: f32,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        step: Option<f32>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        style: Option<ViewStyle>,
+    },
+    #[serde(rename = "progress")]
+    Progress {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        label: Option<String>,
+        value: f32,
+        max: f32,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        style: Option<ViewStyle>,
+    },
+    #[serde(rename = "meter")]
+    Meter {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        label: Option<String>,
+        value: f32,
+        min: f32,
+        max: f32,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        style: Option<ViewStyle>,
+    },
+    #[serde(rename = "badge")]
+    Badge {
+        label: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        tone: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        style: Option<ViewStyle>,
+    },
+    #[serde(rename = "divider")]
+    Divider {
+        axis: StackAxis,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        style: Option<ViewStyle>,
+    },
+    #[serde(rename = "spacer")]
+    Spacer {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        size: Option<f32>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        style: Option<ViewStyle>,
+    },
     #[serde(rename = "dropzone")]
     Dropzone {
         label: String,
@@ -353,6 +429,19 @@ pub enum ViewNode {
     #[serde(rename = "scroll")]
     Scroll {
         axis: StackAxis,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        style: Option<ViewStyle>,
+        children: Vec<ViewNode>,
+    },
+    #[serde(rename = "list")]
+    List {
+        ordered: bool,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        style: Option<ViewStyle>,
+        children: Vec<ViewNode>,
+    },
+    #[serde(rename = "listItem")]
+    ListItem {
         #[serde(skip_serializing_if = "Option::is_none")]
         style: Option<ViewStyle>,
         children: Vec<ViewNode>,

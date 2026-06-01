@@ -138,7 +138,10 @@ fn stack_column_raw(children: Vec<ViewNode>) -> ViewNode {
 }
 
 fn render_element(el: &Element, ctx: &TemplateContext) -> Result<ViewNode, String> {
-    if el.tag == "slot" {
+    let tag = el.tag.to_ascii_lowercase();
+    let tag = tag.as_str();
+
+    if tag == "slot" {
         return if let Some((slot_nodes, slot_ctx)) = &ctx.slot {
             let children = render_nodes_list(slot_nodes, slot_ctx)?;
             Ok(stack_column_raw(children))
@@ -148,7 +151,7 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<ViewNode, Strin
         };
     }
 
-    if el.tag == "slot-rotate" {
+    if tag == "slot-rotate" {
         let phrases = slot_rotate_child_phrases(&el.children)?;
         let mut interval_ms = 3200u64;
         for b in &el.bindings {
@@ -169,7 +172,7 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<ViewNode, Strin
 
     let classes = active_classes(el, ctx);
 
-    if el.tag == "button" {
+    if tag == "button" {
         let label = collect_primary_text(&el.children, ctx)?;
         let on_click = el
             .event_handlers
@@ -184,7 +187,90 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<ViewNode, Strin
         });
     }
 
-    if el.tag == "dropzone" {
+    if tag == "toggle" || tag == "switch" {
+        let label = component_label(el, ctx)?;
+        let hints = style::extract_stack_hints(&classes, Some(ctx));
+        return Ok(ViewNode::Toggle {
+            label,
+            bind: binding_raw(el, "bind"),
+            checked: binding_bool(el, "checked", ctx).unwrap_or(false),
+            on_change: event_handler(el, "change"),
+            style: hints.style.opt(),
+        });
+    }
+
+    if tag == "checkbox" {
+        let label = component_label(el, ctx)?;
+        let hints = style::extract_stack_hints(&classes, Some(ctx));
+        return Ok(ViewNode::Checkbox {
+            label,
+            bind: binding_raw(el, "bind"),
+            checked: binding_bool(el, "checked", ctx).unwrap_or(false),
+            on_change: event_handler(el, "change"),
+            style: hints.style.opt(),
+        });
+    }
+
+    if tag == "slider" {
+        let hints = style::extract_stack_hints(&classes, Some(ctx));
+        return Ok(ViewNode::Slider {
+            label: optional_component_label(el, ctx)?,
+            bind: binding_raw(el, "bind"),
+            value: binding_f32(el, "value", ctx).unwrap_or(0.0),
+            min: binding_f32(el, "min", ctx).unwrap_or(0.0),
+            max: binding_f32(el, "max", ctx).unwrap_or(100.0),
+            step: binding_f32(el, "step", ctx),
+            style: hints.style.opt(),
+        });
+    }
+
+    if tag == "progress" {
+        let hints = style::extract_stack_hints(&classes, Some(ctx));
+        return Ok(ViewNode::Progress {
+            label: optional_component_label(el, ctx)?,
+            value: binding_f32(el, "value", ctx).unwrap_or(0.0),
+            max: binding_f32(el, "max", ctx).unwrap_or(100.0),
+            style: hints.style.opt(),
+        });
+    }
+
+    if tag == "meter" {
+        let hints = style::extract_stack_hints(&classes, Some(ctx));
+        return Ok(ViewNode::Meter {
+            label: optional_component_label(el, ctx)?,
+            value: binding_f32(el, "value", ctx).unwrap_or(0.0),
+            min: binding_f32(el, "min", ctx).unwrap_or(0.0),
+            max: binding_f32(el, "max", ctx).unwrap_or(100.0),
+            style: hints.style.opt(),
+        });
+    }
+
+    if tag == "badge" {
+        let hints = style::extract_stack_hints(&classes, Some(ctx));
+        return Ok(ViewNode::Badge {
+            label: component_label(el, ctx)?,
+            tone: binding_string(el, "tone", ctx),
+            style: hints.style.opt(),
+        });
+    }
+
+    if tag == "divider" || tag == "hr" {
+        let hints = style::extract_stack_hints(&classes, Some(ctx));
+        return Ok(ViewNode::Divider {
+            axis: stack_axis(&classes),
+            style: hints.style.opt(),
+        });
+    }
+
+    if tag == "spacer" {
+        let hints = style::extract_stack_hints(&classes, Some(ctx));
+        return Ok(ViewNode::Spacer {
+            size: binding_f32(el, "size", ctx).or_else(|| parse_gap_spacing(&classes)),
+            style: hints.style.opt(),
+        });
+    }
+
+    if tag == "dropzone" {
         let label = collect_primary_text(&el.children, ctx).unwrap_or_default();
         let accept = el
             .bindings
@@ -207,7 +293,7 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<ViewNode, Strin
         });
     }
 
-    if el.tag == "input" {
+    if tag == "input" || tag == "textfield" || tag == "textinput" || tag == "textarea" {
         let bind = el
             .bindings
             .iter()
@@ -223,7 +309,7 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<ViewNode, Strin
                 v.trim_matches(|c| c == '"' || c == '\'').to_string()
             })
             .unwrap_or_default();
-        let multiline = classes.iter().any(|c| c == "multiline");
+        let multiline = classes.iter().any(|c| c == "multiline") || tag == "textarea";
         let hints = style::extract_stack_hints(&classes, Some(ctx));
         return Ok(ViewNode::Input {
             placeholder,
@@ -233,7 +319,7 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<ViewNode, Strin
         });
     }
 
-    if el.tag == "picker" {
+    if tag == "picker" || tag == "select" {
         let bind = el
             .bindings
             .iter()
@@ -243,7 +329,8 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<ViewNode, Strin
         let mut options = Vec::new();
         for child in &el.children {
             if let Node::Element(inner) = child {
-                if inner.tag == "span" || inner.tag == "button" {
+                let inner_tag = inner.tag.to_ascii_lowercase();
+                if matches!(inner_tag.as_str(), "span" | "button" | "option") {
                     let label = collect_primary_text(&inner.children, ctx)?;
                     let value = inner
                         .bindings
@@ -267,7 +354,7 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<ViewNode, Strin
         });
     }
 
-    if el.tag == "img" {
+    if tag == "img" || tag == "image" {
         let src = el
             .bindings
             .iter()
@@ -293,7 +380,24 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<ViewNode, Strin
         });
     }
 
-    if el.tag == "span" && el.children.len() == 1 {
+    if tag == "ul" || tag == "ol" || tag == "list" || tag == "flatlist" {
+        let hints = style::extract_stack_hints(&classes, Some(ctx));
+        return Ok(ViewNode::List {
+            ordered: tag == "ol",
+            style: hints.style.opt(),
+            children: render_nodes_list(&el.children, ctx)?,
+        });
+    }
+
+    if tag == "li" || tag == "list-item" {
+        let hints = style::extract_stack_hints(&classes, Some(ctx));
+        return Ok(ViewNode::ListItem {
+            style: hints.style.opt(),
+            children: render_nodes_list(&el.children, ctx)?,
+        });
+    }
+
+    if is_text_tag(tag) && el.children.len() == 1 {
         if let Node::Text(parts) = &el.children[0] {
             let txt = render_text_inline(parts, ctx)?;
             let st = style::extract_text_style(&classes, Some(ctx)).opt();
@@ -304,7 +408,11 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<ViewNode, Strin
         }
     }
 
-    let axis = stack_axis(&classes);
+    let axis = if tag == "view" {
+        StackAxis::Column
+    } else {
+        stack_axis(&classes)
+    };
     let spacing = parse_gap_spacing(&classes);
     let scroll = style::is_scroll_container(&classes);
     let hints = style::extract_stack_hints(&classes, Some(ctx));
@@ -338,6 +446,75 @@ fn slug_option_value(label: &str) -> String {
         s = s.replace("__", "_");
     }
     s.trim_matches('_').to_string()
+}
+
+fn component_label(el: &Element, ctx: &TemplateContext) -> Result<String, String> {
+    optional_component_label(el, ctx).map(|label| label.unwrap_or_default())
+}
+
+fn optional_component_label(el: &Element, ctx: &TemplateContext) -> Result<Option<String>, String> {
+    if let Some(label) = binding_string(el, "label", ctx) {
+        return Ok(Some(label));
+    }
+    match collect_primary_text(el.children.as_slice(), ctx) {
+        Ok(label) if !label.is_empty() => Ok(Some(label)),
+        Ok(_) => Ok(None),
+        Err(_) => Ok(None),
+    }
+}
+
+fn binding_raw(el: &Element, prop: &str) -> Option<String> {
+    el.bindings
+        .iter()
+        .find(|binding| binding.prop == prop)
+        .map(|binding| {
+            binding
+                .value
+                .trim()
+                .trim_matches(|c| c == '"' || c == '\'')
+                .to_string()
+        })
+        .filter(|value| !value.is_empty())
+}
+
+fn binding_string(el: &Element, prop: &str, ctx: &TemplateContext) -> Option<String> {
+    el.bindings
+        .iter()
+        .find(|binding| binding.prop == prop)
+        .map(|binding| value_to_str(&eval_expr(&binding.value, ctx)))
+        .map(|value| {
+            value
+                .trim()
+                .trim_matches(|c| c == '"' || c == '\'')
+                .to_string()
+        })
+        .filter(|value| !value.is_empty())
+}
+
+fn binding_f32(el: &Element, prop: &str, ctx: &TemplateContext) -> Option<f32> {
+    binding_string(el, prop, ctx).and_then(|value| value.parse().ok())
+}
+
+fn binding_bool(el: &Element, prop: &str, ctx: &TemplateContext) -> Option<bool> {
+    binding_string(el, prop, ctx).and_then(|value| match value.as_str() {
+        "true" | "1" | "yes" | "on" => Some(true),
+        "false" | "0" | "no" | "off" => Some(false),
+        _ => None,
+    })
+}
+
+fn event_handler(el: &Element, event: &str) -> Option<String> {
+    el.event_handlers
+        .iter()
+        .find(|handler| handler.event == event)
+        .map(|handler| handler.handler.clone())
+}
+
+fn is_text_tag(tag: &str) -> bool {
+    matches!(
+        tag,
+        "span" | "text" | "p" | "label" | "caption" | "h1" | "h2" | "h3" | "h4" | "h5" | "h6"
+    )
 }
 
 fn collect_primary_text(children: &[Node], ctx: &TemplateContext) -> Result<String, String> {

@@ -164,6 +164,66 @@ dropzone @drop="files" accept="image/*,application/pdf" border rounded p-4
 }
 
 #[test]
+fn standard_controls_ir() {
+    let tpl = r#"
+div flex flex-col
+  toggle bind=photos checked=true @change="sync.photos"
+    "Photos"
+  checkbox bind=clipboard checked=false
+    "Clipboard"
+  slider bind=quota value=25 min=0 max=100 step=5 label="Quota"
+  progress value=62 max=100 label="Transfer"
+  meter value=512 min=0 max=1024 label="Storage"
+  badge tone="success"
+    "Online"
+  divider
+  spacer size=16
+"#;
+    let ir = render_template_to_ir(tpl, &TemplateContext::new()).unwrap();
+    let v = serde_json::to_value(&ir).unwrap();
+    let children = &v["root"][0]["children"];
+    assert_eq!(children[0]["kind"], "toggle");
+    assert_eq!(children[0]["checked"], true);
+    assert_eq!(children[0]["onChange"], "sync.photos");
+    assert_eq!(children[1]["kind"], "checkbox");
+    assert_eq!(children[2]["kind"], "slider");
+    assert_eq!(children[2]["step"], 5.0);
+    assert_eq!(children[3]["kind"], "progress");
+    assert_eq!(children[4]["kind"], "meter");
+    assert_eq!(children[5]["kind"], "badge");
+    assert_eq!(children[6]["kind"], "divider");
+    assert_eq!(children[7]["kind"], "spacer");
+    round_trip(&ir);
+}
+
+#[test]
+fn web_and_react_native_style_tags_lower_to_native_ir() {
+    let tpl = r#"
+<View class="flex flex-col gap-2">
+  <Text class="text-lg font-semibold">Cupboard</Text>
+  <p>Paragraph copy</p>
+  <h1>Heading</h1>
+  <ul>
+    <li><span>One</span></li>
+    <li><Text>Two</Text></li>
+  </ul>
+  <Switch checked={true} label="LAN sync" />
+  <Progress value={80} max={100} label="Backup" />
+</View>
+"#;
+    let ir = render_template_to_ir(tpl, &TemplateContext::new()).unwrap();
+    let v = serde_json::to_value(&ir).unwrap();
+    let root = &v["root"][0];
+    assert_eq!(root["kind"], "stack");
+    assert_eq!(root["children"][0]["kind"], "text");
+    assert_eq!(root["children"][3]["kind"], "list");
+    assert_eq!(root["children"][3]["children"][0]["kind"], "listItem");
+    assert_eq!(root["children"][4]["kind"], "toggle");
+    assert_eq!(root["children"][5]["kind"], "progress");
+    round_trip(&ir);
+}
+
+#[test]
 fn render_from_files_entry() {
     let mut files = HashMap::new();
     files.insert("main.crepus".into(), "div\n  \"ok\"".into());
