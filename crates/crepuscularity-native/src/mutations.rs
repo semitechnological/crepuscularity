@@ -379,7 +379,9 @@ fn node_mut_in_list<'a>(nodes: &'a mut [ViewNode], path: &[usize]) -> Option<&'a
     let children = match node {
         ViewNode::Stack { children, .. }
         | ViewNode::Scroll { children, .. }
-        | ViewNode::Dropzone { children, .. } => children,
+        | ViewNode::Dropzone { children, .. }
+        | ViewNode::List { children, .. }
+        | ViewNode::ListItem { children, .. } => children,
         _ => return None,
     };
     node_mut_in_list(children.as_mut_slice(), rest)
@@ -396,7 +398,9 @@ fn children_mut<'a>(
     match node_mut(ir, parent_path)? {
         ViewNode::Stack { children, .. }
         | ViewNode::Scroll { children, .. }
-        | ViewNode::Dropzone { children, .. } => Ok(children),
+        | ViewNode::Dropzone { children, .. }
+        | ViewNode::List { children, .. }
+        | ViewNode::ListItem { children, .. } => Ok(children),
         other => Err(format!(
             "node at {:?} cannot contain children: {other:?}",
             parent_path
@@ -409,9 +413,19 @@ fn node_style_mut(node: &mut ViewNode) -> Option<&mut Option<ViewStyle>> {
         ViewNode::Text { style, .. }
         | ViewNode::Stack { style, .. }
         | ViewNode::Button { style, .. }
+        | ViewNode::Toggle { style, .. }
+        | ViewNode::Checkbox { style, .. }
+        | ViewNode::Slider { style, .. }
+        | ViewNode::Progress { style, .. }
+        | ViewNode::Meter { style, .. }
+        | ViewNode::Badge { style, .. }
+        | ViewNode::Divider { style, .. }
+        | ViewNode::Spacer { style, .. }
         | ViewNode::Dropzone { style, .. }
         | ViewNode::Image { style, .. }
         | ViewNode::Scroll { style, .. }
+        | ViewNode::List { style, .. }
+        | ViewNode::ListItem { style, .. }
         | ViewNode::SlotRotate { style, .. }
         | ViewNode::Input { style, .. }
         | ViewNode::Picker { style, .. } => Some(style),
