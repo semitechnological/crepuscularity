@@ -148,6 +148,22 @@ fn button_and_dynamic_color() {
 }
 
 #[test]
+fn dropzone_ir() {
+    let tpl = r#"
+dropzone @drop="files" accept="image/*,application/pdf" border rounded p-4
+  span text-sm
+    "Drop files"
+"#;
+    let ir = render_template_to_ir(tpl, &TemplateContext::new()).unwrap();
+    let v = serde_json::to_value(&ir).unwrap();
+    assert_eq!(v["root"][0]["kind"], "dropzone");
+    assert_eq!(v["root"][0]["label"], "Drop files");
+    assert_eq!(v["root"][0]["accept"], "image/*,application/pdf");
+    assert_eq!(v["root"][0]["onDrop"], "files");
+    round_trip(&ir);
+}
+
+#[test]
 fn render_from_files_entry() {
     let mut files = HashMap::new();
     files.insert("main.crepus".into(), "div\n  \"ok\"".into());
