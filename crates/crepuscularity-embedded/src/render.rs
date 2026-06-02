@@ -154,19 +154,24 @@ fn render_node(node: &Node, ctx: &TemplateContext) -> Result<EmbeddedNode, Strin
         }
         Node::For(block) => {
             let mut children = Vec::new();
-            for item_ctx in ctx.get_list(&block.iterator) {
-                let mut loop_ctx = ctx.clone();
-                for (k, v) in &item_ctx.vars {
-                    loop_ctx.vars.insert(k.clone(), v.clone());
+            let items = ctx.get_list(&block.iterator);
+            let pattern = block.pattern.trim();
+            let has_pattern = !pattern.is_empty();
+            let mut loop_ctx = ctx.clone();
+            for item_ctx in items {
+                let s = if has_pattern {
+                    item_ctx.get_str("value")
+                } else {
+                    String::new()
+                };
+                loop_ctx.vars.clone_from(&ctx.vars);
+                for (k, v) in item_ctx.vars {
+                    loop_ctx.vars.insert(k, v);
                 }
-                let pattern = block.pattern.trim();
-                if !pattern.is_empty() {
-                    let s = item_ctx.get_str("value");
-                    if !s.is_empty() {
-                        loop_ctx
-                            .vars
-                            .insert(pattern.to_string(), TemplateValue::Str(s));
-                    }
+                if has_pattern && !s.is_empty() {
+                    loop_ctx
+                        .vars
+                        .insert(pattern.to_string(), TemplateValue::Str(s));
                 }
                 children.extend(render_nodes_list(&block.body, &loop_ctx)?);
             }
