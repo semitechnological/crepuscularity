@@ -756,4 +756,29 @@ div
             d.inline_css
         );
     }
+
+    #[test]
+    fn test_merge_unique_font_families() {
+        let input = vec![
+            "  Inter  ".to_string(), // Trimming
+            "".to_string(),          // Empty string
+            "   ".to_string(),       // Whitespace-only string
+            "Roboto".to_string(),    // Normal
+            "inter".to_string(),     // Duplicate, different case
+            "INTER".to_string(),     // Duplicate, different case
+            "Open Sans".to_string(), // Normal
+            "roboto".to_string(),    // Duplicate, different case
+        ];
+
+        let result = merge_unique_font_families(input);
+
+        assert_eq!(
+            result,
+            vec![
+                "Inter".to_string(),
+                "Roboto".to_string(),
+                "Open Sans".to_string(),
+            ]
+        );
+    }
 }
