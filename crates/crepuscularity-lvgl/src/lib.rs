@@ -613,7 +613,7 @@ include card.crepus title="Vitals"
     "OK"
 "#;
         let mut ctx = TemplateContext::new();
-        ctx.virtual_files.insert(
+        std::sync::Arc::make_mut(&mut ctx.virtual_files).insert(
             "card.crepus".into(),
             r#"
 div #card p-2

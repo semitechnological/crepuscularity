@@ -27,7 +27,7 @@ impl SsrHandler {
             vars: opts.defaults.clone(),
             base_dir: None,
             slot: None,
-            virtual_files: HashMap::new(),
+            virtual_files: std::sync::Arc::new(HashMap::new()),
         };
         let html = tokio::task::spawn_blocking({
             let template = opts.template;

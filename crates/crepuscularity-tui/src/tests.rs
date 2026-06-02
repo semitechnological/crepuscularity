@@ -547,7 +547,7 @@ fn include_uses_isolated_context() {
     let mut ctx = TemplateContext::new();
     ctx.base_dir = Some(PathBuf::from("/virtual"));
     ctx.set("secret", "leak");
-    ctx.virtual_files
+    std::sync::Arc::make_mut(&mut ctx.virtual_files)
         .insert("child.crepus".into(), "div\n  \"{secret}\"".into());
 
     let tpl = "div\n include child.crepus";
@@ -559,7 +559,7 @@ fn include_uses_isolated_context() {
 fn include_reads_virtual_file_by_suffix_match() {
     let mut ctx = TemplateContext::new();
     ctx.base_dir = Some(PathBuf::from("/virtual"));
-    ctx.virtual_files
+    std::sync::Arc::make_mut(&mut ctx.virtual_files)
         .insert("child.crepus".into(), "div\n  \"From virtual\"".into());
 
     let tpl = "div\n include child.crepus";
@@ -575,7 +575,7 @@ fn include_reads_virtual_file_by_suffix_match() {
 fn include_rejects_parent_dir_escape() {
     let mut ctx = TemplateContext::new();
     ctx.base_dir = Some(PathBuf::from("/virtual"));
-    ctx.virtual_files
+    std::sync::Arc::make_mut(&mut ctx.virtual_files)
         .insert("../secret.crepus".into(), "div\n  \"secret\"".into());
 
     let tpl = "div\n include ../secret.crepus";
@@ -591,7 +591,7 @@ fn include_rejects_absolute_path() {
     ctx.base_dir = Some(PathBuf::from("/virtual"));
     let path = std::env::temp_dir().join("secret.crepus");
     let include_path = path.to_string_lossy().into_owned();
-    ctx.virtual_files
+    std::sync::Arc::make_mut(&mut ctx.virtual_files)
         .insert(include_path.clone(), "div\n  \"secret\"".into());
 
     let tpl = format!("div\n include {include_path}");
