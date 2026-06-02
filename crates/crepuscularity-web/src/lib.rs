@@ -211,7 +211,10 @@ fn render_node(node: &Node, ctx: &TemplateContext) -> Result<String, String> {
         Node::Include(inc) => render_include(inc, ctx),
         Node::Embed(embed) => render_embed(embed, ctx),
         Node::RawText(expr) => Ok(escape_html(&value_to_str(&eval_expr(expr, ctx)))),
-        Node::RawHtml(expr) => Ok(value_to_str(&eval_expr(expr, ctx))),
+        Node::RawHtml(expr) => {
+            let inner = value_to_str(&eval_expr(expr, ctx));
+            Ok(ammonia::clean(&inner))
+        }
     }
 }
 
