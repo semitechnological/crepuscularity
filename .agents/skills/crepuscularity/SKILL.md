@@ -9,22 +9,22 @@ This skill teaches the core development patterns and conventions used in the `cr
 ## Coding Conventions
 
 ### File Naming
-- Use **camelCase** for file names.
-  - **Example:** `myModule.rs`, `dataProcessor.rs`
+- Use **snake_case** for Rust file names and kebab-case for crate/package directory names where Cargo package names use hyphens.
+  - **Example:** `template_context.rs`, `crepuscularity-web`
 
 ### Import Style
-- Use **relative imports** within the project.
+- Use Rust module paths within the project.
   - **Example:**
     ```rust
     mod utils;
-    use crate::utils::helperFunction;
+    use crate::utils::helper_function;
     ```
 
 ### Export Style
 - Use **named exports** for functions, structs, and modules.
   - **Example:**
     ```rust
-    pub fn calculateTwilight() { ... }
+    pub fn calculate_twilight() { ... }
     pub struct SunPosition { ... }
     ```
 
@@ -43,17 +43,17 @@ This skill teaches the core development patterns and conventions used in the `cr
 **Trigger:** When you need to introduce new functionality.
 **Command:** `/add-module`
 
-1. Create a new Rust file using camelCase (e.g., `newFeature.rs`).
+1. Create a new Rust file using snake_case (e.g., `new_feature.rs`).
 2. Implement your functions/structs with `pub` for named exports.
-3. Use relative imports to include dependencies from other modules.
+3. Use Rust module paths to include dependencies from other modules.
 4. Update the main module (`lib.rs` or `main.rs`) to include your new module.
-5. Write corresponding tests in a file matching `*.test.*` pattern.
+5. Write corresponding tests near the implementation or in the crate's `tests/` directory.
 
 ### Writing and Running Tests
 **Trigger:** When you need to verify code correctness.
 **Command:** `/run-tests`
 
-1. Create a test file with the pattern `*.test.rs` (e.g., `sunrise.test.rs`).
+1. Create tests near the implementation or in a crate-level integration test file (e.g., `tests/sunrise.rs`).
 2. Write test functions using Rust's built-in test framework.
     ```rust
     #[cfg(test)]
@@ -90,7 +90,7 @@ This skill teaches the core development patterns and conventions used in the `cr
 
 ## Testing Patterns
 
-- Test files use the pattern `*.test.rs`.
+- Tests live near the implementation or in crate-level `tests/` directories.
 - Tests are written using Rust's built-in test framework (`#[test]`).
 - Place tests in a `mod tests` block within the test file or alongside the module.
 - Example:

@@ -6,27 +6,27 @@ sandbox_mode = "workspace-write"
 web_search = "live"
 
 [mcp_servers.github]
-command = "npx"
-args = ["-y", "@modelcontextprotocol/server-github"]
+command = "bunx"
+args = ["@modelcontextprotocol/server-github"]
 
 [mcp_servers.context7]
-command = "npx"
-args = ["-y", "@upstash/context7-mcp@latest"]
+command = "bunx"
+args = ["@upstash/context7-mcp@latest"]
 
 [mcp_servers.exa]
 url = "https://mcp.exa.ai/mcp"
 
 [mcp_servers.memory]
-command = "npx"
-args = ["-y", "@modelcontextprotocol/server-memory"]
+command = "bunx"
+args = ["@modelcontextprotocol/server-memory"]
 
 [mcp_servers.playwright]
-command = "npx"
-args = ["-y", "@playwright/mcp@latest", "--extension"]
+command = "bunx"
+args = ["@playwright/mcp@latest", "--extension"]
 
 [mcp_servers.sequential-thinking]
-command = "npx"
-args = ["-y", "@modelcontextprotocol/server-sequential-thinking"]
+command = "bunx"
+args = ["@modelcontextprotocol/server-sequential-thinking"]
 
 [features]
 multi_agent = true

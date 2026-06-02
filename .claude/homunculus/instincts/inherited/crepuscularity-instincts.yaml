@@ -37,12 +37,12 @@ source_repo: https://github.com/tschk/crepuscularity
 
 ## Action
 
-Use camelCase naming convention
+Use snake_case for Rust file names and kebab-case for crate/package directory names where Cargo package names use hyphens
 
 ## Evidence
 
 - Analyzed file naming patterns in repository
-- Dominant pattern: camelCase
+- Dominant Rust source pattern: snake_case
 
 ---
 id: crepuscularity-import-relative
@@ -57,12 +57,12 @@ source_repo: https://github.com/tschk/crepuscularity
 
 ## Action
 
-Use relative imports for project files
+Use Rust module paths for project files
 
 ## Evidence
 
-- Import analysis shows relative import pattern
-- Example: import { x } from '../lib/x'
+- Import analysis shows Rust module path usage
+- Example: use crate::module::item
 
 ---
 id: crepuscularity-export-style
@@ -97,11 +97,11 @@ source_repo: tschk/crepuscularity
 
 ## Action
 
-Name the file using camelCase
+Name Rust source files using snake_case
 
 ## Evidence
 
-- Pattern in files: namingConventions.files = camelCase
+- Pattern in files: namingConventions.files = snake_case
 
 ---
 id: crepuscularity-instinct-function-naming
@@ -116,11 +116,11 @@ source_repo: tschk/crepuscularity
 
 ## Action
 
-Name the function using camelCase
+Name functions using snake_case
 
 ## Evidence
 
-- Pattern in functions: namingConventions.functions = camelCase
+- Pattern in functions: namingConventions.functions = snake_case
 
 ---
 id: crepuscularity-instinct-class-naming
@@ -173,11 +173,11 @@ source_repo: tschk/crepuscularity
 
 ## Action
 
-Use relative imports
+Use Rust module paths
 
 ## Evidence
 
-- Pattern: importStyle = relative
+- Pattern: importStyle = rust_module_paths
 
 ---
 id: crepuscularity-instinct-export-style
@@ -238,4 +238,3 @@ Use a concise, freeform message without a prefix, around 46 characters on averag
 - Pattern: commits.averageLength = 46
 - Pattern: commits.prefixes = []
 - Example: 'Fix Cross-Site Scripting (XSS) via RawHtml SSR'
-
