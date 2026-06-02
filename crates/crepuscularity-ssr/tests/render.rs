@@ -11,7 +11,7 @@ fn ssr_renders_template() {
         vars,
         base_dir: None,
         slot: None,
-        virtual_files: HashMap::new(),
+        virtual_files: std::sync::Arc::new(std::collections::HashMap::new()),
     };
     let html = crepuscularity_web::render_template_to_html(template, &ctx).unwrap();
     assert!(html.contains("Hello World"));

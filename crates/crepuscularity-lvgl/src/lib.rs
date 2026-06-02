@@ -544,6 +544,7 @@ fn push_xml_attr(out: &mut String, value: &str) {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
     use super::*;
 
     #[test]
@@ -613,7 +614,7 @@ include card.crepus title="Vitals"
     "OK"
 "#;
         let mut ctx = TemplateContext::new();
-        ctx.virtual_files.insert(
+        Arc::make_mut(&mut ctx.virtual_files).insert(
             "card.crepus".into(),
             r#"
 div #card p-2
