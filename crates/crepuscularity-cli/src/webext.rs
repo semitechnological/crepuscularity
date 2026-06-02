@@ -11,6 +11,8 @@ use crate::wasm_bundle::{
     cargo_build_wasm32, find_wasm_file, run_wasm_bindgen, run_wasm_opt, wasm_profile_dirs,
     WasmOptStatus,
 };
+use crepuscularity_core::watch::COOLDOWN_MS;
+use crepuscularity_core::{DriverCache, Fingerprint};
 use crepuscularity_webext::BrowserTarget;
 
 // ── Entry point ──────────────────────────────────────────────────────────────
@@ -955,6 +957,8 @@ fn render_crepus_pages(
     std::fs::create_dir_all(&out_dir).map_err(|e| e.to_string())?;
     std::fs::create_dir_all(&src_dir).map_err(|e| e.to_string())?;
 
+    let cache = DriverCache::open(app_path);
+
     for entry in &entries {
         let source = files
             .get(entry)
@@ -1018,10 +1022,18 @@ try {{
         let output = out_dir
             .join(entry.trim_end_matches(".crepus"))
             .with_extension("html");
+
+        // Cache skip: avoid re-rendering unchanged page templates.
+        let fp = Fingerprint::new(source, Some(entry), "webext-page");
+        if output.is_file() && cache.is_up_to_date(&fp, &html) {
+            continue;
+        }
+
         if let Some(parent) = output.parent() {
             std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
         }
-        std::fs::write(output, html).map_err(|e| e.to_string())?;
+        std::fs::write(output, &html).map_err(|e| e.to_string())?;
+        cache.record(&fp, &html);
     }
     Ok(())
 }
@@ -1171,7 +1183,7 @@ fn watch_and_reload(app_path: &Path, browser: Option<BrowserTarget>, options: Bu
         let _ = rx.recv();
         // drain pending events
         while rx.try_recv().is_ok() {}
-        std::thread::sleep(std::time::Duration::from_millis(200));
+        std::thread::sleep(std::time::Duration::from_millis(COOLDOWN_MS));
 
         eprintln!();
         let sp = ui::spinner("rebuilding");
