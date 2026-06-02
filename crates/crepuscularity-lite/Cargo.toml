@@ -16,7 +16,7 @@ cli = ["dep:clap"]
 bench-tui = ["cli", "dep:crossterm", "dep:ratatui", "parallel"]
 
 [dependencies]
-crepuscularity-lite-macros = { path = "../crepuscularity-lite-macros", version = "0.4.4" }
+crepuscularity-lite-macros = { path = "../crepuscularity-lite-macros", version = "0.4.5" }
 arboard = "3.6"
 dirs = "6"
 gpui = { workspace = true, features = ["runtime_shaders"] }

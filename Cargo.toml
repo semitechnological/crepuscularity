@@ -55,7 +55,7 @@ lto = "fat"
 codegen-units = 1
 
 [workspace.package]
-version = "0.4.4"
+version = "0.4.5"
 edition = "2021"
 license = "MPL-2.0"
 

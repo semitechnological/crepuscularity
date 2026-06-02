@@ -1,6 +1,6 @@
 [package]
 name = "crepuscularity-native"
-version = "0.4.6"
+version = "0.4.7"
 edition = "2021"
 license = "MPL-2.0"
 description = "View intermediate representation (JSON) for native SwiftUI / Compose shells (UNSTABLE)."
@@ -13,7 +13,7 @@ default = []
 schema = ["dep:schemars"]
 
 [dependencies]
-crepuscularity-core = { path = "../crepuscularity-core", version = "0.4.10" }
+crepuscularity-core = { path = "../crepuscularity-core", version = "0.4.11" }
 regex = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -21,7 +21,7 @@ schemars = { workspace = true, optional = true }
 toml = { workspace = true }
 
 [dev-dependencies]
-crepuscularity-core = { path = "../crepuscularity-core", version = "0.4.10" }
+crepuscularity-core = { path = "../crepuscularity-core", version = "0.4.11" }
 serde_json = { workspace = true }
 tempfile = { workspace = true }
 

@@ -1,6 +1,6 @@
 [package]
 name = "crepuscularity-embedded-macros"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 license = "MPL-2.0"
 description = "Compile-time .crepus validation for crepuscularity-embedded (UNSTABLE; embedded stack largely untested on hardware)."
@@ -11,7 +11,7 @@ readme = "../../README.md"
 proc-macro = true
 
 [dependencies]
-crepuscularity-core = { path = "../crepuscularity-core", version = "0.4.10" }
+crepuscularity-core = { path = "../crepuscularity-core", version = "0.4.11" }
 proc-macro2 = { workspace = true }
 quote = { workspace = true }
 syn = { workspace = true }
