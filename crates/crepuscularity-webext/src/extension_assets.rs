@@ -28,7 +28,7 @@ pub static UNOCSS_JS: &[u8] = include_bytes!(concat!(
 
 #[cfg(test)]
 mod tests {
-    use super::{BACKGROUND_JS, CONTENT_JS};
+    use super::{BACKGROUND_JS, CONTENT_JS, DEV_JS};
 
     #[test]
     fn background_host_is_mv3_service_worker_safe() {
@@ -36,6 +36,32 @@ mod tests {
         assert!(!BACKGROUND_JS.contains("await import("));
         assert!(!BACKGROUND_JS.contains("const runtimeModule = await"));
         assert!(!BACKGROUND_JS.contains("await fetch("));
+    }
+
+    #[test]
+    fn dev_script_is_csp_safe() {
+        // Dev hot reload must not use eval, inline scripts, or remote origins.
+        assert!(!DEV_JS.contains("eval("), "dev.js must not use eval");
+        assert!(
+            !DEV_JS.contains("Function("),
+            "dev.js must not use Function constructor"
+        );
+        assert!(
+            DEV_JS.contains("fetch("),
+            "dev.js must use fetch for reload-id"
+        );
+        assert!(
+            DEV_JS.contains("location.reload()"),
+            "dev.js must trigger reload"
+        );
+        assert!(
+            !DEV_JS.contains("innerHTML"),
+            "dev.js must not use innerHTML"
+        );
+        assert!(
+            !DEV_JS.contains("document.write"),
+            "dev.js must not use document.write"
+        );
     }
 
     #[test]
