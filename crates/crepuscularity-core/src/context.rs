@@ -13,7 +13,7 @@ pub struct TemplateContext {
     pub slot: Option<(Vec<crate::ast::Node>, Box<TemplateContext>)>,
     /// In-memory virtual file system for WASM / no-filesystem environments.
     /// Keys are paths (e.g. `"views/ui.crepus"`). Checked before real filesystem.
-    pub virtual_files: HashMap<String, String>,
+    pub virtual_files: std::sync::Arc<HashMap<String, String>>,
 }
 
 #[derive(Debug, Clone)]

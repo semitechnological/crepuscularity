@@ -13,13 +13,13 @@ use crate::{
 /// full buffer as a Vec of row strings (one per terminal row).
 fn render(width: u16, height: u16, template: &str, ctx: &TemplateContext) -> Vec<String> {
     let backend = TestBackend::new(width, height);
-    let mut terminal = Terminal::new(backend).unwrap();
+    let mut terminal = Terminal::new(backend);
     terminal
         .draw(|frame| {
             let area = frame.area();
             render_template(template, ctx, frame, area).expect("render_template returned an error");
         })
-        .unwrap();
+        ;
 
     let buf = terminal.backend().buffer();
     let w = buf.area.width as usize;
@@ -94,17 +94,17 @@ fn file_template_builder_renders() {
         &path,
         "div w-full h-full flex-col\n  div h-[1]\n    \"{title}\"\n  div h-[1]\n    \"{input}\"",
     )
-    .unwrap();
+    ;
 
-    let mut ui = template(&path).unwrap();
+    let mut ui = template(&path);
     ui.set("title", "My App");
     ui.set("input", "input contents");
 
     let backend = TestBackend::new(40, 4);
-    let mut terminal = Terminal::new(backend).unwrap();
+    let mut terminal = Terminal::new(backend);
     terminal
         .draw(|frame| ui.draw_full(frame).expect("template draws"))
-        .unwrap();
+        ;
 
     let text = all_text(&buffer_rows(&terminal));
     assert!(text.contains("My App"), "{text}");
@@ -116,14 +116,14 @@ fn file_template_builder_renders() {
 fn draw_helper_owns_terminal_draw_pass() {
     let dir = temp_case("draw-helper");
     let path = dir.join("ui.crepus");
-    fs::write(&path, "div\n  \"{title}\"").unwrap();
+    fs::write(&path, "div\n  \"{title}\"");
 
     let backend = TestBackend::new(40, 4);
-    let mut terminal = Terminal::new(backend).unwrap();
+    let mut terminal = Terminal::new(backend);
     draw_template(&mut terminal, &path, |ui| {
         ui.set("title", "Draw Helper");
     })
-    .unwrap();
+    ;
 
     let text = all_text(&buffer_rows(&terminal));
     assert!(text.contains("Draw Helper"), "{text}");
@@ -300,8 +300,8 @@ fn flex_col_stacks_vertically() {
     let tpl = "div flex-col\n  div h-[1]\n    \"Top\"\n  div h-[1]\n    \"Bottom\"";
     let rows = render(20, 4, tpl, &ctx);
     // "Top" should appear before "Bottom" in the row list.
-    let top_row = rows.iter().position(|r| r.contains("Top")).unwrap();
-    let bot_row = rows.iter().position(|r| r.contains("Bottom")).unwrap();
+    let top_row = rows.iter().position(|r| r.contains("Top"));
+    let bot_row = rows.iter().position(|r| r.contains("Bottom"));
     assert!(
         top_row < bot_row,
         "flex-col: Top should be above Bottom. rows:\n{}",
@@ -315,7 +315,7 @@ fn flex_row_stacks_horizontally() {
     let tpl = "div flex-row\n  div w-[8]\n    \"Left\"\n  div flex-1\n    \"Right\"";
     let rows = render(30, 3, tpl, &ctx);
     // "Left" and "Right" should appear on the same row.
-    let row_with_left = rows.iter().find(|r| r.contains("Left")).unwrap();
+    let row_with_left = rows.iter().find(|r| r.contains("Left"));
     assert!(
         row_with_left.contains("Right"),
         "flex-row: Left and Right should be on the same row. rows:\n{}",
@@ -471,7 +471,7 @@ fn fixed_height_with_one_sided_border_keeps_content_visible() {
 #[test]
 fn child_text_inherits_parent_style() {
     let backend = TestBackend::new(30, 3);
-    let mut terminal = Terminal::new(backend).unwrap();
+    let mut terminal = Terminal::new(backend);
     let ctx = TemplateContext::new();
     terminal
         .draw(|frame| {
@@ -484,7 +484,7 @@ fn child_text_inherits_parent_style() {
             )
             .expect("render_template returned an error");
         })
-        .unwrap();
+        ;
 
     let buf = terminal.backend().buffer();
     let cell = buf
@@ -520,13 +520,13 @@ fn multi_component_render() {
     let content = "--- Card\ndiv border rounded p-1\n  slot\n    \"fallback\"";
     let rows = {
         let backend = TestBackend::new(30, 5);
-        let mut terminal = Terminal::new(backend).unwrap();
+        let mut terminal = Terminal::new(backend);
         terminal
             .draw(|frame| {
                 let area = frame.area();
-                render_component(content, "Card", &ctx, frame, area).unwrap();
+                render_component(content, "Card", &ctx, frame, area);
             })
-            .unwrap();
+            ;
         let buf = terminal.backend().buffer();
         let w = buf.area.width as usize;
         let h = buf.area.height as usize;
@@ -547,7 +547,8 @@ fn include_uses_isolated_context() {
     let mut ctx = TemplateContext::new();
     ctx.base_dir = Some(PathBuf::from("/virtual"));
     ctx.set("secret", "leak");
-    ctx.virtual_files
+    std::sync::Arc::make_mut(&mut ctx.virtual_files)
+
         .insert("child.crepus".into(), "div\n  \"{secret}\"".into());
 
     let tpl = "div\n include child.crepus";
@@ -559,7 +560,8 @@ fn include_uses_isolated_context() {
 fn include_reads_virtual_file_by_suffix_match() {
     let mut ctx = TemplateContext::new();
     ctx.base_dir = Some(PathBuf::from("/virtual"));
-    ctx.virtual_files
+    std::sync::Arc::make_mut(&mut ctx.virtual_files)
+
         .insert("child.crepus".into(), "div\n  \"From virtual\"".into());
 
     let tpl = "div\n include child.crepus";
@@ -575,7 +577,8 @@ fn include_reads_virtual_file_by_suffix_match() {
 fn include_rejects_parent_dir_escape() {
     let mut ctx = TemplateContext::new();
     ctx.base_dir = Some(PathBuf::from("/virtual"));
-    ctx.virtual_files
+    std::sync::Arc::make_mut(&mut ctx.virtual_files)
+
         .insert("../secret.crepus".into(), "div\n  \"secret\"".into());
 
     let tpl = "div\n include ../secret.crepus";
@@ -591,7 +594,8 @@ fn include_rejects_absolute_path() {
     ctx.base_dir = Some(PathBuf::from("/virtual"));
     let path = std::env::temp_dir().join("secret.crepus");
     let include_path = path.to_string_lossy().into_owned();
-    ctx.virtual_files
+    std::sync::Arc::make_mut(&mut ctx.virtual_files)
+
         .insert(include_path.clone(), "div\n  \"secret\"".into());
 
     let tpl = format!("div\n include {include_path}");
@@ -603,7 +607,7 @@ fn include_rejects_absolute_path() {
 
 #[test]
 fn demo_example_renders_without_error() {
-    let template = fs::read_to_string(examples_dir().join("demo.crepus")).unwrap();
+    let template = fs::read_to_string(examples_dir().join("demo.crepus"));
 
     let mut ctx = TemplateContext::new();
     ctx.set("title", "Demo");
@@ -628,7 +632,7 @@ fn demo_example_renders_without_error() {
 
 #[test]
 fn jsx_demo_example_renders_include() {
-    let template = fs::read_to_string(examples_dir().join("jsx-demo.crepus")).unwrap();
+    let template = fs::read_to_string(examples_dir().join("jsx-demo.crepus"));
 
     let mut ctx = TemplateContext::new();
     ctx.base_dir = Some(examples_dir());
@@ -653,7 +657,7 @@ fn jsx_demo_example_renders_include() {
 
 #[test]
 fn components_demo_renders_slot_content() {
-    let template = fs::read_to_string(examples_dir().join("components-demo.crepus")).unwrap();
+    let template = fs::read_to_string(examples_dir().join("components-demo.crepus"));
 
     let mut ctx = TemplateContext::new();
     ctx.base_dir = Some(examples_dir());
@@ -666,12 +670,12 @@ fn components_demo_renders_slot_content() {
 
 fn render_hot(width: u16, height: u16, hot: &mut HotTemplate) -> Vec<String> {
     let backend = TestBackend::new(width, height);
-    let mut terminal = Terminal::new(backend).unwrap();
+    let mut terminal = Terminal::new(backend);
     terminal
         .draw(|frame| {
             let _ = hot.poll_and_draw_full(frame);
         })
-        .unwrap();
+        ;
     buffer_rows(&terminal)
 }
 
@@ -679,26 +683,26 @@ fn render_hot(width: u16, height: u16, hot: &mut HotTemplate) -> Vec<String> {
 fn template_reload_picks_up_new_source() {
     let dir = temp_case("reload");
     let path = dir.join("ui.crepus");
-    fs::write(&path, "div\n  \"first version\"").unwrap();
+    fs::write(&path, "div\n  \"first version\"");
 
-    let mut tpl = template(&path).unwrap();
+    let mut tpl = template(&path);
     let backend = TestBackend::new(40, 3);
-    let mut terminal = Terminal::new(backend).unwrap();
+    let mut terminal = Terminal::new(backend);
     terminal
-        .draw(|frame| tpl.draw_full(frame).unwrap())
-        .unwrap();
+        .draw(|frame| tpl.draw_full(frame))
+        ;
     assert!(
         all_text(&buffer_rows(&terminal)).contains("first version"),
         "{}",
         all_text(&buffer_rows(&terminal))
     );
 
-    fs::write(&path, "div\n  \"second version\"").unwrap();
+    fs::write(&path, "div\n  \"second version\"");
     tpl.reload().expect("reload succeeds after rewrite");
 
     terminal
-        .draw(|frame| tpl.draw_full(frame).unwrap())
-        .unwrap();
+        .draw(|frame| tpl.draw_full(frame))
+        ;
     let text = all_text(&buffer_rows(&terminal));
     assert!(text.contains("second version"), "{text}");
     assert!(!text.contains("first version"), "{text}");
@@ -715,9 +719,9 @@ fn template_reload_without_path_fails() {
 fn hot_template_initial_render_uses_disk_source() {
     let dir = temp_case("hot-initial");
     let path = dir.join("ui.crepus");
-    fs::write(&path, "div\n  \"original\"").unwrap();
+    fs::write(&path, "div\n  \"original\"");
 
-    let mut hot = HotTemplate::watch(&path).unwrap();
+    let mut hot = HotTemplate::watch(&path);
     let rows = render_hot(40, 3, &mut hot);
     assert!(all_text(&rows).contains("original"), "{}", all_text(&rows));
     assert_eq!(hot.template().context().base_dir.as_deref(), Some(&*dir));
@@ -727,9 +731,9 @@ fn hot_template_initial_render_uses_disk_source() {
 fn hot_template_poll_unchanged_when_flag_clear() {
     let dir = temp_case("hot-noop");
     let path = dir.join("ui.crepus");
-    fs::write(&path, "div\n  \"x\"").unwrap();
+    fs::write(&path, "div\n  \"x\"");
 
-    let mut hot = HotTemplate::watch(&path).unwrap();
+    let mut hot = HotTemplate::watch(&path);
     assert_eq!(hot.poll_reload(), ReloadOutcome::Unchanged);
 }
 
@@ -737,14 +741,14 @@ fn hot_template_poll_unchanged_when_flag_clear() {
 fn hot_template_poll_reloads_when_flag_set() {
     let dir = temp_case("hot-flag-set");
     let path = dir.join("ui.crepus");
-    fs::write(&path, "div\n  \"before\"").unwrap();
+    fs::write(&path, "div\n  \"before\"");
 
-    let mut hot = HotTemplate::watch(&path).unwrap();
+    let mut hot = HotTemplate::watch(&path);
     let rows = render_hot(40, 3, &mut hot);
     assert!(all_text(&rows).contains("before"), "{}", all_text(&rows));
 
-    fs::write(&path, "div\n  \"after\"").unwrap();
-    *hot.changed_handle().lock().unwrap() = true;
+    fs::write(&path, "div\n  \"after\"");
+    *hot.changed_handle().lock() = true;
 
     assert_eq!(hot.poll_reload(), ReloadOutcome::Reloaded);
 
@@ -758,16 +762,16 @@ fn hot_template_poll_reloads_when_flag_set() {
 fn hot_template_preserves_context_across_reload() {
     let dir = temp_case("hot-ctx");
     let path = dir.join("ui.crepus");
-    fs::write(&path, "div\n  \"v1: {label}\"").unwrap();
+    fs::write(&path, "div\n  \"v1: {label}\"");
 
-    let mut hot = HotTemplate::watch(&path).unwrap();
+    let mut hot = HotTemplate::watch(&path);
     hot.template_mut().set("label", "kept");
 
     let rows = render_hot(40, 3, &mut hot);
     assert!(all_text(&rows).contains("v1: kept"), "{}", all_text(&rows));
 
-    fs::write(&path, "div\n  \"v2: {label}\"").unwrap();
-    *hot.changed_handle().lock().unwrap() = true;
+    fs::write(&path, "div\n  \"v2: {label}\"");
+    *hot.changed_handle().lock() = true;
     assert_eq!(hot.poll_reload(), ReloadOutcome::Reloaded);
 
     let rows = render_hot(40, 3, &mut hot);
@@ -779,13 +783,13 @@ fn hot_template_preserves_context_across_reload() {
 fn hot_template_poll_returns_error_for_missing_file() {
     let dir = temp_case("hot-err");
     let path = dir.join("ui.crepus");
-    fs::write(&path, "div\n  \"alive\"").unwrap();
+    fs::write(&path, "div\n  \"alive\"");
 
-    let mut hot = HotTemplate::watch(&path).unwrap();
+    let mut hot = HotTemplate::watch(&path);
     let _ = render_hot(40, 3, &mut hot);
 
-    fs::remove_file(&path).unwrap();
-    *hot.changed_handle().lock().unwrap() = true;
+    fs::remove_file(&path);
+    *hot.changed_handle().lock() = true;
 
     match hot.poll_reload() {
         ReloadOutcome::Error(_) => {}
@@ -800,10 +804,10 @@ fn hot_template_poll_returns_error_for_missing_file() {
 fn hot_template_consumes_change_flag() {
     let dir = temp_case("hot-flag-consumed");
     let path = dir.join("ui.crepus");
-    fs::write(&path, "div\n  \"x\"").unwrap();
+    fs::write(&path, "div\n  \"x\"");
 
-    let mut hot = HotTemplate::watch(&path).unwrap();
-    *hot.changed_handle().lock().unwrap() = true;
+    let mut hot = HotTemplate::watch(&path);
+    *hot.changed_handle().lock() = true;
     assert_eq!(hot.poll_reload(), ReloadOutcome::Reloaded);
     assert_eq!(hot.poll_reload(), ReloadOutcome::Unchanged);
     assert!(!hot.has_pending_change());
@@ -816,7 +820,7 @@ fn hot_template_drop_releases_watcher() {
     // permanently leaked a parked OS thread.
     let dir = temp_case("hot-drop");
     let path = dir.join("ui.crepus");
-    fs::write(&path, "div\n  \"x\"").unwrap();
+    fs::write(&path, "div\n  \"x\"");
 
     for _ in 0..16 {
         let hot = HotTemplate::watch(&path).expect("watch should succeed");
@@ -843,47 +847,47 @@ mod watcher_filter {
 
     #[test]
     fn matches_target_template() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir();
         let target = dir.path().join("ui.crepus");
-        fs::write(&target, "div").unwrap();
-        let target = target.canonicalize().unwrap();
+        fs::write(&target, "div");
+        let target = target.canonicalize();
         let e = ev(EventKind::Modify(ModifyKind::Any), vec![target.clone()]);
         assert!(event_touches_relevant_path(&e, &target, dir.path()));
     }
 
     #[test]
     fn matches_sibling_include() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir();
         let target = dir.path().join("ui.crepus");
         let include = dir.path().join("card.crepus");
-        fs::write(&target, "div").unwrap();
-        fs::write(&include, "div").unwrap();
-        let target = target.canonicalize().unwrap();
-        let include = include.canonicalize().unwrap();
+        fs::write(&target, "div");
+        fs::write(&include, "div");
+        let target = target.canonicalize();
+        let include = include.canonicalize();
         let e = ev(EventKind::Modify(ModifyKind::Any), vec![include]);
         assert!(event_touches_relevant_path(&e, &target, dir.path()));
     }
 
     #[test]
     fn matches_target_after_atomic_save_remove() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir();
         let target = dir.path().join("ui.crepus");
-        fs::write(&target, "div").unwrap();
-        let target = target.canonicalize().unwrap();
-        fs::remove_file(&target).unwrap();
+        fs::write(&target, "div");
+        let target = target.canonicalize();
+        fs::remove_file(&target);
         let e = ev(EventKind::Remove(RemoveKind::File), vec![target.clone()]);
         assert!(event_touches_relevant_path(&e, &target, dir.path()));
     }
 
     #[test]
     fn ignores_unrelated_extension() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = tempfile::tempdir();
         let target = dir.path().join("ui.crepus");
         let other = dir.path().join("README.md");
-        fs::write(&target, "div").unwrap();
-        fs::write(&other, "x").unwrap();
-        let target = target.canonicalize().unwrap();
-        let other = other.canonicalize().unwrap();
+        fs::write(&target, "div");
+        fs::write(&other, "x");
+        let target = target.canonicalize();
+        let other = other.canonicalize();
         let e = ev(EventKind::Modify(ModifyKind::Any), vec![other]);
         assert!(!event_touches_relevant_path(&e, &target, dir.path()));
     }

@@ -557,7 +557,7 @@ div #root w-full h-full flex flex-col gap-2 bg-[#101820] p-4
 "##;
         let mut ctx = TemplateContext::new();
         ctx.set("temp", 24);
-        let xml = render_template_to_lvgl_xml(template, &ctx).unwrap();
+        let xml = render_template_to_lvgl_xml(template, &ctx);
         assert!(xml.contains(r#"<component name="CrepusView">"#));
         assert!(xml.contains(r#"<lv_obj id="root" width="100%" height="100%""#));
         assert!(xml.contains(
@@ -574,7 +574,7 @@ progress #cpu value={cpu}
 "#;
         let mut ctx = TemplateContext::new();
         ctx.set("cpu", 68);
-        let xml = render_template_to_lvgl_xml(template, &ctx).unwrap();
+        let xml = render_template_to_lvgl_xml(template, &ctx);
         assert!(xml.contains(r#"<lv_bar id="cpu" value="68"/>"#));
     }
 
@@ -590,7 +590,7 @@ else
 "#;
         let mut ctx = TemplateContext::new();
         ctx.set("ok", true);
-        let xml = render_template_to_lvgl_xml(template, &ctx).unwrap();
+        let xml = render_template_to_lvgl_xml(template, &ctx);
         assert!(xml.contains(r#"text="Ready""#));
         assert!(!xml.contains("Offline"));
     }
@@ -601,7 +601,7 @@ else
 div
   "A&B <C>"
 "#;
-        let xml = render_template_to_lvgl_xml(template, &TemplateContext::new()).unwrap();
+        let xml = render_template_to_lvgl_xml(template, &TemplateContext::new());
         assert!(xml.contains("A&amp;B &lt;C&gt;"));
     }
 
@@ -613,9 +613,11 @@ include card.crepus title="Vitals"
     "OK"
 "#;
         let mut ctx = TemplateContext::new();
-        ctx.virtual_files.insert(
-            "card.crepus".into(),
-            r#"
+        std::sync::Arc::make_mut(&mut ctx.virtual_files)
+
+            .insert(
+                "card.crepus".into(),
+                r#"
 div #card p-2
   h2
     "{title}"
@@ -623,9 +625,9 @@ div #card p-2
     span
       "fallback"
 "#
-            .into(),
-        );
-        let xml = render_template_to_lvgl_xml(template, &ctx).unwrap();
+                .into(),
+            );
+        let xml = render_template_to_lvgl_xml(template, &ctx);
         assert!(xml.contains(r#"<lv_obj id="card" pad_all="8">"#));
         assert!(xml.contains(r#"<lv_label text="Vitals"/>"#));
         assert!(xml.contains(r#"<lv_label text="OK"/>"#));
