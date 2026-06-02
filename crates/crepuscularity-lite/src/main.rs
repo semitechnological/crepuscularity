@@ -273,16 +273,6 @@ impl LiteRoot {
 
     /// Run guest or built-in demo. Keeps the existing V8 isolate so repeated clicks preserve JS globals.
     fn run_guest(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        self.run_guest_impl(window, cx, false);
-    }
-
-    /// Re-read the guest file after a filesystem event: **new isolate** (clean global state) then eval.
-    #[allow(dead_code)]
-    fn run_guest_hot_reload(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        self.run_guest_impl(window, cx, true);
-    }
-
-    fn run_guest_impl(&mut self, window: &mut Window, cx: &mut Context<Self>, reset_v8: bool) {
         let base = std::env::var("CREPUS_LITE_BASE")
             .map(std::path::PathBuf::from)
             .unwrap_or_else(|_| std::env::current_dir().unwrap_or_default());
@@ -321,7 +311,7 @@ impl LiteRoot {
   return runner();
 })();
 "#;
-            self.run_script(format!("{script}\n{entrypoint}"), reset_v8, window, cx);
+            self.run_script(format!("{script}\n{entrypoint}"), false, window, cx);
         } else {
             eprintln!(
                 "crepus-lite: guest source unavailable (missing guest_entry or unreadable file)"
