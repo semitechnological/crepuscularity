@@ -107,4 +107,23 @@ mod tests {
     fn indent_only_ok() {
         assert!(diagnose_crepus_source("div\n  \"hi\"").is_empty());
     }
+
+    #[test]
+    fn test_is_multi_component_file() {
+        assert!(is_multi_component_file("+++"));
+        assert!(is_multi_component_file("+++\nname: Test\n+++\n"));
+
+        // With leading whitespace
+        assert!(is_multi_component_file("   +++"));
+        assert!(is_multi_component_file("\n\n+++"));
+        assert!(is_multi_component_file("\t+++"));
+
+        // Single component / not multi-component
+        assert!(!is_multi_component_file("++"));
+        assert!(!is_multi_component_file("+"));
+        assert!(!is_multi_component_file("div\n  \"hi\""));
+        assert!(!is_multi_component_file(""));
+        assert!(!is_multi_component_file("   "));
+        assert!(!is_multi_component_file("abc\n+++"));
+    }
 }
