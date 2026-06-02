@@ -43,7 +43,7 @@ pub fn render_from_files(
     ctx: &TemplateContext,
 ) -> Result<String, String> {
     let mut ctx = ctx.clone();
-    ctx.virtual_files = files.clone();
+    ctx.virtual_files = std::sync::Arc::new(files.clone());
 
     if let Some((file_part, comp_name)) = entry.split_once('#') {
         let content = files
