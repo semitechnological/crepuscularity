@@ -25,7 +25,7 @@ fn bench_render_component_defaults(c: &mut Criterion) {
                 );
             }
 
-            for (key, _expr) in &meta.defaults {
+            for key in meta.defaults.keys() {
                 child_ctx
                     .vars
                     .entry(key.clone())
@@ -46,7 +46,7 @@ fn bench_render_component_defaults(c: &mut Criterion) {
                 );
             }
 
-            for (key, _expr) in &meta.defaults {
+            for key in meta.defaults.keys() {
                 if !child_ctx.vars.contains_key(key) {
                     child_ctx
                         .vars
