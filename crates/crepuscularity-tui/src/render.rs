@@ -577,28 +577,25 @@ fn build_for(
     let items = ctx.get_list(&block.iterator);
     let mut out = Vec::new();
     let mut child_ctx = ctx.clone();
+    let pattern = block.pattern.trim();
+    let has_pattern = !pattern.is_empty();
     for item_ctx in items {
-        let mut old_values = Vec::new();
+        let item_str = if has_pattern {
+            item_ctx.get_str("value")
+        } else {
+            String::new()
+        };
+        // Restore child_ctx
+        child_ctx.vars.clone_from(&ctx.vars);
         // Merge all fields from the item context into the child context.
-        for (k, v) in &item_ctx.vars {
-            if let Some(old_v) = child_ctx.vars.insert(k.clone(), v.clone()) {
-                old_values.push((k.clone(), Some(old_v)));
-            } else {
-                old_values.push((k.clone(), None));
-            }
+        for (k, v) in item_ctx.vars {
+            child_ctx.vars.insert(k, v);
         }
         // Bind the loop pattern variable to the item's "value" field if present.
-        let pattern = block.pattern.trim();
-        let mut old_pattern_val = None;
-        let mut pattern_inserted = false;
-        if !pattern.is_empty() {
-            let item_str = item_ctx.get_str("value");
-            if !item_str.is_empty() {
-                old_pattern_val = child_ctx
-                    .vars
-                    .insert(pattern.to_string(), TemplateValue::Str(item_str));
-                pattern_inserted = true;
-            }
+        if has_pattern && !item_str.is_empty() {
+            child_ctx
+                .vars
+                .insert(pattern.to_string(), TemplateValue::Str(item_str));
         }
         out.extend(build_children(
             &block.body,
@@ -606,23 +603,6 @@ fn build_for(
             parent_dir,
             inherited,
         ));
-
-        // Restore child_ctx
-        if pattern_inserted {
-            if let Some(old) = old_pattern_val {
-                child_ctx.vars.insert(pattern.to_string(), old);
-            } else {
-                child_ctx.vars.remove(pattern);
-            }
-        }
-
-        for (k, old) in old_values {
-            if let Some(old_v) = old {
-                child_ctx.vars.insert(k, old_v);
-            } else {
-                child_ctx.vars.remove(&k);
-            }
-        }
     }
     out
 }

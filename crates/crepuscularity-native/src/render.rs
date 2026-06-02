@@ -594,19 +594,23 @@ fn render_if(block: &IfBlock, ctx: &TemplateContext) -> Result<ViewNode, String>
 fn render_for(block: &ForBlock, ctx: &TemplateContext) -> Result<ViewNode, String> {
     let items = ctx.get_list(&block.iterator);
     let mut children = Vec::new();
+    let pattern = block.pattern.trim();
+    let has_pattern = !pattern.is_empty();
+    let mut child_ctx = ctx.clone();
     for item_ctx in items {
-        let mut child_ctx = ctx.clone();
-        for (k, v) in &item_ctx.vars {
-            child_ctx.vars.insert(k.clone(), v.clone());
+        let item_str = if has_pattern {
+            item_ctx.get_str("value")
+        } else {
+            String::new()
+        };
+        child_ctx.vars.clone_from(&ctx.vars);
+        for (k, v) in item_ctx.vars {
+            child_ctx.vars.insert(k, v);
         }
-        let pattern = block.pattern.trim();
-        if !pattern.is_empty() {
-            let item_str = item_ctx.get_str("value");
-            if !item_str.is_empty() {
-                child_ctx
-                    .vars
-                    .insert(pattern.to_string(), TemplateValue::Str(item_str));
-            }
+        if has_pattern && !item_str.is_empty() {
+            child_ctx
+                .vars
+                .insert(pattern.to_string(), TemplateValue::Str(item_str));
         }
         children.push(render_nodes_list(&block.body, &child_ctx)?);
     }
