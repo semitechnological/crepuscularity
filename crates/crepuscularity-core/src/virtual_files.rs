@@ -41,7 +41,7 @@ mod tests {
     #[test]
     fn lookup_exact_key() {
         let mut ctx = TemplateContext::new();
-        ctx.virtual_files.insert("child.crepus".into(), "ok".into());
+        std::sync::Arc::make_mut(&mut ctx.virtual_files).insert("child.crepus".into(), "ok".into());
         assert_eq!(
             lookup_virtual_file(&ctx, Path::new("child.crepus")).as_deref(),
             Some("ok")
@@ -51,9 +51,9 @@ mod tests {
     #[test]
     fn lookup_rejects_ambiguous_suffix() {
         let mut ctx = TemplateContext::new();
-        ctx.virtual_files
+        std::sync::Arc::make_mut(&mut ctx.virtual_files)
             .insert("a/child.crepus".into(), "1".into());
-        ctx.virtual_files
+        std::sync::Arc::make_mut(&mut ctx.virtual_files)
             .insert("b/child.crepus".into(), "2".into());
         assert!(lookup_virtual_file(&ctx, Path::new("/virtual/child.crepus")).is_none());
     }

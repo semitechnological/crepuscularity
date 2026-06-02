@@ -82,7 +82,7 @@ fn include_virtual_file() {
         "child.crepus".into(),
         "span text-green-400\n  \"In child\"".into(),
     );
-    ctx.virtual_files = files;
+    ctx.virtual_files = std::sync::Arc::new(files);
     let tpl = "include child.crepus";
     let ir = render_template_to_ir(tpl, &ctx).unwrap();
     let s = serde_json::to_string(&ir).unwrap();

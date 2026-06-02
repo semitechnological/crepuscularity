@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 /// A runtime variable context passed to the template renderer.
 /// Variables can be strings, booleans, numbers, or lists of contexts.
@@ -13,7 +14,7 @@ pub struct TemplateContext {
     pub slot: Option<(Vec<crate::ast::Node>, Box<TemplateContext>)>,
     /// In-memory virtual file system for WASM / no-filesystem environments.
     /// Keys are paths (e.g. `"views/ui.crepus"`). Checked before real filesystem.
-    pub virtual_files: HashMap<String, String>,
+    pub virtual_files: Arc<HashMap<String, String>>,
 }
 
 #[derive(Debug, Clone)]
