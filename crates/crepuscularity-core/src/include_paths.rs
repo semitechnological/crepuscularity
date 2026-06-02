@@ -61,4 +61,29 @@ mod tests {
         let err = resolve_include_path(None, path.to_str().unwrap()).unwrap_err();
         assert!(err.contains("include path outside base dir"));
     }
+
+    #[test]
+    fn include_path_resolves_with_base_dir() {
+        let base = std::path::Path::new("/fake/base");
+        let res = resolve_include_path(Some(base), "foo.crepus").unwrap();
+        assert_eq!(res, std::path::PathBuf::from("/fake/base/foo.crepus"));
+    }
+
+    #[test]
+    fn include_path_resolves_without_base_dir() {
+        let res = resolve_include_path(None, "foo.crepus").unwrap();
+        assert_eq!(res, std::path::PathBuf::from("foo.crepus"));
+    }
+
+    #[test]
+    fn include_path_resolves_nested() {
+        let res = resolve_include_path(None, "foo/bar.crepus").unwrap();
+        assert_eq!(res, std::path::PathBuf::from("foo/bar.crepus"));
+    }
+
+    #[test]
+    fn include_path_rejects_nested_parent_dir() {
+        let err = resolve_include_path(None, "foo/../bar.crepus").unwrap_err();
+        assert!(err.contains("include path outside base dir"));
+    }
 }
