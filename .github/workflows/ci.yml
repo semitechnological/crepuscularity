@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 env:
   CARGO_TERM_COLOR: always
@@ -18,52 +18,52 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
         rust: [stable]
-    
+
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Install Rust
-      uses: dtolnay/rust-toolchain@master
-      with:
-        toolchain: ${{ matrix.rust }}
-    
-    - name: Cache cargo registry
-      uses: actions/cache@v4
-      with:
-        path: ~/.cargo/registry
-        key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
-    
-    - name: Cache cargo index
-      uses: actions/cache@v4
-      with:
-        path: ~/.cargo/git
-        key: ${{ runner.os }}-cargo-git-${{ hashFiles('**/Cargo.lock') }}
-    
-    - name: Cache cargo build
-      uses: actions/cache@v4
-      with:
-        path: target
-        key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
-    
-    - name: Set SDKROOT (macOS)
-      if: runner.os == 'macOS'
-      run: echo "SDKROOT=$(xcrun --show-sdk-path)" >> $GITHUB_ENV
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.rust }}
 
-    - name: WASM target and wasm-bindgen (crepus web build integration tests)
-      run: |
-        rustup target add wasm32-unknown-unknown
-        cargo install wasm-bindgen-cli --version "$WASM_BINDGEN_VERSION" --locked
-      shell: bash
-    
-    - name: Check formatting
-      run: cargo fmt --all -- --check
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
 
-    - name: Run tests
-      run: cargo test --workspace
+      - name: Cache cargo index
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-git-${{ hashFiles('**/Cargo.lock') }}
 
-    - name: Run clippy
-      run: cargo clippy --workspace --all-targets -- -D warnings
-      if: matrix.os == 'ubuntu-latest'
+      - name: Cache cargo build
+        uses: actions/cache@v4
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Set SDKROOT (macOS)
+        if: runner.os == 'macOS'
+        run: echo "SDKROOT=$(xcrun --show-sdk-path)" >> $GITHUB_ENV
+
+      - name: WASM target and wasm-bindgen (crepus web build integration tests)
+        run: |
+          rustup target add wasm32-unknown-unknown
+          cargo install wasm-bindgen-cli --version "$WASM_BINDGEN_VERSION" --locked
+        shell: bash
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Run tests
+        run: cargo test --workspace
+
+      - name: Run clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+        if: matrix.os == 'ubuntu-latest'
 
   build-examples:
     name: Build Examples
@@ -71,138 +71,185 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
-    
-    steps:
-    - uses: actions/checkout@v4
 
-    - name: Install Rust
-      uses: dtolnay/rust-toolchain@stable
-    
-    - name: Set SDKROOT (macOS)
-      if: runner.os == 'macOS'
-      run: echo "SDKROOT=$(xcrun --show-sdk-path)" >> $GITHUB_ENV
-    
-    - name: Build weather example
-      run: cargo build
-      working-directory: examples/weather
-      if: runner.os != 'Windows'
-    
-    - name: Build CLI
-      run: cargo build --package crepuscularity-cli
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Set SDKROOT (macOS)
+        if: runner.os == 'macOS'
+        run: echo "SDKROOT=$(xcrun --show-sdk-path)" >> $GITHUB_ENV
+
+      - name: Build weather example
+        run: cargo build
+        working-directory: examples/weather
+        if: runner.os != 'Windows'
+
+      - name: Build CLI
+        run: cargo build --package crepuscularity-cli
 
   plugin-smoke:
     name: Plugin Smoke
     runs-on: macos-latest
 
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Install Rust
-      uses: dtolnay/rust-toolchain@stable
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
 
-    - name: Cache cargo registry
-      uses: actions/cache@v4
-      with:
-        path: ~/.cargo/registry
-        key: ${{ runner.os }}-plugin-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-plugin-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
 
-    - name: Cache cargo index
-      uses: actions/cache@v4
-      with:
-        path: ~/.cargo/git
-        key: ${{ runner.os }}-plugin-cargo-git-${{ hashFiles('**/Cargo.lock') }}
+      - name: Cache cargo index
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-plugin-cargo-git-${{ hashFiles('**/Cargo.lock') }}
 
-    - name: Cache cargo build
-      uses: actions/cache@v4
-      with:
-        path: target
-        key: ${{ runner.os }}-plugin-cargo-build-${{ hashFiles('**/Cargo.lock') }}
+      - name: Cache cargo build
+        uses: actions/cache@v4
+        with:
+          path: target
+          key: ${{ runner.os }}-plugin-cargo-build-${{ hashFiles('**/Cargo.lock') }}
 
-    - name: Set SDKROOT
-      run: echo "SDKROOT=$(xcrun --show-sdk-path)" >> $GITHUB_ENV
+      - name: Set SDKROOT
+        run: echo "SDKROOT=$(xcrun --show-sdk-path)" >> $GITHUB_ENV
 
-    - name: Install Bun
-      uses: oven-sh/setup-bun@v2
-      with:
-        bun-version: latest
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
 
-    - name: Install Go
-      uses: actions/setup-go@v5
-      with:
-        go-version: '1.24.x'
+      - name: Install Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24.x"
 
-    - name: Install Ruby
-      uses: ruby/setup-ruby@v1
-      with:
-        ruby-version: '3.3'
+      - name: Install Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
 
-    - name: Install PHP
-      uses: shivammathur/setup-php@v2
-      with:
-        php-version: '8.3'
-        coverage: none
+      - name: Install PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          coverage: none
 
-    - name: Install Java
-      uses: actions/setup-java@v4
-      with:
-        distribution: temurin
-        java-version: '21'
+      - name: Install Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
 
-    - name: Install dotnet
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: '8.0.x'
+      - name: Install dotnet
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
 
-    - name: Install Zig
-      uses: mlugg/setup-zig@v2
-      with:
-        version: '0.14.1'
+      - name: Install Zig
+        uses: mlugg/setup-zig@v2
+        with:
+          version: "0.14.1"
 
-    - name: Install V
-      run: |
-        git clone --depth 1 https://github.com/vlang/v.git /tmp/v
-        make -C /tmp/v
-        echo "/tmp/v" >> "$GITHUB_PATH"
+      - name: Install V
+        run: |
+          git clone --depth 1 https://github.com/vlang/v.git /tmp/v
+          make -C /tmp/v
+          echo "/tmp/v" >> "$GITHUB_PATH"
 
-    - name: Install Kotlin
-      run: |
-        KOTLIN_VERSION=2.1.21
-        curl -fsSL -o /tmp/kotlin-compiler.zip "https://github.com/JetBrains/kotlin/releases/download/v${KOTLIN_VERSION}/kotlin-compiler-${KOTLIN_VERSION}.zip"
-        unzip -q /tmp/kotlin-compiler.zip -d /tmp/kotlin
-        echo "/tmp/kotlin/kotlinc/bin" >> "$GITHUB_PATH"
+      - name: Install Kotlin
+        run: |
+          KOTLIN_VERSION=2.1.21
+          curl -fsSL -o /tmp/kotlin-compiler.zip "https://github.com/JetBrains/kotlin/releases/download/v${KOTLIN_VERSION}/kotlin-compiler-${KOTLIN_VERSION}.zip"
+          unzip -q /tmp/kotlin-compiler.zip -d /tmp/kotlin
+          echo "/tmp/kotlin/kotlinc/bin" >> "$GITHUB_PATH"
 
-    - name: Print plugin toolchain versions
-      run: |
-        rustc --version
-        cargo --version
-        python3 --version
-        go version
-        bun --version
-        v version
-        zig version
-        swiftc --version
-        gcc --version | head -n 1
-        g++ --version | head -n 1
-        ruby --version
-        php --version | head -n 1
-        javac -version
-        kotlinc -version
-        dotnet --version
+      - name: Print plugin toolchain versions
+        run: |
+          rustc --version
+          cargo --version
+          python3 --version
+          go version
+          bun --version
+          v version
+          zig version
+          swiftc --version
+          gcc --version | head -n 1
+          g++ --version | head -n 1
+          ruby --version
+          php --version | head -n 1
+          javac -version
+          kotlinc -version
+          dotnet --version
 
-    - name: Run plugin smoke
-      run: bash scripts/plugin-smoke.sh
+      - name: Run plugin smoke
+        run: bash scripts/plugin-smoke.sh
 
   docs:
     name: Documentation
     runs-on: ubuntu-latest
-    
-    steps:
-    - uses: actions/checkout@v4
 
-    - name: Install Rust
-      uses: dtolnay/rust-toolchain@stable
-    
-    - name: Build docs (strict rustdoc)
-      run: cargo doc --no-deps --workspace
-      env:
-        RUSTDOCFLAGS: -D warnings
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build docs (strict rustdoc)
+        run: cargo doc --no-deps --workspace
+        env:
+          RUSTDOCFLAGS: -D warnings
+
+  parallel-web-build:
+    name: Parallel WASM + Host Build
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-parallel-web-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Install WASM target + wasm-bindgen
+        run: |
+          rustup target add wasm32-unknown-unknown
+          cargo install wasm-bindgen-cli --version "$WASM_BINDGEN_VERSION" --locked
+
+      - name: Build WASM client
+        run: |
+          cargo build --target wasm32-unknown-unknown -p crepuscularity-web --release &
+          WASM_PID=$!
+          # Build host server in parallel
+          cargo build -p crepuscularity-cli --release &
+          HOST_PID=$!
+          wait $WASM_PID
+          wait $HOST_PID
+          echo "Both WASM client and host server built successfully"
+
+      - name: Build docs-site (end-to-end web build)
+        run: |
+          cargo run -p crepuscularity-cli --release -- \
+            web build --manifest docs-site/crepus.toml --out-dir /tmp/crepus-docs-dist
+          # Verify outputs exist
+          test -f /tmp/crepus-docs-dist/index.html || (echo "missing index.html" && exit 1)
+          test -f /tmp/crepus-docs-dist/pkg/runtime_bg.wasm || (echo "missing WASM bundle" && exit 1)
+          echo "Parallel web build verified — host SSR + WASM client both built"
