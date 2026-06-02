@@ -127,4 +127,23 @@ mod tests {
         assert_eq!(rgb, [0x18, 0x18, 0x1b]);
         assert_eq!(parse_color_rgb("red-500").unwrap(), [0xfb, 0x2c, 0x36]);
     }
+
+    #[test]
+    fn tailwind_color_edge_cases() {
+        // Opacity syntax should strip the opacity part and parse the color
+        assert_eq!(parse_color_rgb("red-500/50"), Some([0xfb, 0x2c, 0x36]));
+
+        // Arbitrary bracket syntax with hex
+        assert_eq!(parse_color_rgb("[#ff0000]"), Some([0xff, 0x00, 0x00]));
+        assert_eq!(parse_color_rgb("[0x00ff00]"), Some([0x00, 0xff, 0x00]));
+
+        // Direct hex values
+        assert_eq!(parse_color_rgb("#0000ff"), Some([0x00, 0x00, 0xff]));
+        assert_eq!(parse_color_rgb("0x0000ff"), Some([0x00, 0x00, 0xff]));
+
+        // Invalid inputs
+        assert_eq!(parse_color_rgb("unknown-color"), None);
+        assert_eq!(parse_color_rgb("#123"), None); // Short hex is not supported
+        assert_eq!(parse_color_rgb("[invalid]"), None);
+    }
 }
