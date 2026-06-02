@@ -1,6 +1,6 @@
 [package]
 name = "crepuscularity-webext"
-version = "0.2.7"
+version = "0.2.8"
 edition = "2021"
 description = "Browser extension (MV3) support for Crepuscularity — UNSTABLE; in active development."
 license = "MPL-2.0"
@@ -18,8 +18,8 @@ wasm = [
 ]
 
 [dependencies]
-crepuscularity-core = { path = "../crepuscularity-core", version = "0.4.9" }
-crepuscularity-web = { path = "../crepuscularity-web", version = "0.4.3" }
+crepuscularity-core = { path = "../crepuscularity-core", version = "0.4.10" }
+crepuscularity-web = { path = "../crepuscularity-web", version = "0.4.4" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 toml = { workspace = true }
