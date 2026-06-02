@@ -148,7 +148,11 @@ fn raw_html_sanitization_ssr() {
     ctx.set("malicious", "<script>alert(1)</script><b>safe</b>");
     let tpl = "div\n  {=malicious}";
     let html = render_template_to_html_with_ssr(tpl, &ctx, false).unwrap();
-    assert!(!html.contains("<script>"), "Expected script tag to be sanitized out: {}", html);
+    assert!(
+        !html.contains("<script>"),
+        "Expected script tag to be sanitized out: {}",
+        html
+    );
     assert!(html.contains("<b>safe</b>"), "Expected safe html: {}", html);
 }
 
@@ -158,6 +162,10 @@ fn raw_html_sanitization_normal() {
     ctx.set("malicious", "<script>alert(1)</script><b>safe</b>");
     let tpl = "div\n  {=malicious}";
     let html = crepuscularity_web::render_template_to_html(tpl, &ctx).unwrap();
-    assert!(!html.contains("<script>"), "Expected script tag to be sanitized out: {}", html);
+    assert!(
+        !html.contains("<script>"),
+        "Expected script tag to be sanitized out: {}",
+        html
+    );
     assert!(html.contains("<b>safe</b>"), "Expected safe html: {}", html);
 }
