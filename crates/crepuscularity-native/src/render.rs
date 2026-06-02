@@ -54,10 +54,10 @@ pub fn render_component_file_to_ir(
 
     let mut child_ctx = ctx.clone();
     for (key, expr) in &component.meta.defaults {
-        child_ctx
-            .vars
-            .entry(key.clone())
-            .or_insert_with(|| eval_expr(expr, &TemplateContext::new()));
+        if !child_ctx.vars.contains_key(key) {
+            let val = eval_expr(expr, &TemplateContext::new());
+            child_ctx.vars.insert(key.clone(), val);
+        }
     }
 
     render_nodes_to_ir(&component.nodes, &child_ctx)
