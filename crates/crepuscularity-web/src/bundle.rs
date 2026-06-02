@@ -93,4 +93,45 @@ mod tests {
         assert!(html.contains("crepus-slot"));
         assert!(html.contains("text-green-400"));
     }
+
+    #[test]
+    fn parse_bundle_errors() {
+        // Invalid JSON
+        let err = render_bundle("{ invalid json }").unwrap_err();
+        assert!(err.starts_with("bundle JSON:"));
+
+        // Missing entry
+        let bundle = serde_json::json!({
+            "files": { "index.crepus": "div" }
+        })
+        .to_string();
+        let err = render_bundle(&bundle).unwrap_err();
+        assert_eq!(err, "bundle missing string field \"entry\"");
+
+        // Missing files
+        let bundle = serde_json::json!({
+            "entry": "index.crepus"
+        })
+        .to_string();
+        let err = render_bundle(&bundle).unwrap_err();
+        assert_eq!(err, "bundle missing \"files\" object");
+
+        // Invalid files type
+        let bundle = serde_json::json!({
+            "entry": "index.crepus",
+            "files": "not an object"
+        })
+        .to_string();
+        let err = render_bundle(&bundle).unwrap_err();
+        assert_eq!(err, "\"files\" must be a JSON object");
+
+        // Invalid file value type
+        let bundle = serde_json::json!({
+            "entry": "index.crepus",
+            "files": { "index.crepus": 123 }
+        })
+        .to_string();
+        let err = render_bundle(&bundle).unwrap_err();
+        assert_eq!(err, "files[\"index.crepus\"] must be a string");
+    }
 }
