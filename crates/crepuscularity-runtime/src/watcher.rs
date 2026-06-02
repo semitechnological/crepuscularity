@@ -23,14 +23,10 @@
 //!
 //! [`create_watcher`] returns a boxed [`Watcher`] that the caller owns and
 //! drops when it no longer needs change events; dropping the value tears down
-//! `notify`'s internal worker threads cleanly. The legacy [`watch_file`]
-//! helper preserves the old fire-and-forget behaviour by leaking the watcher
-//! into a parked background thread — it remains for backward compatibility
-//! and is no longer used by this crate.
+//! `notify`'s internal worker threads cleanly.
 
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
-use std::thread;
 
 use notify::{recommended_watcher, Event, EventKind, RecursiveMode, Watcher};
 
@@ -79,31 +75,6 @@ pub fn create_watcher(
         .map_err(|e| format!("failed to watch {}: {e}", watch_dir.display()))?;
 
     Ok(Box::new(watcher))
-}
-
-/// Legacy fire-and-forget wrapper around [`create_watcher`].
-///
-/// Spawns a background thread that owns the [`Watcher`] for the rest of the
-/// process — convenient for once-per-process tools, but leaks the underlying
-/// worker if the caller is instantiated more than once. New code should call
-/// [`create_watcher`] and store the returned handle alongside the polling
-/// state so it is dropped when the parent goes away.
-#[deprecated(
-    since = "0.4.3",
-    note = "Use `create_watcher` and own the returned `Watcher` so it drops with your hot-reload state."
-)]
-pub fn watch_file(path: PathBuf, changed: Arc<Mutex<bool>>) {
-    let watcher = match create_watcher(path, changed) {
-        Ok(w) => w,
-        Err(e) => {
-            eprintln!("[crepuscularity-runtime] {e}");
-            return;
-        }
-    };
-    thread::spawn(move || {
-        let _keep_alive = watcher;
-        thread::park();
-    });
 }
 
 fn is_relevant_kind(kind: &EventKind) -> bool {
@@ -158,6 +129,7 @@ mod tests {
     use super::*;
     use notify::event::{CreateKind, ModifyKind, RemoveKind};
     use std::fs;
+    use std::thread;
 
     fn ev(kind: EventKind, paths: Vec<PathBuf>) -> Event {
         Event {
