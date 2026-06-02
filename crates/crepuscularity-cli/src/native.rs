@@ -19,6 +19,7 @@ use std::process::Command;
 
 use console::style;
 use crepuscularity_core::context::{TemplateContext, TemplateValue};
+use crepuscularity_core::{DriverCache, Fingerprint};
 use crepuscularity_native::{
     render_component_file_to_ir, render_from_files, render_template_to_ir, to_json, to_json_pretty,
 };
@@ -369,8 +370,9 @@ fn sync_native_fixture_inner(args: &[String]) -> Result<(), String> {
     }
     ctx.base_dir = template_path.parent().map(Path::to_path_buf);
 
-    let ir = if let Some(component) = parsed.component {
-        render_component_file_to_ir(&template, &component, &ctx)?
+    let component_ref = parsed.component.clone();
+    let ir = if let Some(component) = &parsed.component {
+        render_component_file_to_ir(&template, component, &ctx)?
     } else {
         render_template_to_ir(&template, &ctx)?
     };
@@ -379,11 +381,20 @@ fn sync_native_fixture_inner(args: &[String]) -> Result<(), String> {
         json.push('\n');
     }
 
+    // Cache skip: avoid rewriting unchanged fixtures (prevents git dirty
+    // markers on `crepus native sync` re-runs).
+    let cache = DriverCache::open(&root);
+    let fp = Fingerprint::new(&template, component_ref.as_deref(), "native-ir");
+
     let mut written = 0;
     if parsed.defaults {
         for path in default_fixture_output_paths(&root) {
             if let Some(parent) = path.parent() {
                 if parent.exists() {
+                    if path.is_file() && cache.is_up_to_date(&fp, &json) {
+                        written += 1;
+                        continue;
+                    }
                     fs::write(&path, &json)
                         .map_err(|e| format!("write {}: {e}", path.display()))?;
                     written += 1;
@@ -395,9 +406,14 @@ fn sync_native_fixture_inner(args: &[String]) -> Result<(), String> {
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent).map_err(|e| format!("create {}: {e}", parent.display()))?;
         }
+        if path.is_file() && cache.is_up_to_date(&fp, &json) {
+            written += 1;
+            continue;
+        }
         fs::write(&path, &json).map_err(|e| format!("write {}: {e}", path.display()))?;
         written += 1;
     }
+    cache.record(&fp, &json);
     if written == 0 {
         return Err(format!(
             "no native fixture directories found under {}",
