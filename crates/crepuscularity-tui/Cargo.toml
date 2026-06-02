@@ -14,5 +14,10 @@ notify = { workspace = true }
 ratatui = { workspace = true }
 
 [dev-dependencies]
+criterion = "0.8.2"
 ratatui = { workspace = true }
 tempfile = { workspace = true }
+
+[[bench]]
+name = "render_bench"
+harness = false

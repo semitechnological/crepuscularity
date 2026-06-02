@@ -145,10 +145,11 @@ pub fn render_component(
 
     let mut child_ctx = with_tui_target(ctx);
     for (key, expr) in &component.meta.defaults {
-        child_ctx
-            .vars
-            .entry(key.clone())
-            .or_insert_with(|| eval_expr(expr, &TemplateContext::default()));
+        if !child_ctx.vars.contains_key(key) {
+            child_ctx
+                .vars
+                .insert(key.clone(), eval_expr(expr, &TemplateContext::default()));
+        }
     }
 
     render_nodes(&component.nodes, &child_ctx, frame, area)
@@ -690,10 +691,11 @@ fn build_include(
             Ok(file) => match file.components.get(name) {
                 Some(comp) => {
                     for (k, v) in &comp.meta.defaults {
-                        child_ctx
-                            .vars
-                            .entry(k.clone())
-                            .or_insert_with(|| eval_expr(v, &TemplateContext::default()));
+                        if !child_ctx.vars.contains_key(k) {
+                            child_ctx
+                                .vars
+                                .insert(k.clone(), eval_expr(v, &TemplateContext::default()));
+                        }
                     }
                     comp.nodes.clone()
                 }
