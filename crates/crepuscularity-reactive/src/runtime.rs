@@ -28,8 +28,6 @@ impl ReactiveRuntime {
 }
 
 pub(crate) struct SignalNode {
-    #[allow(dead_code)]
-    pub state: State,
     pub subscribers: Vec<NodeId>,
 }
 
