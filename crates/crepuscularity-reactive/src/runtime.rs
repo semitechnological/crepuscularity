@@ -13,8 +13,6 @@ pub(crate) struct ReactiveRuntime {
     pub current_observer: Option<NodeId>,
     pub pending_effects: Vec<NodeId>,
     pub batch_depth: u32,
-    #[allow(dead_code)]
-    pub flush_scheduled: bool,
     pub next_id: NodeId,
 }
 
@@ -24,7 +22,6 @@ impl ReactiveRuntime {
             current_observer: None,
             pending_effects: Vec::new(),
             batch_depth: 0,
-            flush_scheduled: false,
             next_id: 1,
         }
     }
