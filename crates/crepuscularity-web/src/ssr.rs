@@ -401,8 +401,9 @@ fn render_node_ssr(
                 }),
             );
             let inner = value_to_str(&eval_expr(expr, ctx));
+            let safe_inner = ammonia::clean(&inner);
             Ok(format!(
-                r#"<span style="display:contents" data-crepus-kind="raw" data-crepus-id="c{id}">{inner}</span>"#
+                r#"<span style="display:contents" data-crepus-kind="raw" data-crepus-id="c{id}">{safe_inner}</span>"#
             ))
         }
     }
