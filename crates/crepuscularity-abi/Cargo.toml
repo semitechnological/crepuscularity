@@ -1,6 +1,6 @@
 [package]
 name = "crepuscularity-abi"
-version = "0.1.2"
+version = "0.1.3"
 edition = "2021"
 license = "MPL-2.0"
 description = "Plain C ABI for Crepuscularity View IR sessions."
@@ -13,6 +13,6 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 crepuscularity-core = { path = "../crepuscularity-core", version = "0.4.11" }
-crepuscularity-native = { path = "../crepuscularity-native", version = "0.4.7" }
+crepuscularity-native = { path = "../crepuscularity-native", version = "0.4.8" }
 serde = { workspace = true }
 serde_json = { workspace = true }
