@@ -269,23 +269,37 @@ fn render_for(block: &ForBlock, ctx: &TemplateContext) -> AnyElement {
     let items = ctx.get_list(&block.iterator);
 
     let mut d = div();
+    let mut child_ctx = ctx.clone();
     for item_ctx in items {
-        let mut child_ctx = ctx.clone();
-        for (k, v) in &item_ctx.vars {
-            child_ctx.vars.insert(k.clone(), v.clone());
-        }
         let pattern = block.pattern.trim();
+        let mut pattern_insert = None;
         if !pattern.is_empty() {
             let item_str = item_ctx.get_str("value");
             if !item_str.is_empty() {
-                child_ctx
-                    .vars
-                    .insert(pattern.to_string(), TemplateValue::Str(item_str));
+                pattern_insert = Some((pattern.to_string(), TemplateValue::Str(item_str)));
             }
+        }
+
+        let mut restores = Vec::with_capacity(item_ctx.vars.len() + 1);
+        for (k, v) in &item_ctx.vars {
+            let old = child_ctx.vars.insert(k.clone(), v.clone());
+            restores.push((k.clone(), old));
+        }
+        if let Some((k, v)) = pattern_insert {
+            let old = child_ctx.vars.insert(k.clone(), v);
+            restores.push((k, old));
         }
 
         let child = render_nodes(&block.body, &child_ctx);
         d = d.child(child);
+
+        for (k, old) in restores.into_iter().rev() {
+            if let Some(old_val) = old {
+                child_ctx.vars.insert(k, old_val);
+            } else {
+                child_ctx.vars.remove(&k);
+            }
+        }
     }
     d.into_any_element()
 }
