@@ -9,8 +9,10 @@ Guides and references for the `.crepus` DSL, tooling, and browser extensions.
 | [CLI](cli.md) | `crepus` commands for apps, web, and extensions |
 | [Production readiness](production.md) | build gates, security boundaries, and performance checks |
 | [Observability](observability.md) | timing, tracing, and flamegraph workflow |
+| [Timing profile](timing-profile.md) | SSR request breakdown, flamegraph recipes |
 | [Runtime and reactivity](runtime.md) | state model, update lifecycle, hydration, and Metal setup |
 | [Browser extensions](webext.md) | Manifest V3 apps with `crepus webext` |
+| [Extension policy (MV3)](webext-policy.md) | CSP safety, store submission, permissions checklist |
 | [GPUI integration](gpui.md) | Desktop apps with GPUI |
 | [Lite shell](lite.md) | GPUI + V8 desktop shell and Rust plugin bridge |
 | [Native shells](native.md) | iOS/Android apps via native UI frameworks |
