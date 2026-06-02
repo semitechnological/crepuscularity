@@ -2,6 +2,7 @@
 zig-out/
 vendor/gpui/target/
 Cargo.lock
+!/Cargo.lock
 .DS_Store
 .crepus-cache/
 .claude/
