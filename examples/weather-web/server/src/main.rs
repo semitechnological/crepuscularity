@@ -9,10 +9,6 @@ const TEMPLATE: &str = include_str!("../../weather.crepus");
 struct IpLocation {
     city: String,
     country: String,
-    #[allow(dead_code)]
-    lat: f64,
-    #[allow(dead_code)]
-    lon: f64,
 }
 
 #[derive(Deserialize)]
@@ -59,10 +55,7 @@ async fn fetch_weather() -> (String, String, String, String, String, String, Str
             city = loc.city.clone();
             country = loc.country.clone();
 
-            let url = format!(
-                "https://wttr.in/{}?format=j1",
-                urlencoding::encode(&city)
-            );
+            let url = format!("https://wttr.in/{}?format=j1", urlencoding::encode(&city));
             if let Ok(wresp) = client.get(&url).send().await {
                 if let Ok(wttr) = wresp.json::<WttrResponse>().await {
                     if let Some(cur) = wttr.current_condition.first() {
