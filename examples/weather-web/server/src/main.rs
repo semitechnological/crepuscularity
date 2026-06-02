@@ -9,10 +9,6 @@ const TEMPLATE: &str = include_str!("../../weather.crepus");
 struct IpLocation {
     city: String,
     country: String,
-    #[allow(dead_code)]
-    lat: f64,
-    #[allow(dead_code)]
-    lon: f64,
 }
 
 #[derive(Deserialize)]
