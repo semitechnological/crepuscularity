@@ -1,6 +1,6 @@
 [package]
 name = "crepuscularity-gpui"
-version = "0.4.2"
+version = "0.4.3"
 edition = "2021"
 license = "MPL-2.0"
 description = "GPUI backend for Crepuscularity (view! macro re-exports) — UNSTABLE; in active development."
@@ -21,7 +21,7 @@ symbols = ["dep:gpui-symbols"]
 
 [dependencies]
 gpui = { version = "=0.2.2", default-features = false, features = ["font-kit"] }
-crepuscularity-core = { path = "../crepuscularity-core", version = "0.4.10" }
-crepuscularity_macros = { path = "../crepuscularity_macros", version = "0.5.3" }
-crepuscularity-runtime = { path = "../crepuscularity-runtime", version = "0.4.7" }
+crepuscularity-core = { path = "../crepuscularity-core", version = "0.4.11" }
+crepuscularity_macros = { path = "../crepuscularity_macros", version = "0.5.4" }
+crepuscularity-runtime = { path = "../crepuscularity-runtime", version = "0.4.8" }
 gpui-symbols = { version = "0.6", optional = true }
