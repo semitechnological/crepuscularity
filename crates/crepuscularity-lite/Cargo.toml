@@ -24,7 +24,7 @@ open = "5.3"
 notify-debouncer-mini = "0.7"
 reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls"] }
 serde = { workspace = true }
-serde_json = { workspace = true }
+serde_json.workspace = true
 toml = { workspace = true }
 oxc_allocator = "0.127"
 oxc_codegen = "0.127"
