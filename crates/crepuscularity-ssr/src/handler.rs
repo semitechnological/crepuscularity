@@ -13,17 +13,12 @@ pub struct SsrOptions {
     pub title: String,
 }
 
-pub struct SsrHandler {
-    /// Shared options used to configure the Axum state for this handler.
-    #[allow(dead_code)]
-    opts: Arc<SsrOptions>,
-}
+#[non_exhaustive]
+pub struct SsrHandler;
 
 impl SsrHandler {
-    pub fn new(opts: SsrOptions) -> Self {
-        Self {
-            opts: Arc::new(opts),
-        }
+    pub fn new(_opts: SsrOptions) -> Self {
+        Self
     }
 
     /// Axum-compatible handler: renders the template with SSR markers and wraps it in an HTML5 shell.
