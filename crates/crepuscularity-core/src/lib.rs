@@ -17,6 +17,7 @@ pub mod preprocess;
 pub mod tailwind;
 mod util;
 pub mod virtual_files;
+pub mod watch;
 
 pub use analysis::{analyze_template, classify_node, BindingMap, Fingerprint, Region};
 #[cfg(not(target_arch = "wasm32"))]
