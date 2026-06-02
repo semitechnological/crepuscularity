@@ -206,9 +206,15 @@ fn build_children(
             Node::LetDecl(decl) => {
                 let val = eval_expr(&decl.expr, &ctx);
                 if decl.is_default {
-                    ctx.vars.entry(decl.name.clone()).or_insert(val);
+                    if !ctx.vars.contains_key(&decl.name) {
+                        ctx.vars.insert(decl.name.clone(), val);
+                    }
                 } else {
-                    ctx.vars.insert(decl.name.clone(), val);
+                    if let Some(v) = ctx.vars.get_mut(&decl.name) {
+                        *v = val;
+                    } else {
+                        ctx.vars.insert(decl.name.clone(), val);
+                    }
                 }
             }
             Node::Text(parts) => {
@@ -380,9 +386,15 @@ fn build_content_element(
             Node::LetDecl(decl) => {
                 let val = eval_expr(&decl.expr, &child_ctx);
                 if decl.is_default {
-                    child_ctx.vars.entry(decl.name.clone()).or_insert(val);
+                    if !child_ctx.vars.contains_key(&decl.name) {
+                        child_ctx.vars.insert(decl.name.clone(), val);
+                    }
                 } else {
-                    child_ctx.vars.insert(decl.name.clone(), val);
+                    if let Some(v) = child_ctx.vars.get_mut(&decl.name) {
+                        *v = val;
+                    } else {
+                        child_ctx.vars.insert(decl.name.clone(), val);
+                    }
                 }
             }
             _ => {}
