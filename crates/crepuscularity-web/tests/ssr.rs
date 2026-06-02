@@ -141,3 +141,23 @@ fn ssr_document_wraps() {
     assert!(html.contains("class=\"app\""));
     assert!(html.contains("__crepus_hydration__"));
 }
+
+#[test]
+fn raw_html_sanitization_ssr() {
+    let mut ctx = TemplateContext::new();
+    ctx.set("malicious", "<script>alert(1)</script><b>safe</b>");
+    let tpl = "div\n  {=malicious}";
+    let html = render_template_to_html_with_ssr(tpl, &ctx, false).unwrap();
+    assert!(!html.contains("<script>"), "Expected script tag to be sanitized out: {}", html);
+    assert!(html.contains("<b>safe</b>"), "Expected safe html: {}", html);
+}
+
+#[test]
+fn raw_html_sanitization_normal() {
+    let mut ctx = TemplateContext::new();
+    ctx.set("malicious", "<script>alert(1)</script><b>safe</b>");
+    let tpl = "div\n  {=malicious}";
+    let html = crepuscularity_web::render_template_to_html(tpl, &ctx).unwrap();
+    assert!(!html.contains("<script>"), "Expected script tag to be sanitized out: {}", html);
+    assert!(html.contains("<b>safe</b>"), "Expected safe html: {}", html);
+}
