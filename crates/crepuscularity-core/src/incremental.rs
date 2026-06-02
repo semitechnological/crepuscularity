@@ -140,4 +140,64 @@ mod tests {
             vec!["pages/home.crepus".to_string()]
         );
     }
+
+    #[test]
+    fn deactivate_removes_entry_from_incremental_results() {
+        let mut inv = ActiveInvalidator::new();
+        inv.activate("pages/home.crepus");
+        inv.set_dependencies("pages/home.crepus", ["components/card.crepus"]);
+
+        inv.deactivate("pages/home.crepus");
+
+        assert!(inv
+            .invalidated_entries(["components/card.crepus", "pages/home.crepus"])
+            .is_empty());
+        assert!(!inv.is_active("pages/home.crepus"));
+    }
+
+    #[test]
+    fn set_dependencies_replaces_previous_dependency_set() {
+        let mut inv = ActiveInvalidator::new();
+        inv.activate("pages/home.crepus");
+        inv.set_dependencies("pages/home.crepus", ["components/old.crepus"]);
+        inv.set_dependencies("pages/home.crepus", ["components/new.crepus"]);
+
+        assert!(inv
+            .invalidated_entries(["components/old.crepus"])
+            .is_empty());
+        assert_eq!(
+            inv.invalidated_entries(["components/new.crepus"]),
+            vec!["pages/home.crepus".to_string()]
+        );
+    }
+
+    #[test]
+    fn multiple_changed_files_invalidate_each_active_entry_once() {
+        let mut inv = ActiveInvalidator::new();
+        inv.activate("pages/home.crepus");
+        inv.activate("pages/about.crepus");
+        inv.set_dependencies("pages/home.crepus", ["components/card.crepus"]);
+        inv.set_dependencies("pages/about.crepus", ["components/card.crepus"]);
+
+        assert_eq!(
+            inv.invalidated_entries(["components/card.crepus", "pages/home.crepus"]),
+            vec![
+                "pages/about.crepus".to_string(),
+                "pages/home.crepus".to_string()
+            ]
+        );
+    }
+
+    #[test]
+    fn activation_and_dependency_keys_normalize_relative_prefixes() {
+        let mut inv = ActiveInvalidator::new();
+        inv.activate("./pages/home.crepus");
+        inv.set_dependencies("./pages/home.crepus", ["./components/card.crepus"]);
+
+        assert!(inv.is_active("pages/home.crepus"));
+        assert_eq!(
+            inv.invalidated_entries(["components/card.crepus"]),
+            vec!["pages/home.crepus".to_string()]
+        );
+    }
 }
