@@ -613,11 +613,9 @@ include card.crepus title="Vitals"
     "OK"
 "#;
         let mut ctx = TemplateContext::new();
-        std::sync::Arc::make_mut(&mut ctx.virtual_files)
-
-            .insert(
-                "card.crepus".into(),
-                r#"
+        std::sync::Arc::make_mut(&mut ctx.virtual_files).insert(
+            "card.crepus".into(),
+            r#"
 div #card p-2
   h2
     "{title}"
@@ -625,8 +623,8 @@ div #card p-2
     span
       "fallback"
 "#
-                .into(),
-            );
+            .into(),
+        );
         let xml = render_template_to_lvgl_xml(template, &ctx);
         assert!(xml.contains(r#"<lv_obj id="card" pad_all="8">"#));
         assert!(xml.contains(r#"<lv_label text="Vitals"/>"#));

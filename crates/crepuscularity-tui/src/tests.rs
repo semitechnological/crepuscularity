@@ -14,12 +14,10 @@ use crate::{
 fn render(width: u16, height: u16, template: &str, ctx: &TemplateContext) -> Vec<String> {
     let backend = TestBackend::new(width, height);
     let mut terminal = Terminal::new(backend);
-    terminal
-        .draw(|frame| {
-            let area = frame.area();
-            render_template(template, ctx, frame, area).expect("render_template returned an error");
-        })
-        ;
+    terminal.draw(|frame| {
+        let area = frame.area();
+        render_template(template, ctx, frame, area).expect("render_template returned an error");
+    });
 
     let buf = terminal.backend().buffer();
     let w = buf.area.width as usize;
@@ -93,8 +91,7 @@ fn file_template_builder_renders() {
     fs::write(
         &path,
         "div w-full h-full flex-col\n  div h-[1]\n    \"{title}\"\n  div h-[1]\n    \"{input}\"",
-    )
-    ;
+    );
 
     let mut ui = template(&path);
     ui.set("title", "My App");
@@ -102,9 +99,7 @@ fn file_template_builder_renders() {
 
     let backend = TestBackend::new(40, 4);
     let mut terminal = Terminal::new(backend);
-    terminal
-        .draw(|frame| ui.draw_full(frame).expect("template draws"))
-        ;
+    terminal.draw(|frame| ui.draw_full(frame).expect("template draws"));
 
     let text = all_text(&buffer_rows(&terminal));
     assert!(text.contains("My App"), "{text}");
@@ -122,8 +117,7 @@ fn draw_helper_owns_terminal_draw_pass() {
     let mut terminal = Terminal::new(backend);
     draw_template(&mut terminal, &path, |ui| {
         ui.set("title", "Draw Helper");
-    })
-    ;
+    });
 
     let text = all_text(&buffer_rows(&terminal));
     assert!(text.contains("Draw Helper"), "{text}");
@@ -473,18 +467,16 @@ fn child_text_inherits_parent_style() {
     let backend = TestBackend::new(30, 3);
     let mut terminal = Terminal::new(backend);
     let ctx = TemplateContext::new();
-    terminal
-        .draw(|frame| {
-            let area = frame.area();
-            render_template(
-                "div text-[#cdd6f4]\n  div\n    \"Inherited\"",
-                &ctx,
-                frame,
-                area,
-            )
-            .expect("render_template returned an error");
-        })
-        ;
+    terminal.draw(|frame| {
+        let area = frame.area();
+        render_template(
+            "div text-[#cdd6f4]\n  div\n    \"Inherited\"",
+            &ctx,
+            frame,
+            area,
+        )
+        .expect("render_template returned an error");
+    });
 
     let buf = terminal.backend().buffer();
     let cell = buf
@@ -521,12 +513,10 @@ fn multi_component_render() {
     let rows = {
         let backend = TestBackend::new(30, 5);
         let mut terminal = Terminal::new(backend);
-        terminal
-            .draw(|frame| {
-                let area = frame.area();
-                render_component(content, "Card", &ctx, frame, area);
-            })
-            ;
+        terminal.draw(|frame| {
+            let area = frame.area();
+            render_component(content, "Card", &ctx, frame, area);
+        });
         let buf = terminal.backend().buffer();
         let w = buf.area.width as usize;
         let h = buf.area.height as usize;
@@ -547,8 +537,7 @@ fn include_uses_isolated_context() {
     let mut ctx = TemplateContext::new();
     ctx.base_dir = Some(PathBuf::from("/virtual"));
     ctx.set("secret", "leak");
-    std::sync::Arc::make_mut(&mut ctx.virtual_files)
-
+    std::sync::std::sync::Arc::make_mut(&mut ctx.virtual_files)
         .insert("child.crepus".into(), "div\n  \"{secret}\"".into());
 
     let tpl = "div\n include child.crepus";
@@ -560,8 +549,7 @@ fn include_uses_isolated_context() {
 fn include_reads_virtual_file_by_suffix_match() {
     let mut ctx = TemplateContext::new();
     ctx.base_dir = Some(PathBuf::from("/virtual"));
-    std::sync::Arc::make_mut(&mut ctx.virtual_files)
-
+    std::sync::std::sync::Arc::make_mut(&mut ctx.virtual_files)
         .insert("child.crepus".into(), "div\n  \"From virtual\"".into());
 
     let tpl = "div\n include child.crepus";
@@ -577,8 +565,7 @@ fn include_reads_virtual_file_by_suffix_match() {
 fn include_rejects_parent_dir_escape() {
     let mut ctx = TemplateContext::new();
     ctx.base_dir = Some(PathBuf::from("/virtual"));
-    std::sync::Arc::make_mut(&mut ctx.virtual_files)
-
+    std::sync::std::sync::Arc::make_mut(&mut ctx.virtual_files)
         .insert("../secret.crepus".into(), "div\n  \"secret\"".into());
 
     let tpl = "div\n include ../secret.crepus";
@@ -594,8 +581,7 @@ fn include_rejects_absolute_path() {
     ctx.base_dir = Some(PathBuf::from("/virtual"));
     let path = std::env::temp_dir().join("secret.crepus");
     let include_path = path.to_string_lossy().into_owned();
-    std::sync::Arc::make_mut(&mut ctx.virtual_files)
-
+    std::sync::std::sync::Arc::make_mut(&mut ctx.virtual_files)
         .insert(include_path.clone(), "div\n  \"secret\"".into());
 
     let tpl = format!("div\n include {include_path}");
@@ -671,11 +657,9 @@ fn components_demo_renders_slot_content() {
 fn render_hot(width: u16, height: u16, hot: &mut HotTemplate) -> Vec<String> {
     let backend = TestBackend::new(width, height);
     let mut terminal = Terminal::new(backend);
-    terminal
-        .draw(|frame| {
-            let _ = hot.poll_and_draw_full(frame);
-        })
-        ;
+    terminal.draw(|frame| {
+        let _ = hot.poll_and_draw_full(frame);
+    });
     buffer_rows(&terminal)
 }
 
@@ -688,9 +672,7 @@ fn template_reload_picks_up_new_source() {
     let mut tpl = template(&path);
     let backend = TestBackend::new(40, 3);
     let mut terminal = Terminal::new(backend);
-    terminal
-        .draw(|frame| tpl.draw_full(frame))
-        ;
+    terminal.draw(|frame| tpl.draw_full(frame));
     assert!(
         all_text(&buffer_rows(&terminal)).contains("first version"),
         "{}",
@@ -700,9 +682,7 @@ fn template_reload_picks_up_new_source() {
     fs::write(&path, "div\n  \"second version\"");
     tpl.reload().expect("reload succeeds after rewrite");
 
-    terminal
-        .draw(|frame| tpl.draw_full(frame))
-        ;
+    terminal.draw(|frame| tpl.draw_full(frame));
     let text = all_text(&buffer_rows(&terminal));
     assert!(text.contains("second version"), "{text}");
     assert!(!text.contains("first version"), "{text}");
