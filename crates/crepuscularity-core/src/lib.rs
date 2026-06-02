@@ -12,6 +12,7 @@ pub mod context;
 pub mod diagnostics;
 pub mod eval;
 pub mod include_paths;
+pub mod incremental;
 pub mod parser;
 pub mod preprocess;
 pub mod tailwind;
@@ -25,6 +26,7 @@ pub use cache::DriverCache;
 pub use context::{TemplateContext, TemplateValue};
 pub use diagnostics::{diagnose_crepus_source, is_multi_component_file, CrepusDiagnostic};
 pub use include_paths::resolve_include_path;
+pub use incremental::ActiveInvalidator;
 pub use parser::{
     parse_component_file, parse_template, unescape_crepus_text_literal, ComponentDef,
     ComponentFile, ComponentMeta,
