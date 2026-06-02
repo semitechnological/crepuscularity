@@ -440,15 +440,15 @@ fn update_package_json(project_dir: &Path) -> Result<(), String> {
     let package_path = project_dir.join("package.json");
     let raw = std::fs::read_to_string(&package_path)
         .map_err(|e| format!("read {}: {e}", package_path.display()))?;
-    let mut pkg: Value =
+    let pkg: Value =
         serde_json::from_str(&raw).map_err(|e| format!("parse {}: {e}", package_path.display()))?;
 
-    let obj = pkg.as_object_mut().ok_or_else(|| {
-        format!(
+    let Value::Object(mut obj) = pkg else {
+        return Err(format!(
             "package.json must be a JSON object: {}",
             package_path.display()
-        )
-    })?;
+        ));
+    };
 
     let scripts = obj
         .entry("scripts")
@@ -483,10 +483,7 @@ fn update_package_json(project_dir: &Path) -> Result<(), String> {
         .entry("esbuild")
         .or_insert(Value::String("^0.24.2".into()));
 
-    let mut ordered = BTreeMap::new();
-    for (k, v) in obj.iter() {
-        ordered.insert(k.clone(), v.clone());
-    }
+    let ordered: BTreeMap<_, _> = obj.into_iter().collect();
 
     let updated = serde_json::to_string_pretty(&ordered)
         .map_err(|e| format!("serialize package.json: {e}"))?;
