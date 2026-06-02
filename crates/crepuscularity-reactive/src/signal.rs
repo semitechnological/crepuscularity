@@ -3,7 +3,7 @@ use std::rc::Rc;
 
 use crate::batch::maybe_flush;
 use crate::runtime::{
-    alloc_id, mark_subscribers_dirty, track_read, AnyNode, NodeId, SignalNode, State, NODES,
+    alloc_id, mark_subscribers_dirty, track_read, AnyNode, NodeId, SignalNode, NODES,
 };
 
 /// Reactive value that notifies memos and effects when it changes.
@@ -20,7 +20,6 @@ impl<T: Clone + PartialEq + 'static> Signal<T> {
             n.borrow_mut().insert(
                 id,
                 AnyNode::Signal(SignalNode {
-                    state: State::Clean,
                     subscribers: vec![],
                 }),
             )
