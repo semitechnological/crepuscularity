@@ -1,0 +1,6 @@
+interface:
+  display_name: "Crepuscularity"
+  short_description: "Repo-specific patterns and workflows for crepuscularity"
+  default_prompt: "Use the crepuscularity repo skill to follow existing architecture, testing, and workflow conventions."
+policy:
+  allow_implicit_invocation: true
