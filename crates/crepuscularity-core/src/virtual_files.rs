@@ -34,6 +34,7 @@ pub fn lookup_virtual_file(ctx: &TemplateContext, path: &Path) -> Option<String>
 #[cfg(test)]
 mod tests {
     use std::path::Path;
+    use std::sync::Arc;
 
     use crate::context::TemplateContext;
     use crate::virtual_files::lookup_virtual_file;
@@ -41,7 +42,7 @@ mod tests {
     #[test]
     fn lookup_exact_key() {
         let mut ctx = TemplateContext::new();
-        std::sync::Arc::make_mut(&mut ctx.virtual_files).insert("child.crepus".into(), "ok".into());
+        Arc::make_mut(&mut ctx.virtual_files).insert("child.crepus".into(), "ok".into());
         assert_eq!(
             lookup_virtual_file(&ctx, Path::new("child.crepus")).as_deref(),
             Some("ok")
@@ -51,10 +52,53 @@ mod tests {
     #[test]
     fn lookup_rejects_ambiguous_suffix() {
         let mut ctx = TemplateContext::new();
-        std::sync::Arc::make_mut(&mut ctx.virtual_files)
-            .insert("a/child.crepus".into(), "1".into());
-        std::sync::Arc::make_mut(&mut ctx.virtual_files)
-            .insert("b/child.crepus".into(), "2".into());
+        Arc::make_mut(&mut ctx.virtual_files).insert("a/child.crepus".into(), "1".into());
+        Arc::make_mut(&mut ctx.virtual_files).insert("b/child.crepus".into(), "2".into());
         assert!(lookup_virtual_file(&ctx, Path::new("/virtual/child.crepus")).is_none());
+    }
+
+    #[test]
+    fn lookup_exact_key_full_path() {
+        let mut ctx = TemplateContext::new();
+        Arc::make_mut(&mut ctx.virtual_files).insert("/a/b/c.crepus".into(), "exact".into());
+        assert_eq!(
+            lookup_virtual_file(&ctx, Path::new("/a/b/c.crepus")).as_deref(),
+            Some("exact")
+        );
+    }
+
+    #[test]
+    fn lookup_basename() {
+        let mut ctx = TemplateContext::new();
+        Arc::make_mut(&mut ctx.virtual_files).insert("child.crepus".into(), "base".into());
+        assert_eq!(
+            lookup_virtual_file(&ctx, Path::new("/some/path/child.crepus")).as_deref(),
+            Some("base")
+        );
+    }
+
+    #[test]
+    fn lookup_unambiguous_suffix() {
+        let mut ctx = TemplateContext::new();
+        Arc::make_mut(&mut ctx.virtual_files).insert("dir/child.crepus".into(), "suffix".into());
+        assert_eq!(
+            lookup_virtual_file(&ctx, Path::new("/request/path/child.crepus")).as_deref(),
+            Some("suffix")
+        );
+    }
+
+    #[test]
+    fn lookup_invalid_filename() {
+        let ctx = TemplateContext::new();
+        assert!(lookup_virtual_file(&ctx, Path::new("/")).is_none());
+        assert!(lookup_virtual_file(&ctx, Path::new("..")).is_none());
+        assert!(lookup_virtual_file(&ctx, Path::new("/a/b/..")).is_none());
+    }
+
+    #[test]
+    fn lookup_not_found() {
+        let mut ctx = TemplateContext::new();
+        Arc::make_mut(&mut ctx.virtual_files).insert("other.crepus".into(), "other".into());
+        assert!(lookup_virtual_file(&ctx, Path::new("child.crepus")).is_none());
     }
 }
