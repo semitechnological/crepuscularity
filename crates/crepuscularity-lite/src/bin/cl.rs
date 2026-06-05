@@ -547,7 +547,7 @@ fn init_project(path: &str) -> Result<(), String> {
     )
     .map_err(|e| format!("write {}: {e}", build_path.display()))?;
 
-    let config_path = project_dir.join("crepus-lite.toml");
+    let config_path = project_dir.join("crepus.toml");
     if !config_path.exists() {
         let dev_entry = if supports_native_dev_entry(&project_dir, entry) {
             format!("dev_guest_entry = \"{entry}\"\n")

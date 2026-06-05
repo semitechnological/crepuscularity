@@ -49,7 +49,7 @@ let mut host = V8Host::new(bridge)?;
 let result = host.eval(r#"Crepus.invoke("core.echo", { "message": "hello" })"#)?;
 ```
 
-Use the capability system for file, clipboard, download, window, and app operations. Keep capabilities narrow in production configs rather than granting broad defaults.
+Use the capability system for file, clipboard, download, window, host, and app operations. Lite reads `crepus.toml` by default, falls back to legacy `crepus-lite.toml`, and grants only `core` plus `app` unless optional native capabilities are explicitly enabled.
 
 ## Guest Code
 
