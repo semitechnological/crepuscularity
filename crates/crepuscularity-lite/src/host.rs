@@ -3,6 +3,10 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
+use crepuscularity_core::tailwind::{
+    parse_color_rgb, parse_radius_px, parse_size_width_height, parse_spacing_px,
+    parse_text_size_px, SizeToken,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
@@ -52,6 +56,13 @@ pub struct HostNode {
     pub value: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub placeholder: Option<String>,
+    #[serde(
+        default,
+        rename = "className",
+        alias = "class",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub class_name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub route: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -159,7 +170,8 @@ impl HostState {
         Arc::new(Self::default())
     }
 
-    pub fn render_tree(&self, tree: HostNode) -> HostSnapshot {
+    pub fn render_tree(&self, mut tree: HostNode) -> HostSnapshot {
+        normalize_host_tree_classes(&mut tree);
         let mut inner = self.inner.lock().expect("host state mutex poisoned");
         inner.tree = Some(tree);
         inner.render_count += 1;
@@ -247,6 +259,154 @@ impl HostState {
     }
 }
 
+fn normalize_host_tree_classes(node: &mut HostNode) {
+    let mut classes = Vec::new();
+    if let Some(class_name) = &node.class_name {
+        classes.extend(class_name.split_whitespace());
+    }
+    if let Some(class_name) = node.props.get("class").and_then(Value::as_str) {
+        classes.extend(class_name.split_whitespace());
+    }
+    if let Some(class_name) = node.props.get("className").and_then(Value::as_str) {
+        classes.extend(class_name.split_whitespace());
+    }
+    for class in classes {
+        apply_host_class(class, &mut node.style);
+    }
+    for child in &mut node.children {
+        normalize_host_tree_classes(child);
+    }
+}
+
+fn apply_host_class(class: &str, style: &mut HostStyle) {
+    match class {
+        "flex" => {
+            style.display.get_or_insert_with(|| "flex".to_string());
+        }
+        "flex-row" => {
+            style.direction.get_or_insert_with(|| "row".to_string());
+        }
+        "flex-col" => {
+            style.direction.get_or_insert_with(|| "column".to_string());
+        }
+        "flex-1" => {
+            style.flex_grow.get_or_insert(1.0);
+        }
+        "items-start" => {
+            style.align_items.get_or_insert_with(|| "start".to_string());
+        }
+        "items-center" => {
+            style
+                .align_items
+                .get_or_insert_with(|| "center".to_string());
+        }
+        "items-end" => {
+            style.align_items.get_or_insert_with(|| "end".to_string());
+        }
+        "justify-start" => {
+            style
+                .justify_content
+                .get_or_insert_with(|| "start".to_string());
+        }
+        "justify-center" => {
+            style
+                .justify_content
+                .get_or_insert_with(|| "center".to_string());
+        }
+        "justify-end" => {
+            style
+                .justify_content
+                .get_or_insert_with(|| "end".to_string());
+        }
+        "w-full" => {
+            style.width.get_or_insert(100.0);
+        }
+        "h-full" => {
+            style.height.get_or_insert(100.0);
+        }
+        "border" | "border-1" => {
+            style.border_width.get_or_insert(1.0);
+        }
+        "font-bold" => {
+            style.font_weight.get_or_insert_with(|| "bold".to_string());
+        }
+        "font-medium" => {
+            style
+                .font_weight
+                .get_or_insert_with(|| "medium".to_string());
+        }
+        _ => {
+            apply_host_parametric_class(class, style);
+        }
+    }
+}
+
+fn apply_host_parametric_class(class: &str, style: &mut HostStyle) {
+    if let Some(value) = class.strip_prefix("p-").and_then(parse_spacing_px) {
+        style.padding.get_or_insert(f32::from(value));
+        return;
+    }
+    if let Some(value) = class.strip_prefix("px-").and_then(parse_spacing_px) {
+        style.padding_x.get_or_insert(f32::from(value));
+        return;
+    }
+    if let Some(value) = class.strip_prefix("py-").and_then(parse_spacing_px) {
+        style.padding_y.get_or_insert(f32::from(value));
+        return;
+    }
+    if let Some(value) = class.strip_prefix("gap-").and_then(parse_spacing_px) {
+        style.gap.get_or_insert(f32::from(value));
+        return;
+    }
+    if let Some(value) = class.strip_prefix("w-").and_then(parse_host_size) {
+        style.width.get_or_insert(value);
+        return;
+    }
+    if let Some(value) = class.strip_prefix("h-").and_then(parse_host_size) {
+        style.height.get_or_insert(value);
+        return;
+    }
+    if let Some(value) = class.strip_prefix("rounded-").and_then(parse_radius_px) {
+        style.radius.get_or_insert(f32::from(value));
+        return;
+    }
+    if class == "rounded" {
+        if let Some(value) = parse_radius_px("") {
+            style.radius.get_or_insert(f32::from(value));
+        }
+        return;
+    }
+    if let Some(value) = class.strip_prefix("text-").and_then(parse_text_size_px) {
+        style.font_size.get_or_insert(f32::from(value));
+        return;
+    }
+    if let Some(color) = class.strip_prefix("bg-").and_then(parse_host_color) {
+        style.background.get_or_insert(color);
+        return;
+    }
+    if let Some(color) = class.strip_prefix("text-").and_then(parse_host_color) {
+        style.color.get_or_insert(color);
+        return;
+    }
+    if let Some(color) = class.strip_prefix("border-").and_then(parse_host_color) {
+        style.border_color.get_or_insert(color);
+    }
+}
+
+fn parse_host_size(raw: &str) -> Option<f32> {
+    match parse_size_width_height(raw)? {
+        SizeToken::Full => Some(100.0),
+        SizeToken::Auto => None,
+        SizeToken::Px(value) | SizeToken::Spacing(value) => Some(f32::from(value)),
+        SizeToken::Fraction { num, den } => Some((f32::from(num) / f32::from(den)) * 100.0),
+    }
+}
+
+fn parse_host_color(raw: &str) -> Option<String> {
+    let [r, g, b] = parse_color_rgb(raw)?;
+    Some(format!("#{r:02x}{g:02x}{b:02x}"))
+}
+
 fn snapshot_from_inner(inner: &HostStateInner) -> HostSnapshot {
     let mut storage_keys = inner.storage.keys().cloned().collect::<Vec<_>>();
     storage_keys.sort();
@@ -325,5 +485,31 @@ mod tests {
         });
         assert_eq!(snap.render_count, 1);
         assert_eq!(snap.tree.expect("tree").children.len(), 1);
+    }
+
+    #[test]
+    fn render_tree_accepts_react_class_props() {
+        let tree: HostNode = serde_json::from_value(json!({
+            "type": "View",
+            "className": "flex flex-col gap-4 bg-zinc-950 text-white p-4 rounded-md",
+            "children": [{
+                "type": "Text",
+                "class": "text-xl font-bold",
+                "text": "Hello"
+            }]
+        }))
+        .unwrap();
+
+        let host = HostState::default();
+        let snap = host.render_tree(tree);
+        let tree = snap.tree.expect("tree");
+        assert_eq!(tree.style.direction.as_deref(), Some("column"));
+        assert_eq!(tree.style.gap, Some(16.0));
+        assert_eq!(tree.style.background.as_deref(), Some("#09090b"));
+        assert_eq!(tree.style.color.as_deref(), Some("#ffffff"));
+        assert_eq!(tree.style.padding, Some(16.0));
+        assert_eq!(tree.style.radius, Some(6.0));
+        assert_eq!(tree.children[0].style.font_size, Some(20.0));
+        assert_eq!(tree.children[0].style.font_weight.as_deref(), Some("bold"));
     }
 }

@@ -1838,10 +1838,11 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-lite"
-version = "0.4.6"
+version = "0.4.7"
 dependencies = [
  "arboard",
  "clap",
+ "crepuscularity-core",
  "crepuscularity-lite-macros",
  "crossterm 0.28.1",
  "dirs 6.0.0",
@@ -1869,7 +1870,7 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-lite-macros"
-version = "0.4.6"
+version = "0.4.7"
 dependencies = [
  "crepuscularity-core",
  "proc-macro2",

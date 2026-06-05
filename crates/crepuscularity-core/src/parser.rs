@@ -1919,6 +1919,25 @@ mod tests {
     }
 
     #[test]
+    fn jsx_class_and_class_name_are_class_tokens() {
+        let nodes =
+            parse_template(r#"<div class="flex gap-4" className="text-white bg-zinc-950"></div>"#)
+                .unwrap();
+        let Node::Element(el) = &nodes[0] else {
+            panic!("expected element");
+        };
+        assert_eq!(
+            el.classes,
+            vec![
+                "flex".to_string(),
+                "gap-4".to_string(),
+                "text-white".to_string(),
+                "bg-zinc-950".to_string()
+            ]
+        );
+    }
+
+    #[test]
     fn embed_indent_parses_src_adapter_and_props() {
         let nodes =
             parse_template(r#"embed ./islands/wave.ts adapter="module" title="Wave" count={n}"#)
