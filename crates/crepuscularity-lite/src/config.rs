@@ -8,42 +8,25 @@ use serde::Deserialize;
 
 use crate::bridge::{Bridge, Capability};
 
-const DEFAULT_CONFIG_FILENAME: &str = "crepus-lite.toml";
+const DEFAULT_CONFIG_FILENAME: &str = "crepus.toml";
+const LEGACY_CONFIG_FILENAME: &str = "crepus-lite.toml";
 
-fn default_cap_true() -> bool {
-    true
-}
-
-/// Optional toggles for plugin families (omitted keys default to **enabled**, except `bench`).
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+/// Optional toggles for plugin families (omitted keys default to disabled).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
 pub struct CrepusLiteCapabilities {
-    #[serde(default = "default_cap_true")]
+    #[serde(default)]
     pub fs: bool,
-    #[serde(default = "default_cap_true")]
+    #[serde(default)]
     pub clipboard: bool,
-    #[serde(default = "default_cap_true")]
+    #[serde(default)]
     pub window: bool,
-    #[serde(default = "default_cap_true")]
+    #[serde(default)]
     pub host: bool,
-    #[serde(default = "default_cap_true")]
+    #[serde(default)]
     pub download: bool,
-    /// Developer-only benchmark plugin (`"bench"`).  Off by default — opt in with
-    /// `[capabilities] bench = true` in `crepus-lite.toml`.
+    /// Developer-only benchmark plugin (`"bench"`).  Off by default — opt in with `[capabilities] bench = true`.
     #[serde(default)]
     pub bench: bool,
-}
-
-impl Default for CrepusLiteCapabilities {
-    fn default() -> Self {
-        Self {
-            fs: true,
-            clipboard: true,
-            window: true,
-            host: true,
-            download: true,
-            bench: false,
-        }
-    }
 }
 
 /// Project-oriented settings for guest scripts. Parsed from TOML; safe defaults if the file is missing.
@@ -70,7 +53,7 @@ pub struct CrepusLiteConfig {
 }
 
 impl CrepusLiteConfig {
-    /// Resolve config file path: `CREPUS_LITE_CONFIG` env, else `./crepus-lite.toml`.
+    /// Resolve config file path: `CREPUS_LITE_CONFIG` env, else `./crepus.toml`.
     pub fn config_path() -> PathBuf {
         std::env::var("CREPUS_LITE_CONFIG")
             .map(PathBuf::from)
@@ -80,7 +63,16 @@ impl CrepusLiteConfig {
     /// Load from [`Self::config_path`] if it exists; otherwise [`Default::default`].
     pub fn load_discovered() -> Self {
         let path = Self::config_path();
-        Self::load_from_path(&path).unwrap_or_default()
+        if path.exists() {
+            return Self::load_from_path(&path).unwrap_or_default();
+        }
+        if std::env::var_os("CREPUS_LITE_CONFIG").is_none() {
+            let legacy = PathBuf::from(LEGACY_CONFIG_FILENAME);
+            if legacy.exists() {
+                return Self::load_from_path(&legacy).unwrap_or_default();
+            }
+        }
+        Self::default()
     }
 
     pub fn load_from_path(path: &Path) -> Result<Self, String> {
@@ -237,34 +229,33 @@ mod tests {
     use super::*;
 
     #[test]
-    fn capabilities_default_all_optional_on() {
+    fn capabilities_default_optional_native_off() {
         let c = CrepusLiteConfig::default();
-        // fs / clipboard / window / host / download default on; bench defaults OFF (developer opt-in).
         assert!(
-            c.capabilities.fs
-                && c.capabilities.clipboard
-                && c.capabilities.window
-                && c.capabilities.host
-                && c.capabilities.download
+            !c.capabilities.fs
+                && !c.capabilities.clipboard
+                && !c.capabilities.window
+                && !c.capabilities.host
+                && !c.capabilities.download
         );
         assert!(!c.capabilities.bench);
-        // Core + App + Fs + Clipboard + Window + Host + Download = 7; Bench excluded by default.
-        assert_eq!(c.allowed_capabilities().len(), 7);
+        assert_eq!(c.allowed_capabilities().len(), 2);
     }
 
     #[test]
-    fn capabilities_disable_fs() {
+    fn capabilities_opt_in_fs() {
         let raw = r#"
         guest_entry = "x.js"
         [capabilities]
-        fs = false
+        fs = true
         "#;
         let c: CrepusLiteConfig = toml::from_str(raw).unwrap();
-        assert!(!c.capabilities.fs);
-        assert!(c.capabilities.clipboard);
+        assert!(c.capabilities.fs);
+        assert!(!c.capabilities.clipboard);
         let a = c.allowed_capabilities();
         assert!(a.contains(&Capability::Core));
-        assert!(!a.contains(&Capability::Fs));
+        assert!(a.contains(&Capability::Fs));
+        assert!(!a.contains(&Capability::Clipboard));
     }
 
     #[test]

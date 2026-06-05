@@ -12,7 +12,18 @@ readme = "../../README.md"
 path = "src/lib.rs"
 
 [features]
-default = []
+default = ["font-kit"]
+font-kit = ["gpui/font-kit"]
+full-gpui = ["gpui/default"]
+inspector = ["gpui/inspector"]
+leak-detection = ["gpui/leak-detection"]
+screen-capture = ["gpui/screen-capture"]
+runtime-shaders = ["gpui/runtime_shaders"]
+test-support = ["gpui/test-support"]
+input-latency-histogram = []
+wayland = ["gpui/wayland"]
+x11 = ["gpui/x11"]
+windows-manifest = ["gpui/windows-manifest"]
 gpui-text-extras = [
     "crepuscularity_macros/gpui_text_run_styles",
     "crepuscularity-runtime/gpui_text_run_styles",
@@ -20,8 +31,10 @@ gpui-text-extras = [
 symbols = ["dep:gpui-symbols"]
 
 [dependencies]
-gpui = { version = "=0.2.2", default-features = false, features = ["font-kit"] }
+gpui = { version = "=0.2.2", default-features = false }
 crepuscularity-core = { path = "../crepuscularity-core", version = "0.4.11" }
 crepuscularity_macros = { path = "../crepuscularity_macros", version = "0.5.4" }
 crepuscularity-runtime = { path = "../crepuscularity-runtime", version = "0.4.9" }
 gpui-symbols = { version = "0.6", optional = true }
+log = "0.4"
+pollster = "0.4"
