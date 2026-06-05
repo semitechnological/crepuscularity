@@ -1776,7 +1776,7 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-core"
-version = "0.4.11"
+version = "0.4.12"
 dependencies = [
  "sha2 0.11.0",
  "tempfile",
