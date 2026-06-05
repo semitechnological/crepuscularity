@@ -80,6 +80,50 @@ pub fn parse_size_width_height(rest: &str) -> Option<SizeToken> {
     parse_spacing_px(rest).map(SizeToken::Spacing)
 }
 
+pub fn parse_radius_px(rest: &str) -> Option<u16> {
+    if rest.is_empty() {
+        return Some(4);
+    }
+    if let Some(inner) = rest.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
+        let stripped = inner.strip_suffix("px").unwrap_or(inner);
+        return stripped.parse::<u16>().ok();
+    }
+    match rest {
+        "none" => Some(0),
+        "sm" => Some(2),
+        "md" => Some(6),
+        "lg" => Some(8),
+        "xl" => Some(12),
+        "2xl" => Some(16),
+        "3xl" => Some(24),
+        "full" => Some(999),
+        _ => rest.parse::<u16>().ok(),
+    }
+}
+
+pub fn parse_text_size_px(rest: &str) -> Option<u16> {
+    if let Some(inner) = rest.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
+        let stripped = inner.strip_suffix("px").unwrap_or(inner);
+        return stripped.parse::<u16>().ok();
+    }
+    match rest {
+        "xs" => Some(12),
+        "sm" => Some(14),
+        "base" => Some(16),
+        "lg" => Some(18),
+        "xl" => Some(20),
+        "2xl" => Some(24),
+        "3xl" => Some(30),
+        "4xl" => Some(36),
+        "5xl" => Some(48),
+        "6xl" => Some(60),
+        "7xl" => Some(72),
+        "8xl" => Some(96),
+        "9xl" => Some(128),
+        _ => rest.parse::<u16>().ok(),
+    }
+}
+
 /// Resolve `red-500`, `#fff`, `bg-[#0f0]`, or `red-500/50` to RGB bytes.
 pub fn parse_color_rgb(name: &str) -> Option<[u8; 3]> {
     let name = name.trim();
@@ -90,12 +134,23 @@ pub fn parse_color_rgb(name: &str) -> Option<[u8; 3]> {
         return parse_color_rgb(inner);
     }
     if let Some(hex) = lookup_named_color(name) {
-        return parse_hex_rgb(hex);
+        return parse_named_hex_rgb(hex);
     }
     if name.starts_with('#') || name.starts_with("0x") {
         return parse_hex_rgb(name);
     }
     None
+}
+
+fn parse_named_hex_rgb(s: &str) -> Option<[u8; 3]> {
+    let t = s.trim().trim_start_matches('#').trim_start_matches("0x");
+    if t.len() == 3 {
+        let r = u8::from_str_radix(&t[0..1], 16).ok()?;
+        let g = u8::from_str_radix(&t[1..2], 16).ok()?;
+        let b = u8::from_str_radix(&t[2..3], 16).ok()?;
+        return Some([r * 17, g * 17, b * 17]);
+    }
+    parse_hex_rgb(s)
 }
 
 fn parse_hex_rgb(s: &str) -> Option<[u8; 3]> {
@@ -122,6 +177,20 @@ mod tests {
     }
 
     #[test]
+    fn radius_scale() {
+        assert_eq!(parse_radius_px(""), Some(4));
+        assert_eq!(parse_radius_px("md"), Some(6));
+        assert_eq!(parse_radius_px("[14px]"), Some(14));
+    }
+
+    #[test]
+    fn text_size_scale() {
+        assert_eq!(parse_text_size_px("xl"), Some(20));
+        assert_eq!(parse_text_size_px("2xl"), Some(24));
+        assert_eq!(parse_text_size_px("[22px]"), Some(22));
+    }
+
+    #[test]
     fn tailwind_v4_color() {
         let rgb = parse_color_rgb("zinc-900").unwrap();
         assert_eq!(rgb, [0x18, 0x18, 0x1b]);
@@ -136,6 +205,7 @@ mod tests {
         // Arbitrary bracket syntax with hex
         assert_eq!(parse_color_rgb("[#ff0000]"), Some([0xff, 0x00, 0x00]));
         assert_eq!(parse_color_rgb("[0x00ff00]"), Some([0x00, 0xff, 0x00]));
+        assert_eq!(parse_color_rgb("white"), Some([0xff, 0xff, 0xff]));
 
         // Direct hex values
         assert_eq!(parse_color_rgb("#0000ff"), Some([0x00, 0x00, 0xff]));

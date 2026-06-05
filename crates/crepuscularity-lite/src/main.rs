@@ -90,15 +90,15 @@ fn apply_host_style(mut element: gpui::Div, style: &HostStyle) -> gpui::Div {
 fn add_gap(mut element: gpui::Div, gap: Option<f32>) -> gpui::Div {
     let rounded = gap.map(|value| value.round() as i32).unwrap_or_default();
     element = match rounded {
-        1 => element.gap_1(),
-        2 => element.gap_2(),
-        3 => element.gap_3(),
-        4 => element.gap_4(),
-        5 => element.gap_5(),
-        6 => element.gap_6(),
-        8 => element.gap_8(),
-        10 => element.gap_10(),
-        12 => element.gap_12(),
+        4 => element.gap_1(),
+        8 => element.gap_2(),
+        12 => element.gap_3(),
+        16 => element.gap_4(),
+        20 => element.gap_5(),
+        24 => element.gap_6(),
+        32 => element.gap_8(),
+        40 => element.gap_10(),
+        48 => element.gap_12(),
         _ => element,
     };
     element
