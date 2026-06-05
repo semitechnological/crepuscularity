@@ -17,9 +17,4 @@
   <text x="124" y="362" fill="#f4ebff" font-family="Inter, Arial, sans-serif" font-size="78" font-weight="800">compile everywhere</text>
   <text x="128" y="438" fill="#cbbbe2" font-family="Inter, Arial, sans-serif" font-size="30">GPUI · Web · Manifest V3 · Ratatui · Embedded · LVGL</text>
   <rect x="124" y="478" width="366" height="10" rx="5" fill="url(#accent)"/>
-  <rect x="760" y="136" width="286" height="310" rx="18" fill="#0a0610" stroke="#6c5a83"/>
-  <text x="794" y="196" fill="#9a8ab8" font-family="JetBrains Mono, monospace" font-size="22">$ crepus web build</text>
-  <text x="794" y="250" fill="#f4ebff" font-family="JetBrains Mono, monospace" font-size="22">index.crepus</text>
-  <text x="794" y="304" fill="#ffb070" font-family="JetBrains Mono, monospace" font-size="22">dist/index.html</text>
-  <text x="794" y="358" fill="#e8c4ff" font-family="JetBrains Mono, monospace" font-size="22">docs/*.html</text>
 </svg>
