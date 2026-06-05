@@ -1,6 +1,6 @@
 [package]
 name = "crepuscularity-cli"
-version = "0.7.28"
+version = "0.7.29"
 edition = "2021"
 license = "MPL-2.0"
 description = "crepus CLI — scaffolding and builds for Crepuscularity (UNSTABLE; in active development)."
@@ -39,7 +39,7 @@ desktop = ["dep:gpui", "dep:crepuscularity-runtime"]
 gpui                   = { version = "=0.2.2", default-features = false, features = ["font-kit"], optional = true }
 crepuscularity-core = { path = "../crepuscularity-core", version = "0.4.11" }
 crepuscularity-runtime = { path = "../crepuscularity-runtime", version = "0.4.9", optional = true }
-crepuscularity-tui = { path = "../crepuscularity-tui", version = "0.4.7" }
+crepuscularity-tui = { path = "../crepuscularity-tui", version = "0.4.8" }
 crepuscularity-web = { path = "../crepuscularity-web", version = "0.4.5", features = ["parallel"] }
 crepuscularity-webext  = { path = "../crepuscularity-webext", version = "0.2.9" }
 crepuscularity-native = { path = "../crepuscularity-native", version = "0.4.8" }
@@ -55,7 +55,7 @@ indicatif              = { workspace = true }
 tracing                = { workspace = true }
 tracing-subscriber     = { workspace = true }
  rayon                  = { workspace = true }
-ratatui = { version = "0.29", default-features = false, features = ["crossterm"] }
+ratatui = { version = "0.30", default-features = false, features = ["crossterm"] }
 
 [dev-dependencies]
 tempfile = { workspace = true }

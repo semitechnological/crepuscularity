@@ -16,7 +16,7 @@ cli = ["dep:clap"]
 bench-tui = ["cli", "dep:crossterm", "dep:ratatui", "parallel"]
 
 [dependencies]
-crepuscularity-lite-macros = { path = "../crepuscularity-lite-macros", version = "0.4.5" }
+crepuscularity-lite-macros = { path = "../crepuscularity-lite-macros", version = "0.4.6" }
 arboard = "3.6"
 dirs = "6"
 gpui = { workspace = true, features = ["runtime_shaders"] }
@@ -32,15 +32,15 @@ oxc_parser = "0.127"
 oxc_semantic = "0.127"
 oxc_span = "0.127"
 oxc_transformer = "0.127"
-# V8 147+ requires ICU 2.1.x; pins below unify the transitive ICU tree.
-v8 = "147"
-icu_calendar = "=2.1.1"
-icu_calendar_data = "=2.1.1"
-icu_locale = "=2.1.1"
-icu_locale_data = "=2.1.2"
+# V8 149+ requires ICU 2.2.x; pins below unify the transitive ICU tree.
+v8 = "149"
+icu_calendar = "=2.2.1"
+icu_calendar_data = "=2.2.0"
+icu_locale = "=2.2.0"
+icu_locale_data = "=2.2.0"
 clap = { version = "4.5", optional = true, features = ["derive"] }
 crossterm = { version = "0.28", optional = true }
-ratatui = { version = "0.29", optional = true }
+ratatui = { version = "0.30", optional = true }
 rayon = { version = "1", optional = true }
 
 [[bin]]

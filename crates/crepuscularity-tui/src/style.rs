@@ -5,7 +5,7 @@
 
 use ratatui::layout::{Alignment, Constraint, Direction};
 use ratatui::style::{Color, Modifier, Style};
-use ratatui::widgets::{block::Padding, BorderType, Borders};
+use ratatui::widgets::{BorderType, Borders, Padding};
 
 /// How an element wants to be sized along one axis.
 #[derive(Debug, Clone, Default)]
