@@ -55,7 +55,9 @@ fn apply_context_class(d: Div, class: &str, ctx: &TemplateContext) -> Div {
         if let Some(rest) = class.strip_prefix(prefix) {
             if rest.starts_with('{') && rest.ends_with('}') {
                 let expr = &rest[1..rest.len() - 1];
-                let val = crate::eval::eval_expr(expr, ctx);
+                let Ok(val) = crate::eval::eval_expr(expr, ctx) else {
+                    continue;
+                };
                 let color_str = crate::context::value_to_str(&val);
                 if let Some(hex) = parse_color_str(&color_str) {
                     return apply_fn(d, hex);
@@ -69,13 +71,14 @@ fn apply_context_class(d: Div, class: &str, ctx: &TemplateContext) -> Div {
         if let Some((expr_part, alpha_str)) = rest.rsplit_once('/') {
             if expr_part.starts_with('{') && expr_part.ends_with('}') {
                 let expr = &expr_part[1..expr_part.len() - 1];
-                let val = crate::eval::eval_expr(expr, ctx);
-                let color_str = crate::context::value_to_str(&val);
-                if let Some(hex) = parse_color_str(&color_str) {
-                    if let Ok(alpha) = alpha_str.parse::<u32>() {
-                        let alpha_byte = alpha * 255 / 100;
-                        let rgba_val = (hex << 8) | alpha_byte;
-                        return d.bg(rgba(rgba_val));
+                if let Ok(val) = crate::eval::eval_expr(expr, ctx) {
+                    let color_str = crate::context::value_to_str(&val);
+                    if let Some(hex) = parse_color_str(&color_str) {
+                        if let Ok(alpha) = alpha_str.parse::<u32>() {
+                            let alpha_byte = alpha * 255 / 100;
+                            let rgba_val = (hex << 8) | alpha_byte;
+                            return d.bg(rgba(rgba_val));
+                        }
                     }
                 }
             }
@@ -86,7 +89,9 @@ fn apply_context_class(d: Div, class: &str, ctx: &TemplateContext) -> Div {
     if let Some(rest) = class.strip_prefix("opacity-") {
         if rest.starts_with('{') && rest.ends_with('}') {
             let expr = &rest[1..rest.len() - 1];
-            let val = crate::eval::eval_expr(expr, ctx);
+            let Ok(val) = crate::eval::eval_expr(expr, ctx) else {
+                return apply_base_class(d, class);
+            };
             let s = crate::context::value_to_str(&val);
             if let Ok(n) = s.parse::<f32>() {
                 return d.opacity(n / 100.0);

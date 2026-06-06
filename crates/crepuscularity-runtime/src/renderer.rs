@@ -18,6 +18,14 @@ use crate::ast::*;
 use crate::context::{value_to_str, TemplateContext, TemplateValue};
 use crate::styler::{apply_class_with_ctx, parse_duration_ms};
 
+fn eval_expr_value(expr: &str, ctx: &TemplateContext) -> TemplateValue {
+    crate::eval::eval_expr(expr, ctx).unwrap_or(TemplateValue::Null)
+}
+
+fn eval_condition_bool(ctx: &TemplateContext, expr: &str) -> bool {
+    ctx.eval_condition(expr).unwrap_or(false)
+}
+
 /// Render a list of nodes into a single `AnyElement`, threading `LetDecl`s into
 /// a running context clone so later siblings see the declared variables.
 pub fn render_nodes(nodes: &[Node], ctx: &TemplateContext) -> AnyElement {
@@ -32,7 +40,7 @@ fn render_nodes_with_ctx(nodes: &[Node], mut ctx: TemplateContext) -> AnyElement
             if decl.is_default && ctx.vars.contains_key(&decl.name) {
                 // Default: skip if already set by parent props
             } else {
-                let val = crate::eval::eval_expr(&decl.expr, &ctx);
+                let val = eval_expr_value(&decl.expr, &ctx);
                 ctx.vars.insert(decl.name.clone(), val);
             }
         } else {
@@ -65,13 +73,13 @@ pub fn render_node(node: &Node, ctx: &TemplateContext) -> AnyElement {
         Node::Match(block) => render_match(block, ctx),
         Node::LetDecl(_) => div().into_any_element(), // handled in render_nodes_with_ctx
         Node::RawText(expr) => {
-            let val = crate::eval::eval_expr(expr, ctx);
+            let val = eval_expr_value(expr, ctx);
             div()
                 .child(SharedString::from(value_to_str(&val)))
                 .into_any_element()
         }
         Node::RawHtml(expr) => {
-            let val = crate::eval::eval_expr(expr, ctx);
+            let val = eval_expr_value(expr, ctx);
             div()
                 .child(SharedString::from(value_to_str(&val)))
                 .into_any_element()
@@ -102,7 +110,7 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> AnyElement {
             d = apply_class_with_ctx(d, class, Some(ctx));
         }
         for cc in &el.conditional_classes {
-            if ctx.eval_condition(&cc.condition) {
+            if eval_condition_bool(ctx, &cc.condition) {
                 d = apply_class_with_ctx(d, &cc.class, Some(ctx));
             }
         }
@@ -118,7 +126,7 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> AnyElement {
 
     // Apply conditional classes
     for cc in &el.conditional_classes {
-        if ctx.eval_condition(&cc.condition) {
+        if eval_condition_bool(ctx, &cc.condition) {
             d = apply_class_with_ctx(d, &cc.class, Some(ctx));
         }
     }
@@ -247,7 +255,7 @@ fn render_text(parts: &[TextPart], ctx: &TemplateContext) -> String {
         match part {
             TextPart::Literal(text) => result.push_str(text),
             TextPart::Expr(expr) => {
-                let val = crate::eval::eval_expr(expr, ctx);
+                let val = eval_expr_value(expr, ctx);
                 result.push_str(&value_to_str(&val));
             }
         }
@@ -256,7 +264,7 @@ fn render_text(parts: &[TextPart], ctx: &TemplateContext) -> String {
 }
 
 fn render_if(block: &IfBlock, ctx: &TemplateContext) -> AnyElement {
-    if ctx.eval_condition(&block.condition) {
+    if eval_condition_bool(ctx, &block.condition) {
         render_nodes(&block.then_children, ctx)
     } else if let Some(else_children) = &block.else_children {
         render_nodes(else_children, ctx)
@@ -295,7 +303,7 @@ fn render_for(block: &ForBlock, ctx: &TemplateContext) -> AnyElement {
 }
 
 fn render_match(block: &MatchBlock, ctx: &TemplateContext) -> AnyElement {
-    let val = crate::eval::eval_expr(&block.expr, ctx);
+    let val = eval_expr_value(&block.expr, ctx);
     let value = value_to_str(&val);
 
     for arm in &block.arms {
@@ -326,20 +334,20 @@ fn render_include(inc: &IncludeNode, ctx: &TemplateContext) -> AnyElement {
     // Single-component file: resolve path relative to the current file's directory.
     let file_path = match resolve_include_path(ctx.base_dir.as_deref(), &inc.path) {
         Ok(path) => path,
-        Err(msg) => {
+        Err(e) => {
             return div()
                 .text_color(rgb(0xff4444))
-                .child(SharedString::from(msg))
+                .child(SharedString::from(e.to_string()))
                 .into_any_element();
         }
     };
 
     let nodes = match crepuscularity_core::ast_cache::parse_file(&file_path) {
         Ok(n) => n,
-        Err(msg) => {
+        Err(e) => {
             return div()
                 .text_color(rgb(0xff4444))
-                .child(SharedString::from(msg))
+                .child(SharedString::from(e.to_string()))
                 .into_any_element();
         }
     };
@@ -349,7 +357,7 @@ fn render_include(inc: &IncludeNode, ctx: &TemplateContext) -> AnyElement {
     child_ctx.base_dir = file_path.parent().map(|p| p.to_path_buf());
 
     for (key, expr) in &inc.props {
-        let val = crate::eval::eval_expr(expr, ctx);
+        let val = eval_expr_value(expr, ctx);
         child_ctx.vars.insert(key.clone(), val);
     }
 
@@ -357,7 +365,7 @@ fn render_include(inc: &IncludeNode, ctx: &TemplateContext) -> AnyElement {
         child_ctx.slot = Some((inc.slot.clone(), Box::new(ctx.clone())));
     }
 
-    render_nodes(&nodes, &child_ctx)
+    render_nodes(nodes.as_ref(), &child_ctx)
 }
 
 /// Render a named component from a multi-component file (`path#Name` syntax).
@@ -369,10 +377,10 @@ fn render_named_component(
 ) -> AnyElement {
     let file_path = match resolve_include_path(ctx.base_dir.as_deref(), file_part) {
         Ok(path) => path,
-        Err(msg) => {
+        Err(e) => {
             return div()
                 .text_color(rgb(0xff4444))
-                .child(SharedString::from(msg))
+                .child(SharedString::from(e.to_string()))
                 .into_any_element();
         }
     };
@@ -391,7 +399,7 @@ fn render_named_component(
     let comp_file = match crate::parser::parse_component_file(&content) {
         Ok(cf) => cf,
         Err(e) => {
-            let msg = format!("component file parse error: {}", e);
+            let msg = format!("component file parse error: {e}");
             return div()
                 .text_color(rgb(0xff4444))
                 .child(SharedString::from(msg))
@@ -422,13 +430,13 @@ fn render_named_component(
 
     // Inject TOML defaults first — passed props override them.
     for (key, expr) in &comp.meta.defaults {
-        let val = crate::eval::eval_expr(expr, &TemplateContext::new());
+        let val = eval_expr_value(expr, &TemplateContext::new());
         child_ctx.vars.insert(key.clone(), val);
     }
 
     // Apply passed props.
     for (key, expr) in &inc.props {
-        let val = crate::eval::eval_expr(expr, ctx);
+        let val = eval_expr_value(expr, ctx);
         child_ctx.vars.insert(key.clone(), val);
     }
 
