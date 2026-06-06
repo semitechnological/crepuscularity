@@ -9,88 +9,6 @@ name = "Crepuscularity"
 description = "Documentation and landing (crepus web build)"
 head_html = """
 <link rel="icon" href="./static/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" />
-<style>
-@property --cp-bg { syntax: '<color>'; inherits: true; initial-value: #e3e9f5; }
-@property --cp-fg { syntax: '<color>'; inherits: true; initial-value: #15101f; }
-@property --cp-muted { syntax: '<color>'; inherits: true; initial-value: #4e4a5c; }
-@property --cp-border { syntax: '<color>'; inherits: true; initial-value: #959eb2; }
-@property --cp-elevated { syntax: '<color>'; inherits: true; initial-value: #f4f6fc; }
-@property --cp-code { syntax: '<color>'; inherits: true; initial-value: #0f172a; }
-@property --cp-accent { syntax: '<color>'; inherits: true; initial-value: #c45c35; }
-@keyframes crepus-twilight-dusk {
-  to {
-    --cp-bg: #0c0612;
-    --cp-fg: #f4ebff;
-    --cp-muted: #9a8ab8;
-    --cp-border: #4c4168;
-    --cp-elevated: #161022;
-    --cp-code: #0a0610;
-    --cp-accent: #ffb070;
-  }
-}
-.crepus-twilight-page {
-  --cp-bg: #e3e9f5;
-  --cp-fg: #15101f;
-  --cp-muted: #4e4a5c;
-  --cp-border: #959eb2;
-  --cp-elevated: #f4f6fc;
-  --cp-code: #0f172a;
-  --cp-accent: #c45c35;
-  animation: crepus-twilight-dusk 4.5s cubic-bezier(0.33, 1, 0.68, 1) forwards;
-  background-color: var(--cp-bg);
-  color: var(--cp-fg);
-}
-.crepus-t-text { color: var(--cp-fg); }
-.crepus-t-muted { color: var(--cp-muted); }
-.crepus-t-border { border-color: var(--cp-border) !important; }
-.crepus-t-card {
-  background-color: var(--cp-elevated);
-  border: 1px solid var(--cp-border);
-}
-.crepus-t-header {
-  background: color-mix(in srgb, var(--cp-bg) 88%, transparent);
-  border-bottom: 1px solid var(--cp-border);
-  backdrop-filter: blur(10px);
-}
-.crepus-t-code {
-  background-color: var(--cp-code);
-  color: color-mix(in srgb, var(--cp-fg) 92%, white);
-}
-.crepus-t-pre { background-color: var(--cp-code); color: color-mix(in srgb, var(--cp-fg) 88%, var(--cp-muted)); }
-.crepus-t-btn-primary {
-  background-color: var(--cp-accent);
-  color: #1a0812;
-}
-.crepus-t-btn-primary:hover { filter: brightness(1.06); }
-.crepus-t-btn-ghost {
-  border: 1px solid var(--cp-border);
-  color: var(--cp-fg);
-}
-.crepus-t-icon { color: var(--cp-accent); font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
-.material-symbols-outlined.crepus-cap-icon {
-  font-family: 'Material Symbols Outlined';
-  font-size: 2.75rem;
-  line-height: 1;
-}
-.material-symbols-outlined.crepus-toolchain-icon {
-  font-family: 'Material Symbols Outlined';
-  font-size: 2.25rem;
-  line-height: 1;
-  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
-}
-@keyframes crepus-rise {
-  from { opacity: 0; transform: translateY(24px) scale(0.98); filter: blur(12px); }
-  to { opacity: 1; transform: none; filter: blur(0); }
-}
-.crepus-entrance { animation: crepus-rise 1s cubic-bezier(0.16, 1, 0.3, 1) both; }
-.crepus-e1 { animation-delay: 0.05s; }
-.crepus-e2 { animation-delay: 0.11s; }
-.crepus-e3 { animation-delay: 0.17s; }
-.crepus-e4 { animation-delay: 0.23s; }
-.crepus-e5 { animation-delay: 0.29s; }
-.crepus-e6 { animation-delay: 0.35s; }
-</style>
 """
 
 [targets.seo]
@@ -103,7 +21,7 @@ type = "website"
 image = "https://crepuscularity.undivisible.dev/static/og.png"
 image_alt = "Crepuscularity UI templates preview"
 keywords = ["Rust UI", "GPUI", "WASM", "browser extensions", "Ratatui", "embedded UI", "LVGL"]
-author = "AJ Stafford"
+author = "Max Carter <max@undivisible.dev>"
 robots = "index,follow"
 theme_color = "#0c0612"
 application_name = "Crepuscularity"
@@ -121,15 +39,3 @@ src = "../docs"
 [[targets.seo.alternates]]
 href = "https://crepuscularity.undivisible.dev/"
 hreflang = "en"
-
-[targets.seo.robots_txt]
-enabled = true
-allow = ["/"]
-sitemap = "https://crepuscularity.undivisible.dev/sitemap.xml"
-
-[targets.seo.sitemap]
-enabled = true
-base_url = "https://crepuscularity.undivisible.dev"
-paths = ["/", "/docs/", "/docs/cli.html", "/docs/dsl.html", "/docs/webext.html", "/docs/embedded.html", "/docs/lvgl.html"]
-changefreq = "weekly"
-priority = 0.8
