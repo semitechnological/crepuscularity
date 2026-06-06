@@ -10,6 +10,8 @@ const SVG_WIDTH: u32 = 720;
 const SVG_HEIGHT: u32 = 220;
 const SVG_PAD: u32 = 18;
 const UPDATE_INTERVAL_MS: i32 = 60_000;
+const INITIAL_RETRY_MS: i32 = 100;
+const INITIAL_RETRY_ATTEMPTS: u32 = 100;
 
 #[wasm_bindgen]
 pub fn crepus_render(bundle_json: &str) -> Result<String, JsValue> {
@@ -19,7 +21,7 @@ pub fn crepus_render(bundle_json: &str) -> Result<String, JsValue> {
 #[cfg(target_arch = "wasm32")]
 #[wasm_bindgen(start)]
 pub fn start_downloads_widget() {
-    schedule_downloads_refresh(0);
+    schedule_initial_downloads_refresh(0, INITIAL_RETRY_ATTEMPTS);
     schedule_downloads_interval();
 }
 
@@ -452,16 +454,20 @@ fn url_encode_path_segment(value: &str) -> String {
 }
 
 #[cfg(target_arch = "wasm32")]
-fn schedule_downloads_refresh(delay_ms: i32) {
+fn schedule_initial_downloads_refresh(delay_ms: i32, remaining_attempts: u32) {
     use wasm_bindgen::{closure::Closure, JsCast};
 
     let Some(window) = web_sys::window() else {
         return;
     };
     let callback = Closure::<dyn FnMut()>::wrap(Box::new(move || {
-        wasm_bindgen_futures::spawn_local(async {
-            let _ = refresh_downloads().await;
-        });
+        if downloads_root().ok().flatten().is_some() {
+            wasm_bindgen_futures::spawn_local(async {
+                let _ = refresh_downloads().await;
+            });
+        } else if remaining_attempts > 0 {
+            schedule_initial_downloads_refresh(INITIAL_RETRY_MS, remaining_attempts - 1);
+        }
     }));
     let _ = window.set_timeout_with_callback_and_timeout_and_arguments_0(
         callback.as_ref().unchecked_ref(),
