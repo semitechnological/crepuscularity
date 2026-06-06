@@ -1,4 +1,4 @@
-google-fonts "Inter" "JetBrains Mono"
+google-fonts "Inter" "JetBrains Mono" "Material Symbols Outlined"
 
 div min-h-screen overflow-x-hidden antialiased crepus-twilight-page
 	main max-w-[896px] sm:max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 min-w-0
@@ -63,9 +63,12 @@ div min-h-screen overflow-x-hidden antialiased crepus-twilight-page
 								span text-xs crepus-t-muted leading-snug
 									"LVGL"
 						p text-sm crepus-t-muted leading-relaxed m-0 text-center sm:text-left
-							"Crepuscularity Lite: a GPUI + V8 desktop shell for hosting crepus templates as native apps."
-						a href="./docs/lite.html" no-underline text-sm font-medium crepus-t-text hover:opacity-85 border-b crepus-t-border transition-colors inline-block self-center sm:self-start
-							"Crepuscularity Lite guide →"
+							"Crepuscularity Lite: a GPUI + V8 desktop shell as a drop in replacement for Electron to work as native apps."
+						a href="./docs/lite.html" no-underline text-sm font-medium crepus-t-text guide-link self-center sm:self-start
+							span
+								"Crepuscularity Lite guide"
+							span guide-link-arrow
+								"→"
 				div w-full min-w-0 mx-auto lg:mx-0 lg:place-self-center order-last lg:order-none min-h-[400px]
 					div rounded-xl border overflow-hidden shadow-xl crepus-t-border crepus-t-card
 						div flex items-center gap-2 px-3 sm:px-4 py-2.5 sm:py-3 border-b crepus-t-border bg-[var(--cp-code)]
@@ -140,8 +143,11 @@ $ crepus aurora new my-ios && crepus aurora dev
 								p text-xs crepus-t-muted m-0 leading-relaxed
 									"Plug Rust backends through UniFFI with eventSink wiring for shared state models."
 					div mt-4 sm:mt-5
-						a href="./docs/aurorality.html" no-underline text-sm font-medium crepus-t-text hover:opacity-85 transition-colors border-b border-transparent hover:border-[var(--cp-accent)]
-							"Aurorality guide →"
+						a href="./docs/aurorality.html" no-underline text-sm font-medium crepus-t-text guide-link
+							span
+								"Aurorality guide"
+							span guide-link-arrow
+								"→"
 
 		section py-10 sm:py-14 border-t crepus-t-border crepus-entrance crepus-e4
 			div flex flex-col lg:flex-row lg:items-stretch gap-5 sm:gap-6 lg:gap-8
@@ -216,6 +222,55 @@ $ crepus aurora new my-ios && crepus aurora dev
 						"GPUI · view!"
 					pre font-mono text-sm m-0 flex-1 leading-relaxed crepus-t-pre p-6 rounded-lg whitespace-pre-wrap overflow-x-auto bg-[var(--cp-code)]
 						"view!(cx, div().flex().gap_3().child(\n  button().on_click(cx, handle_click).label(\"Click me\").text_color(gpui::blue())\n).child(\n  text_input().text(input_value).placeholder(\"Type here\")\n))"
+
+		section py-10 sm:py-14 border-t crepus-t-border crepus-entrance crepus-e5 data-downloads-widget="true" data-downloads-state="loading"
+			div flex flex-col lg:flex-row lg:items-end lg:justify-between gap-5 sm:gap-6 mb-7 sm:mb-9
+				div
+					p text-xs font-semibold uppercase tracking-widest crepus-t-muted mb-3 sm:mb-4
+						"Live crates.io signal"
+					h2 text-lg sm:text-2xl font-semibold crepus-t-text mb-2
+						"All Crepuscularity downloads"
+					p text-sm crepus-t-muted m-0 max-w-2xl leading-relaxed
+						"All-time and daily downloads across every published crate whose name starts with crepuscularity, fetched live from crates.io and rolled into one overall graph."
+				a href="https://crates.io/search?q=crepuscularity" no-underline inline-flex items-center px-4 py-2 rounded-lg crepus-t-btn-ghost text-sm font-medium transition-colors hover:bg-[var(--cp-elevated)] self-start lg:self-auto rel="noopener noreferrer" target="_blank"
+					"Open crates.io"
+			div downloads-panel rounded-xl p-5 sm:p-6 lg:p-7 crepus-t-card
+				div grid gap-4 sm:grid-cols-3 mb-6
+					div downloads-stat
+						span text-xs font-semibold uppercase tracking-widest crepus-t-muted
+							"Total"
+						strong text-3xl sm:text-4xl font-semibold crepus-t-text leading-none data-downloads-total="true"
+							"…"
+					div downloads-stat
+						span text-xs font-semibold uppercase tracking-widest crepus-t-muted
+							"Recent"
+						strong text-3xl sm:text-4xl font-semibold crepus-t-text leading-none data-downloads-recent="true"
+							"…"
+					div downloads-stat
+						span text-xs font-semibold uppercase tracking-widest crepus-t-muted
+							"Crates"
+						strong text-3xl sm:text-4xl font-semibold crepus-t-text leading-none data-downloads-crates="true"
+							"…"
+				div grid lg:grid-cols-[minmax(0,1fr)_minmax(260px,360px)] gap-5 sm:gap-6 items-stretch
+					div downloads-graph-shell rounded-lg border crepus-t-border overflow-hidden min-h-[260px]
+						div downloads-graph-header flex items-center justify-between gap-3 px-4 py-3 border-b crepus-t-border
+							span text-xs font-semibold uppercase tracking-widest crepus-t-muted
+								"Cumulative history"
+							span text-xs crepus-t-muted data-downloads-peak="true"
+								"Loading"
+						div downloads-graph p-3 sm:p-4 data-downloads-graph="true"
+							div downloads-skeleton
+					div downloads-crate-list rounded-lg border crepus-t-border overflow-hidden data-downloads-list="true"
+						div downloads-crate-row
+							span
+								strong
+									"Loading crates"
+								small
+									"crates.io"
+							b
+								"…"
+				p text-xs crepus-t-muted mt-5 mb-0 data-downloads-status="true"
+					"Loading live crates.io download history…"
 
 
 		section py-16 sm:py-20 border-t crepus-t-border
@@ -304,48 +359,370 @@ $ crepus aurora new my-ios && crepus aurora dev
 				a href="https://github.com/tschk/crepuscularity" no-underline crepus-t-muted hover:text-[var(--cp-fg)] transition-colors rel="noopener noreferrer" target="_blank"
 					"GitHub"
 
+<style>
+@property --cp-bg { syntax: '<color>'; inherits: true; initial-value: #e3e9f5; }
+@property --cp-fg { syntax: '<color>'; inherits: true; initial-value: #15101f; }
+@property --cp-muted { syntax: '<color>'; inherits: true; initial-value: #4e4a5c; }
+@property --cp-border { syntax: '<color>'; inherits: true; initial-value: #959eb2; }
+@property --cp-elevated { syntax: '<color>'; inherits: true; initial-value: #f4f6fc; }
+@property --cp-code { syntax: '<color>'; inherits: true; initial-value: #0f172a; }
+@property --cp-accent { syntax: '<color>'; inherits: true; initial-value: #c45c35; }
+@keyframes crepus-twilight-dusk {
+  to {
+    --cp-bg: #0c0612;
+    --cp-fg: #f4ebff;
+    --cp-muted: #9a8ab8;
+    --cp-border: #4c4168;
+    --cp-elevated: #161022;
+    --cp-code: #0a0610;
+    --cp-accent: #ffb070;
+  }
+}
+.crepus-twilight-page {
+  --cp-bg: #e3e9f5;
+  --cp-fg: #15101f;
+  --cp-muted: #4e4a5c;
+  --cp-border: #959eb2;
+  --cp-elevated: #f4f6fc;
+  --cp-code: #0f172a;
+  --cp-accent: #c45c35;
+  animation: crepus-twilight-dusk 4.5s cubic-bezier(0.33, 1, 0.68, 1) forwards;
+  background-color: var(--cp-bg);
+  color: var(--cp-fg);
+}
+.crepus-t-text { color: var(--cp-fg); }
+.crepus-t-muted { color: var(--cp-muted); }
+.crepus-t-border { border-color: var(--cp-border) !important; }
+.crepus-t-card {
+  background-color: var(--cp-elevated);
+  border: 1px solid var(--cp-border);
+}
+.crepus-t-header {
+  background: color-mix(in srgb, var(--cp-bg) 88%, transparent);
+  border-bottom: 1px solid var(--cp-border);
+  backdrop-filter: blur(10px);
+}
+.crepus-t-code {
+  background-color: var(--cp-code);
+  color: color-mix(in srgb, var(--cp-fg) 92%, white);
+}
+.crepus-t-pre { background-color: var(--cp-code); color: color-mix(in srgb, var(--cp-fg) 88%, var(--cp-muted)); }
+.crepus-t-btn-primary {
+  background-color: var(--cp-accent);
+  color: #1a0812;
+  transition: background-color 180ms ease, color 180ms ease, filter 180ms ease, border-color 180ms ease;
+}
+.crepus-t-btn-primary:hover { filter: brightness(1.06); }
+.crepus-t-btn-ghost {
+  border: 1px solid var(--cp-border);
+  color: var(--cp-fg);
+  transition: background-color 180ms ease, color 180ms ease, border-color 180ms ease, filter 180ms ease;
+}
+.guide-link {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  width: fit-content;
+  transition: color 180ms ease, opacity 180ms ease;
+}
+.guide-link::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -0.16rem;
+  height: 1px;
+  background: var(--cp-accent);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.guide-link:hover,
+.guide-link:focus-visible {
+  opacity: 0.92;
+}
+.guide-link:hover::after,
+.guide-link:focus-visible::after {
+  transform: scaleX(1);
+}
+.guide-link-arrow {
+  display: inline-block;
+  transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.guide-link:hover .guide-link-arrow,
+.guide-link:focus-visible .guide-link-arrow {
+  transform: translateX(0.22rem);
+}
+.crepus-t-icon { color: var(--cp-accent); font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+.material-symbols-outlined.crepus-cap-icon {
+  font-family: 'Material Symbols Outlined';
+  font-size: 2.75rem;
+  line-height: 1;
+}
+.material-symbols-outlined.crepus-toolchain-icon {
+  font-family: 'Material Symbols Outlined';
+  font-size: 2.25rem;
+  line-height: 1;
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+@keyframes crepus-rise {
+  from { opacity: 0; transform: translateY(24px) scale(0.98); filter: blur(12px); }
+  to { opacity: 1; transform: none; filter: blur(0); }
+}
+.crepus-entrance { animation: crepus-rise 1s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.crepus-e1 { animation-delay: 0.05s; }
+.crepus-e2 { animation-delay: 0.11s; }
+.crepus-e3 { animation-delay: 0.17s; }
+.crepus-e4 { animation-delay: 0.23s; }
+.crepus-e5 { animation-delay: 0.29s; }
+.crepus-e6 { animation-delay: 0.35s; }
 .animate-sunset {
-	position: relative;
-	overflow: hidden;
-	background: linear-gradient(to bottom right, #1f1f23, #121217, #08080b);
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(to bottom right, #1f1f23, #121217, #08080b);
 }
 .animate-sunset::before,
 .animate-sunset::after {
-	content: "";
-	position: absolute;
-	inset: 0;
-	border-radius: inherit;
-	pointer-events: none;
-	opacity: 0;
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
 }
 .animate-sunset::before {
-	background: linear-gradient(to bottom right, #4a251f, #7a3b1f, #2a1420);
-	animation: sunset-warm 24s ease-in-out infinite;
+  background: linear-gradient(to bottom right, #4a251f, #7a3b1f, #2a1420);
+  animation: sunset-warm 24s ease-in-out infinite;
 }
 .animate-sunset::after {
-	background: linear-gradient(to bottom right, #3a1d33, #522a54, #1d1126);
-	animation: sunset-violet 24s ease-in-out infinite;
+  background: linear-gradient(to bottom right, #3a1d33, #522a54, #1d1126);
+  animation: sunset-violet 24s ease-in-out infinite;
 }
 .animate-sunset > * {
-	position: relative;
-	z-index: 1;
+  position: relative;
+  z-index: 1;
 }
 @keyframes sunset-warm {
-	0%, 100% { opacity: 0; }
-	22%, 46% { opacity: 1; }
-	68% { opacity: 0; }
+  0%, 100% { opacity: 0; }
+  22%, 46% { opacity: 1; }
+  68% { opacity: 0; }
 }
 @keyframes sunset-violet {
-	0%, 46%, 100% { opacity: 0; }
-	68%, 88% { opacity: 1; }
+  0%, 46%, 100% { opacity: 0; }
+  68%, 88% { opacity: 1; }
 }
-
+.downloads-panel {
+  position: relative;
+  overflow: hidden;
+}
+.downloads-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(120deg, color-mix(in srgb, var(--cp-accent) 14%, transparent), transparent 34%),
+    radial-gradient(circle at 85% 8%, color-mix(in srgb, #73b7ff 16%, transparent), transparent 24%);
+  opacity: 0.72;
+}
+.downloads-panel > * {
+  position: relative;
+  z-index: 1;
+}
+.downloads-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1px solid color-mix(in srgb, var(--cp-border) 82%, transparent);
+  border-radius: 0.75rem;
+  background: color-mix(in srgb, var(--cp-bg) 18%, transparent);
+}
+.downloads-number-slot {
+  display: inline-block;
+  align-items: baseline;
+  width: max-content;
+  max-width: max-content;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.downloads-slot-char {
+  display: inline-block;
+  min-width: 0.34ch;
+  text-align: center;
+  white-space: pre;
+}
+.downloads-slot-changed {
+  animation: downloads-slot-in 520ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.downloads-graph-shell,
+.downloads-crate-list {
+  background: color-mix(in srgb, var(--cp-code) 20%, transparent);
+}
+.downloads-graph svg {
+  width: 100%;
+  min-height: 220px;
+  display: block;
+  overflow: visible;
+}
+.downloads-area {
+  fill: color-mix(in srgb, var(--cp-accent) 30%, transparent);
+}
+.downloads-graph[data-downloads-graph-hovering="true"] .downloads-area {
+  fill: color-mix(in srgb, var(--cp-muted) 30%, transparent);
+}
+.downloads-area-active {
+  fill: color-mix(in srgb, var(--cp-accent) 30%, transparent);
+}
+.downloads-line {
+  fill: none;
+  stroke: var(--cp-accent);
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.downloads-graph[data-downloads-graph-hovering="true"] .downloads-line {
+  stroke: color-mix(in srgb, var(--cp-muted) 60%, transparent);
+}
+.downloads-line-active {
+  fill: none;
+  stroke: var(--cp-accent);
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.downloads-hover-dot {
+  fill: var(--cp-fg);
+  stroke: var(--cp-accent);
+  stroke-width: 3;
+  pointer-events: none;
+}
+.downloads-hit {
+  fill: transparent;
+  stroke: none;
+  cursor: crosshair;
+  pointer-events: all;
+}
+.downloads-axis {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 0.75rem;
+  color: var(--cp-muted);
+  font-size: 0.75rem;
+}
+.downloads-crate-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.875rem 1rem;
+  color: var(--cp-fg);
+  text-decoration: none;
+  border-bottom: 1px solid color-mix(in srgb, var(--cp-border) 76%, transparent);
+  transition: background-color 180ms ease, border-color 180ms ease;
+}
+.downloads-crate-row:visited,
+.downloads-crate-row:active {
+  color: var(--cp-fg);
+}
+.downloads-crate-row:focus-visible {
+  color: var(--cp-fg);
+  outline: 1px solid var(--cp-accent);
+  outline-offset: -1px;
+}
+.downloads-crate-row:last-child {
+  border-bottom: 0;
+}
+.downloads-crate-row:hover {
+  background: color-mix(in srgb, var(--cp-accent) 10%, transparent);
+}
+.downloads-crate-row > span {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.downloads-crate-row > span > strong {
+  font-size: 0.875rem;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+.downloads-crate-row > span > small {
+  color: var(--cp-muted);
+  font-size: 0.75rem;
+}
+.downloads-crate-row:visited > span > small,
+.downloads-crate-row:active > span > small,
+.downloads-crate-row:focus-visible > span > small {
+  color: var(--cp-muted);
+}
+.downloads-crate-row b {
+  display: block;
+  flex: 0 0 auto;
+  min-width: 7ch;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--cp-accent);
+  text-align: right;
+  white-space: nowrap;
+  overflow: visible;
+}
+.downloads-crate-row:visited b,
+.downloads-crate-row:active b,
+.downloads-crate-row:focus-visible b {
+  color: var(--cp-accent);
+}
+.downloads-overall-row {
+  background: color-mix(in srgb, var(--cp-accent) 14%, transparent);
+}
+.downloads-skeleton {
+  min-height: 220px;
+  border-radius: 0.75rem;
+  background:
+    linear-gradient(110deg, transparent 0%, color-mix(in srgb, var(--cp-fg) 10%, transparent) 44%, transparent 58%),
+    linear-gradient(to top, color-mix(in srgb, var(--cp-accent) 16%, transparent), transparent 70%);
+  background-size: 220% 100%, 100% 100%;
+  animation: downloads-loading 1.4s ease-in-out infinite;
+}
+[data-downloads-state="error"] .downloads-skeleton {
+  animation: none;
+  opacity: 0.35;
+}
+@keyframes downloads-loading {
+  to { background-position: -220% 0, 0 0; }
+}
+@keyframes downloads-slot-in {
+  from {
+    opacity: 1;
+    transform: translateY(-0.75em);
+    filter: blur(6px);
+  }
+  62% {
+    opacity: 1;
+    transform: translateY(0.12em);
+    filter: blur(0);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
 @media (prefers-reduced-motion: reduce) {
-	.animate-sunset::before,
-	.animate-sunset::after {
-		animation: none;
-	}
+  .animate-sunset::before,
+  .animate-sunset::after,
+  .downloads-skeleton,
+  .downloads-slot-changed {
+    animation: none;
+  }
+  .guide-link::after,
+  .guide-link-arrow {
+    transition: none;
+  }
 }
+</style>
 
 .slot-lede text-[var(--cp-fg)] font-medium
 .footer-row flex flex-col sm:flex-row justify-between gap-4 sm:gap-6 sm:items-center
