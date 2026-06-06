@@ -891,27 +891,6 @@ fn write_html_response(stream: &mut TcpStream, html: &str) {
     let _ = stream.write_all(resp.as_bytes());
 }
 
-#[cfg(test)]
-mod tests {
-    use std::collections::HashMap;
-
-    use crate::crepus_toml::WebTargetMeta;
-
-    #[test]
-    fn dev_index_merges_target_head_html() {
-        let site_dir = tempfile::tempdir().expect("tempdir");
-        let files = HashMap::from([("index.crepus".to_string(), "div\n  \"Hello\"".to_string())]);
-        let meta = WebTargetMeta {
-            head_html: Some(r#"<style>.from-target{color:red}</style>"#.into()),
-            ..WebTargetMeta::default()
-        };
-
-        let html = super::render_dev_index_html(site_dir.path(), &files, Some(&meta), "");
-
-        assert!(html.contains(r#"<style>.from-target{color:red}</style>"#));
-    }
-}
-
 fn error_document(message: &str) -> String {
     format!(
         "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>Error</title></head>\
@@ -1075,5 +1054,26 @@ fn guess_mime(ext: &str) -> &'static str {
         "woff2" => "font/woff2",
         "woff" => "font/woff",
         _ => "application/octet-stream",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use crate::crepus_toml::WebTargetMeta;
+
+    #[test]
+    fn dev_index_merges_target_head_html() {
+        let site_dir = tempfile::tempdir().expect("tempdir");
+        let files = HashMap::from([("index.crepus".to_string(), "div\n  \"Hello\"".to_string())]);
+        let meta = WebTargetMeta {
+            head_html: Some(r#"<style>.from-target{color:red}</style>"#.into()),
+            ..WebTargetMeta::default()
+        };
+
+        let html = super::render_dev_index_html(site_dir.path(), &files, Some(&meta), "");
+
+        assert!(html.contains(r#"<style>.from-target{color:red}</style>"#));
     }
 }
