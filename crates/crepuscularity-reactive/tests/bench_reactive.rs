@@ -38,7 +38,8 @@ fn bench_full_rebuild(label: &str, template: &str, iterations: u32) -> (f64, u32
                             if let crepuscularity_core::ast::TextPart::Literal(s) = part {
                                 out.push_str(s);
                             } else if let crepuscularity_core::ast::TextPart::Expr(e) = part {
-                                let val = crepuscularity_core::eval::eval_expr(e, &ctx);
+                                let val = crepuscularity_core::eval::eval_expr(e, &ctx)
+                                    .expect("bench template expr");
                                 out.push_str(&crepuscularity_core::context::value_to_str(&val));
                             }
                         }
