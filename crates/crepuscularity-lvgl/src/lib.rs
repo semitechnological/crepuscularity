@@ -6,6 +6,7 @@ use crepuscularity_core::eval::eval_expr;
 use crepuscularity_core::include_paths::resolve_include_path;
 use crepuscularity_core::parser::{parse_component_file, parse_template};
 use crepuscularity_core::virtual_files::lookup_virtual_file;
+pub use crepuscularity_core::CrepusError;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LvglOptions {
@@ -31,7 +32,7 @@ pub enum LvglRoot {
 pub fn render_template_to_lvgl_xml(
     template: &str,
     ctx: &TemplateContext,
-) -> Result<String, String> {
+) -> Result<String, CrepusError> {
     render_template_to_lvgl_xml_with_options(template, ctx, &LvglOptions::default())
 }
 
@@ -39,7 +40,7 @@ pub fn render_template_to_lvgl_xml_with_options(
     template: &str,
     ctx: &TemplateContext,
     options: &LvglOptions,
-) -> Result<String, String> {
+) -> Result<String, CrepusError> {
     let nodes = parse_template(template)?;
     render_nodes_to_lvgl_xml(&nodes, ctx, options)
 }
@@ -48,18 +49,18 @@ pub fn render_component_file_to_lvgl_xml(
     content: &str,
     component_name: &str,
     ctx: &TemplateContext,
-) -> Result<String, String> {
+) -> Result<String, CrepusError> {
     let file = parse_component_file(content)?;
     let component = file
         .components
         .get(component_name)
-        .ok_or_else(|| format!("component not found: {component_name}"))?;
+        .ok_or_else(|| CrepusError::render(format!("component not found: {component_name}")))?;
     let mut child_ctx = lvgl_context(ctx);
     for (key, expr) in &component.meta.defaults {
         child_ctx
             .vars
             .entry(key.clone())
-            .or_insert_with(|| eval_expr(expr, &TemplateContext::new()));
+            .or_insert(eval_expr(expr, &TemplateContext::new())?);
     }
     render_nodes_to_lvgl_xml(
         &component.nodes,
@@ -75,7 +76,7 @@ pub fn render_nodes_to_lvgl_xml(
     nodes: &[Node],
     ctx: &TemplateContext,
     options: &LvglOptions,
-) -> Result<String, String> {
+) -> Result<String, CrepusError> {
     let mut out = String::new();
     let tag = match options.root {
         LvglRoot::Component => "component",
@@ -116,7 +117,7 @@ struct XmlNode {
     children: Vec<XmlNode>,
 }
 
-fn render_nodes_list(nodes: &[Node], ctx: &TemplateContext) -> Result<Vec<XmlNode>, String> {
+fn render_nodes_list(nodes: &[Node], ctx: &TemplateContext) -> Result<Vec<XmlNode>, CrepusError> {
     let mut ctx = ctx.clone();
     let mut out = Vec::new();
     for node in nodes {
@@ -124,11 +125,11 @@ fn render_nodes_list(nodes: &[Node], ctx: &TemplateContext) -> Result<Vec<XmlNod
             Node::LetDecl(decl) => {
                 if !(decl.is_default && ctx.vars.contains_key(&decl.name)) {
                     ctx.vars
-                        .insert(decl.name.clone(), eval_expr(&decl.expr, &ctx));
+                        .insert(decl.name.clone(), eval_expr(&decl.expr, &ctx)?);
                 }
             }
             Node::If(block) => {
-                let body = if ctx.eval_condition(&block.condition) {
+                let body = if ctx.eval_condition(&block.condition)? {
                     &block.then_children
                 } else {
                     block.else_children.as_deref().unwrap_or(&[])
@@ -157,7 +158,7 @@ fn render_nodes_list(nodes: &[Node], ctx: &TemplateContext) -> Result<Vec<XmlNod
             Node::Element(el) => out.push(render_element(el, &ctx)?),
             Node::Text(parts) => out.push(label_node(render_text_inline(parts, &ctx)?)),
             Node::RawText(expr) | Node::RawHtml(expr) => {
-                out.push(label_node(value_to_str(&eval_expr(expr, &ctx))));
+                out.push(label_node(value_to_str(&eval_expr(expr, &ctx)?)));
             }
             Node::Include(inc) => {
                 let (inner, inner_ctx) = expand_include(inc, &ctx)?;
@@ -169,8 +170,8 @@ fn render_nodes_list(nodes: &[Node], ctx: &TemplateContext) -> Result<Vec<XmlNod
     Ok(out)
 }
 
-fn render_match(block: &MatchBlock, ctx: &TemplateContext) -> Result<Vec<XmlNode>, String> {
-    let value = value_to_str(&eval_expr(&block.expr, ctx));
+fn render_match(block: &MatchBlock, ctx: &TemplateContext) -> Result<Vec<XmlNode>, CrepusError> {
+    let value = value_to_str(&eval_expr(&block.expr, ctx)?);
     for arm in &block.arms {
         let pattern = arm.pattern.trim();
         if pattern == "_"
@@ -185,7 +186,7 @@ fn render_match(block: &MatchBlock, ctx: &TemplateContext) -> Result<Vec<XmlNode
     Ok(Vec::new())
 }
 
-fn render_element(el: &Element, ctx: &TemplateContext) -> Result<XmlNode, String> {
+fn render_element(el: &Element, ctx: &TemplateContext) -> Result<XmlNode, CrepusError> {
     if el.tag == "slot" {
         let children = if let Some((nodes, slot_ctx)) = &ctx.slot {
             render_nodes_list(nodes, slot_ctx)?
@@ -201,7 +202,7 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<XmlNode, String
 
     let mut classes = el.classes.clone();
     for class in &el.conditional_classes {
-        if ctx.eval_condition(&class.condition) {
+        if ctx.eval_condition(&class.condition)? {
             classes.push(class.class.clone());
         }
     }
@@ -216,7 +217,7 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<XmlNode, String
     for binding in &el.bindings {
         attrs.push((
             lvgl_attr_name(&binding.prop),
-            eval_binding(&binding.value, ctx),
+            eval_binding(&binding.value, ctx)?,
         ));
     }
     for handler in &el.event_handlers {
@@ -241,41 +242,45 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<XmlNode, String
     })
 }
 
-fn render_text_inline(parts: &[TextPart], ctx: &TemplateContext) -> Result<String, String> {
+fn render_text_inline(parts: &[TextPart], ctx: &TemplateContext) -> Result<String, CrepusError> {
     let mut out = String::new();
     for part in parts {
         match part {
-            TextPart::Literal(s) => out.push_str(&ctx.interpolate(s)),
-            TextPart::Expr(expr) => out.push_str(&value_to_str(&eval_expr(expr, ctx))),
+            TextPart::Literal(s) => out.push_str(&ctx.interpolate(s)?),
+            TextPart::Expr(expr) => {
+                out.push_str(&value_to_str(&eval_expr(expr, ctx)?));
+            }
         }
     }
     Ok(out)
 }
 
-fn read_file(ctx: &TemplateContext, path: &Path) -> Result<String, String> {
+fn read_file(ctx: &TemplateContext, path: &Path) -> Result<String, CrepusError> {
     if let Some(content) = lookup_virtual_file(ctx, path) {
         return Ok(content);
     }
-    std::fs::read_to_string(path).map_err(|e| format!("include error: {:?}: {}", path, e))
+    std::fs::read_to_string(path)
+        .map_err(|e| CrepusError::render(format!("include error: {:?}: {}", path, e)))
 }
 
 fn expand_include(
     inc: &IncludeNode,
     ctx: &TemplateContext,
-) -> Result<(Vec<Node>, TemplateContext), String> {
+) -> Result<(Vec<Node>, TemplateContext), CrepusError> {
     if let Some((file_part, comp_name)) = inc.path.split_once('#') {
         return expand_named_component(inc, ctx, file_part, comp_name);
     }
 
     let file_path = resolve_include_path(ctx.base_dir.as_deref(), &inc.path)?;
     let content = read_file(ctx, &file_path)?;
-    let nodes = parse_template(&content).map_err(|e| format!("include parse error: {e}"))?;
+    let nodes = parse_template(&content)
+        .map_err(|e| CrepusError::render(format!("include parse error: {e}")))?;
 
     let mut child_ctx = TemplateContext::new();
     child_ctx.base_dir = file_path.parent().map(|p| p.to_path_buf());
     child_ctx.virtual_files = ctx.virtual_files.clone();
     for (key, expr) in &inc.props {
-        child_ctx.vars.insert(key.clone(), eval_expr(expr, ctx));
+        child_ctx.vars.insert(key.clone(), eval_expr(expr, ctx)?);
     }
     if !inc.slot.is_empty() {
         child_ctx.slot = Some((inc.slot.clone(), Box::new(ctx.clone())));
@@ -289,15 +294,14 @@ fn expand_named_component(
     ctx: &TemplateContext,
     file_part: &str,
     comp_name: &str,
-) -> Result<(Vec<Node>, TemplateContext), String> {
+) -> Result<(Vec<Node>, TemplateContext), CrepusError> {
     let file_path = resolve_include_path(ctx.base_dir.as_deref(), file_part)?;
     let content = read_file(ctx, &file_path)?;
-    let comp_file =
-        parse_component_file(&content).map_err(|e| format!("component file parse error: {e}"))?;
-    let comp = comp_file
-        .components
-        .get(comp_name)
-        .ok_or_else(|| format!("component '{comp_name}' not found in {file_part}"))?;
+    let comp_file = parse_component_file(&content)
+        .map_err(|e| CrepusError::render(format!("component file parse error: {e}")))?;
+    let comp = comp_file.components.get(comp_name).ok_or_else(|| {
+        CrepusError::render(format!("component '{comp_name}' not found in {file_part}"))
+    })?;
 
     let mut child_ctx = TemplateContext::new();
     child_ctx.base_dir = file_path.parent().map(|p| p.to_path_buf());
@@ -306,10 +310,10 @@ fn expand_named_component(
         child_ctx
             .vars
             .entry(key.clone())
-            .or_insert_with(|| eval_expr(expr, &TemplateContext::new()));
+            .or_insert(eval_expr(expr, &TemplateContext::new())?);
     }
     for (key, expr) in &inc.props {
-        child_ctx.vars.insert(key.clone(), eval_expr(expr, ctx));
+        child_ctx.vars.insert(key.clone(), eval_expr(expr, ctx)?);
     }
     if !inc.slot.is_empty() {
         child_ctx.slot = Some((inc.slot.clone(), Box::new(ctx.clone())));
@@ -354,14 +358,18 @@ fn take_text_child(children: &mut Vec<XmlNode>) -> Option<String> {
     None
 }
 
-fn eval_binding(value: &str, ctx: &TemplateContext) -> String {
+fn eval_binding(value: &str, ctx: &TemplateContext) -> Result<String, CrepusError> {
     let trimmed = value.trim();
     if trimmed.starts_with('{') && trimmed.ends_with('}') && trimmed.len() >= 2 {
-        value_to_str(&eval_expr(&trimmed[1..trimmed.len() - 1], ctx))
+        Ok(value_to_str(&eval_expr(
+            &trimmed[1..trimmed.len() - 1],
+            ctx,
+        )?))
     } else if ctx.get(trimmed).is_some() {
-        value_to_str(&eval_expr(trimmed, ctx))
+        Ok(value_to_str(&eval_expr(trimmed, ctx)?))
     } else {
         ctx.interpolate(trimmed)
+            .map_err(|e| CrepusError::render(e.to_string()))
     }
 }
 

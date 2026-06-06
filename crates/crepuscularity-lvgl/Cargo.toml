@@ -1,6 +1,6 @@
 [package]
 name = "crepuscularity-lvgl"
-version = "0.1.2"
+version = "0.1.4"
 edition = "2021"
 license = "MPL-2.0"
 description = "LVGL Pro XML generator for the Crepuscularity .crepus DSL."
