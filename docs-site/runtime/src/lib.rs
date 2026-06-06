@@ -816,39 +816,95 @@ fn bind_graph_hover(root: &web_sys::Element) -> Result<(), JsValue> {
     let move_root = root.clone();
     let on_move = Closure::<dyn FnMut(web_sys::Event)>::wrap(Box::new(
         move |event: web_sys::Event| {
-            let Some(target) = event
+            let _ = apply_graph_pointer_event(&move_root, &event);
+        },
+    ));
+    graph.add_event_listener_with_callback("pointermove", on_move.as_ref().unchecked_ref())?;
+    on_move.forget();
+
+    let down_root = root.clone();
+    let on_down = Closure::<dyn FnMut(web_sys::Event)>::wrap(Box::new(
+        move |event: web_sys::Event| {
+            event.prevent_default();
+            let _ = apply_graph_pointer_event(&down_root, &event);
+        },
+    ));
+    graph.add_event_listener_with_callback("pointerdown", on_down.as_ref().unchecked_ref())?;
+    on_down.forget();
+
+    let leave_root = root.clone();
+    let on_leave = Closure::<dyn FnMut()>::wrap(Box::new(move || {
+        let _ = reset_graph_hover(&leave_root);
+    }));
+    graph.add_event_listener_with_callback("pointerleave", on_leave.as_ref().unchecked_ref())?;
+    on_leave.forget();
+
+    bind_graph_outside_reset(root)?;
+
+    Ok(())
+}
+
+#[cfg(target_arch = "wasm32")]
+fn apply_graph_pointer_event(
+    root: &web_sys::Element,
+    event: &web_sys::Event,
+) -> Result<(), JsValue> {
+    use wasm_bindgen::JsCast;
+
+    let Some(target) = event
+        .target()
+        .and_then(|target: web_sys::EventTarget| target.dyn_into::<web_sys::Element>().ok())
+    else {
+        return Ok(());
+    };
+    let Some(index) = target
+        .get_attribute("data-downloads-hover-index")
+        .and_then(|value| value.parse::<usize>().ok())
+    else {
+        return Ok(());
+    };
+    graph_hover_dot(root, &target)?;
+    graph_hover_paths(root, &target)?;
+    update_graph_hover_date(root, &target)?;
+    update_download_values(root, index)?;
+    Ok(())
+}
+
+#[cfg(target_arch = "wasm32")]
+fn bind_graph_outside_reset(root: &web_sys::Element) -> Result<(), JsValue> {
+    use wasm_bindgen::{closure::Closure, JsCast};
+
+    if root.get_attribute("data-downloads-outside-reset-bound").is_some() {
+        return Ok(());
+    }
+    root.set_attribute("data-downloads-outside-reset-bound", "true")?;
+
+    let reset_root = root.clone();
+    let on_down = Closure::<dyn FnMut(web_sys::Event)>::wrap(Box::new(
+        move |event: web_sys::Event| {
+            let inside_graph = event
                 .target()
                 .and_then(|target: web_sys::EventTarget| {
                     target.dyn_into::<web_sys::Element>().ok()
                 })
-            else {
-                return;
-            };
-            let Some(index) = target
-                .get_attribute("data-downloads-hover-index")
-                .and_then(|value| value.parse::<usize>().ok())
-            else {
-                return;
-            };
-            let _ = graph_hover_dot(&move_root, &target);
-            let _ = graph_hover_paths(&move_root, &target);
-            let _ = update_graph_hover_date(&move_root, &target);
-            let _ = update_download_values(&move_root, index);
+                .and_then(|target| target.closest("[data-downloads-graph]").ok().flatten())
+                .is_some();
+            if !inside_graph {
+                let _ = reset_graph_hover(&reset_root);
+            }
         },
     ));
-    graph.add_event_listener_with_callback("mousemove", on_move.as_ref().unchecked_ref())?;
-    on_move.forget();
-
-    let leave_root = root.clone();
-    let on_leave = Closure::<dyn FnMut()>::wrap(Box::new(move || {
-        let _ = hide_graph_hover(&leave_root);
-        let _ = restore_graph_hover_date(&leave_root);
-        let _ = restore_download_values(&leave_root);
-    }));
-    graph.add_event_listener_with_callback("mouseleave", on_leave.as_ref().unchecked_ref())?;
-    on_leave.forget();
+    document()?.add_event_listener_with_callback("pointerdown", on_down.as_ref().unchecked_ref())?;
+    on_down.forget();
 
     Ok(())
+}
+
+#[cfg(target_arch = "wasm32")]
+fn reset_graph_hover(root: &web_sys::Element) -> Result<(), JsValue> {
+    hide_graph_hover(root)?;
+    restore_graph_hover_date(root)?;
+    restore_download_values(root)
 }
 
 #[cfg(target_arch = "wasm32")]
