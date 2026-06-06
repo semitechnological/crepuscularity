@@ -148,7 +148,8 @@ fn build_web(target: &Target, base_dir: &Path, idx: usize) -> Result<Artifact, S
         crepuscularity_web::render_component_file_to_html(&template, component, &ctx)
     } else {
         crepuscularity_web::render_template_to_html(&template, &ctx)
-    }?;
+    }
+    .map_err(|e| e.to_string())?;
     Ok(artifact(target, idx, "web", contents, base_dir))
 }
 
@@ -182,7 +183,8 @@ fn build_lvgl(target: &Target, base_dir: &Path, idx: usize) -> Result<Artifact, 
             &ctx,
             &crepuscularity_lvgl::LvglOptions { name, root },
         )
-    }?;
+    }
+    .map_err(|e| e.to_string())?;
     Ok(artifact(target, idx, "lvgl", contents, base_dir))
 }
 
@@ -199,7 +201,8 @@ fn build_native(target: &Target, base_dir: &Path, idx: usize) -> Result<Artifact
         crepuscularity_native::render_component_file_to_ir(&template, component, &ctx)
     } else {
         crepuscularity_native::render_template_to_ir(&template, &ctx)
-    }?;
+    }
+    .map_err(|e| e.to_string())?;
     let contents = if target.root.as_deref() == Some("pretty") {
         crepuscularity_native::to_json_pretty(&ir).map_err(|e| e.to_string())?
     } else {
