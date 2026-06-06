@@ -131,7 +131,7 @@ pub mod template;
 mod tests;
 
 pub use crepuscularity_core::{
-    build, parse_component_file, parse_template, TemplateContext, TemplateValue,
+    build, parse_component_file, parse_template, CrepusError, TemplateContext, TemplateValue,
 };
 pub use crepuscularity_macros::template_refs;
 pub use hot_reload::{HotTemplate, ReloadOutcome};
