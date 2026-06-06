@@ -36,5 +36,8 @@ crepuscularity-core = { path = "../crepuscularity-core", version = "0.4.11" }
 crepuscularity_macros = { path = "../crepuscularity_macros", version = "0.5.4" }
 crepuscularity-runtime = { path = "../crepuscularity-runtime", version = "0.4.9" }
 gpui-symbols = { version = "0.6", optional = true }
+hdrhistogram = "7"
 log = "0.4"
 pollster = "0.4"
+schemars = "1"
+serde = { version = "1", features = ["derive"] }
