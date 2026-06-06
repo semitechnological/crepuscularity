@@ -41,6 +41,8 @@ cargo run -p crepuscularity-cli -- web build --manifest docs-site/crepus.toml --
 
 The generated docs should include `docs/index.html`, one HTML page for each published Markdown guide, `docs/docs-search-index.json`, `pkg/*.wasm`, and `.nojekyll` at the site root.
 
+GitHub workflow templates for downstream Crepus projects live in `.github/workflow-templates/`. Use `crepus-ci.yml` for formatting, linting, and tests, and `crepus-pages.yml` for GitHub Pages deployments driven by `crepus web build`.
+
 ## Security boundaries
 
 Crepuscularity templates are source code, not an untrusted markup sandbox. Do not render attacker-controlled `.crepus` source unless you wrap it in a separate policy layer.

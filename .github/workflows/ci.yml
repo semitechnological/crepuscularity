@@ -6,6 +6,13 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   CARGO_TERM_COLOR: always
   WASM_BINDGEN_VERSION: 0.2.121
@@ -58,12 +65,12 @@ jobs:
       - name: Check formatting
         run: cargo fmt --all -- --check
 
-      - name: Run tests
-        run: cargo test --workspace
-
       - name: Run clippy
-        run: cargo clippy --workspace --all-targets -- -D warnings
+        run: cargo clippy --locked --workspace --all-targets -- -D warnings
         if: matrix.os == 'ubuntu-latest'
+
+      - name: Run tests
+        run: cargo test --locked --workspace
 
   build-examples:
     name: Build Examples
@@ -83,12 +90,12 @@ jobs:
         run: echo "SDKROOT=$(xcrun --show-sdk-path)" >> $GITHUB_ENV
 
       - name: Build weather example
-        run: cargo build
+        run: cargo build --locked
         working-directory: examples/weather
         if: runner.os != 'Windows'
 
       - name: Build CLI
-        run: cargo build --package crepuscularity-cli
+        run: cargo build --locked --package crepuscularity-cli
 
   plugin-smoke:
     name: Plugin Smoke
@@ -203,7 +210,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Build docs (strict rustdoc)
-        run: cargo doc --no-deps --workspace
+        run: cargo doc --locked --no-deps --workspace
         env:
           RUSTDOCFLAGS: -D warnings
 
@@ -236,10 +243,10 @@ jobs:
 
       - name: Build WASM client
         run: |
-          cargo build --target wasm32-unknown-unknown -p crepuscularity-web --release &
+          cargo build --locked --target wasm32-unknown-unknown -p crepuscularity-web --release &
           WASM_PID=$!
           # Build host server in parallel
-          cargo build -p crepuscularity-cli --release &
+          cargo build --locked -p crepuscularity-cli --release &
           HOST_PID=$!
           wait $WASM_PID
           wait $HOST_PID
@@ -247,7 +254,7 @@ jobs:
 
       - name: Build docs-site (end-to-end web build)
         run: |
-          cargo run -p crepuscularity-cli --release -- \
+          cargo run --locked -p crepuscularity-cli --release -- \
             web build --manifest docs-site/crepus.toml --out-dir /tmp/crepus-docs-dist
           # Verify outputs exist
           test -f /tmp/crepus-docs-dist/index.html || (echo "missing index.html" && exit 1)
