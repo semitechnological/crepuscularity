@@ -46,8 +46,6 @@ jobs:
           test -f docs-site/dist/index.html
           test -f docs-site/dist/.nojekyll
           test -f docs-site/dist/pkg/runtime_bg.wasm
-          test -f docs-site/dist/docs/index.html
-          test -f docs-site/dist/docs/docs-search-index.json
 
       - uses: actions/upload-pages-artifact@v3
         with:
