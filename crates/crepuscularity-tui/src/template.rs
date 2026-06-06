@@ -134,7 +134,7 @@ impl Template {
     }
 
     pub fn draw(&self, frame: &mut Frame, area: Rect) -> Result<(), String> {
-        render_template(&self.source, &self.ctx, frame, area)
+        render_template(&self.source, &self.ctx, frame, area).map_err(|e| e.to_string())
     }
 
     pub fn draw_full(&self, frame: &mut Frame) -> Result<(), String> {

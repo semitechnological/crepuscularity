@@ -26,20 +26,34 @@ use crepuscularity_core::include_paths::resolve_include_path;
 use crepuscularity_core::parser::{parse_component_file, parse_template};
 use crepuscularity_core::preprocess::slot_rotate_child_phrases;
 use crepuscularity_core::virtual_files::lookup_virtual_file;
+use crepuscularity_core::CrepusError;
 
 use crate::style::{parse_classes, StyleHints};
 
-fn read_file(ctx: &TemplateContext, path: &std::path::Path) -> Result<String, String> {
+fn eval_value(expr: &str, ctx: &TemplateContext) -> TemplateValue {
+    eval_expr(expr, ctx).unwrap_or(TemplateValue::Null)
+}
+
+fn eval_condition(ctx: &TemplateContext, expr: &str) -> bool {
+    ctx.eval_condition(expr).unwrap_or(false)
+}
+
+fn interpolate_str(ctx: &TemplateContext, s: &str) -> String {
+    ctx.interpolate(s).unwrap_or_else(|_| s.to_string())
+}
+
+fn read_file(ctx: &TemplateContext, path: &std::path::Path) -> Result<String, CrepusError> {
     if let Some(content) = lookup_virtual_file(ctx, path) {
         return Ok(content);
     }
     if cfg!(not(target_arch = "wasm32")) {
-        std::fs::read_to_string(path).map_err(|e| format!("include error: {:?}: {}", path, e))
+        std::fs::read_to_string(path)
+            .map_err(|e| CrepusError::render(format!("include error: {:?}: {}", path, e)))
     } else {
-        Err(format!(
+        Err(CrepusError::render(format!(
             "include error: file not in virtual bundle: {}",
             path.to_string_lossy()
-        ))
+        )))
     }
 }
 
@@ -110,7 +124,7 @@ pub fn render_template(
     ctx: &TemplateContext,
     frame: &mut Frame,
     area: Rect,
-) -> Result<(), String> {
+) -> Result<(), CrepusError> {
     let nodes = parse_template(template)?;
     render_nodes(&nodes, ctx, frame, area)
 }
@@ -121,7 +135,7 @@ pub fn render_nodes(
     ctx: &TemplateContext,
     frame: &mut Frame,
     area: Rect,
-) -> Result<(), String> {
+) -> Result<(), CrepusError> {
     // The root is implicitly a vertical flex container filling the whole area.
     let render_ctx = with_tui_target(ctx);
     let children = build_children(nodes, &render_ctx, Direction::Vertical, Style::default());
@@ -136,19 +150,19 @@ pub fn render_component(
     ctx: &TemplateContext,
     frame: &mut Frame,
     area: Rect,
-) -> Result<(), String> {
+) -> Result<(), CrepusError> {
     let file = parse_component_file(content)?;
     let component = file
         .components
         .get(component_name)
-        .ok_or_else(|| format!("component not found: {component_name}"))?;
+        .ok_or_else(|| CrepusError::render(format!("component not found: {component_name}")))?;
 
     let mut child_ctx = with_tui_target(ctx);
     for (key, expr) in &component.meta.defaults {
         if !child_ctx.vars.contains_key(key) {
             child_ctx
                 .vars
-                .insert(key.clone(), eval_expr(expr, &TemplateContext::default()));
+                .insert(key.clone(), eval_value(expr, &TemplateContext::default()));
         }
     }
 
@@ -205,7 +219,7 @@ fn build_children(
         match node {
             // Variable declarations mutate context for subsequent siblings.
             Node::LetDecl(decl) => {
-                let val = eval_expr(&decl.expr, &ctx);
+                let val = eval_value(&decl.expr, &ctx);
                 if decl.is_default {
                     if !ctx.vars.contains_key(&decl.name) {
                         ctx.vars.insert(decl.name.clone(), val);
@@ -222,10 +236,10 @@ fn build_children(
                 text_buf.push(build_line(parts, &ctx));
             }
             Node::RawText(expr) => {
-                text_buf.push(Line::raw(value_to_str(&eval_expr(expr, &ctx))));
+                text_buf.push(Line::raw(value_to_str(&eval_value(expr, &ctx))));
             }
             Node::RawHtml(expr) => {
-                text_buf.push(Line::raw(value_to_str(&eval_expr(expr, &ctx))));
+                text_buf.push(Line::raw(value_to_str(&eval_value(expr, &ctx))));
             }
             // Structural nodes: flush buffered text first, then emit.
             Node::Element(el) => {
@@ -319,7 +333,7 @@ fn build_element(
         .bindings
         .iter()
         .find(|b| b.prop == "title")
-        .map(|b| value_to_str(&eval_expr(&b.value, ctx)))
+        .map(|b| value_to_str(&eval_value(&b.value, ctx)))
     {
         hints.title = Some(title_val);
     }
@@ -382,10 +396,10 @@ fn build_content_element(
         match child {
             Node::Text(parts) => lines.push(build_line(parts, &child_ctx)),
             Node::RawText(expr) => {
-                lines.push(Line::raw(value_to_str(&eval_expr(expr, &child_ctx))))
+                lines.push(Line::raw(value_to_str(&eval_value(expr, &child_ctx))))
             }
             Node::LetDecl(decl) => {
-                let val = eval_expr(&decl.expr, &child_ctx);
+                let val = eval_value(&decl.expr, &child_ctx);
                 if decl.is_default {
                     if !child_ctx.vars.contains_key(&decl.name) {
                         child_ctx.vars.insert(decl.name.clone(), val);
@@ -523,7 +537,7 @@ fn slot_rotate_interval_ms(el: &Element, ctx: &TemplateContext) -> u64 {
     const DEFAULT_INTERVAL_MS: u64 = 3200;
     for b in &el.bindings {
         if b.prop == "interval" {
-            let v = value_to_str(&eval_expr(&b.value, ctx));
+            let v = value_to_str(&eval_value(&b.value, ctx));
             let trimmed = v.trim_matches('"').trim();
             return trimmed.parse().unwrap_or(DEFAULT_INTERVAL_MS);
         }
@@ -558,7 +572,7 @@ fn build_if(
     parent_dir: Direction,
     inherited: Style,
 ) -> Vec<WidgetChild> {
-    let body = if ctx.eval_condition(&block.condition) {
+    let body = if eval_condition(ctx, &block.condition) {
         &block.then_children
     } else if let Some(ref else_children) = block.else_children {
         else_children
@@ -613,7 +627,7 @@ fn build_match(
     parent_dir: Direction,
     inherited: Style,
 ) -> Vec<WidgetChild> {
-    let val = value_to_str(&eval_expr(&block.expr, ctx));
+    let val = value_to_str(&eval_value(&block.expr, ctx));
     for arm in &block.arms {
         let pattern = arm.pattern.trim();
         let matched = if pattern == "_" {
@@ -645,21 +659,20 @@ fn build_include(
 
     let full_path = match resolve_include_path(ctx.base_dir.as_deref(), file_path) {
         Ok(path) => path,
-        Err(e) => return error_children(&e),
+        Err(e) => return error_children(&e.to_string()),
     };
 
     // Load file content: virtual files take priority, then filesystem.
     let content = match read_file(ctx, &full_path) {
         Ok(c) => c,
-        Err(e) => return error_children(&e),
+        Err(e) => return error_children(&e.to_string()),
     };
 
     let mut child_ctx = TemplateContext::new();
     child_ctx.base_dir = full_path.parent().map(|p| p.to_path_buf());
     child_ctx.virtual_files = ctx.virtual_files.clone();
     for (key, expr) in &inc.props {
-        let val = eval_expr(expr, ctx);
-        child_ctx.vars.insert(key.clone(), val);
+        child_ctx.vars.insert(key.clone(), eval_value(expr, ctx));
     }
     if !inc.slot.is_empty() {
         child_ctx.slot = Some((inc.slot.clone(), Box::new(ctx.clone())));
@@ -674,18 +687,18 @@ fn build_include(
                         if !child_ctx.vars.contains_key(k) {
                             child_ctx
                                 .vars
-                                .insert(k.clone(), eval_expr(v, &TemplateContext::default()));
+                                .insert(k.clone(), eval_value(v, &TemplateContext::default()));
                         }
                     }
                     comp.nodes.clone()
                 }
                 None => return error_children(&format!("component not found: {name}")),
             },
-            Err(e) => return error_children(&format!("parse error in '{file_path}': {e}")),
+            Err(e) => return error_children(&format!("parse error in '{file_path}': {}", e)),
         },
         None => match parse_template(&content) {
             Ok(n) => n,
-            Err(e) => return error_children(&format!("parse error in '{file_path}': {e}")),
+            Err(e) => return error_children(&format!("parse error in '{file_path}': {}", e)),
         },
     };
 
@@ -784,11 +797,11 @@ fn active_classes(el: &Element, ctx: &TemplateContext) -> Vec<String> {
     let mut classes: Vec<String> = el
         .classes
         .iter()
-        .filter_map(|c| active_class(ctx, &ctx.interpolate(c)))
+        .filter_map(|c| active_class(ctx, &interpolate_str(ctx, c)))
         .collect();
     for cc in &el.conditional_classes {
-        if ctx.eval_condition(&cc.condition) {
-            if let Some(class) = active_class(ctx, &ctx.interpolate(&cc.class)) {
+        if eval_condition(ctx, &cc.condition) {
+            if let Some(class) = active_class(ctx, &interpolate_str(ctx, &cc.class)) {
                 classes.push(class);
             }
         }
@@ -826,7 +839,7 @@ fn scroll_offset(el: &Element, ctx: &TemplateContext, classes: &[String]) -> usi
                 "scroll-offset" | "scroll-y" | "scroll"
             )
         })
-        .map(|binding| value_to_str(&eval_expr(&binding.value, ctx)))
+        .map(|binding| value_to_str(&eval_value(&binding.value, ctx)))
         .or_else(|| {
             let value = ctx.get_str("scroll_offset");
             (!value.is_empty()).then_some(value)
@@ -862,7 +875,7 @@ fn build_line(parts: &[TextPart], ctx: &TemplateContext) -> Line<'static> {
         .iter()
         .map(|part| match part {
             TextPart::Literal(s) => Span::raw(s.clone()),
-            TextPart::Expr(expr) => Span::raw(value_to_str(&eval_expr(expr, ctx))),
+            TextPart::Expr(expr) => Span::raw(value_to_str(&eval_value(expr, ctx))),
         })
         .collect();
     Line::from(spans)

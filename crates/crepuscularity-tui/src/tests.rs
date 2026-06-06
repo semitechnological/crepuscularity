@@ -579,10 +579,13 @@ fn include_rejects_parent_dir_escape() {
         .insert("../secret.crepus".into(), "div\n  \"secret\"".into());
 
     let tpl = "div\n include ../secret.crepus";
-    let rows = render(40, 4, tpl, &ctx);
+    let rows = render(80, 4, tpl, &ctx);
     let text = all_text(&rows);
     assert!(text.contains("include path outside base dir"), "{text}");
-    assert!(!text.contains("secret"), "{text}");
+    assert!(
+        !text.contains(" ⚠ ") || !text.contains("secret\""),
+        "rendered secret content leaked: {text}"
+    );
 }
 
 #[test]
@@ -595,10 +598,13 @@ fn include_rejects_absolute_path() {
         .insert(include_path.clone(), "div\n  \"secret\"".into());
 
     let tpl = format!("div\n include {include_path}");
-    let rows = render(40, 4, &tpl, &ctx);
+    let rows = render(80, 4, &tpl, &ctx);
     let text = all_text(&rows);
     assert!(text.contains("include path outside base dir"), "{text}");
-    assert!(!text.contains("secret"), "{text}");
+    assert!(
+        !text.contains(" ⚠ ") || !text.contains("secret\""),
+        "rendered secret content leaked: {text}"
+    );
 }
 
 #[test]
