@@ -7,6 +7,7 @@ use crepuscularity_core::context::{value_to_str, TemplateContext, TemplateValue}
 use crepuscularity_core::eval::eval_expr;
 use crepuscularity_core::parser::{parse_component_file, parse_template};
 use crepuscularity_core::preprocess::slot_rotate_child_phrases;
+use crepuscularity_core::CrepusError;
 
 use crate::include_expand;
 use crate::ir::{PickerOption, StackAxis, ViewIr, ViewNode, IR_VERSION};
@@ -17,25 +18,25 @@ pub fn render_from_files(
     files: &HashMap<String, String>,
     entry: &str,
     ctx: &TemplateContext,
-) -> Result<ViewIr, String> {
+) -> Result<ViewIr, CrepusError> {
     let mut ctx = ctx.clone();
     ctx.virtual_files = std::sync::Arc::new(files.clone());
 
     if let Some((file_part, comp_name)) = entry.split_once('#') {
-        let content = files
-            .get(file_part)
-            .ok_or_else(|| format!("file not found in virtual fs: {file_part}"))?;
+        let content = files.get(file_part).ok_or_else(|| {
+            CrepusError::render(format!("file not found in virtual fs: {file_part}"))
+        })?;
         return render_component_file_to_ir(content, comp_name, &ctx);
     }
 
     let content = files
         .get(entry)
-        .ok_or_else(|| format!("file not found in virtual fs: {entry}"))?;
+        .ok_or_else(|| CrepusError::render(format!("file not found in virtual fs: {entry}")))?;
     render_template_to_ir(content, &ctx)
 }
 
 /// Parse and lower a template string to IR.
-pub fn render_template_to_ir(template: &str, ctx: &TemplateContext) -> Result<ViewIr, String> {
+pub fn render_template_to_ir(template: &str, ctx: &TemplateContext) -> Result<ViewIr, CrepusError> {
     let nodes = parse_template(template)?;
     render_nodes_to_ir(&nodes, ctx)
 }
@@ -45,17 +46,17 @@ pub fn render_component_file_to_ir(
     content: &str,
     component_name: &str,
     ctx: &TemplateContext,
-) -> Result<ViewIr, String> {
+) -> Result<ViewIr, CrepusError> {
     let file = parse_component_file(content)?;
     let component = file
         .components
         .get(component_name)
-        .ok_or_else(|| format!("component not found: {component_name}"))?;
+        .ok_or_else(|| CrepusError::render(format!("component not found: {component_name}")))?;
 
     let mut child_ctx = ctx.clone();
     for (key, expr) in &component.meta.defaults {
         if !child_ctx.vars.contains_key(key) {
-            let val = eval_expr(expr, &TemplateContext::new());
+            let val = eval_expr(expr, &TemplateContext::new())?;
             child_ctx.vars.insert(key.clone(), val);
         }
     }
@@ -64,7 +65,7 @@ pub fn render_component_file_to_ir(
 }
 
 /// Lower already-parsed nodes into a [`ViewIr`].
-pub fn render_nodes_to_ir(nodes: &[Node], ctx: &TemplateContext) -> Result<ViewIr, String> {
+pub fn render_nodes_to_ir(nodes: &[Node], ctx: &TemplateContext) -> Result<ViewIr, CrepusError> {
     let root = render_nodes_list(nodes, ctx)?;
     Ok(ViewIr {
         version: IR_VERSION,
@@ -75,7 +76,7 @@ pub fn render_nodes_to_ir(nodes: &[Node], ctx: &TemplateContext) -> Result<ViewI
 pub(crate) fn render_nodes_list(
     nodes: &[Node],
     ctx: &TemplateContext,
-) -> Result<Vec<ViewNode>, String> {
+) -> Result<Vec<ViewNode>, CrepusError> {
     let mut ctx = ctx.clone();
     let mut out = Vec::new();
     for node in nodes {
@@ -83,7 +84,7 @@ pub(crate) fn render_nodes_list(
             if decl.is_default && ctx.vars.contains_key(&decl.name) {
                 continue;
             }
-            let val = eval_expr(&decl.expr, &ctx);
+            let val = eval_expr(&decl.expr, &ctx)?;
             ctx.vars.insert(decl.name.clone(), val);
             continue;
         }
@@ -97,7 +98,7 @@ pub(crate) fn render_nodes_list(
     Ok(out)
 }
 
-fn render_node(node: &Node, ctx: &TemplateContext) -> Result<ViewNode, String> {
+fn render_node(node: &Node, ctx: &TemplateContext) -> Result<ViewNode, CrepusError> {
     match node {
         Node::Element(el) => render_element(el, ctx),
         Node::Text(parts) => Ok(ViewNode::Text {
@@ -108,19 +109,19 @@ fn render_node(node: &Node, ctx: &TemplateContext) -> Result<ViewNode, String> {
         Node::For(block) => render_for(block, ctx),
         Node::Match(block) => render_match(block, ctx),
         Node::LetDecl(_) => Ok(stack_column_raw(vec![])),
-        Node::Include(_) => {
-            Err("internal error: include should be expanded in render_nodes_list".into())
-        }
+        Node::Include(_) => Err(CrepusError::render(
+            "internal error: include should be expanded in render_nodes_list",
+        )),
         Node::Embed(_) => Ok(ViewNode::Text {
             content: String::new(),
             style: None,
         }),
         Node::RawText(expr) => Ok(ViewNode::Text {
-            content: value_to_str(&eval_expr(expr, ctx)),
+            content: value_to_str(&eval_expr(expr, ctx)?),
             style: None,
         }),
         Node::RawHtml(expr) => Ok(ViewNode::Text {
-            content: value_to_str(&eval_expr(expr, ctx)),
+            content: value_to_str(&eval_expr(expr, ctx)?),
             style: None,
         }),
     }
@@ -137,7 +138,7 @@ fn stack_column_raw(children: Vec<ViewNode>) -> ViewNode {
     }
 }
 
-fn render_element(el: &Element, ctx: &TemplateContext) -> Result<ViewNode, String> {
+fn render_element(el: &Element, ctx: &TemplateContext) -> Result<ViewNode, CrepusError> {
     let tag = el.tag.to_ascii_lowercase();
     let tag = tag.as_str();
 
@@ -152,16 +153,16 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<ViewNode, Strin
     }
 
     if tag == "slot-rotate" {
-        let phrases = slot_rotate_child_phrases(&el.children)?;
+        let phrases = slot_rotate_child_phrases(&el.children).map_err(CrepusError::render)?;
         let mut interval_ms = 3200u64;
         for b in &el.bindings {
             if b.prop == "interval" {
-                let v = value_to_str(&eval_expr(&b.value, ctx));
+                let v = value_to_str(&eval_expr(&b.value, ctx)?);
                 let v = v.trim_matches('"').trim();
                 interval_ms = v.parse().unwrap_or(3200);
             }
         }
-        let classes = active_classes(el, ctx);
+        let classes = active_classes(el, ctx)?;
         let style = style::extract_stack_hints(&classes, Some(ctx)).style;
         return Ok(ViewNode::SlotRotate {
             phrases,
@@ -170,7 +171,7 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<ViewNode, Strin
         });
     }
 
-    let classes = active_classes(el, ctx);
+    let classes = active_classes(el, ctx)?;
 
     if tag == "button" {
         let label = collect_primary_text(&el.children, ctx)?;
@@ -276,7 +277,7 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<ViewNode, Strin
             .bindings
             .iter()
             .find(|b| b.prop == "accept")
-            .map(|b| value_to_str(&eval_expr(&b.value, ctx)));
+            .and_then(|b| eval_expr(&b.value, ctx).ok().map(|v| value_to_str(&v)));
         let on_drop = el
             .event_handlers
             .iter()
@@ -359,18 +360,18 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<ViewNode, Strin
             .bindings
             .iter()
             .find(|b| b.prop == "src")
-            .map(|b| value_to_str(&eval_expr(&b.value, ctx)))
+            .and_then(|b| eval_expr(&b.value, ctx).ok().map(|v| value_to_str(&v)))
             .unwrap_or_default();
         let alt = el
             .bindings
             .iter()
             .find(|b| b.prop == "alt")
-            .map(|b| value_to_str(&eval_expr(&b.value, ctx)));
+            .and_then(|b| eval_expr(&b.value, ctx).ok().map(|v| value_to_str(&v)));
         let placeholder = el
             .bindings
             .iter()
             .find(|b| b.prop == "placeholder")
-            .map(|b| value_to_str(&eval_expr(&b.value, ctx)));
+            .and_then(|b| eval_expr(&b.value, ctx).ok().map(|v| value_to_str(&v)));
         let hints = style::extract_stack_hints(&classes, Some(ctx));
         return Ok(ViewNode::Image {
             src,
@@ -448,11 +449,14 @@ fn slug_option_value(label: &str) -> String {
     s.trim_matches('_').to_string()
 }
 
-fn component_label(el: &Element, ctx: &TemplateContext) -> Result<String, String> {
+fn component_label(el: &Element, ctx: &TemplateContext) -> Result<String, CrepusError> {
     optional_component_label(el, ctx).map(|label| label.unwrap_or_default())
 }
 
-fn optional_component_label(el: &Element, ctx: &TemplateContext) -> Result<Option<String>, String> {
+fn optional_component_label(
+    el: &Element,
+    ctx: &TemplateContext,
+) -> Result<Option<String>, CrepusError> {
     if let Some(label) = binding_string(el, "label", ctx) {
         return Ok(Some(label));
     }
@@ -481,7 +485,11 @@ fn binding_string(el: &Element, prop: &str, ctx: &TemplateContext) -> Option<Str
     el.bindings
         .iter()
         .find(|binding| binding.prop == prop)
-        .map(|binding| value_to_str(&eval_expr(&binding.value, ctx)))
+        .and_then(|binding| {
+            eval_expr(&binding.value, ctx)
+                .ok()
+                .map(|v| value_to_str(&v))
+        })
         .map(|value| {
             value
                 .trim()
@@ -517,7 +525,7 @@ fn is_text_tag(tag: &str) -> bool {
     )
 }
 
-fn collect_primary_text(children: &[Node], ctx: &TemplateContext) -> Result<String, String> {
+fn collect_primary_text(children: &[Node], ctx: &TemplateContext) -> Result<String, CrepusError> {
     for c in children {
         match c {
             Node::Text(parts) => return render_text_inline(parts, ctx),
@@ -533,17 +541,17 @@ fn collect_primary_text(children: &[Node], ctx: &TemplateContext) -> Result<Stri
     Ok(String::new())
 }
 
-fn active_classes(el: &Element, ctx: &TemplateContext) -> Vec<String> {
+fn active_classes(el: &Element, ctx: &TemplateContext) -> Result<Vec<String>, CrepusError> {
     let mut expanded = Vec::new();
     for c in el.classes.iter() {
-        expanded.push(ctx.interpolate(c));
+        expanded.push(ctx.interpolate(c)?);
     }
     for cc in &el.conditional_classes {
-        if ctx.eval_condition(&cc.condition) {
-            expanded.push(ctx.interpolate(&cc.class));
+        if ctx.eval_condition(&cc.condition)? {
+            expanded.push(ctx.interpolate(&cc.class)?);
         }
     }
-    expanded
+    Ok(expanded)
 }
 
 fn stack_axis(classes: &[String]) -> StackAxis {
@@ -568,19 +576,21 @@ fn parse_gap_spacing(classes: &[String]) -> Option<f32> {
     None
 }
 
-fn render_text_inline(parts: &[TextPart], ctx: &TemplateContext) -> Result<String, String> {
+fn render_text_inline(parts: &[TextPart], ctx: &TemplateContext) -> Result<String, CrepusError> {
     let mut result = String::new();
     for part in parts {
         match part {
             TextPart::Literal(text) => result.push_str(text),
-            TextPart::Expr(expr) => result.push_str(&value_to_str(&eval_expr(expr, ctx))),
+            TextPart::Expr(expr) => {
+                result.push_str(&value_to_str(&eval_expr(expr, ctx)?));
+            }
         }
     }
     Ok(result)
 }
 
-fn render_if(block: &IfBlock, ctx: &TemplateContext) -> Result<ViewNode, String> {
-    let body = if ctx.eval_condition(&block.condition) {
+fn render_if(block: &IfBlock, ctx: &TemplateContext) -> Result<ViewNode, CrepusError> {
+    let body = if ctx.eval_condition(&block.condition)? {
         &block.then_children
     } else if let Some(else_children) = &block.else_children {
         else_children
@@ -591,7 +601,7 @@ fn render_if(block: &IfBlock, ctx: &TemplateContext) -> Result<ViewNode, String>
     Ok(stack_column_raw(children))
 }
 
-fn render_for(block: &ForBlock, ctx: &TemplateContext) -> Result<ViewNode, String> {
+fn render_for(block: &ForBlock, ctx: &TemplateContext) -> Result<ViewNode, CrepusError> {
     let items = ctx.get_list(&block.iterator);
     let mut children = Vec::new();
     let pattern = block.pattern.trim();
@@ -629,8 +639,8 @@ fn render_for(block: &ForBlock, ctx: &TemplateContext) -> Result<ViewNode, Strin
     Ok(stack_column_raw(flattened))
 }
 
-fn render_match(block: &MatchBlock, ctx: &TemplateContext) -> Result<ViewNode, String> {
-    let val = eval_expr(&block.expr, ctx);
+fn render_match(block: &MatchBlock, ctx: &TemplateContext) -> Result<ViewNode, CrepusError> {
+    let val = eval_expr(&block.expr, ctx)?;
     let value = value_to_str(&val);
 
     for arm in &block.arms {

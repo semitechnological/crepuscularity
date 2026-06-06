@@ -99,7 +99,9 @@ fn file_include_rejects_parent_dir() {
 
     let mut ctx = TemplateContext::new();
     ctx.base_dir = Some(root);
-    let err = render_template_to_ir("include ../secret.crepus", &ctx).unwrap_err();
+    let err = render_template_to_ir("include ../secret.crepus", &ctx)
+        .unwrap_err()
+        .to_string();
     assert!(
         err.contains("include path outside base dir"),
         "expected base-dir rejection, got: {err}"
@@ -116,7 +118,9 @@ fn file_include_rejects_absolute_path() {
 
     let mut ctx = TemplateContext::new();
     ctx.base_dir = Some(root);
-    let err = render_template_to_ir(&format!("include {}", secret.display()), &ctx).unwrap_err();
+    let err = render_template_to_ir(&format!("include {}", secret.display()), &ctx)
+        .unwrap_err()
+        .to_string();
     assert!(
         err.contains("include path outside base dir"),
         "expected absolute-path rejection, got: {err}"

@@ -502,7 +502,9 @@ fn apply_layout_class(hints: &mut StackLayoutHints, class: &str, ctx: Option<&Te
             if let Some(rest) = class.strip_prefix("bg-") {
                 let (ok, expr) = parse_braced_expr(rest);
                 if ok {
-                    let v = crepuscularity_core::eval::eval_expr(expr, ctx);
+                    let Ok(v) = crepuscularity_core::eval::eval_expr(expr, ctx) else {
+                        return;
+                    };
                     let color_str = crepuscularity_core::context::value_to_str(&v);
                     if let Some(hex) = resolve_color(&color_str) {
                         s.background_color = Some(hex);
@@ -513,7 +515,9 @@ fn apply_layout_class(hints: &mut StackLayoutHints, class: &str, ctx: Option<&Te
             if let Some(rest) = class.strip_prefix("text-") {
                 let (ok, expr) = parse_braced_expr(rest);
                 if ok {
-                    let v = crepuscularity_core::eval::eval_expr(expr, ctx);
+                    let Ok(v) = crepuscularity_core::eval::eval_expr(expr, ctx) else {
+                        return;
+                    };
                     let color_str = crepuscularity_core::context::value_to_str(&v);
                     if let Some(hex) = resolve_color(&color_str) {
                         s.foreground_color = Some(hex);
@@ -560,7 +564,9 @@ fn apply_text_class(s: &mut ViewStyle, class: &str, ctx: Option<&TemplateContext
         if let Some(ctx) = ctx {
             let (ok, expr) = parse_braced_expr(rest);
             if ok {
-                let v = crepuscularity_core::eval::eval_expr(expr, ctx);
+                let Ok(v) = crepuscularity_core::eval::eval_expr(expr, ctx) else {
+                    return;
+                };
                 let color_str = crepuscularity_core::context::value_to_str(&v);
                 if let Some(hex) = resolve_color(&color_str) {
                     s.foreground_color = Some(hex);

@@ -30,6 +30,7 @@ mod render;
 pub mod style;
 
 pub use colors::resolve_rgba;
+pub use crepuscularity_core::CrepusError;
 pub use hot_reload::{ast_shape_compatible, plan_hot_reload, HotReloadEnvelope, HotReloadMessage};
 pub use ir::{PickerOption, StackAxis, ViewIr, ViewNode, ViewStyle, IR_VERSION};
 pub use mutations::{apply_mutations, diff_ir, IrMutation};
