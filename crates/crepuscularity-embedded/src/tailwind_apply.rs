@@ -404,7 +404,9 @@ fn resolve_color_token(name: &str, _ctx: Ctx<'_>) -> Option<Color> {
             use crepuscularity_core::context::value_to_str;
             use crepuscularity_core::eval::eval_expr;
             let expr = &name[1..name.len() - 1];
-            let v = eval_expr(expr, ctx);
+            let Ok(v) = eval_expr(expr, ctx) else {
+                return None;
+            };
             let s = value_to_str(&v).trim_matches('"').to_string();
             return color_from_name(&s);
         }
