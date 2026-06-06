@@ -7,8 +7,14 @@ Optional **C ABI** (`cdylib`) for in-process View IR compilation and event dispa
 - Replaces any experimental `crepuscularity-ffi` approach: plain `extern "C"`, no proc-macro FFI framework in-tree
 
 ```bash
-cargo build -p crepuscularity-abi
+cargo build -p crepuscularity-abi --profile abi
 cargo test -p crepuscularity-abi
 ```
+
+## Embedder contract
+
+- **`CrepusSession` is not thread-safe** — one session per thread, or serialize externally.
+- **Event callback JSON pointers** stay valid until the next `crepus_session_dispatch_event_json` on that session.
+- **Production builds** use the workspace `abi` profile (`--profile abi`) so panics never unwind across the C ABI.
 
 See [docs/view-ir-contract.md](../../docs/view-ir-contract.md) and [docs/polyglot.md](../../docs/polyglot.md).
