@@ -46,12 +46,12 @@ fn run_check(args: &[String]) -> Result<(), String> {
     let (path, component) = parse_file_args(args)?;
     let content = fs::read_to_string(&path).map_err(|e| format!("read {}: {e}", path.display()))?;
     if let Some(name) = component {
-        let file = parse_component_file(&content)?;
+        let file = parse_component_file(&content).map_err(|e| e.to_string())?;
         file.components
             .get(&name)
             .ok_or_else(|| format!("component not found: {name}"))?;
     } else {
-        parse_template(&content)?;
+        parse_template(&content).map_err(|e| e.to_string())?;
     }
     println!("ok: {}", path.display());
     Ok(())

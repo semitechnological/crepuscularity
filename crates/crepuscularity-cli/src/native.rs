@@ -164,12 +164,13 @@ fn run_ir_inner(args: &[String]) -> Result<String, String> {
         }
         let pretty = env.pretty.unwrap_or(parsed.pretty);
         let ir = if let (Some(files), Some(entry)) = (env.files, env.entry) {
-            render_from_files(&files, &entry, &ctx)?
+            render_from_files(&files, &entry, &ctx).map_err(|e| e.to_string())?
         } else if let Some(template) = env.template {
             if let Some(component) = env.component {
-                render_component_file_to_ir(&template, &component, &ctx)?
+                render_component_file_to_ir(&template, &component, &ctx)
+                    .map_err(|e| e.to_string())?
             } else {
-                render_template_to_ir(&template, &ctx)?
+                render_template_to_ir(&template, &ctx).map_err(|e| e.to_string())?
             }
         } else {
             return Err("stdin JSON must include files+entry or template".to_string());
@@ -184,9 +185,9 @@ fn run_ir_inner(args: &[String]) -> Result<String, String> {
             .map_err(|e| format!("read stdin: {e}"))?;
         ctx.base_dir = parsed.base_dir;
         let ir = if let Some(component) = parsed.component {
-            render_component_file_to_ir(&template, &component, &ctx)?
+            render_component_file_to_ir(&template, &component, &ctx).map_err(|e| e.to_string())?
         } else {
-            render_template_to_ir(&template, &ctx)?
+            render_template_to_ir(&template, &ctx).map_err(|e| e.to_string())?
         };
         return stringify_ir(&ir, parsed.pretty);
     }
@@ -197,9 +198,9 @@ fn run_ir_inner(args: &[String]) -> Result<String, String> {
     let content = fs::read_to_string(&path).map_err(|e| format!("read {}: {e}", path.display()))?;
     ctx.base_dir = path.parent().map(Path::to_path_buf);
     let ir = if let Some(component) = parsed.component {
-        render_component_file_to_ir(&content, &component, &ctx)?
+        render_component_file_to_ir(&content, &component, &ctx).map_err(|e| e.to_string())?
     } else {
-        render_template_to_ir(&content, &ctx)?
+        render_template_to_ir(&content, &ctx).map_err(|e| e.to_string())?
     };
     stringify_ir(&ir, parsed.pretty)
 }
@@ -372,9 +373,9 @@ fn sync_native_fixture_inner(args: &[String]) -> Result<(), String> {
 
     let component_ref = parsed.component.clone();
     let ir = if let Some(component) = &parsed.component {
-        render_component_file_to_ir(&template, component, &ctx)?
+        render_component_file_to_ir(&template, component, &ctx).map_err(|e| e.to_string())?
     } else {
-        render_template_to_ir(&template, &ctx)?
+        render_template_to_ir(&template, &ctx).map_err(|e| e.to_string())?
     };
     let mut json = stringify_ir(&ir, parsed.pretty)?;
     if !json.ends_with('\n') {

@@ -28,9 +28,9 @@ pub(crate) fn collect_web_islands(
 ) -> Result<Vec<WebIslandRef>, String> {
     let mut out = BTreeMap::new();
     for content in files.values() {
-        let components = parse_component_file(content)?;
+        let components = parse_component_file(content).map_err(|e| e.to_string())?;
         if components.components.is_empty() {
-            let nodes = parse_template(content)?;
+            let nodes = parse_template(content).map_err(|e| e.to_string())?;
             collect_nodes(&nodes, &mut out);
         } else {
             for component in components.components.values() {

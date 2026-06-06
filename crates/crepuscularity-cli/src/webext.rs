@@ -805,7 +805,7 @@ fn prerender_popup_html(
         ctx.set("show_help", show_help);
         ctx.set("show_crepus", show_crepus);
         ctx.set("system_prompt", load_system_prompt(app_path));
-        render_from_files(&files, "popup.crepus", &ctx)
+        render_from_files(&files, "popup.crepus", &ctx).map_err(|e| e.to_string())
     };
 
     let main_html = render(false, false)?;
@@ -1075,7 +1075,8 @@ fn render_crepus_page_html(
     use crepuscularity_web::render_from_files;
 
     let decorators = strip_indent_decorators(source);
-    let body = render_from_files(files, entry, &TemplateContext::new())?;
+    let body =
+        render_from_files(files, entry, &TemplateContext::new()).map_err(|e| e.to_string())?;
     let stem = Path::new(entry)
         .file_stem()
         .and_then(|s| s.to_str())
