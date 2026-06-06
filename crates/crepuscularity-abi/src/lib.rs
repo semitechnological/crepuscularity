@@ -1,3 +1,20 @@
+//! C ABI for View IR rendering sessions.
+//!
+//! # Thread safety
+//!
+//! [`CrepusSession`] is **not** `Sync`. Use one session per thread, or serialize
+//! all calls to a shared session with an external mutex.
+//!
+//! # Panics
+//!
+//! This crate is built with `panic = "abort"` so unwinding never crosses the C ABI.
+//!
+//! # Event callbacks
+//!
+//! Pointers passed to [`CrepusEventCallback`] are valid until the next
+//! `crepus_session_dispatch_event` call on the same session (or until the session
+//! is freed). Do not retain them past that point.
+
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::ffi::{CStr, CString};
@@ -19,6 +36,7 @@ use serde_json::{json, Value};
 // `event_json_utf8`, etc.) MUST point to valid null-terminated UTF-8 C strings.
 // `crepus_string_free` MUST only be called on pointers returned by this crate;
 // after calling it the pointer is invalid and MUST NOT be used again.
+// Event callback JSON pointers are valid only until the next dispatch on that session.
 
 thread_local! {
     static LAST_ERROR: RefCell<Option<String>> = const { RefCell::new(None) };
@@ -34,6 +52,8 @@ pub struct CrepusSession {
     callback: Option<CrepusEventCallback>,
     userdata: *mut c_void,
     last_error: Option<String>,
+    /// Keeps the most recent event callback payload alive until the next dispatch.
+    last_event_payload: Option<CString>,
 }
 
 enum Source {
@@ -257,7 +277,9 @@ fn dispatch_event(
     if let Some(callback) = session.callback {
         let c_payload = CString::new(payload_json.clone())
             .map_err(|_| "event payload contains interior NUL".to_string())?;
-        callback(c_payload.as_ptr(), session.userdata);
+        let ptr = c_payload.as_ptr();
+        session.last_event_payload = Some(c_payload);
+        callback(ptr, session.userdata);
     }
 
     let ir_json = render_session(session)?;
@@ -310,12 +332,14 @@ fn render_session(session: &mut CrepusSession) -> Result<String, String> {
             let mut ctx = session.context.clone();
             ctx.base_dir = base_dir.clone();
             if let Some(component) = &session.component {
-                render_component_file_to_ir(template, component, &ctx)?
+                render_component_file_to_ir(template, component, &ctx).map_err(|e| e.to_string())?
             } else {
-                render_template_to_ir(template, &ctx)?
+                render_template_to_ir(template, &ctx).map_err(|e| e.to_string())?
             }
         }
-        Source::Files { entry, files } => render_from_files(files, entry, &session.context)?,
+        Source::Files { entry, files } => {
+            render_from_files(files, entry, &session.context).map_err(|e| e.to_string())?
+        }
     };
     to_json(&ir).map_err(|e| format!("serialize IR: {e}"))
 }

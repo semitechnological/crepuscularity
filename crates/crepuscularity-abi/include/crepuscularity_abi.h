@@ -8,7 +8,10 @@ extern "C" {
 #endif
 
 typedef struct CrepusSession CrepusSession;
+/* event_json is valid until the next crepus_session_dispatch_event_json on the same session. */
 typedef void (*CrepusEventCallback)(const char *event_json, void *userdata);
+
+/* CrepusSession is not thread-safe: use one session per thread or external locking. */
 
 CrepusSession *crepus_session_new(void);
 void crepus_session_free(CrepusSession *session);
