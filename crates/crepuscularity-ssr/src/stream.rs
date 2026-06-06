@@ -28,7 +28,7 @@ pub async fn stream_ssr_response(
     tokio::task::spawn_blocking(move || {
         let result = render_ssr_document(&template, &ctx, &doc, true)
             .map(|s| s.into_bytes())
-            .map_err(std::io::Error::other);
+            .map_err(|e| std::io::Error::other(e.to_string()));
         let _ = tx.blocking_send(result);
     });
 
