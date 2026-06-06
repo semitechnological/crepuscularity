@@ -32,7 +32,7 @@ jobs:
 
       - name: Build docs site
         run: |
-          cargo run -p crepuscularity-cli -- web build --manifest docs-site/crepus.toml --target docs
+          cargo run --locked -p crepuscularity-cli --no-default-features -- web build --manifest docs-site/crepus.toml --target docs
 
       - uses: actions/upload-pages-artifact@v3
         with:
