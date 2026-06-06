@@ -26,7 +26,7 @@ ssr = ["dep:base64"]
 [dependencies]
 ammonia = "4.1.2"
 base64 = { workspace = true, optional = true }
-crepuscularity-core = { path = "../crepuscularity-core", version = "0.4.11" }
+crepuscularity-core = { path = "../crepuscularity-core", version = "0.4.15" }
 crepuscularity_macros = { path = "../crepuscularity_macros", version = "0.5.4" }
 js-sys = { workspace = true, optional = true }
 rayon = { workspace = true, optional = true }

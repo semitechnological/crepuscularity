@@ -16,7 +16,7 @@ cli = ["dep:clap"]
 bench-tui = ["cli", "dep:crossterm", "dep:ratatui", "parallel"]
 
 [dependencies]
-crepuscularity-core = { path = "../crepuscularity-core", version = "0.4.12" }
+crepuscularity-core = { path = "../crepuscularity-core", version = "0.4.15" }
 crepuscularity-lite-macros = { path = "../crepuscularity-lite-macros", version = "0.4.7" }
 arboard = "3.6"
 dirs = "6"
