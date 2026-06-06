@@ -43,8 +43,8 @@ use crepuscularity_web::render_from_files;
 
 use crate::crepus_toml::WebTargetMeta;
 use crate::web::{
-    ensure_web_dev_artifacts, load_site_head, merged_site_google_fonts, merged_site_inline_css,
-    render_index_html,
+    ensure_web_dev_artifacts, load_site_head, merge_site_head_meta, merged_site_google_fonts,
+    merged_site_inline_css, render_index_html,
 };
 use crate::web_docs_hook::{docs_src_path, run_docs_hook, DocsHookTheme};
 
@@ -96,6 +96,17 @@ pub struct ServeOptions {
     /// Entry-point template relative to `site_dir` (default `"index.crepus"`).
     pub entry: String,
     pub meta: Option<WebTargetMeta>,
+}
+
+#[derive(Clone)]
+struct DevRequestContext {
+    vfm: Arc<RwLock<HashMap<String, String>>>,
+    generation: Arc<AtomicU64>,
+    last_sse_msg: Arc<RwLock<String>>,
+    entry: String,
+    site_dir: PathBuf,
+    dev_root: PathBuf,
+    meta: Option<WebTargetMeta>,
 }
 
 // ── Hot-reload script ────────────────────────────────────────────────────────
@@ -290,19 +301,22 @@ pub fn run(opts: ServeOptions) {
         console::style("→").dim(),
     );
 
-    let entry = opts.entry.clone();
+    let ctx = DevRequestContext {
+        vfm: Arc::clone(&vfm),
+        generation: Arc::clone(&generation),
+        last_sse_msg: Arc::clone(&last_sse_msg),
+        entry: opts.entry.clone(),
+        site_dir: site_dir.clone(),
+        dev_root: dev_root.clone(),
+        meta: opts.meta.clone(),
+    };
 
     for stream in listener.incoming() {
         match stream {
             Ok(s) => {
-                let vfm = Arc::clone(&vfm);
-                let gen = Arc::clone(&generation);
-                let sse_msg = Arc::clone(&last_sse_msg);
-                let entry = entry.clone();
-                let site_dir = site_dir.clone();
-                let dev_root = dev_root.clone();
+                let ctx = ctx.clone();
                 std::thread::spawn(move || {
-                    handle_connection(s, vfm, gen, sse_msg, &entry, &site_dir, &dev_root);
+                    handle_connection(s, ctx);
                 });
             }
             Err(e) => {
@@ -670,15 +684,7 @@ fn serve_docs_path(stream: &mut TcpStream, url_path: &str, dev_root: &Path) {
 
 // ── HTTP connection handler ──────────────────────────────────────────────────
 
-fn handle_connection(
-    mut stream: TcpStream,
-    vfm: Arc<RwLock<HashMap<String, String>>>,
-    generation: Arc<AtomicU64>,
-    last_sse_msg: Arc<RwLock<String>>,
-    entry: &str,
-    site_dir: &Path,
-    dev_root: &Path,
-) {
+fn handle_connection(mut stream: TcpStream, ctx: DevRequestContext) {
     let _ = stream.set_read_timeout(Some(Duration::from_secs(5)));
 
     // Read the request line (first line only).
@@ -701,39 +707,45 @@ fn handle_connection(
 
     match (method, path) {
         ("GET", "/dev-reload") => {
-            long_poll_sse(stream, generation, last_sse_msg);
+            long_poll_sse(stream, ctx.generation, ctx.last_sse_msg);
         }
 
         ("GET", "/crepus-bundle.json") => {
-            serve_crepus_bundle(&mut stream, &vfm, entry);
+            serve_crepus_bundle(&mut stream, &ctx.vfm, &ctx.entry);
         }
 
         ("GET", "/crepus-islands.json") => {
-            serve_dev_fs_file(&mut stream, &dev_root.join("crepus-islands.json"));
+            serve_dev_fs_file(&mut stream, &ctx.dev_root.join("crepus-islands.json"));
         }
 
         ("GET", "/app.js") => {
-            serve_dev_fs_file(&mut stream, &dev_root.join("app.js"));
+            serve_dev_fs_file(&mut stream, &ctx.dev_root.join("app.js"));
         }
 
         ("GET", "/vendor/unocss.js") => {
-            serve_dev_fs_file(&mut stream, &dev_root.join("vendor/unocss.js"));
+            serve_dev_fs_file(&mut stream, &ctx.dev_root.join("vendor/unocss.js"));
         }
 
         ("GET", p) if p.starts_with("/pkg/") => {
-            serve_pkg_path(&mut stream, p, dev_root);
+            serve_pkg_path(&mut stream, p, &ctx.dev_root);
         }
 
         ("GET", p) if p.starts_with("/islands/") => {
-            serve_dev_fs_file(&mut stream, &dev_root.join(p.trim_start_matches('/')));
+            serve_dev_fs_file(&mut stream, &ctx.dev_root.join(p.trim_start_matches('/')));
         }
 
         ("GET", p) if p.starts_with("/docs") => {
-            serve_docs_path(&mut stream, p, dev_root);
+            serve_docs_path(&mut stream, p, &ctx.dev_root);
         }
 
         ("GET", "/" | "/index.html") => {
-            serve_index_document(&mut stream, &vfm, entry, site_dir);
+            serve_index_document(
+                &mut stream,
+                &ctx.vfm,
+                &ctx.entry,
+                &ctx.site_dir,
+                ctx.meta.as_ref(),
+            );
         }
 
         ("GET", p) if p.ends_with(".crepus") || p.ends_with(".html") => {
@@ -743,15 +755,27 @@ fn handle_connection(
             } else {
                 template_key.to_string()
             };
-            if template_key == entry {
-                serve_index_document(&mut stream, &vfm, entry, site_dir);
+            if template_key == ctx.entry {
+                serve_index_document(
+                    &mut stream,
+                    &ctx.vfm,
+                    &ctx.entry,
+                    &ctx.site_dir,
+                    ctx.meta.as_ref(),
+                );
             } else {
-                serve_secondary_preview(&mut stream, &vfm, &template_key, site_dir);
+                serve_secondary_preview(
+                    &mut stream,
+                    &ctx.vfm,
+                    &template_key,
+                    &ctx.site_dir,
+                    ctx.meta.as_ref(),
+                );
             }
         }
 
         ("GET", p) if p.starts_with("/static/") => {
-            serve_static_file(&mut stream, p, site_dir);
+            serve_static_file(&mut stream, p, &ctx.site_dir);
         }
 
         _ => {
@@ -772,15 +796,13 @@ fn serve_index_document(
     vfm: &Arc<RwLock<HashMap<String, String>>>,
     entry: &str,
     site_dir: &Path,
+    meta: Option<&WebTargetMeta>,
 ) {
     let files = vfm
         .read()
         .unwrap_or_else(std::sync::PoisonError::into_inner)
         .clone();
-    let head = load_site_head(site_dir);
-    let google_fonts = merged_site_google_fonts(site_dir, &files, None);
-    let inline_css = merged_site_inline_css(&files);
-    let mut html = render_index_html(&head, &google_fonts, &inline_css, "");
+    let mut html = render_dev_index_html(site_dir, &files, meta, "");
 
     if !html_contains_entry(&files, entry) {
         let msg = format!("file not found in virtual fs: {entry}");
@@ -807,6 +829,7 @@ fn serve_secondary_preview(
     vfm: &Arc<RwLock<HashMap<String, String>>>,
     template_key: &str,
     site_dir: &Path,
+    meta: Option<&WebTargetMeta>,
 ) {
     let files = vfm
         .read()
@@ -822,10 +845,7 @@ fn serve_secondary_preview(
         ),
     };
 
-    let head = load_site_head(site_dir);
-    let google_fonts = merged_site_google_fonts(site_dir, &files, None);
-    let inline_css = merged_site_inline_css(&files);
-    let mut html = render_index_html(&head, &google_fonts, &inline_css, "");
+    let mut html = render_dev_index_html(site_dir, &files, meta, "");
 
     let needle = r#"<div id="crepus-root"></div>
   <script type="module" src="./app.js"></script>"#;
@@ -840,6 +860,18 @@ fn serve_secondary_preview(
     }
     inject_reload_before_body_end(&mut html);
     write_html_response(stream, &html);
+}
+
+fn render_dev_index_html(
+    site_dir: &Path,
+    files: &HashMap<String, String>,
+    meta: Option<&WebTargetMeta>,
+    template_head: &str,
+) -> String {
+    let head = merge_site_head_meta(load_site_head(site_dir), meta);
+    let google_fonts = merged_site_google_fonts(site_dir, files, meta);
+    let inline_css = merged_site_inline_css(files);
+    render_index_html(&head, &google_fonts, &inline_css, template_head)
 }
 
 fn inject_reload_before_body_end(html: &mut String) {
@@ -857,6 +889,27 @@ fn write_html_response(stream: &mut TcpStream, html: &str) {
         html
     );
     let _ = stream.write_all(resp.as_bytes());
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use crate::crepus_toml::WebTargetMeta;
+
+    #[test]
+    fn dev_index_merges_target_head_html() {
+        let site_dir = tempfile::tempdir().expect("tempdir");
+        let files = HashMap::from([("index.crepus".to_string(), "div\n  \"Hello\"".to_string())]);
+        let meta = WebTargetMeta {
+            head_html: Some(r#"<style>.from-target{color:red}</style>"#.into()),
+            ..WebTargetMeta::default()
+        };
+
+        let html = super::render_dev_index_html(site_dir.path(), &files, Some(&meta), "");
+
+        assert!(html.contains(r#"<style>.from-target{color:red}</style>"#));
+    }
 }
 
 fn error_document(message: &str) -> String {
