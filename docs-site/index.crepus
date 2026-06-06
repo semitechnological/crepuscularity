@@ -560,6 +560,15 @@ $ crepus aurora new my-ios && crepus aurora dev
 .downloads-crate-list {
   background: color-mix(in srgb, var(--cp-code) 20%, transparent);
 }
+.downloads-panel,
+[data-downloads-graph] {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+[data-downloads-graph] {
+  touch-action: none;
+}
 .downloads-graph svg {
   width: 100%;
   min-height: 220px;

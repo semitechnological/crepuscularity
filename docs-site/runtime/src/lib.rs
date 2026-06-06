@@ -814,28 +814,81 @@ fn bind_graph_hover(root: &web_sys::Element) -> Result<(), JsValue> {
     };
 
     let move_root = root.clone();
+    let move_graph = graph.clone();
     let on_move = Closure::<dyn FnMut(web_sys::Event)>::wrap(Box::new(
         move |event: web_sys::Event| {
-            let _ = apply_graph_pointer_event(&move_root, &event);
+            let Ok(pointer) = event.dyn_into::<web_sys::PointerEvent>() else {
+                return;
+            };
+            if !should_track_graph_pointer(&move_root, &pointer) {
+                return;
+            }
+            pointer.prevent_default();
+            let _ = apply_graph_pointer_event(&move_root, &move_graph, &pointer);
         },
     ));
     graph.add_event_listener_with_callback("pointermove", on_move.as_ref().unchecked_ref())?;
     on_move.forget();
 
     let down_root = root.clone();
+    let down_graph = graph.clone();
     let on_down = Closure::<dyn FnMut(web_sys::Event)>::wrap(Box::new(
         move |event: web_sys::Event| {
-            event.prevent_default();
-            let _ = apply_graph_pointer_event(&down_root, &event);
+            let Ok(pointer) = event.dyn_into::<web_sys::PointerEvent>() else {
+                return;
+            };
+            pointer.prevent_default();
+            let _ = down_graph.set_pointer_capture(pointer.pointer_id());
+            let _ = set_graph_scrubbing(&down_root, true);
+            let _ = apply_graph_pointer_event(&down_root, &down_graph, &pointer);
         },
     ));
     graph.add_event_listener_with_callback("pointerdown", on_down.as_ref().unchecked_ref())?;
     on_down.forget();
 
+    let up_root = root.clone();
+    let up_graph = graph.clone();
+    let on_up = Closure::<dyn FnMut(web_sys::Event)>::wrap(Box::new(
+        move |event: web_sys::Event| {
+            let Ok(pointer) = event.dyn_into::<web_sys::PointerEvent>() else {
+                return;
+            };
+            let _ = up_graph.release_pointer_capture(pointer.pointer_id());
+            let _ = set_graph_scrubbing(&up_root, false);
+        },
+    ));
+    graph.add_event_listener_with_callback("pointerup", on_up.as_ref().unchecked_ref())?;
+    on_up.forget();
+
+    let cancel_root = root.clone();
+    let cancel_graph = graph.clone();
+    let on_cancel = Closure::<dyn FnMut(web_sys::Event)>::wrap(Box::new(
+        move |event: web_sys::Event| {
+            let Ok(pointer) = event.dyn_into::<web_sys::PointerEvent>() else {
+                return;
+            };
+            let _ = cancel_graph.release_pointer_capture(pointer.pointer_id());
+            let _ = set_graph_scrubbing(&cancel_root, false);
+        },
+    ));
+    graph.add_event_listener_with_callback("pointercancel", on_cancel.as_ref().unchecked_ref())?;
+    on_cancel.forget();
+
     let leave_root = root.clone();
-    let on_leave = Closure::<dyn FnMut()>::wrap(Box::new(move || {
-        let _ = reset_graph_hover(&leave_root);
-    }));
+    let on_leave = Closure::<dyn FnMut(web_sys::Event)>::wrap(Box::new(
+        move |event: web_sys::Event| {
+            if graph_is_scrubbing(&leave_root) {
+                return;
+            }
+            let pointer_type = event
+                .dyn_ref::<web_sys::PointerEvent>()
+                .map(|pointer| pointer.pointer_type())
+                .unwrap_or_else(|| "mouse".into());
+            if pointer_type == "mouse" {
+                let _ = reset_graph_hover(&leave_root);
+            }
+        },
+    ));
     graph.add_event_listener_with_callback("pointerleave", on_leave.as_ref().unchecked_ref())?;
     on_leave.forget();
 
@@ -845,27 +898,66 @@ fn bind_graph_hover(root: &web_sys::Element) -> Result<(), JsValue> {
 }
 
 #[cfg(target_arch = "wasm32")]
+fn graph_is_scrubbing(root: &web_sys::Element) -> bool {
+    root.get_attribute("data-downloads-scrubbing").as_deref() == Some("true")
+}
+
+#[cfg(target_arch = "wasm32")]
+fn set_graph_scrubbing(root: &web_sys::Element, scrubbing: bool) -> Result<(), JsValue> {
+    if scrubbing {
+        root.set_attribute("data-downloads-scrubbing", "true")
+    } else {
+        root.remove_attribute("data-downloads-scrubbing")
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+fn should_track_graph_pointer(root: &web_sys::Element, pointer: &web_sys::PointerEvent) -> bool {
+    if graph_is_scrubbing(root) {
+        return true;
+    }
+    pointer.pointer_type() == "mouse"
+}
+
+#[cfg(target_arch = "wasm32")]
 fn apply_graph_pointer_event(
     root: &web_sys::Element,
-    event: &web_sys::Event,
+    graph: &web_sys::Element,
+    pointer: &web_sys::PointerEvent,
 ) -> Result<(), JsValue> {
-    use wasm_bindgen::JsCast;
-
-    let Some(target) = event
-        .target()
-        .and_then(|target: web_sys::EventTarget| target.dyn_into::<web_sys::Element>().ok())
-    else {
+    let Some(hit) = graph_hit_at_pointer(graph, pointer) else {
         return Ok(());
     };
-    let Some(index) = target
+    apply_graph_hit(root, &hit)
+}
+
+#[cfg(target_arch = "wasm32")]
+fn graph_hit_at_pointer(
+    graph: &web_sys::Element,
+    pointer: &web_sys::PointerEvent,
+) -> Option<web_sys::Element> {
+    let doc = document().ok()?;
+    let element = doc.element_from_point(pointer.client_x() as f32, pointer.client_y() as f32)?;
+    let hit = element.closest(".downloads-hit").ok().flatten()?;
+    let graph_container = hit.closest("[data-downloads-graph]").ok().flatten()?;
+    if graph_container == *graph {
+        Some(hit)
+    } else {
+        None
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+fn apply_graph_hit(root: &web_sys::Element, hit: &web_sys::Element) -> Result<(), JsValue> {
+    let Some(index) = hit
         .get_attribute("data-downloads-hover-index")
         .and_then(|value| value.parse::<usize>().ok())
     else {
         return Ok(());
     };
-    graph_hover_dot(root, &target)?;
-    graph_hover_paths(root, &target)?;
-    update_graph_hover_date(root, &target)?;
+    graph_hover_dot(root, hit)?;
+    graph_hover_paths(root, hit)?;
+    update_graph_hover_date(root, hit)?;
     update_download_values(root, index)?;
     Ok(())
 }
@@ -882,6 +974,9 @@ fn bind_graph_outside_reset(root: &web_sys::Element) -> Result<(), JsValue> {
     let reset_root = root.clone();
     let on_down = Closure::<dyn FnMut(web_sys::Event)>::wrap(Box::new(
         move |event: web_sys::Event| {
+            if graph_is_scrubbing(&reset_root) {
+                return;
+            }
             let inside_graph = event
                 .target()
                 .and_then(|target: web_sys::EventTarget| {
