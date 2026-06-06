@@ -62,13 +62,13 @@ impl TemplateContext {
     }
 
     /// Evaluate a condition expression — delegates to the full expression evaluator.
-    pub fn eval_condition(&self, expr: &str) -> bool {
+    pub fn eval_condition(&self, expr: &str) -> Result<bool, crate::error::CrepusError> {
         crate::eval::eval_condition(expr, self)
     }
 
     /// Interpolate a string with `{expr}` placeholders.
     /// Expressions are fully evaluated (arithmetic, property access, etc.).
-    pub fn interpolate(&self, template: &str) -> String {
+    pub fn interpolate(&self, template: &str) -> Result<String, crate::error::CrepusError> {
         let mut result = String::new();
         let mut chars = template.chars().peekable();
 
@@ -92,14 +92,26 @@ impl TemplateContext {
                         _ => expr.push(c),
                     }
                 }
-                let val = crate::eval::eval_expr(expr.trim(), self);
+                let val = crate::eval::eval_expr(expr.trim(), self)?;
                 result.push_str(&value_to_str(&val));
             } else {
                 result.push(ch);
             }
         }
 
-        result
+        Ok(result)
+    }
+
+    /// Build a child context for `for` loops: shared virtual files, overlaid variables.
+    pub fn child_with_vars(&self, vars: impl IntoIterator<Item = (String, TemplateValue)>) -> Self {
+        let mut child = Self {
+            vars: self.vars.clone(),
+            base_dir: self.base_dir.clone(),
+            slot: self.slot.clone(),
+            virtual_files: Arc::clone(&self.virtual_files),
+        };
+        child.vars.extend(vars);
+        child
     }
 }
 

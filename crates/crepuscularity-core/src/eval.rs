@@ -13,6 +13,7 @@
 ///   post = prim ("." ident)*
 ///   prim = int | float | str | bool | null | "(" expr ")" | ident
 use crate::context::{TemplateContext, TemplateValue};
+use crate::error::CrepusError;
 
 // ── Tokens ──────────────────────────────────────────────────────────────────
 
@@ -521,7 +522,7 @@ fn apply_property(val: TemplateValue, prop: &str) -> TemplateValue {
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
-pub fn eval_expr(expr: &str, ctx: &TemplateContext) -> TemplateValue {
+pub fn eval_expr(expr: &str, ctx: &TemplateContext) -> Result<TemplateValue, CrepusError> {
     let _span = if tracing::enabled!(tracing::Level::TRACE) {
         Some(tracing::trace_span!("eval_expr", expr = %expr).entered())
     } else {
@@ -529,21 +530,24 @@ pub fn eval_expr(expr: &str, ctx: &TemplateContext) -> TemplateValue {
     };
     let expr = expr.trim();
     if expr.is_empty() {
-        return TemplateValue::Null;
+        return Ok(TemplateValue::Null);
     }
     let tokens = tokenize(expr);
     let mut parser = Parser::new(tokens, ctx);
     let value = parser.parse_expr();
     if parser.is_at_end() {
-        value
+        Ok(value)
     } else {
-        TemplateValue::Null
+        Err(CrepusError::eval(
+            expr,
+            "unexpected tokens after expression",
+        ))
     }
 }
 
 /// Evaluate an expression as a boolean condition.
-pub fn eval_condition(expr: &str, ctx: &TemplateContext) -> bool {
-    is_truthy(&eval_expr(expr, ctx))
+pub fn eval_condition(expr: &str, ctx: &TemplateContext) -> Result<bool, CrepusError> {
+    Ok(is_truthy(&eval_expr(expr, ctx)?))
 }
 
 #[cfg(test)]
@@ -553,7 +557,7 @@ mod tests {
     #[test]
     fn string_literal_preserves_multi_byte_utf8() {
         let ctx = TemplateContext::new();
-        let v = eval_expr("\"Hola ñ — 你好\"", &ctx);
+        let v = eval_expr("\"Hola ñ — 你好\"", &ctx).expect("valid literal");
         match v {
             TemplateValue::Str(s) => assert_eq!(s, "Hola ñ — 你好"),
             other => panic!("expected string, got {:?}", other),
@@ -565,7 +569,7 @@ mod tests {
         let mut ctx = TemplateContext::new();
         ctx.vars
             .insert("name".into(), TemplateValue::Str("世界".into()));
-        let v = eval_expr("\"hi \" + name", &ctx);
+        let v = eval_expr("\"hi \" + name", &ctx).expect("valid concat");
         match v {
             TemplateValue::Str(s) => assert_eq!(s, "hi 世界"),
             other => panic!("expected string, got {:?}", other),
@@ -579,5 +583,12 @@ mod tests {
         let ctx = TemplateContext::new();
         let _ = eval_expr("\"abc", &ctx);
         let _ = eval_expr("\"ñ", &ctx);
+    }
+
+    #[test]
+    fn trailing_tokens_are_errors() {
+        let ctx = TemplateContext::new();
+        let err = eval_expr("1 + 2 foo", &ctx).unwrap_err();
+        assert!(err.to_string().contains("unexpected tokens"));
     }
 }
