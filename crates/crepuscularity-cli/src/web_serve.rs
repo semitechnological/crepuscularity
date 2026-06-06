@@ -398,7 +398,7 @@ fn build_sse_message(path: &Path) -> String {
             filename, ts
         ),
         Ok(Err(e)) => {
-            let escaped = e.replace('\n', "\\n");
+            let escaped = e.to_string().replace('\n', "\\n");
             format!("event: crepus-error\ndata: {escaped}\n\n")
         }
         Err(e) => {
@@ -841,7 +841,7 @@ fn serve_secondary_preview(
         Err(e) => format!(
             "<div style=\"font-family:monospace;padding:2rem\">\
              <h2 style=\"color:#ef4444\">Template error</h2><pre>{}</pre></div>",
-            html_escape(&e)
+            html_escape(&e.to_string())
         ),
     };
 
@@ -959,18 +959,27 @@ fn write_simple_not_found(stream: &mut TcpStream) {
     let _ = stream.write_all(body);
 }
 
-fn serve_static_file(stream: &mut TcpStream, url_path: &str, site_dir: &Path) {
+/// Resolve a static asset under `site_dir`, rejecting `..` and symlink escapes.
+pub(crate) fn resolve_static_file(site_dir: &Path, url_path: &str) -> Option<PathBuf> {
     let rel = url_path.trim_start_matches('/');
     if rel.is_empty() || rel.contains("..") {
+        return None;
+    }
+    let base = std::fs::canonicalize(site_dir).ok()?;
+    let candidate = base.join(rel);
+    let resolved = std::fs::canonicalize(&candidate).ok()?;
+    if resolved.starts_with(&base) {
+        Some(resolved)
+    } else {
+        None
+    }
+}
+
+fn serve_static_file(stream: &mut TcpStream, url_path: &str, site_dir: &Path) {
+    let Some(file_path) = resolve_static_file(site_dir, url_path) else {
         write_simple_not_found(stream);
         return;
-    }
-    let base = std::fs::canonicalize(site_dir).unwrap_or_else(|_| site_dir.to_path_buf());
-    let file_path = base.join(rel);
-    if !file_path.starts_with(&base) {
-        write_simple_not_found(stream);
-        return;
-    }
+    };
 
     match std::fs::read(&file_path) {
         Ok(bytes) => {
@@ -1059,9 +1068,42 @@ fn guess_mime(ext: &str) -> &'static str {
 
 #[cfg(test)]
 mod tests {
+    use crate::crepus_toml::WebTargetMeta;
     use std::collections::HashMap;
 
-    use crate::crepus_toml::WebTargetMeta;
+    #[test]
+    fn resolve_static_file_rejects_parent_segments() {
+        let site = tempfile::tempdir().expect("tempdir");
+        assert!(super::resolve_static_file(site.path(), "../secret.txt").is_none());
+        assert!(super::resolve_static_file(site.path(), "static/../../etc/passwd").is_none());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn resolve_static_file_blocks_symlink_escape() {
+        use std::os::unix::fs::symlink;
+
+        let site = tempfile::tempdir().expect("tempdir");
+        let outside = tempfile::tempdir().expect("outside");
+        std::fs::write(outside.path().join("secret.txt"), "nope").expect("write secret");
+        symlink(outside.path(), site.path().join("escape")).expect("symlink");
+
+        assert!(super::resolve_static_file(site.path(), "escape/secret.txt").is_none());
+    }
+
+    #[test]
+    fn resolve_static_file_allows_in_tree_asset() {
+        let site = tempfile::tempdir().expect("tempdir");
+        let asset = site.path().join("static").join("app.css");
+        std::fs::create_dir_all(asset.parent().expect("parent")).expect("mkdir");
+        std::fs::write(&asset, "body{}").expect("write css");
+
+        let resolved = super::resolve_static_file(site.path(), "static/app.css").expect("asset");
+        assert_eq!(
+            resolved,
+            std::fs::canonicalize(&asset).expect("canonicalize")
+        );
+    }
 
     #[test]
     fn dev_index_merges_target_head_html() {

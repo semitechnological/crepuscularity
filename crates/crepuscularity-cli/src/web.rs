@@ -374,7 +374,7 @@ wasm-bindgen = "0.2"
 
 #[wasm_bindgen]
 pub fn crepus_render(bundle_json: &str) -> Result<String, JsValue> {
-    crepuscularity_web::render_bundle(bundle_json).map_err(|e| JsValue::from_str(&e))
+    crepuscularity_web::render_bundle(bundle_json).map_err(|e| JsValue::from_str(&e.to_string()))
 }
 "#;
     std::fs::write(base.join("runtime/src/lib.rs"), lib_rs).unwrap_or_else(|e| {
