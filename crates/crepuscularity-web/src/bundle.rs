@@ -6,6 +6,7 @@
 use std::collections::HashMap;
 
 use crepuscularity_core::context::TemplateContext;
+use crepuscularity_core::CrepusError;
 use serde_json::Value;
 
 use crate::render_from_files;
@@ -18,7 +19,7 @@ use crate::render_from_files;
 ///   "files": { "index.crepus": "div\\n  \\"hi\\"" }
 /// }
 /// ```
-pub fn render_bundle(bundle_json: &str) -> Result<String, String> {
+pub fn render_bundle(bundle_json: &str) -> Result<String, CrepusError> {
     let (files, entry) = parse_bundle(bundle_json)?;
     let ctx = TemplateContext::new();
     render_from_files(&files, &entry, &ctx)
@@ -28,30 +29,31 @@ pub fn render_bundle(bundle_json: &str) -> Result<String, String> {
 pub fn render_bundle_with_context(
     bundle_json: &str,
     ctx: &TemplateContext,
-) -> Result<String, String> {
+) -> Result<String, CrepusError> {
     let (files, entry) = parse_bundle(bundle_json)?;
     render_from_files(&files, &entry, ctx)
 }
 
-fn parse_bundle(bundle_json: &str) -> Result<(HashMap<String, String>, String), String> {
-    let root: Value = serde_json::from_str(bundle_json).map_err(|e| format!("bundle JSON: {e}"))?;
+fn parse_bundle(bundle_json: &str) -> Result<(HashMap<String, String>, String), CrepusError> {
+    let root: Value = serde_json::from_str(bundle_json)
+        .map_err(|e| CrepusError::render(format!("bundle JSON: {e}")))?;
     let entry = root
         .get("entry")
         .and_then(|v| v.as_str())
-        .ok_or_else(|| "bundle missing string field \"entry\"".to_string())?
+        .ok_or_else(|| CrepusError::render("bundle missing string field \"entry\""))?
         .to_string();
 
     let files_val = root
         .get("files")
-        .ok_or_else(|| "bundle missing \"files\" object".to_string())?;
+        .ok_or_else(|| CrepusError::render("bundle missing \"files\" object"))?;
     let files_obj = files_val
         .as_object()
-        .ok_or_else(|| "\"files\" must be a JSON object".to_string())?;
+        .ok_or_else(|| CrepusError::render("\"files\" must be a JSON object"))?;
     let mut files = HashMap::new();
     for (k, v) in files_obj {
         let s = v
             .as_str()
-            .ok_or_else(|| format!("files[{k:?}] must be a string"))?
+            .ok_or_else(|| CrepusError::render(format!("files[{k:?}] must be a string")))?
             .to_string();
         files.insert(k.clone(), s);
     }
@@ -97,24 +99,24 @@ mod tests {
     #[test]
     fn parse_bundle_errors() {
         // Invalid JSON
-        let err = render_bundle("{ invalid json }").unwrap_err();
-        assert!(err.starts_with("bundle JSON:"));
+        let err = render_bundle("{ invalid json }").unwrap_err().to_string();
+        assert!(err.contains("bundle JSON:"));
 
         // Missing entry
         let bundle = serde_json::json!({
             "files": { "index.crepus": "div" }
         })
         .to_string();
-        let err = render_bundle(&bundle).unwrap_err();
-        assert_eq!(err, "bundle missing string field \"entry\"");
+        let err = render_bundle(&bundle).unwrap_err().to_string();
+        assert_eq!(err, "render error: bundle missing string field \"entry\"");
 
         // Missing files
         let bundle = serde_json::json!({
             "entry": "index.crepus"
         })
         .to_string();
-        let err = render_bundle(&bundle).unwrap_err();
-        assert_eq!(err, "bundle missing \"files\" object");
+        let err = render_bundle(&bundle).unwrap_err().to_string();
+        assert_eq!(err, "render error: bundle missing \"files\" object");
 
         // Invalid files type
         let bundle = serde_json::json!({
@@ -122,8 +124,8 @@ mod tests {
             "files": "not an object"
         })
         .to_string();
-        let err = render_bundle(&bundle).unwrap_err();
-        assert_eq!(err, "\"files\" must be a JSON object");
+        let err = render_bundle(&bundle).unwrap_err().to_string();
+        assert_eq!(err, "render error: \"files\" must be a JSON object");
 
         // Invalid file value type
         let bundle = serde_json::json!({
@@ -131,7 +133,10 @@ mod tests {
             "files": { "index.crepus": 123 }
         })
         .to_string();
-        let err = render_bundle(&bundle).unwrap_err();
-        assert_eq!(err, "files[\"index.crepus\"] must be a string");
+        let err = render_bundle(&bundle).unwrap_err().to_string();
+        assert_eq!(
+            err,
+            "render error: files[\"index.crepus\"] must be a string"
+        );
     }
 }

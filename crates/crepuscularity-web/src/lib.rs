@@ -20,6 +20,7 @@ pub mod dom;
 pub use bundle::{render_bundle, render_bundle_with_context};
 pub use crepuscularity_core::build;
 pub use crepuscularity_core::preprocess::google_fonts_head_markup;
+pub use crepuscularity_core::CrepusError;
 pub use crepuscularity_macros::crepus_refs;
 
 #[cfg(feature = "ssr")]
@@ -41,33 +42,33 @@ pub fn render_from_files(
     files: &std::collections::HashMap<String, String>,
     entry: &str,
     ctx: &TemplateContext,
-) -> Result<String, String> {
+) -> Result<String, CrepusError> {
     let mut ctx = ctx.clone();
     ctx.virtual_files = std::sync::Arc::new(files.clone());
 
     if let Some((file_part, comp_name)) = entry.split_once('#') {
-        let content = files
-            .get(file_part)
-            .ok_or_else(|| format!("file not found in virtual fs: {file_part}"))?;
+        let content = files.get(file_part).ok_or_else(|| {
+            CrepusError::render(format!("file not found in virtual fs: {file_part}"))
+        })?;
         return render_component_file_to_html(content, comp_name, &ctx);
     }
 
     let content = files
         .get(entry)
-        .ok_or_else(|| format!("file not found in virtual fs: {entry}"))?;
+        .ok_or_else(|| CrepusError::render(format!("file not found in virtual fs: {entry}")))?;
     render_template_to_html(content, &ctx)
 }
 
 /// Render multiple entry points from a virtual file map in parallel (requires `parallel` feature).
 ///
-/// Returns a `Vec` of `(entry, Result<String, String>)` in the same order as `entries`.
+/// Returns a `Vec` of `(entry, Result<String, CrepusError>)` in the same order as `entries`.
 /// Each entry is independent — rendering runs on a Rayon thread pool.
 /// Falls back to sequential iteration when the `parallel` feature is disabled (e.g. WASM).
 pub fn par_render_from_files(
     files: &std::collections::HashMap<String, String>,
     entries: &[&str],
     ctx: &TemplateContext,
-) -> Vec<(String, Result<String, String>)> {
+) -> Vec<(String, Result<String, CrepusError>)> {
     #[cfg(feature = "parallel")]
     {
         use rayon::prelude::*;
@@ -92,7 +93,7 @@ pub fn par_render_from_files(
 pub fn par_render_component_file(
     content: &str,
     ctx: &TemplateContext,
-) -> Result<std::collections::HashMap<String, Result<String, String>>, String> {
+) -> Result<std::collections::HashMap<String, Result<String, CrepusError>>, CrepusError> {
     let file = parse_component_file(content)?;
 
     #[cfg(feature = "parallel")]
@@ -104,10 +105,9 @@ pub fn par_render_component_file(
             .map(|(name, comp)| {
                 let mut child_ctx = ctx.clone();
                 for (key, expr) in &comp.meta.defaults {
-                    child_ctx
-                        .vars
-                        .entry(key.clone())
-                        .or_insert_with(|| eval_expr(expr, &TemplateContext::new()));
+                    if let Ok(val) = eval_expr(expr, &TemplateContext::new()) {
+                        child_ctx.vars.entry(key.clone()).or_insert(val);
+                    }
                 }
                 let html = render_nodes_to_html(&comp.nodes, &child_ctx);
                 (name.clone(), html)
@@ -117,21 +117,18 @@ pub fn par_render_component_file(
     }
     #[cfg(not(feature = "parallel"))]
     {
-        let results = file
-            .components
-            .iter()
-            .map(|(name, comp)| {
-                let mut child_ctx = ctx.clone();
-                for (key, expr) in &comp.meta.defaults {
-                    child_ctx
-                        .vars
-                        .entry(key.clone())
-                        .or_insert_with(|| eval_expr(expr, &TemplateContext::new()));
-                }
-                let html = render_nodes_to_html(&comp.nodes, &child_ctx);
-                (name.clone(), html)
-            })
-            .collect();
+        let mut results = std::collections::HashMap::new();
+        for (name, comp) in &file.components {
+            let mut child_ctx = ctx.clone();
+            for (key, expr) in &comp.meta.defaults {
+                child_ctx
+                    .vars
+                    .entry(key.clone())
+                    .or_insert(eval_expr(expr, &TemplateContext::new())?);
+            }
+            let html = render_nodes_to_html(&comp.nodes, &child_ctx);
+            results.insert(name.clone(), html);
+        }
         Ok(results)
     }
 }
@@ -142,7 +139,10 @@ pub fn par_render_component_file(
 /// `include`, prefer [`render_from_files`] so every source file is supplied through the same
 /// virtual file map used by WASM and static-site builds.
 #[tracing::instrument(skip(template, ctx), fields(template_len = template.len()))]
-pub fn render_template_to_html(template: &str, ctx: &TemplateContext) -> Result<String, String> {
+pub fn render_template_to_html(
+    template: &str,
+    ctx: &TemplateContext,
+) -> Result<String, CrepusError> {
     let nodes = crepuscularity_core::ast_cache::parse_content(template)?;
     render_nodes_to_html(&nodes, ctx)
 }
@@ -155,19 +155,19 @@ pub fn render_component_file_to_html(
     content: &str,
     component_name: &str,
     ctx: &TemplateContext,
-) -> Result<String, String> {
+) -> Result<String, CrepusError> {
     let file = parse_component_file(content)?;
     let component = file
         .components
         .get(component_name)
-        .ok_or_else(|| format!("component not found: {component_name}"))?;
+        .ok_or_else(|| CrepusError::render(format!("component not found: {component_name}")))?;
 
     let mut child_ctx = ctx.clone();
     for (key, expr) in &component.meta.defaults {
         child_ctx
             .vars
             .entry(key.clone())
-            .or_insert_with(|| eval_expr(expr, &TemplateContext::new()));
+            .or_insert(eval_expr(expr, &TemplateContext::new())?);
     }
 
     render_nodes_to_html(&component.nodes, &child_ctx)
@@ -176,52 +176,59 @@ pub fn render_component_file_to_html(
 /// Render an already parsed AST node list to escaped HTML.
 ///
 /// Use this when a caller owns parsing or analysis separately from rendering. `$: let` declarations
-/// are applied in source order to a cloned context, so sibling nodes after a declaration can see it.
-pub fn render_nodes_to_html(nodes: &[Node], ctx: &TemplateContext) -> Result<String, String> {
-    render_nodes_with_ctx(nodes, ctx.clone())
+/// are applied in source order via an optional context overlay, so sibling nodes after a declaration can see it.
+pub fn render_nodes_to_html(nodes: &[Node], ctx: &TemplateContext) -> Result<String, CrepusError> {
+    render_nodes_with_ctx(nodes, None, ctx)
 }
 
-fn render_nodes_with_ctx(nodes: &[Node], mut ctx: TemplateContext) -> Result<String, String> {
+fn render_nodes_with_ctx(
+    nodes: &[Node],
+    mut overlay: Option<TemplateContext>,
+    base: &TemplateContext,
+) -> Result<String, CrepusError> {
     let _span = tracing::debug_span!("render_html", node_count = nodes.len()).entered();
     let mut html = String::new();
 
     for node in nodes {
         if let Node::LetDecl(decl) = node {
-            if decl.is_default && ctx.vars.contains_key(&decl.name) {
+            let cur = overlay.as_ref().unwrap_or(base);
+            if decl.is_default && cur.vars.contains_key(&decl.name) {
                 continue;
             }
-            let val = eval_expr(&decl.expr, &ctx);
-            ctx.vars.insert(decl.name.clone(), val);
+            let overlay_ctx = overlay.get_or_insert_with(|| base.clone());
+            let val = eval_expr(&decl.expr, overlay_ctx)?;
+            overlay_ctx.vars.insert(decl.name.clone(), val);
             continue;
         }
-        html.push_str(&render_node(node, &ctx)?);
+        let cur = overlay.as_ref().unwrap_or(base);
+        html.push_str(&render_node(node, cur)?);
     }
 
     Ok(html)
 }
 
-fn render_node(node: &Node, ctx: &TemplateContext) -> Result<String, String> {
+fn render_node(node: &Node, ctx: &TemplateContext) -> Result<String, CrepusError> {
     match node {
         Node::Element(el) => render_element(el, ctx),
-        Node::Text(parts) => Ok(escape_html(&render_text(parts, ctx))),
+        Node::Text(parts) => Ok(escape_html(&render_text(parts, ctx)?)),
         Node::If(block) => render_if(block, ctx),
         Node::For(block) => render_for(block, ctx),
         Node::Match(block) => render_match(block, ctx),
         Node::LetDecl(_) => Ok(String::new()),
         Node::Include(inc) => render_include(inc, ctx),
         Node::Embed(embed) => render_embed(embed, ctx),
-        Node::RawText(expr) => Ok(escape_html(&value_to_str(&eval_expr(expr, ctx)))),
+        Node::RawText(expr) => Ok(escape_html(&value_to_str(&eval_expr(expr, ctx)?))),
         Node::RawHtml(expr) => {
-            let inner = value_to_str(&eval_expr(expr, ctx));
+            let inner = value_to_str(&eval_expr(expr, ctx)?);
             Ok(ammonia::clean(&inner))
         }
     }
 }
 
-fn render_embed(embed: &EmbedNode, ctx: &TemplateContext) -> Result<String, String> {
+fn render_embed(embed: &EmbedNode, ctx: &TemplateContext) -> Result<String, CrepusError> {
     let mut props = serde_json::Map::new();
     for (key, expr) in &embed.props {
-        props.insert(key.clone(), template_value_to_json(&eval_expr(expr, ctx)));
+        props.insert(key.clone(), template_value_to_json(&eval_expr(expr, ctx)?));
     }
     let props_json = serde_json::Value::Object(props).to_string();
     let adapter = embed.adapter.as_deref().unwrap_or("module");
@@ -269,7 +276,7 @@ fn template_value_to_json(value: &TemplateValue) -> serde_json::Value {
     }
 }
 
-fn render_element(el: &Element, ctx: &TemplateContext) -> Result<String, String> {
+fn render_element(el: &Element, ctx: &TemplateContext) -> Result<String, CrepusError> {
     if el.tag == "slot" {
         return if let Some((slot_nodes, slot_ctx)) = &ctx.slot {
             render_nodes_to_html(slot_nodes, slot_ctx)
@@ -279,14 +286,16 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<String, String>
     }
 
     if el.tag == "slot-rotate" {
-        let phrases = slot_rotate_child_phrases(&el.children)?;
+        let phrases = slot_rotate_child_phrases(&el.children).map_err(CrepusError::render)?;
         if phrases.len() < 2 {
-            return Err("slot-rotate needs at least two plain-text phrase children".into());
+            return Err(CrepusError::render(
+                "slot-rotate needs at least two plain-text phrase children",
+            ));
         }
         let mut interval_ms = 3200u64;
         for b in &el.bindings {
             if b.prop == "interval" {
-                let v = value_to_str(&eval_expr(&b.value, ctx));
+                let v = value_to_str(&eval_expr(&b.value, ctx)?);
                 let v = v.trim_matches('"').trim();
                 interval_ms = v.parse().unwrap_or(3200);
             }
@@ -296,7 +305,7 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<String, String>
         let mut class_names = vec!["crepus-slot".to_string()];
         class_names.extend(el.classes.clone());
         for cc in &el.conditional_classes {
-            if ctx.eval_condition(&cc.condition) {
+            if ctx.eval_condition(&cc.condition)? {
                 class_names.push(cc.class.clone());
             }
         }
@@ -309,7 +318,7 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<String, String>
             out.push('"');
         }
         out.push_str(" class=\"");
-        out.push_str(&escape_html(&ctx.interpolate(&class_names.join(" "))));
+        out.push_str(&escape_html(&ctx.interpolate(&class_names.join(" "))?));
         out.push('"');
         out.push_str(" data-slot-words=\"");
         out.push_str(&escape_html(&words_json));
@@ -326,7 +335,7 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<String, String>
             out.push(' ');
             out.push_str(&binding.prop);
             out.push_str("=\"");
-            let value = value_to_str(&eval_expr(&binding.value, ctx));
+            let value = value_to_str(&eval_expr(&binding.value, ctx)?);
             out.push_str(&escape_html(&value));
             out.push('"');
         }
@@ -358,7 +367,7 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<String, String>
 
     let mut class_names = el.classes.clone();
     for cc in &el.conditional_classes {
-        if ctx.eval_condition(&cc.condition) {
+        if ctx.eval_condition(&cc.condition)? {
             class_names.push(cc.class.clone());
         }
     }
@@ -375,7 +384,7 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<String, String>
 
     if !class_names.is_empty() {
         out.push_str(" class=\"");
-        out.push_str(&escape_html(&ctx.interpolate(&class_names.join(" "))));
+        out.push_str(&escape_html(&ctx.interpolate(&class_names.join(" "))?));
         out.push('"');
     }
 
@@ -383,7 +392,7 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<String, String>
         out.push(' ');
         out.push_str(&binding.prop);
         out.push_str("=\"");
-        let value = value_to_str(&eval_expr(&binding.value, ctx));
+        let value = value_to_str(&eval_expr(&binding.value, ctx)?);
         out.push_str(&escape_html(&value));
         out.push('"');
     }
@@ -421,19 +430,24 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<String, String>
     Ok(out)
 }
 
-pub(crate) fn render_text(parts: &[TextPart], ctx: &TemplateContext) -> String {
+pub(crate) fn render_text(
+    parts: &[TextPart],
+    ctx: &TemplateContext,
+) -> Result<String, CrepusError> {
     let mut result = String::new();
     for part in parts {
         match part {
             TextPart::Literal(text) => result.push_str(text),
-            TextPart::Expr(expr) => result.push_str(&value_to_str(&eval_expr(expr, ctx))),
+            TextPart::Expr(expr) => {
+                result.push_str(&value_to_str(&eval_expr(expr, ctx)?));
+            }
         }
     }
-    result
+    Ok(result)
 }
 
-fn render_if(block: &IfBlock, ctx: &TemplateContext) -> Result<String, String> {
-    if ctx.eval_condition(&block.condition) {
+fn render_if(block: &IfBlock, ctx: &TemplateContext) -> Result<String, CrepusError> {
+    if ctx.eval_condition(&block.condition)? {
         render_nodes_to_html(&block.then_children, ctx)
     } else if let Some(else_children) = &block.else_children {
         render_nodes_to_html(else_children, ctx)
@@ -442,38 +456,34 @@ fn render_if(block: &IfBlock, ctx: &TemplateContext) -> Result<String, String> {
     }
 }
 
-fn render_for(block: &ForBlock, ctx: &TemplateContext) -> Result<String, String> {
+fn render_for(block: &ForBlock, ctx: &TemplateContext) -> Result<String, CrepusError> {
     let items = ctx.get_list(&block.iterator);
     let mut out = String::new();
+    let pattern = block.pattern.trim();
 
     for item_ctx in items {
-        let mut child_ctx = ctx.clone();
-        for (k, v) in &item_ctx.vars {
-            child_ctx.vars.insert(k.clone(), v.clone());
-        }
-
-        let pattern = block.pattern.trim();
+        let mut vars: Vec<(String, TemplateValue)> = item_ctx
+            .vars
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect();
         if !pattern.is_empty() {
             let item_str = item_ctx.get_str("value");
             if !item_str.is_empty() {
-                child_ctx
-                    .vars
-                    .insert(pattern.to_string(), TemplateValue::Str(item_str));
+                vars.push((pattern.to_string(), TemplateValue::Str(item_str)));
             } else {
-                child_ctx
-                    .vars
-                    .insert(pattern.to_string(), TemplateValue::Scope(item_ctx.clone()));
+                vars.push((pattern.to_string(), TemplateValue::Scope(item_ctx.clone())));
             }
         }
-
+        let child_ctx = ctx.child_with_vars(vars);
         out.push_str(&render_nodes_to_html(&block.body, &child_ctx)?);
     }
 
     Ok(out)
 }
 
-fn render_match(block: &MatchBlock, ctx: &TemplateContext) -> Result<String, String> {
-    let val = eval_expr(&block.expr, ctx);
+fn render_match(block: &MatchBlock, ctx: &TemplateContext) -> Result<String, CrepusError> {
+    let val = eval_expr(&block.expr, ctx)?;
     let value = value_to_str(&val);
 
     for arm in &block.arms {
@@ -495,21 +505,22 @@ fn render_match(block: &MatchBlock, ctx: &TemplateContext) -> Result<String, Str
     Ok(String::new())
 }
 
-pub(crate) fn read_file(ctx: &TemplateContext, path: &Path) -> Result<String, String> {
+pub(crate) fn read_file(ctx: &TemplateContext, path: &Path) -> Result<String, CrepusError> {
     if let Some(content) = lookup_virtual_file(ctx, path) {
         return Ok(content);
     }
     if cfg!(not(target_arch = "wasm32")) {
-        std::fs::read_to_string(path).map_err(|e| format!("include error: {:?}: {}", path, e))
+        std::fs::read_to_string(path)
+            .map_err(|e| CrepusError::render(format!("include error: {:?}: {}", path, e)))
     } else {
-        Err(format!(
+        Err(CrepusError::render(format!(
             "include error: file not in virtual bundle: {}",
             path.to_string_lossy()
-        ))
+        )))
     }
 }
 
-fn render_include(inc: &IncludeNode, ctx: &TemplateContext) -> Result<String, String> {
+fn render_include(inc: &IncludeNode, ctx: &TemplateContext) -> Result<String, CrepusError> {
     if let Some((file_part, comp_name)) = inc.path.split_once('#') {
         return render_named_component(inc, ctx, file_part, comp_name);
     }
@@ -517,13 +528,13 @@ fn render_include(inc: &IncludeNode, ctx: &TemplateContext) -> Result<String, St
     let file_path = resolve_include_path(ctx.base_dir.as_deref(), &inc.path)?;
     let content = read_file(ctx, &file_path)?;
     let nodes = crepuscularity_core::ast_cache::parse_content(&content)
-        .map_err(|e| format!("include parse error: {}", e))?;
+        .map_err(|e| CrepusError::render(format!("include parse error: {e}")))?;
 
     let mut child_ctx = TemplateContext::new();
     child_ctx.base_dir = file_path.parent().map(|p| p.to_path_buf());
     child_ctx.virtual_files = ctx.virtual_files.clone();
     for (key, expr) in &inc.props {
-        child_ctx.vars.insert(key.clone(), eval_expr(expr, ctx));
+        child_ctx.vars.insert(key.clone(), eval_expr(expr, ctx)?);
     }
     if !inc.slot.is_empty() {
         child_ctx.slot = Some((inc.slot.clone(), Box::new(ctx.clone())));
@@ -537,15 +548,17 @@ fn render_named_component(
     ctx: &TemplateContext,
     file_part: &str,
     comp_name: &str,
-) -> Result<String, String> {
+) -> Result<String, CrepusError> {
     let file_path = resolve_include_path(ctx.base_dir.as_deref(), file_part)?;
     let content = read_file(ctx, &file_path)?;
-    let comp_file =
-        parse_component_file(&content).map_err(|e| format!("component file parse error: {}", e))?;
-    let comp = comp_file
-        .components
-        .get(comp_name)
-        .ok_or_else(|| format!("component '{}' not found in {}", comp_name, file_part))?;
+    let comp_file = parse_component_file(&content)
+        .map_err(|e| CrepusError::render(format!("component file parse error: {e}")))?;
+    let comp = comp_file.components.get(comp_name).ok_or_else(|| {
+        CrepusError::render(format!(
+            "component '{}' not found in {}",
+            comp_name, file_part
+        ))
+    })?;
 
     let mut child_ctx = TemplateContext::new();
     child_ctx.base_dir = file_path.parent().map(|p| p.to_path_buf());
@@ -553,10 +566,10 @@ fn render_named_component(
     for (key, expr) in &comp.meta.defaults {
         child_ctx
             .vars
-            .insert(key.clone(), eval_expr(expr, &TemplateContext::new()));
+            .insert(key.clone(), eval_expr(expr, &TemplateContext::new())?);
     }
     for (key, expr) in &inc.props {
-        child_ctx.vars.insert(key.clone(), eval_expr(expr, ctx));
+        child_ctx.vars.insert(key.clone(), eval_expr(expr, ctx)?);
     }
     if !inc.slot.is_empty() {
         child_ctx.slot = Some((inc.slot.clone(), Box::new(ctx.clone())));
@@ -603,7 +616,7 @@ fn node_is_dynamic(node: &Node) -> bool {
 pub fn render_template_to_html_with_hydration(
     template: &str,
     ctx: &TemplateContext,
-) -> Result<String, String> {
+) -> Result<String, CrepusError> {
     use std::sync::atomic::AtomicU32;
 
     let nodes = crepuscularity_core::ast_cache::parse_content(template)?;
@@ -631,20 +644,22 @@ fn render_nodes_with_hydration_impl(
     ctx: &TemplateContext,
     counter: &std::sync::atomic::AtomicU32,
     is_root: bool,
-) -> Result<String, String> {
+) -> Result<String, CrepusError> {
     use std::sync::atomic::Ordering;
 
     // Process LetDecl nodes first.
-    let mut ctx = ctx.clone();
+    let mut overlay = Some(ctx.clone());
     for node in nodes {
         if let Node::LetDecl(decl) = node {
-            if decl.is_default && ctx.vars.contains_key(&decl.name) {
+            let overlay_ctx = overlay.as_mut().expect("overlay for hydration");
+            if decl.is_default && overlay_ctx.vars.contains_key(&decl.name) {
                 continue;
             }
-            let val = crepuscularity_core::eval::eval_expr(&decl.expr, &ctx);
-            ctx.vars.insert(decl.name.clone(), val);
+            let val = crepuscularity_core::eval::eval_expr(&decl.expr, overlay_ctx)?;
+            overlay_ctx.vars.insert(decl.name.clone(), val);
         }
     }
+    let ctx = overlay.as_ref().expect("overlay for hydration");
 
     let mut html = String::new();
     let mut is_first = is_root;
@@ -679,7 +694,7 @@ fn render_element_with_hydration(
     counter: &std::sync::atomic::AtomicU32,
     is_root: bool,
     dyn_id: Option<u32>,
-) -> Result<String, String> {
+) -> Result<String, CrepusError> {
     if el.tag == "slot" {
         return if let Some((slot_nodes, slot_ctx)) = &ctx.slot {
             render_nodes_to_html(slot_nodes, slot_ctx)
@@ -690,7 +705,7 @@ fn render_element_with_hydration(
 
     let mut class_names = el.classes.clone();
     for cc in &el.conditional_classes {
-        if ctx.eval_condition(&cc.condition) {
+        if ctx.eval_condition(&cc.condition)? {
             class_names.push(cc.class.clone());
         }
     }
@@ -708,7 +723,7 @@ fn render_element_with_hydration(
 
     if !class_names.is_empty() {
         out.push_str(" class=\"");
-        out.push_str(&escape_html(&ctx.interpolate(&class_names.join(" "))));
+        out.push_str(&escape_html(&ctx.interpolate(&class_names.join(" "))?));
         out.push('"');
     }
 
@@ -717,7 +732,7 @@ fn render_element_with_hydration(
         out.push_str(&binding.prop);
         out.push_str("=\"");
         let value = crepuscularity_core::context::value_to_str(
-            &crepuscularity_core::eval::eval_expr(&binding.value, ctx),
+            &crepuscularity_core::eval::eval_expr(&binding.value, ctx)?,
         );
         out.push_str(&escape_html(&value));
         out.push('"');
@@ -763,13 +778,13 @@ fn render_element_with_hydration(
 pub(crate) fn hydration_payload_bytes(
     ctx: serde_json::Value,
     bind: serde_json::Value,
-) -> Result<Vec<u8>, String> {
+) -> Result<Vec<u8>, CrepusError> {
     let payload = serde_json::json!({
         "v": 1,
         "ctx": ctx,
         "bind": bind,
     });
-    serde_json::to_vec(&payload).map_err(|e| e.to_string())
+    serde_json::to_vec(&payload).map_err(|e| CrepusError::render(e.to_string()))
 }
 
 #[cfg(feature = "hydration")]

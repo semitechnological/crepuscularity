@@ -1,6 +1,6 @@
 [package]
 name = "crepuscularity-web"
-version = "0.4.5"
+version = "0.4.7"
 edition = "2021"
 license = "MPL-2.0"
 description = "Web / SSR / DOM integration for Crepuscularity (UNSTABLE; in active development)."
