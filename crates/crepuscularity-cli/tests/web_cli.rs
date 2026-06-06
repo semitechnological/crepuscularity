@@ -190,10 +190,10 @@ fn web_build_via_crepus_toml_target_docs_emits_wasm() {
         .canonicalize()
         .expect("repo root");
 
-    let manifest = repo.join("crepus.toml");
+    let manifest = repo.join("docs-site/crepus.toml");
     assert!(
         manifest.is_file(),
-        "repo crepus.toml missing (needed for --target docs test)"
+        "docs-site crepus.toml missing (needed for --target docs test)"
     );
 
     let status = crepus()

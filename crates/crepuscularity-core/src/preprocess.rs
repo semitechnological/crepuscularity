@@ -440,10 +440,12 @@ pub fn google_fonts_head_markup(families: &[String]) -> String {
         if i > 0 {
             q.push('&');
         }
-        let slug = f.split_whitespace().collect::<Vec<_>>().join("+");
+        let slug = encode_google_font_family(f);
         q.push_str("family=");
         q.push_str(&slug);
-        q.push_str(":wght@400;500;600;700");
+        if !slug.contains(':') {
+            q.push_str(":wght@400;500;600;700");
+        }
     }
     q.push_str("&display=swap");
     format!(
@@ -451,6 +453,43 @@ pub fn google_fonts_head_markup(families: &[String]) -> String {
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?{q}" rel="stylesheet">"#
     )
+}
+
+pub fn google_font_css_family_name(family: &str) -> &str {
+    family
+        .split_once(':')
+        .map_or(family, |(name, _)| name)
+        .trim()
+}
+
+fn encode_google_font_family(family: &str) -> String {
+    let family = normalize_google_font_family(family);
+    let mut out = String::new();
+    for byte in family.as_bytes() {
+        match byte {
+            b' ' => out.push('+'),
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b':' | b',' | b'@' | b'.' | b'_' | b'-' => {
+                out.push(*byte as char);
+            }
+            b => out.push_str(&format!("%{b:02X}")),
+        }
+    }
+    out
+}
+
+fn normalize_google_font_family(family: &str) -> String {
+    match family.trim().to_lowercase().as_str() {
+        "material symbols outlined" => {
+            "Material Symbols Outlined:opsz,wght,FILL,GRAD@24,400,0,0".to_string()
+        }
+        "material symbols rounded" => {
+            "Material Symbols Rounded:opsz,wght,FILL,GRAD@24,400,0,0".to_string()
+        }
+        "material symbols sharp" => {
+            "Material Symbols Sharp:opsz,wght,FILL,GRAD@24,400,0,0".to_string()
+        }
+        _ => family.trim().to_string(),
+    }
 }
 
 /// Plain-text lines from a `slot-rotate` element's children (web + native renderers).
@@ -631,6 +670,25 @@ div
         assert!(s.contains("fonts.googleapis.com"));
         assert!(s.contains("JetBrains+Mono"));
         assert!(s.contains("family=Inter"));
+    }
+
+    #[test]
+    fn google_fonts_head_markup_supports_material_symbols_shorthand() {
+        let s = google_fonts_head_markup(&["Material Symbols Outlined".into()]);
+        assert!(s.contains("Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0"));
+        assert!(!s.contains("Material+Symbols+Outlined:wght@400"));
+    }
+
+    #[test]
+    fn google_fonts_head_markup_preserves_axis_suffix() {
+        let s = google_fonts_head_markup(&[
+            "Inter".into(),
+            "Material Symbols Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200".into(),
+        ]);
+        assert!(s.contains("family=Inter:wght@400;500;600;700"));
+        assert!(s.contains(
+            "family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"
+        ));
     }
 
     #[test]

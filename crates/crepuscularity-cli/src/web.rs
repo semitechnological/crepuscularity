@@ -9,8 +9,8 @@
 
 use console::style;
 use crepuscularity_core::preprocess::{
-    extract_head_block, google_fonts_head_markup, merge_unique_font_families,
-    strip_indent_decorators,
+    extract_head_block, google_font_css_family_name, google_fonts_head_markup,
+    merge_unique_font_families, strip_indent_decorators,
 };
 use crepuscularity_core::{DriverCache, Fingerprint};
 use serde::Deserialize;
@@ -956,7 +956,9 @@ pub(crate) fn render_index_html(
     let body_font_css = google_fonts
         .first()
         .map(|n| {
-            let q = n.trim().replace('\\', r"\\").replace('"', r#"\""#);
+            let q = google_font_css_family_name(n)
+                .replace('\\', r"\\")
+                .replace('"', r#"\""#);
             format!(r#""{q}", system-ui, -apple-system, sans-serif"#)
         })
         .unwrap_or_else(|| "system-ui, -apple-system, sans-serif".to_string());
