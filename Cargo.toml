@@ -38,6 +38,14 @@ members = [
 lto = "thin"
 codegen-units = 1
 
+# ABI / cdylib embedders: `cargo build -p crepuscularity-abi --profile abi`
+[profile.abi]
+inherits = "release"
+panic = "abort"
+codegen-units = 1
+
+
+
 # PGO-optimised release — use via scripts/pgo-build.sh:
 #
 #   scripts/pgo-build.sh pgo-gen   # step 1 & 2: instrumented build + profile run
@@ -96,6 +104,7 @@ wasm-bindgen = "0.2"
 web-sys = "0.3"
 regex = "1"
 schemars = { version = "0.8", features = ["derive"] }
+thiserror = "2"
 
 # Default build uses crates.io `gpui` 0.2.2 so `cargo publish` matches consumers. For `vendor/gpui`,
 # copy `.cargo/config.toml.example` → `.cargo/config.toml` and enable `gpui-text-extras` where needed.

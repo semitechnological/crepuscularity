@@ -1732,7 +1732,7 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity"
-version = "0.4.4"
+version = "0.4.5"
 dependencies = [
  "crepuscularity-core",
  "crepuscularity-lvgl",
@@ -1745,7 +1745,7 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-abi"
-version = "0.1.3"
+version = "0.1.5"
 dependencies = [
  "crepuscularity-core",
  "crepuscularity-native",
@@ -1755,7 +1755,7 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-cli"
-version = "0.7.29"
+version = "0.7.32"
 dependencies = [
  "console",
  "crepuscularity-core",
@@ -1782,10 +1782,11 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-core"
-version = "0.4.12"
+version = "0.4.15"
 dependencies = [
  "sha2 0.11.0",
  "tempfile",
+ "thiserror 2.0.18",
  "toml 1.1.2+spec-1.1.0",
  "tracing",
 ]
@@ -1800,7 +1801,7 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-embedded"
-version = "0.1.12"
+version = "0.1.14"
 dependencies = [
  "crepuscularity-core",
  "crepuscularity-embedded-macros",
@@ -1898,7 +1899,7 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-lvgl"
-version = "0.1.2"
+version = "0.1.4"
 dependencies = [
  "crepuscularity-core",
  "tempfile",
@@ -1906,7 +1907,7 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-native"
-version = "0.4.8"
+version = "0.4.10"
 dependencies = [
  "crepuscularity-core",
  "regex",
@@ -1919,7 +1920,7 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-reactive"
-version = "0.1.3"
+version = "0.1.4"
 dependencies = [
  "base64 0.22.1",
  "crepuscularity-core",
@@ -1931,7 +1932,7 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-runtime"
-version = "0.4.9"
+version = "0.4.10"
 dependencies = [
  "crepuscularity-core",
  "gpui",
@@ -1944,7 +1945,7 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-ssr"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "axum",
  "crepuscularity-core",
@@ -1959,7 +1960,7 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-tui"
-version = "0.4.8"
+version = "0.4.10"
 dependencies = [
  "crepuscularity-core",
  "crepuscularity_macros",
@@ -1971,7 +1972,7 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-web"
-version = "0.4.5"
+version = "0.4.7"
 dependencies = [
  "ammonia",
  "base64 0.22.1",
