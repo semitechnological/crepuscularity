@@ -38,7 +38,7 @@ impl SsrHandler {
                     title: &title,
                     ..Default::default()
                 };
-                render_ssr_document(template, &ctx, &doc, true)
+                render_ssr_document(template, &ctx, &doc, true).map_err(|e| e.to_string())
             }
         })
         .await
