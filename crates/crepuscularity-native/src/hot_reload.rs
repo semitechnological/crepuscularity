@@ -82,19 +82,29 @@ pub fn plan_hot_reload(
                     ir,
                     reason: "previous template parse failed".to_string(),
                 },
-                Err(e) => HotReloadMessage::Error { message: e },
+                Err(e) => HotReloadMessage::Error {
+                    message: e.to_string(),
+                },
             };
         }
     };
 
     let new_nodes = match parse_template(new_template) {
         Ok(nodes) => nodes,
-        Err(e) => return HotReloadMessage::Error { message: e },
+        Err(e) => {
+            return HotReloadMessage::Error {
+                message: e.to_string(),
+            }
+        }
     };
 
     let new_ir = match render_template_to_ir(new_template, ctx) {
         Ok(ir) => ir,
-        Err(e) => return HotReloadMessage::Error { message: e },
+        Err(e) => {
+            return HotReloadMessage::Error {
+                message: e.to_string(),
+            }
+        }
     };
 
     if !ast_shape_compatible(&old_nodes, &new_nodes) {
