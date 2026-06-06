@@ -157,6 +157,28 @@ fn raw_html_sanitization_ssr() {
 }
 
 #[test]
+fn head_extra_strips_malicious_script() {
+    let ctx = TemplateContext::new();
+    let doc = SsrDocument {
+        lang: "en",
+        title: "Safe",
+        head_extra: "<script>alert('xss')</script>",
+        body_class: None,
+    };
+    let html = render_ssr_document("div\n  \"ok\"", &ctx, &doc, false).unwrap();
+    assert!(
+        !html.contains("<script>"),
+        "malicious script in head_extra must be stripped: {html}"
+    );
+    assert!(
+        !html.contains("alert("),
+        "script payload must not appear in document: {html}"
+    );
+    assert!(html.contains("<title>Safe</title>"));
+    assert!(html.contains("<div>ok</div>"));
+}
+
+#[test]
 fn raw_html_sanitization_normal() {
     let mut ctx = TemplateContext::new();
     ctx.set("malicious", "<script>alert(1)</script><b>safe</b>");
