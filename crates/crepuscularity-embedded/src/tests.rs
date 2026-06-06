@@ -123,13 +123,19 @@ fn hit_test_deepest_id() {
 #[test]
 fn include_path_traversal_rejected() {
     let err = crepuscularity_core::resolve_include_path(None, "../secret.crepus").unwrap_err();
-    assert!(err.contains("include path outside base dir"), "{err}");
+    assert!(
+        err.to_string().contains("include path outside base dir"),
+        "{err}"
+    );
 }
 
 #[test]
 fn include_absolute_path_rejected() {
     let err = crepuscularity_core::resolve_include_path(None, "/etc/passwd").unwrap_err();
-    assert!(err.contains("include path outside base dir"), "{err}");
+    assert!(
+        err.to_string().contains("include path outside base dir"),
+        "{err}"
+    );
 }
 
 #[test]

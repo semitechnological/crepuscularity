@@ -6,6 +6,7 @@ use crepuscularity_core::ast::*;
 use crepuscularity_core::context::{value_to_str, TemplateContext, TemplateValue};
 use crepuscularity_core::eval::eval_expr;
 use crepuscularity_core::parser::{parse_component_file, parse_template};
+use crepuscularity_core::CrepusError;
 
 use crate::document::{EmbeddedDocument, EmbeddedNode, EmbeddedStyle};
 use crate::framebuffer::Framebuffer;
@@ -44,7 +45,7 @@ pub fn render_template_to_framebuffer(
     ctx: &TemplateContext,
     screen: ScreenSize,
     fb: &mut impl Framebuffer,
-) -> Result<EmbeddedDocument, String> {
+) -> Result<EmbeddedDocument, CrepusError> {
     let nodes = parse_template(template)?;
     render_parsed_nodes_to_framebuffer(&nodes, ctx, screen, fb)
 }
@@ -55,7 +56,7 @@ pub fn render_parsed_nodes_to_framebuffer(
     ctx: &TemplateContext,
     screen: ScreenSize,
     fb: &mut impl Framebuffer,
-) -> Result<EmbeddedDocument, String> {
+) -> Result<EmbeddedDocument, CrepusError> {
     let ctx = with_embedded_target(ctx, screen);
     let mut doc = render_nodes_to_document(nodes, &ctx, screen)?;
     layout_document(&mut doc);
@@ -69,18 +70,18 @@ pub fn render_component_file_to_framebuffer(
     ctx: &TemplateContext,
     screen: ScreenSize,
     fb: &mut impl Framebuffer,
-) -> Result<EmbeddedDocument, String> {
+) -> Result<EmbeddedDocument, CrepusError> {
     let file = parse_component_file(content)?;
     let component = file
         .components
         .get(component_name)
-        .ok_or_else(|| format!("component not found: {component_name}"))?;
+        .ok_or_else(|| CrepusError::render(format!("component not found: {component_name}")))?;
     let mut child_ctx = with_embedded_target(ctx, screen);
     for (key, expr) in &component.meta.defaults {
         child_ctx
             .vars
             .entry(key.clone())
-            .or_insert_with(|| eval_expr(expr, &TemplateContext::new()));
+            .or_insert(eval_expr(expr, &TemplateContext::new())?);
     }
     let mut doc = render_nodes_to_document(&component.nodes, &child_ctx, screen)?;
     layout_document(&mut doc);
@@ -93,10 +94,10 @@ pub fn render_file_to_framebuffer(
     ctx: &TemplateContext,
     screen: ScreenSize,
     fb: &mut impl Framebuffer,
-) -> Result<EmbeddedDocument, String> {
+) -> Result<EmbeddedDocument, CrepusError> {
     let path = path.as_ref();
-    let content =
-        std::fs::read_to_string(path).map_err(|e| format!("read {}: {}", path.display(), e))?;
+    let content = std::fs::read_to_string(path)
+        .map_err(|e| CrepusError::render(format!("read {}: {}", path.display(), e)))?;
     let mut child_ctx = ctx.clone();
     child_ctx.base_dir = path.parent().map(|p| p.to_path_buf());
     render_template_to_framebuffer(&content, &child_ctx, screen, fb)
@@ -106,21 +107,24 @@ pub fn render_nodes_to_document(
     nodes: &[Node],
     ctx: &TemplateContext,
     screen: ScreenSize,
-) -> Result<EmbeddedDocument, String> {
+) -> Result<EmbeddedDocument, CrepusError> {
     Ok(EmbeddedDocument::new(
         render_nodes_list(nodes, ctx)?,
         screen,
     ))
 }
 
-fn render_nodes_list(nodes: &[Node], ctx: &TemplateContext) -> Result<Vec<EmbeddedNode>, String> {
+fn render_nodes_list(
+    nodes: &[Node],
+    ctx: &TemplateContext,
+) -> Result<Vec<EmbeddedNode>, CrepusError> {
     let mut ctx = ctx.clone();
     let mut out = Vec::new();
     for node in nodes {
         if let Node::LetDecl(decl) = node {
             if !(decl.is_default && ctx.vars.contains_key(&decl.name)) {
                 ctx.vars
-                    .insert(decl.name.clone(), eval_expr(&decl.expr, &ctx));
+                    .insert(decl.name.clone(), eval_expr(&decl.expr, &ctx)?);
             }
             continue;
         }
@@ -134,12 +138,12 @@ fn render_nodes_list(nodes: &[Node], ctx: &TemplateContext) -> Result<Vec<Embedd
     Ok(out)
 }
 
-fn render_node(node: &Node, ctx: &TemplateContext) -> Result<EmbeddedNode, String> {
+fn render_node(node: &Node, ctx: &TemplateContext) -> Result<EmbeddedNode, CrepusError> {
     match node {
         Node::Element(el) => render_element(el, ctx),
         Node::Text(parts) => Ok(text_node(render_text_inline(parts, ctx)?)),
         Node::If(block) => {
-            let body = if ctx.eval_condition(&block.condition) {
+            let body = if ctx.eval_condition(&block.condition)? {
                 &block.then_children
             } else {
                 block.else_children.as_deref().unwrap_or(&[])
@@ -191,7 +195,7 @@ fn render_node(node: &Node, ctx: &TemplateContext) -> Result<EmbeddedNode, Strin
             None,
             None,
         )),
-        Node::Include(_) => Err("include not expanded".into()),
+        Node::Include(_) => Err(CrepusError::render("include not expanded")),
         Node::Embed(_) => Ok(container(
             "embed",
             EmbeddedStyle::default(),
@@ -199,13 +203,13 @@ fn render_node(node: &Node, ctx: &TemplateContext) -> Result<EmbeddedNode, Strin
             None,
             None,
         )),
-        Node::RawText(expr) => Ok(text_node(value_to_str(&eval_expr(expr, ctx)))),
-        Node::RawHtml(expr) => Ok(text_node(value_to_str(&eval_expr(expr, ctx)))),
+        Node::RawText(expr) => Ok(text_node(value_to_str(&eval_expr(expr, ctx)?))),
+        Node::RawHtml(expr) => Ok(text_node(value_to_str(&eval_expr(expr, ctx)?))),
     }
 }
 
-fn render_match(block: &MatchBlock, ctx: &TemplateContext) -> Result<EmbeddedNode, String> {
-    let value = value_to_str(&eval_expr(&block.expr, ctx));
+fn render_match(block: &MatchBlock, ctx: &TemplateContext) -> Result<EmbeddedNode, CrepusError> {
+    let value = value_to_str(&eval_expr(&block.expr, ctx)?);
     for arm in &block.arms {
         let pattern = arm.pattern.trim();
         if pattern == "_"
@@ -232,7 +236,7 @@ fn render_match(block: &MatchBlock, ctx: &TemplateContext) -> Result<EmbeddedNod
     ))
 }
 
-fn render_element(el: &Element, ctx: &TemplateContext) -> Result<EmbeddedNode, String> {
+fn render_element(el: &Element, ctx: &TemplateContext) -> Result<EmbeddedNode, CrepusError> {
     if el.tag == "slot" {
         let children = if let Some((nodes, slot_ctx)) = &ctx.slot {
             render_nodes_list(nodes, slot_ctx)?
@@ -241,7 +245,7 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<EmbeddedNode, S
         };
         return Ok(container(
             &el.tag,
-            style(el, ctx),
+            style(el, ctx)?,
             children,
             el.id.clone(),
             None,
@@ -258,7 +262,7 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<EmbeddedNode, S
         let mut n = text_node(label);
         n.id = el.id.clone();
         n.tag = "button".into();
-        n.style = style(el, ctx);
+        n.style = style(el, ctx)?;
         n.on_click = on_click;
         return Ok(n);
     }
@@ -268,21 +272,21 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<EmbeddedNode, S
             let mut n = text_node(render_text_inline(parts, ctx)?);
             n.id = el.id.clone();
             n.tag = el.tag.clone();
-            n.style = style(el, ctx);
+            n.style = style(el, ctx)?;
             return Ok(n);
         }
     }
 
     Ok(container(
         &el.tag,
-        style(el, ctx),
+        style(el, ctx)?,
         render_nodes_list(&el.children, ctx)?,
         el.id.clone(),
         None,
     ))
 }
 
-fn collect_primary_text(children: &[Node], ctx: &TemplateContext) -> Result<String, String> {
+fn collect_primary_text(children: &[Node], ctx: &TemplateContext) -> Result<String, CrepusError> {
     for child in children {
         match child {
             Node::Text(parts) => return render_text_inline(parts, ctx),
@@ -295,17 +299,17 @@ fn collect_primary_text(children: &[Node], ctx: &TemplateContext) -> Result<Stri
     Ok(String::new())
 }
 
-fn style(el: &Element, ctx: &TemplateContext) -> EmbeddedStyle {
+fn style(el: &Element, ctx: &TemplateContext) -> Result<EmbeddedStyle, CrepusError> {
     let mut classes = Vec::new();
     for c in &el.classes {
-        classes.push(ctx.interpolate(c));
+        classes.push(ctx.interpolate(c)?);
     }
     for cc in &el.conditional_classes {
-        if ctx.eval_condition(&cc.condition) {
-            classes.push(ctx.interpolate(&cc.class));
+        if ctx.eval_condition(&cc.condition)? {
+            classes.push(ctx.interpolate(&cc.class)?);
         }
     }
-    style_from_classes_with_context(&classes, Some(ctx))
+    Ok(style_from_classes_with_context(&classes, Some(ctx)))
 }
 
 fn container(
@@ -338,12 +342,14 @@ fn text_node(text: String) -> EmbeddedNode {
     }
 }
 
-fn render_text_inline(parts: &[TextPart], ctx: &TemplateContext) -> Result<String, String> {
+fn render_text_inline(parts: &[TextPart], ctx: &TemplateContext) -> Result<String, CrepusError> {
     let mut out = String::new();
     for part in parts {
         match part {
             TextPart::Literal(s) => out.push_str(s),
-            TextPart::Expr(e) => out.push_str(&value_to_str(&eval_expr(e, ctx))),
+            TextPart::Expr(e) => {
+                out.push_str(&value_to_str(&eval_expr(e, ctx)?));
+            }
         }
     }
     Ok(out)

@@ -96,7 +96,7 @@ pub use style::{parse_classes, style_from_classes};
 
 #[cfg(feature = "std")]
 pub use crepuscularity_core::{
-    build, parse_component_file, parse_template, TemplateContext, TemplateValue,
+    build, parse_component_file, parse_template, CrepusError, TemplateContext, TemplateValue,
 };
 #[cfg(feature = "macros")]
 pub use crepuscularity_embedded_macros as macros;

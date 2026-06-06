@@ -148,14 +148,14 @@ impl Template {
             self.cache_generation == self.source_generation && self.parse_cache.is_some();
         if !cache_valid {
             let nodes = if let Some(ref name) = self.component {
-                let file = parse_component_file(&self.source)?;
+                let file = parse_component_file(&self.source).map_err(|e| e.to_string())?;
                 let component = file
                     .components
                     .get(name)
                     .ok_or_else(|| format!("component not found: {name}"))?;
                 component.nodes.clone()
             } else {
-                parse_template(&self.source)?
+                parse_template(&self.source).map_err(|e| e.to_string())?
             };
             self.parse_cache = Some(nodes);
             self.cache_generation = self.source_generation;
@@ -171,7 +171,8 @@ impl Template {
         let screen = self.screen;
         let ctx = self.ctx.clone();
         let nodes = self.ensure_parsed_nodes()?;
-        let doc = render_parsed_nodes_to_framebuffer(nodes, &ctx, screen, fb)?;
+        let doc = render_parsed_nodes_to_framebuffer(nodes, &ctx, screen, fb)
+            .map_err(|e| e.to_string())?;
         self.document = Some(doc);
         Ok(self.document.as_ref().expect("document set by draw"))
     }
