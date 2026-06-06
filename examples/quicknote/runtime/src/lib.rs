@@ -49,7 +49,7 @@ fn render_component(
     for (k, v) in props {
         ctx.set(*k, v.clone());
     }
-    render_component_file_to_html(UI_CREPUS, component_name, &ctx)
+    render_component_file_to_html(UI_CREPUS, component_name, &ctx).map_err(|e| e.to_string())
 }
 
 // ── WASM exports ─────────────────────────────────────────────────────────────
