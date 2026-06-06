@@ -41,7 +41,7 @@ use crate::watcher::create_watcher;
 /// State model for the hot-reload view.
 pub struct HotReloadState {
     pub path: PathBuf,
-    pub template: Result<Vec<Node>, String>,
+    pub template: Result<Arc<Vec<Node>>, String>,
     pub context: TemplateContext,
     pub changed: Arc<Mutex<bool>>,
 
@@ -135,8 +135,8 @@ impl Drop for HotReloadState {
     }
 }
 
-fn load_template(path: &std::path::Path) -> Result<Vec<Node>, String> {
-    crepuscularity_core::ast_cache::parse_file(path)
+fn load_template(path: &std::path::Path) -> Result<Arc<Vec<Node>>, String> {
+    crepuscularity_core::ast_cache::parse_file(path).map_err(|e| e.to_string())
 }
 
 /// A GPUI view that renders a hot-reloaded template.
@@ -154,7 +154,7 @@ impl Render for HotReloadView {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let state = self.state.read(cx);
         match &state.template {
-            Ok(nodes) => render_nodes(nodes, &state.context),
+            Ok(nodes) => render_nodes(nodes.as_ref(), &state.context),
             Err(err) => {
                 let msg = format!("Parse error:\n\n{}", err);
                 div()

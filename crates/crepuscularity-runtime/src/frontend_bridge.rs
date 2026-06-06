@@ -1,5 +1,5 @@
 use std::collections::VecDeque;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard};
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -19,36 +19,30 @@ pub struct FrontendBridge {
     outbound: Arc<Mutex<VecDeque<FrontendMessage>>>,
 }
 
+fn lock_queue<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
+    mutex
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
 impl FrontendBridge {
     pub fn new() -> Self {
         Self::default()
     }
 
     pub fn send_to_runtime(&self, message: FrontendMessage) {
-        self.outbound
-            .lock()
-            .expect("frontend bridge outbound queue poisoned")
-            .push_back(message);
+        lock_queue(&self.outbound).push_back(message);
     }
 
     pub fn recv_for_runtime(&self) -> Option<FrontendMessage> {
-        self.inbound
-            .lock()
-            .expect("frontend bridge inbound queue poisoned")
-            .pop_front()
+        lock_queue(&self.inbound).pop_front()
     }
 
     pub fn send_to_frontend(&self, message: FrontendMessage) {
-        self.inbound
-            .lock()
-            .expect("frontend bridge inbound queue poisoned")
-            .push_back(message);
+        lock_queue(&self.inbound).push_back(message);
     }
 
     pub fn recv_for_frontend(&self) -> Option<FrontendMessage> {
-        self.outbound
-            .lock()
-            .expect("frontend bridge outbound queue poisoned")
-            .pop_front()
+        lock_queue(&self.outbound).pop_front()
     }
 }
