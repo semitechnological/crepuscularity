@@ -15,6 +15,7 @@ examples/**/target/
 examples/**/Cargo.lock
 docs-site/**/target/
 docs-site/**/Cargo.lock
+!docs-site/docs-renderer/Cargo.lock
 editors/vscode/node_modules/
 # Packaged VSIX artifacts (built locally with `vsce package` or CI).
 editors/vscode/*.vsix
