@@ -62,6 +62,9 @@ jobs:
           cargo install wasm-bindgen-cli --version "$WASM_BINDGEN_VERSION" --locked
         shell: bash
 
+      - name: Pre-build docs-site renderer (docs hook)
+        run: cargo build --locked --manifest-path docs-site/docs-renderer/Cargo.toml
+
       - name: Check formatting
         run: cargo fmt --all -- --check
 

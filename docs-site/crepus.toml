@@ -33,7 +33,7 @@ json_ld = [
 
 [targets.docs]
 command = "cargo"
-args = ["run", "--quiet", "--manifest-path", "docs-renderer/Cargo.toml", "--"]
+args = ["run", "--quiet", "--locked", "--manifest-path", "docs-renderer/Cargo.toml", "--"]
 src = "../docs"
 
 [[targets.seo.alternates]]
