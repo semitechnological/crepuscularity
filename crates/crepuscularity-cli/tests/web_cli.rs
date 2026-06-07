@@ -1,6 +1,9 @@
 //! Integration tests for `crepus web`.
 
 use std::process::Command;
+use std::sync::Mutex;
+
+static DOCS_HOOK_TEST_LOCK: Mutex<()> = Mutex::new(());
 
 fn crepus() -> Command {
     Command::new(env!("CARGO_BIN_EXE_crepus"))
@@ -96,6 +99,7 @@ fn web_build_example_site_emits_wasm() {
     ignore = "default desktop crepus.exe does not spawn reliably on Windows CI"
 )]
 fn web_build_docs_site_emits_wasm() {
+    let _guard = DOCS_HOOK_TEST_LOCK.lock().expect("docs hook test lock");
     if !wasm_build_prereqs_ok() {
         eprintln!("skipping: wasm32 target or wasm-bindgen not installed");
         return;
@@ -178,6 +182,7 @@ fn web_build_docs_site_emits_wasm() {
     ignore = "default desktop crepus.exe does not spawn reliably on Windows CI"
 )]
 fn web_build_via_crepus_toml_target_docs_emits_wasm() {
+    let _guard = DOCS_HOOK_TEST_LOCK.lock().expect("docs hook test lock");
     if !wasm_build_prereqs_ok() {
         eprintln!("skipping: wasm32 target or wasm-bindgen not installed");
         return;
