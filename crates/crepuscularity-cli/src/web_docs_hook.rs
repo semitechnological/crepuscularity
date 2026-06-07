@@ -166,11 +166,25 @@ mod tests {
             src: Some("../docs".into()),
         };
 
+        let manifest = site_dir.join("docs-renderer/Cargo.toml");
+        let package_name = package_name_from_manifest(&manifest).expect("package name");
+        let binary_name = if cfg!(windows) {
+            format!("{package_name}.exe")
+        } else {
+            package_name
+        };
+        let expected_binary = site_dir
+            .join("docs-renderer/target/debug")
+            .join(binary_name);
+        if !expected_binary.is_file() {
+            eprintln!("skipping: docs renderer binary not built");
+            return;
+        }
+
         let invocation = resolve_docs_hook_invocation(&site_dir, &hook);
         assert_eq!(
             invocation.program,
-            site_dir
-                .join("docs-renderer/target/debug/docs_site_renderer")
+            expected_binary
                 .canonicalize()
                 .expect("docs renderer binary")
         );
