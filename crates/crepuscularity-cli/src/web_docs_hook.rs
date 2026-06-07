@@ -191,8 +191,8 @@ mod tests {
 
     #[test]
     fn package_name_from_manifest_reads_package_name() {
-        let manifest = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../docs-site/docs-renderer/Cargo.toml");
+        let manifest =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs-site/docs-renderer/Cargo.toml");
         assert_eq!(
             package_name_from_manifest(&manifest).as_deref(),
             Some("docs_site_renderer")
