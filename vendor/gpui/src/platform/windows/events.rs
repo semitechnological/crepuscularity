@@ -717,7 +717,7 @@ impl WindowsWindowInner {
         requested_client_rect[0].right -= insets.right;
         requested_client_rect[0].bottom -= insets.bottom;
 
-        // Fix auto hide taskbar not showing. This solution is based on the approach
+        // Workaround for auto hide taskbar not showing. This solution is based on the approach
         // used by Chrome. However, it may result in one row of pixels being obscured
         // in our client area. But as Chrome says, "there seems to be no better solution."
         if is_maximized
