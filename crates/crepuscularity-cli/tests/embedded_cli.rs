@@ -32,8 +32,8 @@ fn embedded_snapshot_writes_ppm_header() {
             out.to_str().unwrap(),
         ])
         .status()
-        .expect("spawn crepus embedded render");
-    assert!(status.success(), "embedded render failed");
+        .expect("spawn crepus embedded snapshot");
+    assert!(status.success(), "embedded snapshot failed");
 
     let bytes = std::fs::read(&out).expect("read ppm");
     let header_len = "P6\n64 48\n255\n".len();
