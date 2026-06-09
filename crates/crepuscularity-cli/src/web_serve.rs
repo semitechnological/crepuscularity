@@ -948,7 +948,9 @@ fn serve_pkg_path(stream: &mut TcpStream, url_path: &str, dev_root: &Path) {
 }
 
 fn serve_islands_path(stream: &mut TcpStream, url_path: &str, dev_root: &Path) {
-    let rel = url_path.trim_start_matches("/islands/").trim_start_matches('/');
+    let rel = url_path
+        .trim_start_matches("/islands/")
+        .trim_start_matches('/');
     if rel.is_empty() || rel.contains("..") {
         write_simple_not_found(stream);
         return;
