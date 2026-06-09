@@ -70,10 +70,11 @@ fn expand_named_component(
     child_ctx.base_dir = file_path.parent().map(|p| p.to_path_buf());
     child_ctx.virtual_files = ctx.virtual_files.clone();
     for (key, expr) in &comp.meta.defaults {
-        child_ctx
-            .vars
-            .entry(key.clone())
-            .or_insert(eval_expr(expr, &TemplateContext::new())?);
+        if !child_ctx.vars.contains_key(key) {
+            child_ctx
+                .vars
+                .insert(key.clone(), eval_expr(expr, &TemplateContext::new())?);
+        }
     }
     for (key, expr) in &inc.props {
         child_ctx.vars.insert(key.clone(), eval_expr(expr, ctx)?);
