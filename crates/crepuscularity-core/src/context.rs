@@ -197,7 +197,10 @@ mod tests {
         ctx.set("age", 30);
 
         assert_eq!(ctx.interpolate("Hello {name}!").unwrap(), "Hello Alice!");
-        assert_eq!(ctx.interpolate("{name} is {age} years old.").unwrap(), "Alice is 30 years old.");
+        assert_eq!(
+            ctx.interpolate("{name} is {age} years old.").unwrap(),
+            "Alice is 30 years old."
+        );
     }
 
     #[test]
@@ -208,7 +211,10 @@ mod tests {
 
         assert_eq!(ctx.interpolate("Result: {1 + 2}").unwrap(), "Result: 3");
         assert_eq!(ctx.interpolate("x + y = {x + y}").unwrap(), "x + y = 30");
-        assert_eq!(ctx.interpolate("Is x greater? {x > y}").unwrap(), "Is x greater? false");
+        assert_eq!(
+            ctx.interpolate("Is x greater? {x > y}").unwrap(),
+            "Is x greater? false"
+        );
     }
 
     #[test]
@@ -218,10 +224,7 @@ mod tests {
         ctx.set("b", "beta");
         ctx.set("c", "gamma");
 
-        assert_eq!(
-            ctx.interpolate("{a}-{b}-{c}").unwrap(),
-            "alpha-beta-gamma"
-        );
+        assert_eq!(ctx.interpolate("{a}-{b}-{c}").unwrap(), "alpha-beta-gamma");
         assert_eq!(
             ctx.interpolate("Start {a} middle {b} end {c}.").unwrap(),
             "Start alpha middle beta end gamma."
