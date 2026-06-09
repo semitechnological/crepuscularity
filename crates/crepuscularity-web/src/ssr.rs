@@ -111,10 +111,11 @@ fn render_component_file_to_html_with_ssr(
 
     let mut child_ctx = ctx.clone();
     for (key, expr) in &component.meta.defaults {
-        child_ctx
-            .vars
-            .entry(key.clone())
-            .or_insert(eval_expr(expr, &TemplateContext::new())?);
+        if !child_ctx.vars.contains_key(key) {
+            child_ctx
+                .vars
+                .insert(key.clone(), eval_expr(expr, &TemplateContext::new())?);
+        }
     }
 
     let counter = Cell::new(0u32);

@@ -78,10 +78,11 @@ pub fn render_component_file_to_framebuffer(
         .ok_or_else(|| CrepusError::render(format!("component not found: {component_name}")))?;
     let mut child_ctx = with_embedded_target(ctx, screen);
     for (key, expr) in &component.meta.defaults {
-        child_ctx
-            .vars
-            .entry(key.clone())
-            .or_insert(eval_expr(expr, &TemplateContext::new())?);
+        if !child_ctx.vars.contains_key(key) {
+            child_ctx
+                .vars
+                .insert(key.clone(), eval_expr(expr, &TemplateContext::new())?);
+        }
     }
     let mut doc = render_nodes_to_document(&component.nodes, &child_ctx, screen)?;
     layout_document(&mut doc);
