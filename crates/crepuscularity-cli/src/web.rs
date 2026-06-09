@@ -1,6 +1,6 @@
 //! `crepus web` — `.crepus`-first static sites (WASM runtime) + dev server.
 //!
-//! Commands: new, build, dev (alias: serve), site-json, build-full.
+//! Commands: new, build, dev (alias: serve), build-full.
 //!
 //! Production builds mirror `crepus webext`: compile the site `runtime/` crate to
 //! `wasm32-unknown-unknown`, run `wasm-bindgen`, ship `crepus-bundle.json` + a thin HTML shell.
@@ -44,11 +44,6 @@ pub fn run(args: &[String]) {
         Some("build") => {
             let b = parse_build_args(&args[1..]);
             build_site_wasm(&b);
-        }
-
-        Some("site-json") => {
-            let site_dir = parse_site_dir(&args[1..]);
-            print_site_json(&site_dir);
         }
 
         Some("dev") | Some("serve") => {
@@ -159,43 +154,6 @@ fn parse_dev_args(args: &[String]) -> ServeOptions {
     }
 }
 
-fn parse_site_dir(args: &[String]) -> PathBuf {
-    let mut i = 0;
-    while i < args.len() {
-        if args[i] == "--site" {
-            if let Some(p) = args.get(i + 1) {
-                return PathBuf::from(p);
-            }
-        }
-        i += 1;
-    }
-    std::env::current_dir().unwrap_or_else(|e| {
-        ui::error(&format!("cannot determine current directory: {e}"));
-    })
-}
-
-fn print_site_json(site_dir: &Path) {
-    eprintln!(
-        "{}",
-        style("crepus web site-json: deprecated — use .crepus + optional site.json for SEO only.")
-            .yellow()
-    );
-    let path = site_dir.join("site.json");
-    if !path.exists() {
-        ui::error(&format!("site.json not found in {}", site_dir.display()));
-    }
-    let raw = std::fs::read_to_string(&path).unwrap_or_else(|e| {
-        ui::error(&format!("read {}: {e}", path.display()));
-    });
-    let v: serde_json::Value = serde_json::from_str(&raw).unwrap_or_else(|e| {
-        ui::error(&format!("parse {}: {e}", path.display()));
-    });
-    let pretty = serde_json::to_string_pretty(&v).unwrap_or_else(|e| {
-        ui::error(&format!("serialize: {e}"));
-    });
-    println!("{pretty}");
-}
-
 fn print_web_usage() {
     eprintln!("{}", style("crepus web").cyan().bold());
     eprintln!(
@@ -213,11 +171,6 @@ fn print_web_usage() {
         "  {}  {}",
         style("build [--site DIR] [--release]").green(),
         style("emit dist/ (HTML shell + WASM + crepus-bundle.json)").dim()
-    );
-    eprintln!(
-        "  {}  {}",
-        style("site-json [--site DIR]         ").green(),
-        style("pretty-print site.json (deprecated)").dim()
     );
     eprintln!(
         "  {}  {}",
@@ -415,11 +368,6 @@ pub(crate) struct WebBuildArgs {
 }
 
 fn parse_build_args(args: &[String]) -> WebBuildArgs {
-    if args.iter().any(|a| a == "--legacy-site-json") {
-        ui::error(
-            "crepus web build no longer supports --legacy-site-json; use `crepus web new` and `crepus web build` with `.crepus` + WASM (see docs/cli.md).",
-        );
-    }
     if args.iter().any(|a| a == "--json") {
         ui::error("crepus web build no longer supports --json for site.json paths.");
     }

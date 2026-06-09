@@ -498,22 +498,7 @@ fn root_help_lists_web_commands() {
         stderr
     );
     assert!(
-        stderr.contains("web new") && stderr.contains("web build") && stderr.contains("site-json"),
+        stderr.contains("web new") && stderr.contains("web build"),
         "usage should list web commands in stderr:\n{stderr}"
     );
-}
-
-#[test]
-#[cfg_attr(
-    windows,
-    ignore = "default desktop crepus.exe does not spawn reliably on Windows CI"
-)]
-fn web_build_rejects_legacy_site_json_flag() {
-    let tmp = tempfile::tempdir().expect("tempdir");
-    let status = crepus()
-        .current_dir(tmp.path())
-        .args(["web", "build", "--legacy-site-json"])
-        .status()
-        .expect("spawn");
-    assert!(!status.success());
 }
