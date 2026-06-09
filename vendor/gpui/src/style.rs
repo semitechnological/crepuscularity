@@ -925,7 +925,7 @@ impl HighlightStyle {
                 .fade_out
                 .map(|source_fade| {
                     self.fade_out
-                        .map(|dest_fade| (dest_fade * (1. + source_fade)).clamp(0., 1.))
+                        .map(|dest_fade| (1.0 - (1.0 - dest_fade) * (1.0 - source_fade)).clamp(0., 1.))
                         .unwrap_or(source_fade)
                 })
                 .or(self.fade_out),
@@ -1336,7 +1336,7 @@ mod tests {
                 thickness: px(2.),
                 color: Some(blue()),
             }),
-            fade_out: Some(0.),
+            fade_out: Some(0.5),
             font_style: Some(FontStyle::Italic),
             font_weight: Some(FontWeight(300.)),
             background_color: Some(yellow()),
@@ -1368,7 +1368,7 @@ mod tests {
                 thickness: px(4.),
                 color: Some(crate::red()),
             }),
-            fade_out: Some(0.),
+            fade_out: Some(0.5),
             font_style: Some(FontStyle::Oblique),
             font_weight: Some(FontWeight(800.)),
             background_color: Some(green()),
@@ -1385,8 +1385,7 @@ mod tests {
                 thickness: px(4.),
                 color: Some(red()),
             }),
-            // TODO this does not seem right
-            fade_out: Some(0.),
+            fade_out: Some(0.75),
             font_style: Some(FontStyle::Oblique),
             font_weight: Some(FontWeight(800.)),
             background_color: Some(green()),
