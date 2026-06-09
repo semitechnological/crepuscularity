@@ -115,6 +115,15 @@ fn parse_color_str(s: &str) -> Option<u32> {
 /// Returns Ok(div) if class matched, Err(div) to fall through to dynamic.
 #[allow(clippy::result_large_err)]
 fn apply_static(d: Div, class: &str) -> Result<Div, Div> {
+    apply_layout(d, class)
+        .or_else(|d| apply_colors(d, class))
+        .or_else(|d| apply_typography(d, class))
+        .or_else(|d| apply_borders_shadows(d, class))
+        .or_else(|d| apply_misc(d, class))
+}
+
+#[allow(clippy::result_large_err)]
+fn apply_layout(d: Div, class: &str) -> Result<Div, Div> {
     Ok(match class {
         // ── Display ──
         "block" => d.block(),
@@ -201,6 +210,87 @@ fn apply_static(d: Div, class: &str) -> Result<Div, Div> {
         "max-w-full" => d.max_w_full(),
         "max-h-full" => d.max_h_full(),
 
+        // ── Grid ──
+        "grid-cols-1" => d.grid_cols(1),
+        "grid-cols-2" => d.grid_cols(2),
+        "grid-cols-3" => d.grid_cols(3),
+        "grid-cols-4" => d.grid_cols(4),
+        "grid-cols-5" => d.grid_cols(5),
+        "grid-cols-6" => d.grid_cols(6),
+        "grid-cols-7" => d.grid_cols(7),
+        "grid-cols-8" => d.grid_cols(8),
+        "grid-cols-9" => d.grid_cols(9),
+        "grid-cols-10" => d.grid_cols(10),
+        "grid-cols-11" => d.grid_cols(11),
+        "grid-cols-12" => d.grid_cols(12),
+        "grid-rows-1" => d.grid_rows(1),
+        "grid-rows-2" => d.grid_rows(2),
+        "grid-rows-3" => d.grid_rows(3),
+        "grid-rows-4" => d.grid_rows(4),
+        "grid-rows-5" => d.grid_rows(5),
+        "grid-rows-6" => d.grid_rows(6),
+        "col-span-full" => d.col_span_full(),
+        "col-start-auto" => d.col_start_auto(),
+        "col-end-auto" => d.col_end_auto(),
+        "row-span-full" => d.row_span_full(),
+        "row-start-auto" => d.row_start_auto(),
+        "row-end-auto" => d.row_end_auto(),
+
+        // ── Align self ──
+        "self-start" => {
+            let mut d = d;
+            d.style().align_self = Some(AlignItems::Start);
+            d
+        }
+        "self-end" => {
+            let mut d = d;
+            d.style().align_self = Some(AlignItems::End);
+            d
+        }
+        "self-center" => {
+            let mut d = d;
+            d.style().align_self = Some(AlignItems::Center);
+            d
+        }
+        "self-stretch" => {
+            let mut d = d;
+            d.style().align_self = Some(AlignItems::Stretch);
+            d
+        }
+        "self-baseline" => {
+            let mut d = d;
+            d.style().align_self = Some(AlignItems::Baseline);
+            d
+        }
+        "self-auto" => {
+            let mut d = d;
+            d.style().align_self = None;
+            d
+        }
+
+        // ── Aspect ratio ──
+        "aspect-square" => {
+            let mut d = d;
+            d.style().aspect_ratio = Some(1.0);
+            d
+        }
+        "aspect-video" => {
+            let mut d = d;
+            d.style().aspect_ratio = Some(16.0 / 9.0);
+            d
+        }
+        "aspect-auto" => {
+            let mut d = d;
+            d.style().aspect_ratio = None;
+            d
+        }
+        _ => return Err(d),
+    })
+}
+
+#[allow(clippy::result_large_err)]
+fn apply_colors(d: Div, class: &str) -> Result<Div, Div> {
+    Ok(match class {
         // ── Named colors — background ──
         "bg-black" => d.bg(gpui::black()),
         "bg-white" => d.bg(gpui::white()),
@@ -223,7 +313,92 @@ fn apply_static(d: Div, class: &str) -> Result<Div, Div> {
         "border-white" => d.border_color(gpui::white()),
         "border-black" => d.border_color(gpui::black()),
         "border-transparent" => d.border_color(gpui::transparent_black()),
+        _ => return Err(d),
+    })
+}
 
+#[allow(clippy::result_large_err)]
+fn apply_typography(d: Div, class: &str) -> Result<Div, Div> {
+    Ok(match class {
+        // ── Typography — weight ──
+        "font-thin" => d.font_weight(gpui::FontWeight::THIN),
+        "font-light" => d.font_weight(gpui::FontWeight::LIGHT),
+        "font-normal" => d.font_weight(gpui::FontWeight::NORMAL),
+        "font-medium" => d.font_weight(gpui::FontWeight::MEDIUM),
+        "font-semibold" => d.font_weight(gpui::FontWeight::SEMIBOLD),
+        "font-bold" => d.font_weight(gpui::FontWeight::BOLD),
+        "font-extrabold" => d.font_weight(gpui::FontWeight::EXTRA_BOLD),
+        "font-black" => d.font_weight(gpui::FontWeight::BLACK),
+
+        // ── Typography — style ──
+        "italic" | "font-italic" => d.italic(),
+        "not-italic" => d.not_italic(),
+
+        // ── Typography — size ──
+        "text-xs" => d.text_xs(),
+        "text-sm" => d.text_sm(),
+        "text-base" => d.text_base(),
+        "text-lg" => d.text_lg(),
+        "text-xl" => d.text_xl(),
+        "text-2xl" => d.text_2xl(),
+        "text-3xl" => d.text_3xl(),
+        // 4xl-9xl: GPUI only has up to text_3xl, use text_size for larger
+        "text-4xl" => d.text_size(rems(2.25)),
+        "text-5xl" => d.text_size(rems(3.)),
+        "text-6xl" => d.text_size(rems(3.75)),
+        "text-7xl" => d.text_size(rems(4.5)),
+        "text-8xl" => d.text_size(rems(6.)),
+        "text-9xl" => d.text_size(rems(8.)),
+
+        // ── Typography — alignment ──
+        "text-left" => d.text_left(),
+        "text-center" => d.text_center(),
+        "text-right" => d.text_right(),
+
+        // ── Typography — decoration ──
+        "underline" => d.underline(),
+        "line-through" => d.line_through(),
+        "no-underline" => d.text_decoration_none(),
+        "decoration-solid" => d.text_decoration_solid(),
+        "decoration-wavy" => d.text_decoration_wavy(),
+        "decoration-0" => d.text_decoration_0(),
+        "decoration-1" => d.text_decoration_1(),
+        "decoration-2" => d.text_decoration_2(),
+        "decoration-4" => d.text_decoration_4(),
+        "decoration-8" => d.text_decoration_8(),
+
+        // ── Typography — line height ──
+        "leading-none" => d.line_height(relative(1.)),
+        "leading-tight" => d.line_height(relative(1.25)),
+        "leading-snug" => d.line_height(relative(1.375)),
+        "leading-normal" => d.line_height(relative(1.5)),
+        "leading-relaxed" => d.line_height(relative(1.625)),
+        "leading-loose" => d.line_height(relative(2.)),
+
+        // ── Typography — overflow ──
+        "truncate" => d.truncate(),
+        "text-ellipsis" => d.text_ellipsis(),
+        "whitespace-nowrap" => d.whitespace_nowrap(),
+        "whitespace-normal" => d.whitespace_normal(),
+
+        // ── Text transform (GPUI APIs newer than crates.io 0.2.2; vendored gpui in this repo) ──
+        #[cfg(feature = "gpui_text_run_styles")]
+        "uppercase" => d.text_transform(TextTransform::Uppercase),
+        #[cfg(feature = "gpui_text_run_styles")]
+        "lowercase" => d.text_transform(TextTransform::Lowercase),
+        #[cfg(feature = "gpui_text_run_styles")]
+        "capitalize" => d.text_transform(TextTransform::Capitalize),
+        #[cfg(feature = "gpui_text_run_styles")]
+        "normal-case" => d.text_transform(TextTransform::None),
+        #[cfg(not(feature = "gpui_text_run_styles"))]
+        "uppercase" | "lowercase" | "capitalize" | "normal-case" => d,
+        _ => return Err(d),
+    })
+}
+
+#[allow(clippy::result_large_err)]
+fn apply_borders_shadows(d: Div, class: &str) -> Result<Div, Div> {
+    Ok(match class {
         // ── Border style ──
         "border-dashed" => d.border_dashed(),
 
@@ -331,92 +506,6 @@ fn apply_static(d: Div, class: &str) -> Result<Div, Div> {
         "rounded-br-3xl" => d.rounded_br_3xl(),
         "rounded-br-full" => d.rounded_br_full(),
 
-        // ── Typography — weight ──
-        "font-thin" => d.font_weight(gpui::FontWeight::THIN),
-        "font-light" => d.font_weight(gpui::FontWeight::LIGHT),
-        "font-normal" => d.font_weight(gpui::FontWeight::NORMAL),
-        "font-medium" => d.font_weight(gpui::FontWeight::MEDIUM),
-        "font-semibold" => d.font_weight(gpui::FontWeight::SEMIBOLD),
-        "font-bold" => d.font_weight(gpui::FontWeight::BOLD),
-        "font-extrabold" => d.font_weight(gpui::FontWeight::EXTRA_BOLD),
-        "font-black" => d.font_weight(gpui::FontWeight::BLACK),
-
-        // ── Typography — style ──
-        "italic" | "font-italic" => d.italic(),
-        "not-italic" => d.not_italic(),
-
-        // ── Typography — size ──
-        "text-xs" => d.text_xs(),
-        "text-sm" => d.text_sm(),
-        "text-base" => d.text_base(),
-        "text-lg" => d.text_lg(),
-        "text-xl" => d.text_xl(),
-        "text-2xl" => d.text_2xl(),
-        "text-3xl" => d.text_3xl(),
-        // 4xl-9xl: GPUI only has up to text_3xl, use text_size for larger
-        "text-4xl" => d.text_size(rems(2.25)),
-        "text-5xl" => d.text_size(rems(3.)),
-        "text-6xl" => d.text_size(rems(3.75)),
-        "text-7xl" => d.text_size(rems(4.5)),
-        "text-8xl" => d.text_size(rems(6.)),
-        "text-9xl" => d.text_size(rems(8.)),
-
-        // ── Typography — alignment ──
-        "text-left" => d.text_left(),
-        "text-center" => d.text_center(),
-        "text-right" => d.text_right(),
-
-        // ── Typography — decoration ──
-        "underline" => d.underline(),
-        "line-through" => d.line_through(),
-        "no-underline" => d.text_decoration_none(),
-        "decoration-solid" => d.text_decoration_solid(),
-        "decoration-wavy" => d.text_decoration_wavy(),
-        "decoration-0" => d.text_decoration_0(),
-        "decoration-1" => d.text_decoration_1(),
-        "decoration-2" => d.text_decoration_2(),
-        "decoration-4" => d.text_decoration_4(),
-        "decoration-8" => d.text_decoration_8(),
-
-        // ── Typography — line height ──
-        "leading-none" => d.line_height(relative(1.)),
-        "leading-tight" => d.line_height(relative(1.25)),
-        "leading-snug" => d.line_height(relative(1.375)),
-        "leading-normal" => d.line_height(relative(1.5)),
-        "leading-relaxed" => d.line_height(relative(1.625)),
-        "leading-loose" => d.line_height(relative(2.)),
-
-        // ── Typography — overflow ──
-        "truncate" => d.truncate(),
-        "text-ellipsis" => d.text_ellipsis(),
-        "whitespace-nowrap" => d.whitespace_nowrap(),
-        "whitespace-normal" => d.whitespace_normal(),
-
-        // ── Cursor ──
-        "cursor-default" => d.cursor_default(),
-        "cursor-pointer" => d.cursor_pointer(),
-        "cursor-text" => d.cursor_text(),
-        "cursor-move" => d.cursor_move(),
-        "cursor-not-allowed" => d.cursor_not_allowed(),
-        "cursor-context-menu" => d.cursor_context_menu(),
-        "cursor-crosshair" => d.cursor_crosshair(),
-        "cursor-vertical-text" => d.cursor_vertical_text(),
-        "cursor-alias" => d.cursor_alias(),
-        "cursor-copy" => d.cursor_copy(),
-        "cursor-no-drop" => d.cursor_no_drop(),
-        "cursor-grab" => d.cursor_grab(),
-        "cursor-grabbing" => d.cursor_grabbing(),
-        "cursor-ew-resize" => d.cursor_ew_resize(),
-        "cursor-ns-resize" => d.cursor_ns_resize(),
-        "cursor-nesw-resize" => d.cursor_nesw_resize(),
-        "cursor-nwse-resize" => d.cursor_nwse_resize(),
-        "cursor-col-resize" => d.cursor_col_resize(),
-        "cursor-row-resize" => d.cursor_row_resize(),
-        "cursor-n-resize" => d.cursor_n_resize(),
-        "cursor-e-resize" => d.cursor_e_resize(),
-        "cursor-s-resize" => d.cursor_s_resize(),
-        "cursor-w-resize" => d.cursor_w_resize(),
-
         // ── Shadow ──
         "shadow-2xs" => d.shadow_2xs(),
         "shadow-xs" => d.shadow_xs(),
@@ -426,115 +515,6 @@ fn apply_static(d: Div, class: &str) -> Result<Div, Div> {
         "shadow-xl" => d.shadow_xl(),
         "shadow-2xl" => d.shadow_2xl(),
         "shadow-none" => d.shadow_none(),
-
-        // ── Grid ──
-        "grid-cols-1" => d.grid_cols(1),
-        "grid-cols-2" => d.grid_cols(2),
-        "grid-cols-3" => d.grid_cols(3),
-        "grid-cols-4" => d.grid_cols(4),
-        "grid-cols-5" => d.grid_cols(5),
-        "grid-cols-6" => d.grid_cols(6),
-        "grid-cols-7" => d.grid_cols(7),
-        "grid-cols-8" => d.grid_cols(8),
-        "grid-cols-9" => d.grid_cols(9),
-        "grid-cols-10" => d.grid_cols(10),
-        "grid-cols-11" => d.grid_cols(11),
-        "grid-cols-12" => d.grid_cols(12),
-        "grid-rows-1" => d.grid_rows(1),
-        "grid-rows-2" => d.grid_rows(2),
-        "grid-rows-3" => d.grid_rows(3),
-        "grid-rows-4" => d.grid_rows(4),
-        "grid-rows-5" => d.grid_rows(5),
-        "grid-rows-6" => d.grid_rows(6),
-        "col-span-full" => d.col_span_full(),
-        "col-start-auto" => d.col_start_auto(),
-        "col-end-auto" => d.col_end_auto(),
-        "row-span-full" => d.row_span_full(),
-        "row-start-auto" => d.row_start_auto(),
-        "row-end-auto" => d.row_end_auto(),
-
-        // ── Transitions & animations — no-op at class level ──
-        // Actual animation is handled by animate: attributes in the renderer.
-        "transition"
-        | "transition-all"
-        | "transition-colors"
-        | "transition-opacity"
-        | "transition-shadow"
-        | "transition-transform"
-        | "duration-75"
-        | "duration-100"
-        | "duration-150"
-        | "duration-200"
-        | "duration-300"
-        | "duration-500"
-        | "duration-700"
-        | "duration-1000"
-        | "ease-linear"
-        | "ease-in"
-        | "ease-out"
-        | "ease-in-out"
-        | "delay-75"
-        | "delay-100"
-        | "delay-150"
-        | "delay-200"
-        | "delay-300"
-        | "delay-500"
-        | "delay-700"
-        | "delay-1000"
-        | "animate-none"
-        | "animate-spin"
-        | "animate-ping"
-        | "animate-pulse"
-        | "animate-bounce" => d,
-
-        // ── Align self ──
-        "self-start" => {
-            let mut d = d;
-            d.style().align_self = Some(AlignItems::Start);
-            d
-        }
-        "self-end" => {
-            let mut d = d;
-            d.style().align_self = Some(AlignItems::End);
-            d
-        }
-        "self-center" => {
-            let mut d = d;
-            d.style().align_self = Some(AlignItems::Center);
-            d
-        }
-        "self-stretch" => {
-            let mut d = d;
-            d.style().align_self = Some(AlignItems::Stretch);
-            d
-        }
-        "self-baseline" => {
-            let mut d = d;
-            d.style().align_self = Some(AlignItems::Baseline);
-            d
-        }
-        "self-auto" => {
-            let mut d = d;
-            d.style().align_self = None;
-            d
-        }
-
-        // ── Aspect ratio ──
-        "aspect-square" => {
-            let mut d = d;
-            d.style().aspect_ratio = Some(1.0);
-            d
-        }
-        "aspect-video" => {
-            let mut d = d;
-            d.style().aspect_ratio = Some(16.0 / 9.0);
-            d
-        }
-        "aspect-auto" => {
-            let mut d = d;
-            d.style().aspect_ratio = None;
-            d
-        }
 
         // ── Ring (focus ring via box-shadow spread) ──
         "ring" => d.shadow(vec![BoxShadow {
@@ -569,18 +549,71 @@ fn apply_static(d: Div, class: &str) -> Result<Div, Div> {
             spread_radius: px(8.),
         }]),
         "ring-inset" => d, // GPUI has no inset shadow; accepted silently
+        _ => return Err(d),
+    })
+}
 
-        // ── Text transform (GPUI APIs newer than crates.io 0.2.2; vendored gpui in this repo) ──
-        #[cfg(feature = "gpui_text_run_styles")]
-        "uppercase" => d.text_transform(TextTransform::Uppercase),
-        #[cfg(feature = "gpui_text_run_styles")]
-        "lowercase" => d.text_transform(TextTransform::Lowercase),
-        #[cfg(feature = "gpui_text_run_styles")]
-        "capitalize" => d.text_transform(TextTransform::Capitalize),
-        #[cfg(feature = "gpui_text_run_styles")]
-        "normal-case" => d.text_transform(TextTransform::None),
-        #[cfg(not(feature = "gpui_text_run_styles"))]
-        "uppercase" | "lowercase" | "capitalize" | "normal-case" => d,
+#[allow(clippy::result_large_err)]
+fn apply_misc(d: Div, class: &str) -> Result<Div, Div> {
+    Ok(match class {
+        // ── Cursor ──
+        "cursor-default" => d.cursor_default(),
+        "cursor-pointer" => d.cursor_pointer(),
+        "cursor-text" => d.cursor_text(),
+        "cursor-move" => d.cursor_move(),
+        "cursor-not-allowed" => d.cursor_not_allowed(),
+        "cursor-context-menu" => d.cursor_context_menu(),
+        "cursor-crosshair" => d.cursor_crosshair(),
+        "cursor-vertical-text" => d.cursor_vertical_text(),
+        "cursor-alias" => d.cursor_alias(),
+        "cursor-copy" => d.cursor_copy(),
+        "cursor-no-drop" => d.cursor_no_drop(),
+        "cursor-grab" => d.cursor_grab(),
+        "cursor-grabbing" => d.cursor_grabbing(),
+        "cursor-ew-resize" => d.cursor_ew_resize(),
+        "cursor-ns-resize" => d.cursor_ns_resize(),
+        "cursor-nesw-resize" => d.cursor_nesw_resize(),
+        "cursor-nwse-resize" => d.cursor_nwse_resize(),
+        "cursor-col-resize" => d.cursor_col_resize(),
+        "cursor-row-resize" => d.cursor_row_resize(),
+        "cursor-n-resize" => d.cursor_n_resize(),
+        "cursor-e-resize" => d.cursor_e_resize(),
+        "cursor-s-resize" => d.cursor_s_resize(),
+        "cursor-w-resize" => d.cursor_w_resize(),
+
+        // ── Transitions & animations — no-op at class level ──
+        // Actual animation is handled by animate: attributes in the renderer.
+        "transition"
+        | "transition-all"
+        | "transition-colors"
+        | "transition-opacity"
+        | "transition-shadow"
+        | "transition-transform"
+        | "duration-75"
+        | "duration-100"
+        | "duration-150"
+        | "duration-200"
+        | "duration-300"
+        | "duration-500"
+        | "duration-700"
+        | "duration-1000"
+        | "ease-linear"
+        | "ease-in"
+        | "ease-out"
+        | "ease-in-out"
+        | "delay-75"
+        | "delay-100"
+        | "delay-150"
+        | "delay-200"
+        | "delay-300"
+        | "delay-500"
+        | "delay-700"
+        | "delay-1000"
+        | "animate-none"
+        | "animate-spin"
+        | "animate-ping"
+        | "animate-pulse"
+        | "animate-bounce" => d,
 
         // ── Accepted silently (CSS-only or unsupported in GPUI) ──
         "inline-flex"
