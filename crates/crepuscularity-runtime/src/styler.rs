@@ -122,6 +122,7 @@ fn apply_static(d: Div, class: &str) -> Result<Div, Div> {
         .or_else(|d| apply_misc(d, class))
 }
 
+#[allow(clippy::result_large_err)]
 fn apply_layout(d: Div, class: &str) -> Result<Div, Div> {
     Ok(match class {
         // ── Display ──
@@ -287,6 +288,7 @@ fn apply_layout(d: Div, class: &str) -> Result<Div, Div> {
     })
 }
 
+#[allow(clippy::result_large_err)]
 fn apply_colors(d: Div, class: &str) -> Result<Div, Div> {
     Ok(match class {
         // ── Named colors — background ──
@@ -315,6 +317,7 @@ fn apply_colors(d: Div, class: &str) -> Result<Div, Div> {
     })
 }
 
+#[allow(clippy::result_large_err)]
 fn apply_typography(d: Div, class: &str) -> Result<Div, Div> {
     Ok(match class {
         // ── Typography — weight ──
@@ -393,6 +396,7 @@ fn apply_typography(d: Div, class: &str) -> Result<Div, Div> {
     })
 }
 
+#[allow(clippy::result_large_err)]
 fn apply_borders_shadows(d: Div, class: &str) -> Result<Div, Div> {
     Ok(match class {
         // ── Border style ──
@@ -549,6 +553,7 @@ fn apply_borders_shadows(d: Div, class: &str) -> Result<Div, Div> {
     })
 }
 
+#[allow(clippy::result_large_err)]
 fn apply_misc(d: Div, class: &str) -> Result<Div, Div> {
     Ok(match class {
         // ── Cursor ──
