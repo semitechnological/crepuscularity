@@ -731,7 +731,7 @@ fn handle_connection(mut stream: TcpStream, ctx: DevRequestContext) {
         }
 
         ("GET", p) if p.starts_with("/islands/") => {
-            serve_dev_fs_file(&mut stream, &ctx.dev_root.join(p.trim_start_matches('/')));
+            serve_islands_path(&mut stream, p, &ctx.dev_root);
         }
 
         ("GET", p) if p.starts_with("/docs") => {
@@ -939,6 +939,23 @@ fn serve_pkg_path(stream: &mut TcpStream, url_path: &str, dev_root: &Path) {
         return;
     }
     let base = dev_root.join("pkg");
+    let path = base.join(rel);
+    if !path.starts_with(&base) {
+        write_simple_not_found(stream);
+        return;
+    }
+    serve_dev_fs_file(stream, &path);
+}
+
+fn serve_islands_path(stream: &mut TcpStream, url_path: &str, dev_root: &Path) {
+    let rel = url_path
+        .trim_start_matches("/islands/")
+        .trim_start_matches('/');
+    if rel.is_empty() || rel.contains("..") {
+        write_simple_not_found(stream);
+        return;
+    }
+    let base = dev_root.join("islands");
     let path = base.join(rel);
     if !path.starts_with(&base) {
         write_simple_not_found(stream);

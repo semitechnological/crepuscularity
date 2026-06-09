@@ -369,14 +369,12 @@ impl Platform for WindowsPlatform {
 
     fn hide(&self) {}
 
-    // todo(windows)
     fn hide_other_apps(&self) {
-        unimplemented!()
+        log::info!("hide_other_apps is not implemented on Windows, ignoring the call")
     }
 
-    // todo(windows)
     fn unhide_other_apps(&self) {
-        unimplemented!()
+        log::info!("unhide_other_apps is not implemented on Windows, ignoring the call")
     }
 
     fn displays(&self) -> Vec<Rc<dyn PlatformDisplay>> {
@@ -545,9 +543,11 @@ impl Platform for WindowsPlatform {
         Ok(std::env::current_exe()?)
     }
 
-    // todo(windows)
-    fn path_for_auxiliary_executable(&self, _name: &str) -> Result<PathBuf> {
-        anyhow::bail!("not yet implemented");
+    fn path_for_auxiliary_executable(&self, name: &str) -> Result<PathBuf> {
+        let mut path = std::env::current_exe()?;
+        path.set_file_name(name);
+        path.set_extension("exe");
+        Ok(path)
     }
 
     fn set_cursor_style(&self, style: CursorStyle) {

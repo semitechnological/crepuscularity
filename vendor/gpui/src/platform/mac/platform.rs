@@ -1376,6 +1376,14 @@ extern "C" fn will_finish_launching(_this: &mut Object, _: Sel, _: id) {
             let false_value: id = msg_send![class!(NSNumber), numberWithBool:false];
             let _: () = msg_send![user_defaults, setObject: false_value forKey: name];
         }
+
+        // Disable Apple Press and Hold to allow raw key repeats.
+        let name = ns_string("ApplePressAndHoldEnabled");
+        let existing_value: id = msg_send![user_defaults, objectForKey: name];
+        if existing_value == nil {
+            let false_value: id = msg_send![class!(NSNumber), numberWithBool:false];
+            let _: () = msg_send![user_defaults, setObject: false_value forKey: name];
+        }
     }
 }
 

@@ -111,10 +111,11 @@ fn render_component_file_to_html_with_ssr(
 
     let mut child_ctx = ctx.clone();
     for (key, expr) in &component.meta.defaults {
-        child_ctx
-            .vars
-            .entry(key.clone())
-            .or_insert(eval_expr(expr, &TemplateContext::new())?);
+        if !child_ctx.vars.contains_key(key) {
+            child_ctx
+                .vars
+                .insert(key.clone(), eval_expr(expr, &TemplateContext::new())?);
+        }
     }
 
     let counter = Cell::new(0u32);
@@ -128,25 +129,39 @@ fn render_component_file_to_html_with_ssr(
 pub fn render_bundle_with_ssr(bundle_json: &str, markers: bool) -> Result<String, CrepusError> {
     let root: Value = serde_json::from_str(bundle_json)
         .map_err(|e| CrepusError::render(format!("bundle JSON: {e}")))?;
-    let entry = root
-        .get("entry")
-        .and_then(|v| v.as_str())
-        .ok_or_else(|| CrepusError::render("bundle missing string field \"entry\""))?
-        .to_string();
-    let files_val = root
-        .get("files")
+
+    let mut root_map = match root {
+        Value::Object(map) => map,
+        _ => return Err(CrepusError::render("bundle must be a JSON object")),
+    };
+
+    let entry = match root_map.remove("entry") {
+        Some(Value::String(s)) => s,
+        _ => return Err(CrepusError::render("bundle missing string field \"entry\"")),
+    };
+
+    let files_val = root_map
+        .remove("files")
         .ok_or_else(|| CrepusError::render("bundle missing \"files\" object"))?;
-    let files_obj = files_val
-        .as_object()
-        .ok_or_else(|| CrepusError::render("\"files\" must be a JSON object"))?;
-    let mut files = HashMap::new();
+
+    let files_obj = match files_val {
+        Value::Object(map) => map,
+        _ => return Err(CrepusError::render("\"files\" must be a JSON object")),
+    };
+
+    let mut files = HashMap::with_capacity(files_obj.len());
     for (k, v) in files_obj {
-        let s = v
-            .as_str()
-            .ok_or_else(|| CrepusError::render(format!("files[{k:?}] must be a string")))?
-            .to_string();
-        files.insert(k.clone(), s);
+        let s = match v {
+            Value::String(s) => s,
+            _ => {
+                return Err(CrepusError::render(format!(
+                    "files[{k:?}] must be a string"
+                )))
+            }
+        };
+        files.insert(k, s);
     }
+
     let ctx = TemplateContext::new();
     render_from_files_with_ssr(&files, &entry, &ctx, markers)
 }

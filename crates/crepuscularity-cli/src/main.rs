@@ -9,7 +9,6 @@
 //!   crepus render FILE [--ctx FILE] [--var k=v] [--component Name]
 //!   crepus web new NAME                          scaffold index.crepus + runtime/ + crepus.toml
 //!   crepus web build [--site DIR] [--out-dir DIR]   dist/ with WASM + crepus-bundle.json
-//!   crepus web site-json [--site DIR]             pretty-print site.json (deprecated)
 //!   crepus webext new NAME                       scaffold a browser extension
 //!   crepus webext build [--app PATH]             build browser extension
 //!   crepus webext manifest [--app PATH]          print manifest.json
@@ -317,10 +316,6 @@ fn print_usage() {
         (
             "web build [--site] [--release]       ",
             "static dist/ — HTML shell + WASM bundle",
-        ),
-        (
-            "web site-json [--site DIR]           ",
-            "pretty-print site.json",
         ),
         (
             "web dev [--site DIR] [--port N]      ",
