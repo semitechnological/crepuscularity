@@ -482,7 +482,7 @@ impl<P: LinuxClient + 'static> Platform for P {
     }
 
     fn set_dock_menu(&self, _menu: Vec<MenuItem>, _keymap: &Keymap) {
-        // todo(linux)
+        // Not applicable on Linux
     }
 
     fn path_for_auxiliary_executable(&self, _name: &str) -> Result<PathBuf> {
