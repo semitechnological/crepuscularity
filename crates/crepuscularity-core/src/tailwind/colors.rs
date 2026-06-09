@@ -307,3 +307,34 @@ pub fn lookup_color_u32(name: &str) -> Option<u32> {
     }
     u32::from_str_radix(&h[..6], 16).ok()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_lookup_named_color() {
+        assert_eq!(lookup_named_color("amber-500"), Some("#fe9a00"));
+        assert_eq!(lookup_named_color("black"), Some("#000"));
+        assert_eq!(lookup_named_color("white"), Some("#fff"));
+        assert_eq!(lookup_named_color("zinc-950"), Some("#09090b"));
+
+        // Edge cases
+        assert_eq!(lookup_named_color(""), None);
+        assert_eq!(lookup_named_color("non-existent-color"), None);
+        assert_eq!(lookup_named_color("amber"), None); // Must specify shade
+        assert_eq!(lookup_named_color("amber-5000"), None);
+    }
+
+    #[test]
+    fn test_lookup_color_u32() {
+        assert_eq!(lookup_color_u32("amber-500"), Some(0xfe9a00));
+        assert_eq!(lookup_color_u32("zinc-950"), Some(0x09090b));
+
+        // Short hex strings currently return None because of `h.len() < 6` check
+        assert_eq!(lookup_color_u32("black"), None);
+        assert_eq!(lookup_color_u32("white"), None);
+
+        assert_eq!(lookup_color_u32("non-existent-color"), None);
+    }
+}
