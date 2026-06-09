@@ -919,7 +919,7 @@ fn check_requires(requires: &[String]) -> bool {
         return true;
     }
     for r in requires {
-        let (ok, _, _) = run_shell(Path::new("."), r, false, false);
+        let (ok, _, _) = run_shell(Path::new("."), r, false, false, &HashMap::new());
         if !ok {
             return false;
         }
@@ -1059,11 +1059,12 @@ fn run_shell(
     script: &str,
     inherit_io: bool,
     measure_memory: bool,
+    envs: &HashMap<String, String>,
 ) -> (bool, String, Option<u64>) {
     #[cfg(unix)]
     {
         let mut cmd = Command::new("sh");
-        cmd.arg("-c").arg(script).current_dir(workdir);
+        cmd.arg("-c").arg(script).current_dir(workdir).envs(envs);
         match exec_tracked(&mut cmd, inherit_io, measure_memory) {
             Ok(x) => x,
             Err(e) => (false, e, None),
@@ -1072,7 +1073,7 @@ fn run_shell(
     #[cfg(not(unix))]
     {
         let mut cmd = Command::new("cmd");
-        cmd.args(["/C", script]).current_dir(workdir);
+        cmd.args(["/C", script]).current_dir(workdir).envs(envs);
         let _measure_memory = measure_memory; // RSS sampling not implemented on Windows
         if inherit_io {
             let st = cmd.status();
@@ -1108,6 +1109,21 @@ fn expand_vars(s: &str, vars: &HashMap<String, String>) -> String {
     out
 }
 
+#[cfg(unix)]
+fn shell_native_vars(s: &str, _vars: &HashMap<String, String>) -> String {
+    s.to_string()
+}
+
+#[cfg(not(unix))]
+fn shell_native_vars(s: &str, vars: &HashMap<String, String>) -> String {
+    let mut out = s.to_string();
+    for k in vars.keys() {
+        out = out.replace(&format!("${k}"), &format!("%{k}%"));
+        out = out.replace(&format!("${{{k}}}"), &format!("%{k}%"));
+    }
+    out
+}
+
 /// Step `cwd` supports `$REPO` / `$WORK` / `$TARGET` like `shell`. If the expanded path is
 /// absolute, it is used as-is; otherwise it is resolved under the per-target work dir.
 fn resolve_step_cwd(ctx: &StepRunCtx<'_>, step: &BenchStep) -> PathBuf {
@@ -1131,7 +1147,7 @@ fn run_steps(
     for (i, step) in steps.iter().enumerate() {
         let one = i + 1;
         let cwd = resolve_step_cwd(&ctx, step);
-        let script = expand_vars(&step.shell, ctx.vars);
+        let script = shell_native_vars(&step.shell, ctx.vars);
 
         if ctx.dry_run {
             print_step_line(ctx.json_out, ctx.verbose, one, n, &step.name, None);
@@ -1168,7 +1184,7 @@ fn run_steps(
         }
 
         let t0 = Instant::now();
-        let (ok, stderr, max_rss) = run_shell(&cwd, &script, inherit_io, ctx.measure_memory);
+        let (ok, stderr, max_rss) = run_shell(&cwd, &script, inherit_io, ctx.measure_memory, ctx.vars);
         let ms = t0.elapsed().as_millis();
 
         let tail = stderr_tail_opt(&stderr);
