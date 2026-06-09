@@ -188,8 +188,14 @@ mod tests {
         assert_eq!(parse_size_width_height("px"), Some(SizeToken::Px(1)));
 
         // Fractions
-        assert_eq!(parse_size_width_height("1/2"), Some(SizeToken::Fraction { num: 1, den: 2 }));
-        assert_eq!(parse_size_width_height("3/4"), Some(SizeToken::Fraction { num: 3, den: 4 }));
+        assert_eq!(
+            parse_size_width_height("1/2"),
+            Some(SizeToken::Fraction { num: 1, den: 2 })
+        );
+        assert_eq!(
+            parse_size_width_height("3/4"),
+            Some(SizeToken::Fraction { num: 3, den: 4 })
+        );
         assert_eq!(parse_size_width_height("1/0"), None); // division by zero check if present, actually d > 0 check
 
         // Arbitrary pixel sizes
