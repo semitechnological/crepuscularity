@@ -177,6 +177,37 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_size_width_height() {
+        // Exact string matches
+        assert_eq!(parse_size_width_height("full"), Some(SizeToken::Full));
+        assert_eq!(parse_size_width_height("screen"), Some(SizeToken::Full));
+        assert_eq!(parse_size_width_height("auto"), Some(SizeToken::Auto));
+        assert_eq!(parse_size_width_height("fit"), Some(SizeToken::Auto));
+        assert_eq!(parse_size_width_height("min"), Some(SizeToken::Auto));
+        assert_eq!(parse_size_width_height("max"), Some(SizeToken::Auto));
+        assert_eq!(parse_size_width_height("px"), Some(SizeToken::Px(1)));
+
+        // Fractions
+        assert_eq!(parse_size_width_height("1/2"), Some(SizeToken::Fraction { num: 1, den: 2 }));
+        assert_eq!(parse_size_width_height("3/4"), Some(SizeToken::Fraction { num: 3, den: 4 }));
+        assert_eq!(parse_size_width_height("1/0"), None); // division by zero check if present, actually d > 0 check
+
+        // Arbitrary pixel sizes
+        assert_eq!(parse_size_width_height("[10px]"), Some(SizeToken::Px(10)));
+        assert_eq!(parse_size_width_height("[42]"), Some(SizeToken::Px(42)));
+
+        // Spacing scale fallbacks
+        assert_eq!(parse_size_width_height("4"), Some(SizeToken::Spacing(16)));
+        assert_eq!(parse_size_width_height("1.5"), Some(SizeToken::Spacing(6)));
+
+        // Invalid inputs
+        assert_eq!(parse_size_width_height("invalid"), None);
+        assert_eq!(parse_size_width_height("1/invalid"), None);
+        assert_eq!(parse_size_width_height("[invalid]"), None);
+        assert_eq!(parse_size_width_height(""), None);
+    }
+
+    #[test]
     fn radius_scale() {
         assert_eq!(parse_radius_px(""), Some(4));
         assert_eq!(parse_radius_px("md"), Some(6));
