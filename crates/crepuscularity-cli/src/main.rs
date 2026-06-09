@@ -284,165 +284,147 @@ fn print_usage() {
         style(env!("CARGO_PKG_VERSION")).dim()
     );
     eprintln!();
+
+    let commands = [
+        (
+            "new <name>                           ",
+            "scaffold a new GPUI app",
+        ),
+        (
+            "init <kind> <name>                    ",
+            "scaffold web, webext, tui, native, ios, or gpui",
+        ),
+        (
+            "dev [--bin NAME] [--debug|--dev|--release]",
+            "hot-reload dev loop",
+        ),
+        (
+            "build [TYPE|ID] [--debug|--dev|--release]",
+            "build crepus.toml targets, or cargo fallback",
+        ),
+        (
+            "preview <file.crepus>                ",
+            "live-preview a template (GPUI window)",
+        ),
+        (
+            "render <file.crepus> [--ctx] [--var] ",
+            "render template to HTML on stdout",
+        ),
+        (
+            "web new <name>                       ",
+            "scaffold .crepus site + WASM runtime/",
+        ),
+        (
+            "web build [--site] [--release]       ",
+            "static dist/ — HTML shell + WASM bundle",
+        ),
+        (
+            "web site-json [--site DIR]           ",
+            "pretty-print site.json",
+        ),
+        (
+            "web dev [--site DIR] [--port N]      ",
+            "live-reload dev server (alias: serve)",
+        ),
+        ("", ""),
+        (
+            "webext new <name>                    ",
+            "scaffold a browser extension",
+        ),
+        (
+            "webext build [--app PATH] [--release]",
+            "build extension to dist/unpacked/",
+        ),
+        (
+            "webext manifest [--app PATH]         ",
+            "print manifest.json",
+        ),
+        (
+            "ios new <name>                         ",
+            "XcodeGen + NativeShell SwiftPM app",
+        ),
+        (
+            "ios generate [--dir] [--spec]          ",
+            "xcodegen; finds crepus.toml [ios] up-tree",
+        ),
+        (
+            "ios build [--dir] [--scheme] [--release]",
+            "xcodegen + xcodebuild; toml = defaults",
+        ),
+        (
+            "tui new <name>                         ",
+            "scaffold TUI app with Ratatui",
+        ),
+        ("tui build [--debug|--dev|--release]     ", "build TUI app"),
+        (
+            "tui preview <file.crepus>               ",
+            "hot-reload preview a .crepus template in the terminal",
+        ),
+        (
+            "native new <name>                       ",
+            "scaffold native iOS/Android app",
+        ),
+        (
+            "native ir <file.crepus>                  ",
+            "emit View IR JSON",
+        ),
+        (
+            "native build ios [--scheme]             ",
+            "build native iOS app",
+        ),
+        (
+            "native build android [--flavor]         ",
+            "build native Android app",
+        ),
+        (
+            "embedded check <file> [--component Name]  ",
+            "validate .crepus for CI / build.rs",
+        ),
+        (
+            "embedded snapshot <file> -W -H --out ppm",
+            "debug PPM only (use Rust API in firmware)",
+        ),
+        (
+            "aurora dev [--watch DIR]           ",
+            "hot-reload preview window (SwiftUI Runner).",
+        ),
+        (
+            "aurora run [PROJECT] [--macos|--ios]",
+            "build & launch a SwiftUI project.",
+        ),
+        (
+            "benchmark [all|run|check] [flags…]   ",
+            "benchmark.toml run or prereq probe (see examples/benchmarks)",
+        ),
+    ];
+
     eprintln!("{}", style("COMMANDS").dim());
-    eprintln!(
-        "  {}  {}",
-        style("new <name>                           ").green(),
-        style("scaffold a new GPUI app").dim()
-    );
-    eprintln!(
-        "  {}  {}",
-        style("init <kind> <name>                    ").green(),
-        style("scaffold web, webext, tui, native, ios, or gpui").dim()
-    );
-    eprintln!(
-        "  {}  {}",
-        style("dev [--bin NAME] [--debug|--dev|--release]").green(),
-        style("hot-reload dev loop").dim()
-    );
-    eprintln!(
-        "  {}  {}",
-        style("build [TYPE|ID] [--debug|--dev|--release]").green(),
-        style("build crepus.toml targets, or cargo fallback").dim()
-    );
-    eprintln!(
-        "  {}  {}",
-        style("preview <file.crepus>                ").green(),
-        style("live-preview a template (GPUI window)").dim()
-    );
-    eprintln!(
-        "  {}  {}",
-        style("render <file.crepus> [--ctx] [--var] ").green(),
-        style("render template to HTML on stdout").dim()
-    );
-    eprintln!(
-        "  {}  {}",
-        style("web new <name>                       ").green(),
-        style("scaffold .crepus site + WASM runtime/").dim()
-    );
-    eprintln!(
-        "  {}  {}",
-        style("web build [--site] [--release]       ").green(),
-        style("static dist/ — HTML shell + WASM bundle").dim()
-    );
-    eprintln!(
-        "  {}  {}",
-        style("web site-json [--site DIR]           ").green(),
-        style("pretty-print site.json").dim()
-    );
-    eprintln!(
-        "  {}  {}",
-        style("web dev [--site DIR] [--port N]      ").green(),
-        style("live-reload dev server (alias: serve)").dim()
-    );
+    for (cmd, desc) in commands {
+        if cmd.is_empty() {
+            eprintln!();
+        } else {
+            eprintln!("  {}  {}", style(cmd).green(), style(desc).dim());
+        }
+    }
     eprintln!();
-    eprintln!(
-        "  {}  {}",
-        style("webext new <name>                    ").green(),
-        style("scaffold a browser extension").dim()
-    );
-    eprintln!(
-        "  {}  {}",
-        style("webext build [--app PATH] [--release]").green(),
-        style("build extension to dist/unpacked/").dim()
-    );
-    eprintln!(
-        "  {}  {}",
-        style("webext manifest [--app PATH]         ").green(),
-        style("print manifest.json").dim()
-    );
-    eprintln!(
-        "  {}  {}",
-        style("ios new <name>                         ").green(),
-        style("XcodeGen + NativeShell SwiftPM app").dim()
-    );
-    eprintln!(
-        "  {}  {}",
-        style("ios generate [--dir] [--spec]          ").green(),
-        style("xcodegen; finds crepus.toml [ios] up-tree").dim()
-    );
-    eprintln!(
-        "  {}  {}",
-        style("ios build [--dir] [--scheme] [--release]").green(),
-        style("xcodegen + xcodebuild; toml = defaults").dim()
-    );
-    eprintln!(
-        "  {}  {}",
-        style("tui new <name>                         ").green(),
-        style("scaffold TUI app with Ratatui").dim()
-    );
-    eprintln!(
-        "  {}  {}",
-        style("tui build [--debug|--dev|--release]     ").green(),
-        style("build TUI app").dim()
-    );
-    eprintln!(
-        "  {}  {}",
-        style("tui preview <file.crepus>               ").green(),
-        style("hot-reload preview a .crepus template in the terminal").dim()
-    );
-    eprintln!(
-        "  {}  {}",
-        style("native new <name>                       ").green(),
-        style("scaffold native iOS/Android app").dim()
-    );
-    eprintln!(
-        "  {}  {}",
-        style("native ir <file.crepus>                  ").green(),
-        style("emit View IR JSON").dim()
-    );
-    eprintln!(
-        "  {}  {}",
-        style("native build ios [--scheme]             ").green(),
-        style("build native iOS app").dim()
-    );
-    eprintln!(
-        "  {}  {}",
-        style("native build android [--flavor]         ").green(),
-        style("build native Android app").dim()
-    );
-    eprintln!(
-        "  {}  {}",
-        style("embedded check <file> [--component Name]  ").green(),
-        style("validate .crepus for CI / build.rs").dim()
-    );
-    eprintln!(
-        "  {}  {}",
-        style("embedded snapshot <file> -W -H --out ppm").green(),
-        style("debug PPM only (use Rust API in firmware)").dim()
-    );
-    eprintln!(
-        "  {}  {}",
-        style("aurora dev [--watch DIR]           ").green(),
-        style("hot-reload preview window (SwiftUI Runner).").dim()
-    );
-    eprintln!(
-        "  {}  {}",
-        style("aurora run [PROJECT] [--macos|--ios]").green(),
-        style("build & launch a SwiftUI project.").dim()
-    );
-    eprintln!(
-        "  {}  {}",
-        style("benchmark [all|run|check] [flags…]   ").green(),
-        style("benchmark.toml run or prereq probe (see examples/benchmarks)").dim()
-    );
-    eprintln!();
+
+    let options = [
+        ("-h, --help                           ", "show this help"),
+        ("-V, --version                        ", "show version"),
+        (
+            "--emit-events                        ",
+            "emit JSON events to stdout (IDE integration)",
+        ),
+    ];
+
     eprintln!("{}", style("OPTIONS").dim());
-    eprintln!(
-        "  {}  {}",
-        style("-h, --help                           ").green(),
-        style("show this help").dim()
-    );
-    eprintln!(
-        "  {}  {}",
-        style("-V, --version                        ").green(),
-        style("show version").dim()
-    );
-    eprintln!(
-        "  {}  {}",
-        style("--emit-events                        ").green(),
-        style("emit JSON events to stdout (IDE integration)").dim()
-    );
+    for (opt, desc) in options {
+        if opt.is_empty() {
+            eprintln!();
+        } else {
+            eprintln!("  {}  {}", style(opt).green(), style(desc).dim());
+        }
+    }
 }
 
 #[cfg(feature = "desktop")]
