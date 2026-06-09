@@ -105,8 +105,10 @@ pub fn par_render_component_file(
             .map(|(name, comp)| {
                 let mut child_ctx = ctx.clone();
                 for (key, expr) in &comp.meta.defaults {
-                    if let Ok(val) = eval_expr(expr, &TemplateContext::new()) {
-                        child_ctx.vars.entry(key.clone()).or_insert(val);
+                    if !child_ctx.vars.contains_key(key) {
+                        if let Ok(val) = eval_expr(expr, &TemplateContext::new()) {
+                            child_ctx.vars.insert(key.clone(), val);
+                        }
                     }
                 }
                 let html = render_nodes_to_html(&comp.nodes, &child_ctx);
@@ -121,10 +123,11 @@ pub fn par_render_component_file(
         for (name, comp) in &file.components {
             let mut child_ctx = ctx.clone();
             for (key, expr) in &comp.meta.defaults {
-                child_ctx
-                    .vars
-                    .entry(key.clone())
-                    .or_insert(eval_expr(expr, &TemplateContext::new())?);
+                if !child_ctx.vars.contains_key(key) {
+                    child_ctx
+                        .vars
+                        .insert(key.clone(), eval_expr(expr, &TemplateContext::new())?);
+                }
             }
             let html = render_nodes_to_html(&comp.nodes, &child_ctx);
             results.insert(name.clone(), html);
@@ -164,10 +167,11 @@ pub fn render_component_file_to_html(
 
     let mut child_ctx = ctx.clone();
     for (key, expr) in &component.meta.defaults {
-        child_ctx
-            .vars
-            .entry(key.clone())
-            .or_insert(eval_expr(expr, &TemplateContext::new())?);
+        if !child_ctx.vars.contains_key(key) {
+            child_ctx
+                .vars
+                .insert(key.clone(), eval_expr(expr, &TemplateContext::new())?);
+        }
     }
 
     render_nodes_to_html(&component.nodes, &child_ctx)
