@@ -545,9 +545,11 @@ impl Platform for WindowsPlatform {
         Ok(std::env::current_exe()?)
     }
 
-    // todo(windows)
-    fn path_for_auxiliary_executable(&self, _name: &str) -> Result<PathBuf> {
-        anyhow::bail!("not yet implemented");
+    fn path_for_auxiliary_executable(&self, name: &str) -> Result<PathBuf> {
+        let mut path = std::env::current_exe()?;
+        path.set_file_name(name);
+        path.set_extension("exe");
+        Ok(path)
     }
 
     fn set_cursor_style(&self, style: CursorStyle) {
