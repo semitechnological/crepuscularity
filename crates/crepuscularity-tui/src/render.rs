@@ -171,30 +171,50 @@ pub fn render_component(
 
 fn with_tui_target(ctx: &TemplateContext) -> TemplateContext {
     let mut ctx = ctx.clone();
-    ctx.vars
-        .entry("crepus_target".to_string())
-        .or_insert_with(|| TemplateValue::Str("tui".to_string()));
-    ctx.vars
-        .entry("is_tui".to_string())
-        .or_insert(TemplateValue::Bool(true));
-    ctx.vars
-        .entry("is_gui".to_string())
-        .or_insert(TemplateValue::Bool(false));
-    ctx.vars
-        .entry("is_web".to_string())
-        .or_insert(TemplateValue::Bool(false));
-    ctx.vars
-        .entry("crepus_platform".to_string())
-        .or_insert_with(|| TemplateValue::Str(std::env::consts::OS.to_string()));
-    ctx.vars
-        .entry("is_macos".to_string())
-        .or_insert(TemplateValue::Bool(cfg!(target_os = "macos")));
-    ctx.vars
-        .entry("is_windows".to_string())
-        .or_insert(TemplateValue::Bool(cfg!(target_os = "windows")));
-    ctx.vars
-        .entry("is_linux".to_string())
-        .or_insert(TemplateValue::Bool(cfg!(target_os = "linux")));
+
+    if !ctx.vars.contains_key("crepus_target") {
+        ctx.vars.insert(
+            "crepus_target".to_string(),
+            TemplateValue::Str("tui".to_string()),
+        );
+    }
+    if !ctx.vars.contains_key("is_tui") {
+        ctx.vars
+            .insert("is_tui".to_string(), TemplateValue::Bool(true));
+    }
+    if !ctx.vars.contains_key("is_gui") {
+        ctx.vars
+            .insert("is_gui".to_string(), TemplateValue::Bool(false));
+    }
+    if !ctx.vars.contains_key("is_web") {
+        ctx.vars
+            .insert("is_web".to_string(), TemplateValue::Bool(false));
+    }
+    if !ctx.vars.contains_key("crepus_platform") {
+        ctx.vars.insert(
+            "crepus_platform".to_string(),
+            TemplateValue::Str(std::env::consts::OS.to_string()),
+        );
+    }
+    if !ctx.vars.contains_key("is_macos") {
+        ctx.vars.insert(
+            "is_macos".to_string(),
+            TemplateValue::Bool(cfg!(target_os = "macos")),
+        );
+    }
+    if !ctx.vars.contains_key("is_windows") {
+        ctx.vars.insert(
+            "is_windows".to_string(),
+            TemplateValue::Bool(cfg!(target_os = "windows")),
+        );
+    }
+    if !ctx.vars.contains_key("is_linux") {
+        ctx.vars.insert(
+            "is_linux".to_string(),
+            TemplateValue::Bool(cfg!(target_os = "linux")),
+        );
+    }
+
     ctx
 }
 
