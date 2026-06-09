@@ -71,31 +71,28 @@ struct FontIdentifier {
 
 impl DirectWriteComponent {
     pub fn new(directx_devices: &DirectXDevices) -> Result<Self> {
-        // todo: ideally this would not be a large unsafe block but smaller isolated ones for easier auditing
-        unsafe {
-            let factory: IDWriteFactory5 = DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED)?;
-            // The `IDWriteInMemoryFontFileLoader` here is supported starting from
-            // Windows 10 Creators Update, which consequently requires the entire
-            // `DirectWriteTextSystem` to run on `win10 1703`+.
-            let in_memory_loader = factory.CreateInMemoryFontFileLoader()?;
-            factory.RegisterFontFileLoader(&in_memory_loader)?;
-            let builder = factory.CreateFontSetBuilder()?;
-            let mut locale_vec = vec![0u16; LOCALE_NAME_MAX_LENGTH as usize];
-            GetUserDefaultLocaleName(&mut locale_vec);
-            let locale = String::from_utf16_lossy(&locale_vec);
-            let text_renderer = Arc::new(TextRendererWrapper::new(&locale));
+        let factory: IDWriteFactory5 = unsafe { DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED)? };
+        // The `IDWriteInMemoryFontFileLoader` here is supported starting from
+        // Windows 10 Creators Update, which consequently requires the entire
+        // `DirectWriteTextSystem` to run on `win10 1703`+.
+        let in_memory_loader = unsafe { factory.CreateInMemoryFontFileLoader()? };
+        unsafe { factory.RegisterFontFileLoader(&in_memory_loader)? };
+        let builder = unsafe { factory.CreateFontSetBuilder()? };
+        let mut locale_vec = vec![0u16; LOCALE_NAME_MAX_LENGTH as usize];
+        unsafe { GetUserDefaultLocaleName(&mut locale_vec) };
+        let locale = String::from_utf16_lossy(&locale_vec);
+        let text_renderer = Arc::new(TextRendererWrapper::new(&locale));
 
-            let gpu_state = GPUState::new(directx_devices)?;
+        let gpu_state = GPUState::new(directx_devices)?;
 
-            Ok(DirectWriteComponent {
-                locale,
-                factory,
-                in_memory_loader,
-                builder,
-                text_renderer,
-                gpu_state,
-            })
-        }
+        Ok(DirectWriteComponent {
+            locale,
+            factory,
+            in_memory_loader,
+            builder,
+            text_renderer,
+            gpu_state,
+        })
     }
 }
 
