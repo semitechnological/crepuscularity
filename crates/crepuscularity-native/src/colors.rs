@@ -117,4 +117,24 @@ mod tests {
         assert!(resolve_rgba("Slate-500").is_some());
         assert!(resolve_rgba("#FF0000").is_some());
     }
+
+    #[test]
+    fn test_parse_opacity_suffix_valid() {
+        assert_eq!(parse_opacity_suffix("0"), Some(0.0));
+        assert_eq!(parse_opacity_suffix("50"), Some(0.5));
+        assert_eq!(parse_opacity_suffix("100"), Some(1.0));
+        assert_eq!(parse_opacity_suffix("75"), Some(0.75));
+        assert_eq!(parse_opacity_suffix("33"), Some(0.33));
+    }
+
+    #[test]
+    fn test_parse_opacity_suffix_invalid() {
+        assert_eq!(parse_opacity_suffix("101"), None);
+        assert_eq!(parse_opacity_suffix("200"), None);
+        assert_eq!(parse_opacity_suffix("255"), None);
+        assert_eq!(parse_opacity_suffix("-1"), None);
+        assert_eq!(parse_opacity_suffix("abc"), None);
+        assert_eq!(parse_opacity_suffix(""), None);
+        assert_eq!(parse_opacity_suffix(" "), None);
+    }
 }
