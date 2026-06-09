@@ -1184,7 +1184,8 @@ fn run_steps(
         }
 
         let t0 = Instant::now();
-        let (ok, stderr, max_rss) = run_shell(&cwd, &script, inherit_io, ctx.measure_memory, ctx.vars);
+        let (ok, stderr, max_rss) =
+            run_shell(&cwd, &script, inherit_io, ctx.measure_memory, ctx.vars);
         let ms = t0.elapsed().as_millis();
 
         let tail = stderr_tail_opt(&stderr);
