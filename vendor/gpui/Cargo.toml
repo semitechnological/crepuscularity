@@ -43,15 +43,6 @@ default = [
 ]
 inspector = ["gpui_macros/inspector"]
 leak-detection = ["backtrace"]
-macos-blade = [
-    "blade-graphics",
-    "blade-macros",
-    "blade-util",
-    "bytemuck",
-    "objc2",
-    "objc2-metal",
-]
-runtime_shaders = []
 screen-capture = ["scap"]
 test-support = [
     "leak-detection",

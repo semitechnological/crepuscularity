@@ -8,13 +8,12 @@ mod linux;
 #[cfg(target_os = "macos")]
 mod mac;
 
-#[cfg(any(
+#[cfg(
     all(
         any(target_os = "linux", target_os = "freebsd"),
         any(feature = "x11", feature = "wayland")
-    ),
-    all(target_os = "macos", feature = "macos-blade")
-))]
+    )
+)]
 mod blade;
 
 #[cfg(any(test, feature = "test-support"))]
