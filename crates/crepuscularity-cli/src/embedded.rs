@@ -25,19 +25,6 @@ pub fn run(args: &[String]) {
                 std::process::exit(1);
             }
         },
-        Some("render") => {
-            eprintln!(
-                "{}",
-                style("note: `embedded render` is deprecated; use `embedded snapshot`").yellow()
-            );
-            match run_snapshot(&args[1..]) {
-                Ok(()) => {}
-                Err(e) => {
-                    eprintln!("{e}");
-                    std::process::exit(1);
-                }
-            }
-        }
         _ => print_embedded_usage(),
     }
 }
