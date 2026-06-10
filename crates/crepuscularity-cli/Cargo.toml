@@ -29,17 +29,29 @@ name = "embedded_check_cli"
 path = "tests/embedded_check_cli.rs"
 
 [features]
+# Default: lightest build — no GPUI, no TUI, no Aurora.
+default = []
+
 # Desktop (GPUI) commands: `crepus new`, `crepus dev`, `crepus preview`.
-# Enabled by default. Disable for cross-compilation to platforms where GPUI
-# (and its DirectX/Metal shaders) cannot be compiled.
-default = ["desktop"]
+# Enable for GPUI windowed preview on desktop platforms.
 desktop = ["dep:gpui", "dep:crepuscularity-runtime"]
+
+# TUI commands: `crepus tui preview`, `crepus benchmark` live dashboard.
+# Requires ratatui + crossterm.
+tui = ["dep:ratatui", "dep:crepuscularity-tui"]
+
+# Aurora (SwiftUI) commands: `crepus aurora dev/build/new/swiftgen`.
+# Shells out to the external `aurorality` CLI.
+aurora = []
+
+# Everything enabled — use this for release binaries.
+full = ["desktop", "tui", "aurora"]
 
 [dependencies]
 gpui                   = { version = "=0.2.2", default-features = false, features = ["font-kit"], optional = true }
 crepuscularity-core = { path = "../crepuscularity-core", version = "0.4.15" }
 crepuscularity-runtime = { path = "../crepuscularity-runtime", version = "0.4.10", optional = true }
-crepuscularity-tui = { path = "../crepuscularity-tui", version = "0.4.10" }
+crepuscularity-tui = { path = "../crepuscularity-tui", version = "0.4.10", optional = true }
 crepuscularity-web = { path = "../crepuscularity-web", version = "0.4.7", features = ["parallel"] }
 crepuscularity-webext  = { path = "../crepuscularity-webext", version = "0.2.9" }
 crepuscularity-native = { path = "../crepuscularity-native", version = "0.4.10" }
@@ -55,7 +67,7 @@ indicatif              = { workspace = true }
 tracing                = { workspace = true }
 tracing-subscriber     = { workspace = true }
  rayon                  = { workspace = true }
-ratatui = { version = "0.30", default-features = false, features = ["crossterm"] }
+ratatui = { version = "0.30", default-features = false, features = ["crossterm"], optional = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

@@ -75,6 +75,10 @@ jobs:
       - name: Run tests
         run: cargo test --locked --workspace
 
+      - name: Test CLI with all features
+        run: cargo test --locked --package crepuscularity-cli --features full
+        if: matrix.os == 'ubuntu-latest'
+
   build-examples:
     name: Build Examples
     runs-on: ${{ matrix.os }}
@@ -98,7 +102,7 @@ jobs:
         if: runner.os != 'Windows'
 
       - name: Build CLI
-        run: cargo build --locked --package crepuscularity-cli
+        run: cargo build --locked --package crepuscularity-cli --features full
 
   plugin-smoke:
     name: Plugin Smoke
@@ -249,7 +253,7 @@ jobs:
           cargo build --locked --target wasm32-unknown-unknown -p crepuscularity-web --release &
           WASM_PID=$!
           # Build host server in parallel
-          cargo build --locked -p crepuscularity-cli --release &
+          cargo build --locked -p crepuscularity-cli --release --features full &
           HOST_PID=$!
           wait $WASM_PID
           wait $HOST_PID

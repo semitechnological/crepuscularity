@@ -3,6 +3,7 @@
 use console::style;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
+#[cfg(feature = "tui")]
 use std::io::IsTerminal;
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -214,6 +215,7 @@ pub fn run(args: &[String]) {
     // None: default verbose for human runs; Some: explicit --verbose / --quiet.
     let mut verbose_override: Option<bool> = None;
     let mut measure_memory = true;
+    #[cfg(feature = "tui")]
     let mut no_tui = false;
 
     let mut i = 0;
@@ -257,6 +259,7 @@ pub fn run(args: &[String]) {
                 print_benchmark_usage();
                 return;
             }
+            #[cfg(feature = "tui")]
             "--no-tui" => no_tui = true,
             _ => {}
         }
@@ -486,16 +489,22 @@ pub fn run(args: &[String]) {
         println!("{}", serde_json::to_string_pretty(&report).unwrap());
     } else {
         let outcomes = benchmark_outcomes_from_suites(&json_suites);
-        let top_completed: Vec<(String, f64, u128)> = summary
-            .by_wall_time
-            .iter()
-            .map(|r| (r.label.clone(), r.share_of_completed_wall_pct, r.wall_ms))
-            .collect();
-        let mut drew_tui = false;
-        if !no_tui && std::io::stderr().is_terminal() {
-            drew_tui = crate::benchmark_tui::try_show_dashboard(&outcomes, &top_completed, dry_run)
-                .unwrap_or(false);
-        }
+        #[cfg(feature = "tui")]
+        let drew_tui = {
+            let top_completed: Vec<(String, f64, u128)> = summary
+                .by_wall_time
+                .iter()
+                .map(|r| (r.label.clone(), r.share_of_completed_wall_pct, r.wall_ms))
+                .collect();
+            if !no_tui && std::io::stderr().is_terminal() {
+                crate::benchmark_tui::try_show_dashboard(&outcomes, &top_completed, dry_run)
+                    .unwrap_or(false)
+            } else {
+                false
+            }
+        };
+        #[cfg(not(feature = "tui"))]
+        let drew_tui = false;
         if !drew_tui {
             print_collapsed_plain_summary(&outcomes, &summary.by_wall_time, dry_run);
         }
