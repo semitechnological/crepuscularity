@@ -163,18 +163,35 @@ pub fn run_wasm_bindgen(wasm_path: &Path, out_dir: &Path, out_name: &str) -> Res
             .output()
             .map_err(|e| format!("cargo install wasm-bindgen-cli {ver}: {e}"))?;
         if !install.status.success() {
-            crate::ui::spinner_err(&spinner, &format!("could not install wasm-bindgen-cli {ver}: {}", String::from_utf8_lossy(&install.stderr)));
+            crate::ui::spinner_err(
+                &spinner,
+                &format!(
+                    "could not install wasm-bindgen-cli {ver}: {}",
+                    String::from_utf8_lossy(&install.stderr)
+                ),
+            );
             return Err(String::from_utf8_lossy(&install.stderr).into_owned());
         }
         crate::ui::spinner_ok(&spinner, &format!("wasm-bindgen-cli {ver} installed"));
         if !install.status.success() {
-            return Err(format!("could not install wasm-bindgen-cli {ver}: {}", String::from_utf8_lossy(&install.stderr)));
+            return Err(format!(
+                "could not install wasm-bindgen-cli {ver}: {}",
+                String::from_utf8_lossy(&install.stderr)
+            ));
         }
         // retry
         let mut cmd2 = Command::new("wasm-bindgen");
         prepend_rustup_bin_to_path(&mut cmd2);
         let out2 = cmd2
-            .args(["--target", "web", "--out-dir", out_dir_str.as_ref(), "--out-name", out_name, wasm])
+            .args([
+                "--target",
+                "web",
+                "--out-dir",
+                out_dir_str.as_ref(),
+                "--out-name",
+                out_name,
+                wasm,
+            ])
             .output()
             .map_err(|e| format!("wasm-bindgen (retry): {e}"))?;
         if out2.status.success() {
