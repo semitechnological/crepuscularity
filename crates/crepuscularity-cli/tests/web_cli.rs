@@ -238,6 +238,56 @@ fn web_build_via_crepus_toml_target_docs_emits_wasm() {
     windows,
     ignore = "default desktop crepus.exe does not spawn reliably on Windows CI"
 )]
+fn web_build_relative_manifest_writes_docs_to_default_out_dir() {
+    let _guard = DOCS_HOOK_TEST_LOCK.lock().expect("docs hook test lock");
+    if !wasm_build_prereqs_ok() {
+        eprintln!("skipping: wasm32 target or wasm-bindgen not installed");
+        return;
+    }
+
+    let repo = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .canonicalize()
+        .expect("repo root");
+    let out_dir = repo.join("docs-site/dist");
+    let nested_out_dir = repo.join("docs-site/docs-site/dist");
+    let _ = std::fs::remove_dir_all(&out_dir);
+    let _ = std::fs::remove_dir_all(&nested_out_dir);
+
+    let status = crepus()
+        .current_dir(&repo)
+        .args([
+            "web",
+            "build",
+            "--target",
+            "docs",
+            "--manifest",
+            "docs-site/crepus.toml",
+        ])
+        .status()
+        .expect("spawn");
+    assert!(
+        status.success(),
+        "crepus web build with relative --manifest should succeed"
+    );
+
+    let docs_index = std::fs::read_to_string(out_dir.join("docs/index.html"))
+        .expect("docs index in manifest out dir");
+    assert!(
+        docs_index.contains("doc-grid") && docs_index.contains("Documentation"),
+        "relative --manifest must render docs into docs-site/dist/docs (not docs-site/docs-site/dist/docs)"
+    );
+    assert!(
+        !nested_out_dir.exists(),
+        "docs hook must not write to a nested docs-site/docs-site/dist path"
+    );
+}
+
+#[test]
+#[cfg_attr(
+    windows,
+    ignore = "default desktop crepus.exe does not spawn reliably on Windows CI"
+)]
 fn root_build_uses_crepus_toml_lvgl_target() {
     let tmp = tempfile::tempdir().expect("tempdir");
     let root = tmp.path();
