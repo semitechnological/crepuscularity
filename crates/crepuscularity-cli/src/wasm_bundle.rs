@@ -170,15 +170,8 @@ pub fn run_wasm_bindgen(wasm_path: &Path, out_dir: &Path, out_name: &str) -> Res
                     String::from_utf8_lossy(&install.stderr)
                 ),
             );
-            return Err(String::from_utf8_lossy(&install.stderr).into_owned());
         }
         crate::ui::spinner_ok(&spinner, &format!("wasm-bindgen-cli {ver} installed"));
-        if !install.status.success() {
-            return Err(format!(
-                "could not install wasm-bindgen-cli {ver}: {}",
-                String::from_utf8_lossy(&install.stderr)
-            ));
-        }
         // retry
         let mut cmd2 = Command::new("wasm-bindgen");
         prepend_rustup_bin_to_path(&mut cmd2);
@@ -210,7 +203,6 @@ fn parse_wasm_bindgen_needed_version(stderr: &str) -> Option<String> {
             return line
                 .split("rust Wasm file schema version:")
                 .nth(1)?
-                .trim()
                 .split_whitespace()
                 .next()
                 .map(|s| s.to_string());
