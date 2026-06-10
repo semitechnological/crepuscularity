@@ -134,7 +134,7 @@ pub fn cargo_build_wasm32(runtime_dir: &Path, options: BuildOptions) -> Result<(
 }
 
 pub fn run_wasm_bindgen(wasm_path: &Path, out_dir: &Path, out_name: &str) -> Result<(), String> {
-    let out_dir = out_dir.to_string_lossy();
+    let out_dir_str = out_dir.to_string_lossy();
     let wasm = wasm_path.to_str().ok_or("wasm path utf-8")?;
     let mut cmd = Command::new("wasm-bindgen");
     prepend_rustup_bin_to_path(&mut cmd);
@@ -143,7 +143,7 @@ pub fn run_wasm_bindgen(wasm_path: &Path, out_dir: &Path, out_name: &str) -> Res
             "--target",
             "web",
             "--out-dir",
-            out_dir.as_ref(),
+            out_dir_str.as_ref(),
             "--out-name",
             out_name,
             wasm,
@@ -151,10 +151,55 @@ pub fn run_wasm_bindgen(wasm_path: &Path, out_dir: &Path, out_name: &str) -> Res
         .output()
         .map_err(|e| format!("wasm-bindgen: {e}"))?;
     if out.status.success() {
-        Ok(())
-    } else {
-        Err(String::from_utf8_lossy(&out.stderr).into_owned())
+        return Ok(());
     }
+
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    // version mismatch: "rust Wasm file schema version: 0.2.123"
+    if let Some(ver) = parse_wasm_bindgen_needed_version(&stderr) {
+        let spinner = crate::ui::spinner(&format!("installing wasm-bindgen-cli {ver}"));
+        let install = Command::new("cargo")
+            .args(["install", "wasm-bindgen-cli", "--version", &ver, "--locked"])
+            .output()
+            .map_err(|e| format!("cargo install wasm-bindgen-cli {ver}: {e}"))?;
+        if !install.status.success() {
+            crate::ui::spinner_err(&spinner, &format!("could not install wasm-bindgen-cli {ver}: {}", String::from_utf8_lossy(&install.stderr)));
+            return Err(String::from_utf8_lossy(&install.stderr).into_owned());
+        }
+        crate::ui::spinner_ok(&spinner, &format!("wasm-bindgen-cli {ver} installed"));
+        if !install.status.success() {
+            return Err(format!("could not install wasm-bindgen-cli {ver}: {}", String::from_utf8_lossy(&install.stderr)));
+        }
+        // retry
+        let mut cmd2 = Command::new("wasm-bindgen");
+        prepend_rustup_bin_to_path(&mut cmd2);
+        let out2 = cmd2
+            .args(["--target", "web", "--out-dir", out_dir_str.as_ref(), "--out-name", out_name, wasm])
+            .output()
+            .map_err(|e| format!("wasm-bindgen (retry): {e}"))?;
+        if out2.status.success() {
+            return Ok(());
+        }
+        return Err(String::from_utf8_lossy(&out2.stderr).into_owned());
+    }
+
+    Err(stderr.into_owned())
+}
+
+fn parse_wasm_bindgen_needed_version(stderr: &str) -> Option<String> {
+    // "rust Wasm file schema version: 0.2.123"
+    for line in stderr.lines() {
+        if line.contains("rust Wasm file schema version:") {
+            return line
+                .split("rust Wasm file schema version:")
+                .nth(1)?
+                .trim()
+                .split_whitespace()
+                .next()
+                .map(|s| s.to_string());
+        }
+    }
+    None
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
