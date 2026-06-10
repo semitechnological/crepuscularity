@@ -37,6 +37,9 @@ jobs:
           rustup target add wasm32-unknown-unknown
           cargo install wasm-bindgen-cli --version "$WASM_BINDGEN_VERSION" --locked
 
+      - name: Pre-build docs-site renderer
+        run: cargo build --locked --manifest-path docs-site/docs-renderer/Cargo.toml
+
       - name: Build docs site
         run: |
           cargo run --locked -p crepuscularity-cli --no-default-features -- web build --manifest docs-site/crepus.toml --target docs
@@ -46,6 +49,9 @@ jobs:
           test -f docs-site/dist/index.html
           test -f docs-site/dist/.nojekyll
           test -f docs-site/dist/pkg/runtime_bg.wasm
+          test -d docs-site/dist/docs
+          test -f docs-site/dist/docs/index.html
+          test -f docs-site/dist/docs/cli.html
 
       - uses: actions/upload-pages-artifact@v3
         with:
