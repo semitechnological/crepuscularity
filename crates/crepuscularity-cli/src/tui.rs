@@ -4,9 +4,9 @@
 //! using Ratatui for layout and Crossterm for input handling.
 
 use std::fs;
+use std::path::Path;
 #[cfg(feature = "tui")]
 use std::path::PathBuf;
-use std::path::Path;
 use std::process::Command;
 
 use console::style;
