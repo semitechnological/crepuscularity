@@ -16,6 +16,7 @@ jobs:
   build:
     name: Build ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ matrix.optional || false }}
     strategy:
       fail-fast: false
       matrix:
@@ -30,6 +31,7 @@ jobs:
           - target: x86_64-apple-darwin
             os: macos-13
             artifact: crepus-x86_64-macos
+            optional: true
           - target: aarch64-apple-darwin
             os: macos-latest
             artifact: crepus-aarch64-macos
