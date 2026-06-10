@@ -78,7 +78,11 @@ pub fn strip_indent_decorators(raw: &str) -> IndentDecorators {
                 let name_indent = lines[end - 2].len() - lines[end - 2].trim_start().len();
                 let exp_indent = exp_line.len() - exp_line.trim_start().len();
                 if exp_indent > name_indent && !exp_line.trim().is_empty() {
-                    let alias_name = name_line.strip_prefix('.').unwrap_or(name_line).trim().to_string();
+                    let alias_name = name_line
+                        .strip_prefix('.')
+                        .unwrap_or(name_line)
+                        .trim()
+                        .to_string();
                     alias_lines.push((alias_name, exp_line.trim().to_string()));
                     end -= 2;
                     continue;
