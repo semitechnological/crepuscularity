@@ -10,7 +10,6 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
-  WASM_BINDGEN_VERSION: "0.2.121"
 
 jobs:
   # ── Build binaries for each platform ──────────────────────────────────────
@@ -62,12 +61,6 @@ jobs:
       - name: Install cross (Linux aarch64)
         if: matrix.cross
         run: cargo install cross --git https://github.com/cross-rs/cross
-
-      - name: Install wasm-bindgen-cli (WASM deps)
-        if: "!matrix.cross"
-        run: |
-          rustup target add wasm32-unknown-unknown
-          cargo install wasm-bindgen-cli --version "$WASM_BINDGEN_VERSION" --locked
 
       - name: Build (native)
         if: "!matrix.cross"
