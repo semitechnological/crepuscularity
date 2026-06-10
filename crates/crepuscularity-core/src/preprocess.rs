@@ -53,16 +53,37 @@ pub fn strip_indent_decorators(raw: &str) -> IndentDecorators {
 
     let mut end = lines.len();
     let mut alias_lines: Vec<(String, String)> = Vec::new();
-    while end > i {
+    // Scan backwards from the bottom, pairing `.name` + indented expansion (two-line form)
+    // or single-line `.name expansion` form.
+    loop {
+        if end <= i {
+            break;
+        }
         let t = lines[end - 1].trim();
         if t.is_empty() {
             end -= 1;
             continue;
         }
+        // Single-line: `.name expansion tokens`
         if let Some((name, expansion)) = parse_class_alias_line(t) {
             alias_lines.push((name, expansion));
             end -= 1;
             continue;
+        }
+        // Two-line: `  expansion tokens` then `.name` (backward: expansion first, then name)
+        if end >= 2 {
+            let name_line = lines[end - 2].trim();
+            let exp_line = lines[end - 1];
+            if name_line.starts_with('.') && !name_line.contains(' ') {
+                let name_indent = lines[end - 2].len() - lines[end - 2].trim_start().len();
+                let exp_indent = exp_line.len() - exp_line.trim_start().len();
+                if exp_indent > name_indent && !exp_line.trim().is_empty() {
+                    let alias_name = name_line.strip_prefix('.').unwrap_or(name_line).trim().to_string();
+                    alias_lines.push((alias_name, exp_line.trim().to_string()));
+                    end -= 2;
+                    continue;
+                }
+            }
         }
         break;
     }
