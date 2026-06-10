@@ -39,6 +39,10 @@ pub(crate) fn run_docs_hook(
         return Ok(());
     }
 
+    // `out_docs_dir` is relative to the process cwd during `crepus web build`, but the hook
+    // subprocess runs with `current_dir = site_dir`. Resolve to an absolute path first.
+    let out_docs_dir = absolutize_process_cwd(out_docs_dir);
+
     let theme_json = json!({
         "accent": theme.accent,
         "accent_soft": theme.accent_soft,
@@ -141,6 +145,15 @@ fn absolutize(base: &Path, raw: &str) -> PathBuf {
         let joined = base.join(path);
         std::fs::canonicalize(&joined).unwrap_or(joined)
     }
+}
+
+fn absolutize_process_cwd(path: &Path) -> PathBuf {
+    if path.is_absolute() {
+        return path.to_path_buf();
+    }
+    let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let joined = cwd.join(path);
+    std::fs::canonicalize(&joined).unwrap_or(joined)
 }
 
 #[cfg(test)]

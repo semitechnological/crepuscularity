@@ -403,6 +403,17 @@ fn absolutize(base: &Path, path: &str) -> PathBuf {
     }
 }
 
+/// Resolve the directory containing `crepus.toml` against `cwd` when the manifest path is relative.
+fn manifest_dir(manifest_path: &Path, cwd: &Path) -> Option<PathBuf> {
+    let parent = manifest_path.parent()?;
+    let parent = if parent.is_absolute() {
+        parent.to_path_buf()
+    } else {
+        cwd.join(parent)
+    };
+    Some(std::fs::canonicalize(&parent).unwrap_or(parent))
+}
+
 pub fn find_manifest_upward(start: &Path) -> Option<PathBuf> {
     let mut dir = if start.is_file() {
         start.parent()?.to_path_buf()
@@ -431,7 +442,7 @@ pub fn try_load_ios(manifest_path: &Path) -> Option<IosTomlSection> {
 pub fn load_web_targets(manifest: Option<PathBuf>) -> Option<Vec<ResolvedWebTarget>> {
     let cwd = std::env::current_dir().ok()?;
     let mpath = manifest.or_else(|| find_manifest_upward(&cwd))?;
-    let md = mpath.parent()?.to_path_buf();
+    let md = manifest_dir(&mpath, &cwd)?;
     let raw = std::fs::read_to_string(&mpath).ok()?;
     let man = CrepusManifest::parse(&raw).ok()?;
     let targets = man.web_targets(&md).ok()?;
@@ -449,10 +460,8 @@ pub fn load_manifest_targets(
     let Some(mpath) = manifest.or_else(|| find_manifest_upward(&cwd)) else {
         return Ok(None);
     };
-    let md = mpath
-        .parent()
-        .ok_or_else(|| format!("manifest has no parent: {}", mpath.display()))?
-        .to_path_buf();
+    let md = manifest_dir(&mpath, &cwd)
+        .ok_or_else(|| format!("manifest has no parent: {}", mpath.display()))?;
     let raw =
         std::fs::read_to_string(&mpath).map_err(|e| format!("read {}: {e}", mpath.display()))?;
     let man = CrepusManifest::parse(&raw)?;
