@@ -29,7 +29,7 @@ use crate::web_serve::ServeOptions;
 
 const WEB_INDEX_HTML: &str = include_str!("../assets/web/index.html");
 const WEB_APP_JS: &str = include_str!("../assets/web/app.js");
-const UNOCSS_JS: &[u8] = include_bytes!("../../crepuscularity-webext/assets/vendor/unocss.js");
+const UNOCSS_JS: &[u8] = include_bytes!("../assets/vendor/unocss.js");
 
 // ── Entry point ──────────────────────────────────────────────────────────────
 
@@ -1324,7 +1324,9 @@ fn render_head_raw(head_raw: &str) -> String {
 
 fn copy_unocss(vendor_dir: &Path) {
     let dst = vendor_dir.join("unocss.js");
-    let _ = std::fs::write(&dst, UNOCSS_JS);
+    std::fs::write(&dst, UNOCSS_JS).unwrap_or_else(|e| {
+        ui::error(&format!("write {}: {e}", dst.display()));
+    });
 }
 
 /// Directory under a site root where `crepus web dev` caches UnoCSS, `app.js`, and wasm-bindgen output.
