@@ -4,7 +4,9 @@
 //! using Ratatui for layout and Crossterm for input handling.
 
 use std::fs;
-use std::path::{Path, PathBuf};
+#[cfg(feature = "tui")]
+use std::path::PathBuf;
+use std::path::Path;
 use std::process::Command;
 
 use console::style;
@@ -37,11 +39,16 @@ pub fn run(args: &[String]) {
             let extra = stripped.into_iter().skip(1).collect::<Vec<_>>();
             run_tui_app(options, &extra);
         }
+        #[cfg(feature = "tui")]
         Some("preview") => {
             let path = args.get(1).map(PathBuf::from).unwrap_or_else(|| {
                 ui::error("Usage: crepus tui preview <file.crepus>");
             });
             preview_tui_template(&path);
+        }
+        #[cfg(not(feature = "tui"))]
+        Some("preview") => {
+            ui::error("TUI preview not compiled in. Rebuild crepus with --features tui.");
         }
         _ => print_tui_usage(),
     }
@@ -240,6 +247,7 @@ fn print_tui_usage() {
 /// changes via [`crepuscularity_tui::HotTemplate`], and re-renders on each
 /// save. `q` or `Esc` exits cleanly; `r` forces a reload. A `context.toml`
 /// next to the template is loaded as initial variables.
+#[cfg(feature = "tui")]
 fn preview_tui_template(path: &Path) {
     use crepuscularity_tui::{HotTemplate, ReloadOutcome};
     use ratatui::crossterm::event::{self, Event, KeyCode, KeyEventKind};
@@ -320,6 +328,7 @@ fn preview_tui_template(path: &Path) {
 /// Minimal TOML loader (key=value, strings/bools/ints/floats) shared with
 /// `crepus preview`.  Lives here to avoid the `desktop` cfg-gate so non-GPUI
 /// builds still get TUI preview support.
+#[cfg(feature = "tui")]
 fn load_tui_context_toml(path: &Path, ctx: &mut crepuscularity_tui::TemplateContext) {
     use crepuscularity_tui::TemplateValue;
     let Ok(content) = std::fs::read_to_string(path) else {
@@ -352,6 +361,7 @@ fn load_tui_context_toml(path: &Path, ctx: &mut crepuscularity_tui::TemplateCont
 ///
 /// Unlike `str::trim_matches('"').trim_matches('\'')` this preserves repeated
 /// quotes inside the value, e.g. `"\"\"hi\"\""` → `\"hi\"` rather than `hi`.
+#[cfg(feature = "tui")]
 fn strip_one_outer_quote_pair(s: &str) -> &str {
     let bytes = s.as_bytes();
     if bytes.len() >= 2 {
@@ -366,7 +376,7 @@ fn strip_one_outer_quote_pair(s: &str) -> &str {
     s
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "tui"))]
 mod tests {
     use super::strip_one_outer_quote_pair;
 

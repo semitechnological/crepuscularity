@@ -1,15 +1,13 @@
 //! Full-screen results dashboard after `crepus benchmark` (human mode, TTY stderr).
+//!
+//! The interactive dashboard (ratatui) is only compiled when the `tui` feature
+//! is enabled.  Without it, only [`TargetOutcomeSummary`] is available so the
+//! plain-text fallback in `benchmark.rs` always works.
 
+#[cfg(feature = "tui")]
 use std::io::{self, stderr, IsTerminal};
 
-use ratatui::crossterm::event::{self, Event, KeyCode, KeyEventKind};
-use ratatui::crossterm::terminal::{
-    disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
-};
-use ratatui::crossterm::ExecutableCommand;
-use ratatui::layout::{Constraint, Direction, Layout};
-use ratatui::prelude::*;
-use ratatui::widgets::{Block, Borders, Cell, Paragraph, Row, Table};
+// ── Always-available types ──────────────────────────────────────────────────
 
 pub(crate) struct TargetOutcomeSummary {
     pub suite: String,
@@ -20,6 +18,24 @@ pub(crate) struct TargetOutcomeSummary {
     pub detail: String,
 }
 
+// ── Ratatui interactive dashboard (feature = "tui") ────────────────────────
+
+#[cfg(feature = "tui")]
+use ratatui::crossterm::event::{self, Event, KeyCode, KeyEventKind};
+#[cfg(feature = "tui")]
+use ratatui::crossterm::terminal::{
+    disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
+};
+#[cfg(feature = "tui")]
+use ratatui::crossterm::ExecutableCommand;
+#[cfg(feature = "tui")]
+use ratatui::layout::{Constraint, Direction, Layout};
+#[cfg(feature = "tui")]
+use ratatui::prelude::*;
+#[cfg(feature = "tui")]
+use ratatui::widgets::{Block, Borders, Cell, Paragraph, Row, Table};
+
+#[cfg(feature = "tui")]
 fn fmt_ms(ms: u128) -> String {
     if ms < 1000 {
         format!("{ms}ms")
@@ -28,6 +44,7 @@ fn fmt_ms(ms: u128) -> String {
     }
 }
 
+#[cfg(feature = "tui")]
 fn elide(s: &str, max_chars: usize) -> String {
     let t = s.trim().replace('\n', " ");
     if t.chars().count() <= max_chars {
@@ -42,6 +59,7 @@ fn elide(s: &str, max_chars: usize) -> String {
     }
 }
 
+#[cfg(feature = "tui")]
 fn draw_frame(
     f: &mut Frame,
     outcomes: &[TargetOutcomeSummary],
@@ -162,6 +180,7 @@ fn draw_frame(
 }
 
 /// `Ok(true)` if an interactive screen was shown; `Ok(false)` if skipped (no TTY).
+#[cfg(feature = "tui")]
 pub(crate) fn try_show_dashboard(
     outcomes: &[TargetOutcomeSummary],
     top_completed: &[(String, f64, u128)],

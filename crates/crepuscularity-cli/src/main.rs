@@ -33,6 +33,7 @@
 //!   crepus aurora swiftgen --view FILE --out DIR --view-name NAME
 //!   crepus benchmark [all|run|check] [flags…]    benchmark.toml run or prereq check (examples/benchmarks)
 
+#[cfg(feature = "aurora")]
 mod aurora;
 mod benchmark;
 mod benchmark_tui;
@@ -200,8 +201,13 @@ fn main() {
             native::run(&args[2..]);
         }
 
+        #[cfg(feature = "aurora")]
         Some("aurora") => {
             aurora::run(&args[2..]);
+        }
+        #[cfg(not(feature = "aurora"))]
+        Some("aurora") => {
+            ui::error("Aurora not compiled in. Rebuild crepus with --features aurora.");
         }
 
         Some("embedded") => {
@@ -263,15 +269,30 @@ fn run_init(args: &[String]) {
         ui::error("Usage: crepus init <kind> <name>");
     }
     let sub_args = vec!["new".to_string(), name.to_string()];
+    let mut kinds = vec!["web", "webext", "tui", "native", "ios"];
+    #[cfg(feature = "desktop")]
+    kinds.push("gpui");
+    #[cfg(not(feature = "desktop"))]
+    kinds.push("app");
+    #[cfg(feature = "aurora")]
+    kinds.push("aurora");
+    let kinds_str = kinds.join(", ");
     match kind {
         "web" => web::run(&sub_args),
         "webext" | "extension" | "browser-extension" => webext::run(&sub_args),
         "tui" => tui::run(&sub_args),
         "native" => native::run(&sub_args),
         "ios" => ios::run(&sub_args),
+        #[cfg(feature = "desktop")]
         "gpui" | "app" | "desktop" => new::run(name),
+        #[cfg(not(feature = "desktop"))]
+        "gpui" | "app" | "desktop" => {
+            ui::error("GPUI scaffold not compiled in. Rebuild crepus with --features desktop.");
+        }
+        #[cfg(feature = "aurora")]
+        "aurora" => aurora::run(&sub_args),
         other => ui::error(&format!(
-            "unknown init kind {other:?}; expected web, webext, tui, native, ios, or gpui"
+            "unknown init kind {other:?}; expected {kinds_str}"
         )),
     }
 }
