@@ -241,21 +241,31 @@ fn refresh_mobile_state(state: &MobileDevState) {
         .read()
         .unwrap_or_else(std::sync::PoisonError::into_inner)
         .clone();
+    let rendered_ir = match render_template_to_ir(&new_template, &state.ctx) {
+        Ok(ir) => ir,
+        Err(e) => {
+            store_event(
+                state,
+                HotReloadMessage::Error {
+                    message: e.to_string(),
+                },
+            );
+            return;
+        }
+    };
     let message = plan_hot_reload(&old_template, &new_template, &state.ctx);
     match &message {
         HotReloadMessage::Patch { .. } | HotReloadMessage::FullReload { ir: _, .. } => {
-            if let Ok(ir) = render_template_to_ir(&new_template, &state.ctx) {
-                if let Ok(json) = to_json(&ir) {
-                    *state
-                        .last_ir_json
-                        .write()
-                        .unwrap_or_else(std::sync::PoisonError::into_inner) = json;
-                    *state
-                        .last_template
-                        .write()
-                        .unwrap_or_else(std::sync::PoisonError::into_inner) = new_template;
-                    sync_outputs(&state.root, &state.template_path, state.platform);
-                }
+            if let Ok(json) = to_json(&rendered_ir) {
+                *state
+                    .last_ir_json
+                    .write()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner) = json;
+                *state
+                    .last_template
+                    .write()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner) = new_template;
+                sync_outputs(&state.root, &state.template_path, state.platform);
             }
         }
         _ => {}
@@ -784,5 +794,25 @@ mod tests {
             .clone();
         assert!(ir.contains("Hi"));
         assert!(!ir.contains("bad indent"));
+    }
+
+    #[test]
+    fn refresh_render_error_does_not_emit_patch() {
+        let (_temp, state) = temp_state("div\n  \"Hi\"");
+        std::fs::write(&state.template_path, "div\n  include missing.crepus").unwrap();
+        refresh_mobile_state(&state);
+        let event = state
+            .last_event
+            .read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
+        assert!(matches!(event.message, HotReloadMessage::Error { .. }));
+        let ir = state
+            .last_ir_json
+            .read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
+        assert!(ir.contains("Hi"));
+        assert!(!ir.contains("missing.crepus"));
     }
 }
