@@ -717,6 +717,10 @@ const TEMPLATE_FILES: &[(&str, &str)] = &[
         include_str!("../templates/native/ios/Sources/NativeShell/ViewIrModels.swift"),
     ),
     (
+        "ios/Sources/NativeShell/CrepusMobileRuntime.swift",
+        include_str!("../templates/native/ios/Sources/NativeShell/CrepusMobileRuntime.swift"),
+    ),
+    (
         "ios/Sources/NativeShell/ViewIrTreeView.swift",
         include_str!("../templates/native/ios/Sources/NativeShell/ViewIrTreeView.swift"),
     ),
@@ -756,6 +760,12 @@ const TEMPLATE_FILES: &[(&str, &str)] = &[
         "android/app/src/main/java/dev/crepuscularity/nativeshell/MainActivity.kt",
         include_str!(
             "../templates/native/android/app/src/main/java/dev/crepuscularity/nativeshell/MainActivity.kt"
+        ),
+    ),
+    (
+        "android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusMobileRuntime.kt",
+        include_str!(
+            "../templates/native/android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusMobileRuntime.kt"
         ),
     ),
     (

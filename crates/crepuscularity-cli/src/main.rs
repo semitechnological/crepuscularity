@@ -26,6 +26,8 @@
 //!   crepus native build android [--flavor F]     build Android app
 //!   crepus native run ios                        run iOS app (Xcode)
 //!   crepus native run android                    install Android app
+//!   crepus mobile new NAME                       scaffold unified mobile app
+//!   crepus mobile dev [--platform ios|android|all]
 //!   crepus embedded check FILE
 //!   crepus embedded snapshot FILE --width W --height H --out path.ppm
 //!   crepus aurora dev [--watch DIR] [--port N]
@@ -50,6 +52,7 @@ pub mod events;
 #[cfg(feature = "desktop")]
 mod hud;
 mod ios;
+mod mobile;
 mod native;
 mod new;
 mod render;
@@ -202,6 +205,10 @@ fn main() {
             native::run(&args[2..]);
         }
 
+        Some("mobile") => {
+            mobile::run(&args[2..]);
+        }
+
         #[cfg(feature = "aurora")]
         Some("aurora") => {
             aurora::run(&args[2..]);
@@ -270,7 +277,7 @@ fn run_init(args: &[String]) {
         ui::error("Usage: crepus init <kind> <name>");
     }
     let sub_args = vec!["new".to_string(), name.to_string()];
-    let mut kinds = vec!["web", "webext", "tui", "native", "ios"];
+    let mut kinds = vec!["web", "webext", "tui", "native", "ios", "mobile"];
     #[cfg(feature = "desktop")]
     kinds.push("gpui");
     #[cfg(not(feature = "desktop"))]
@@ -283,6 +290,7 @@ fn run_init(args: &[String]) {
         "webext" | "extension" | "browser-extension" => webext::run(&sub_args),
         "tui" => tui::run(&sub_args),
         "native" => native::run(&sub_args),
+        "mobile" => mobile::run(&sub_args),
         "ios" => ios::run(&sub_args),
         #[cfg(feature = "desktop")]
         "gpui" | "app" | "desktop" => new::run(name),
@@ -378,8 +386,24 @@ fn print_usage() {
             "hot-reload preview a .crepus template in the terminal",
         ),
         (
+            "mobile new <name>                       ",
+            "scaffold unified iOS/Android app",
+        ),
+        (
+            "mobile dev [--platform ios|android|all] ",
+            "serve View IR hot reload on port 4001",
+        ),
+        (
+            "mobile build [--platform ios|android|all]",
+            "build mobile app targets",
+        ),
+        (
+            "mobile run --platform ios|android       ",
+            "run/install one mobile target",
+        ),
+        (
             "native new <name>                       ",
-            "scaffold native iOS/Android app",
+            "compat: scaffold native iOS/Android app",
         ),
         (
             "native ir <file.crepus>                  ",

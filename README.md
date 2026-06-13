@@ -127,7 +127,7 @@ JSX/HTML tag syntax is supported as an **input format** in the core parser — t
 ## CLI Commands
 
 ```bash
-crepus init <kind> <name>            # Scaffold web, webext, tui, native, ios, or gpui apps
+crepus init <kind> <name>            # Scaffold web, webext, tui, mobile, native, ios, or gpui apps
 crepus new <name>                    # Alias for crepus init gpui <name>
 crepus dev [--emit-events]           # Hot-reload dev loop
 crepus build [type-or-id] [--target ID]  # Build crepus.toml targets, selected type/id, or cargo fallback
@@ -145,6 +145,11 @@ crepus aurora new <name>             # Scaffold SwiftUI + Rust project
 crepus ios new <name>                # Alias for crepus init ios <name>
 crepus ios generate [--dir]          # Run xcodegen (finds crepus.toml [ios] upward)
 crepus ios build [--dir] [...]       # Simulator build via xcodebuild
+
+crepus mobile new <name>             # Preferred iOS + Android scaffold
+crepus mobile dev [--platform all]   # View IR hot-reload server on port 4001
+crepus mobile build --platform android|ios|all
+crepus mobile run --platform android|ios
 
 crepus native ir <file.crepus>       # Emit View IR JSON for plugins and native shells
 crepus native sync <file.crepus> --dir <app> [--out FILE]  # Write View IR fixtures into native containers

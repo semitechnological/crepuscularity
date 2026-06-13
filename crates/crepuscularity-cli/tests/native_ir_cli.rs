@@ -262,3 +262,148 @@ fn native_codegen_writes_compose_source() {
     assert!(generated.contains("Button(onClick = {})"));
     assert!(generated.contains("Modifier.padding(8.dp)"));
 }
+
+#[test]
+#[cfg_attr(
+    windows,
+    ignore = "default desktop crepus.exe does not spawn reliably on Windows CI"
+)]
+fn mobile_help_lists_core_commands() {
+    let out = crepus()
+        .args(["mobile", "--help"])
+        .output()
+        .expect("spawn crepus mobile --help");
+    assert!(out.status.success());
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(stderr.contains("crepus mobile"));
+    assert!(stderr.contains("new <name>"));
+    assert!(stderr.contains("dev [--platform"));
+    assert!(stderr.contains("codegen"));
+}
+
+#[test]
+#[cfg_attr(
+    windows,
+    ignore = "default desktop crepus.exe does not spawn reliably on Windows CI"
+)]
+fn mobile_new_scaffolds_runtime_files() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let out = crepus()
+        .current_dir(tmp.path())
+        .args(["mobile", "new", "phone"])
+        .output()
+        .expect("spawn crepus mobile new");
+    assert!(
+        out.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let root = tmp.path().join("phone");
+    assert!(root.join("views/main.crepus").is_file());
+    assert!(root
+        .join("ios/Sources/NativeShell/CrepusMobileRuntime.swift")
+        .is_file());
+    assert!(root
+        .join("android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusMobileRuntime.kt")
+        .is_file());
+}
+
+#[test]
+#[cfg_attr(
+    windows,
+    ignore = "default desktop crepus.exe does not spawn reliably on Windows CI"
+)]
+fn mobile_sync_mirrors_view_ir_fixtures() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let new_out = crepus()
+        .current_dir(tmp.path())
+        .args(["mobile", "new", "phone"])
+        .output()
+        .expect("spawn crepus mobile new");
+    assert!(new_out.status.success());
+    let root = tmp.path().join("phone");
+    std::fs::write(
+        root.join("views/main.crepus"),
+        "div\n  span\n    \"Hello {name}\"",
+    )
+    .expect("write template");
+
+    let out = crepus()
+        .current_dir(&root)
+        .args(["mobile", "sync", "--var", "name=Ada", "--pretty"])
+        .output()
+        .expect("spawn crepus mobile sync");
+    assert!(
+        out.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let root_fixture = std::fs::read_to_string(root.join("fixture.json")).unwrap();
+    let ios_fixture =
+        std::fs::read_to_string(root.join("ios/Sources/NativeShell/fixture.json")).unwrap();
+    let android_fixture =
+        std::fs::read_to_string(root.join("android/app/src/main/assets/fixture.json")).unwrap();
+    assert_eq!(root_fixture, ios_fixture);
+    assert_eq!(root_fixture, android_fixture);
+    assert!(root_fixture.contains("Hello Ada"));
+}
+
+#[test]
+#[cfg_attr(
+    windows,
+    ignore = "default desktop crepus.exe does not spawn reliably on Windows CI"
+)]
+fn mobile_codegen_writes_swiftui_and_compose_source() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let tpl = tmp.path().join("screen.crepus");
+    std::fs::write(&tpl, "div\n  span\n    \"Hello {name}\"").expect("write template");
+    let swift_out = tmp.path().join("swift");
+    let compose_out = tmp.path().join("compose");
+
+    let swift = crepus()
+        .args([
+            "mobile",
+            "codegen",
+            tpl.to_str().unwrap(),
+            "--platform",
+            "ios",
+            "--out",
+            swift_out.to_str().unwrap(),
+            "--view-name",
+            "GreetingScreen",
+            "--var",
+            "name=Ada",
+        ])
+        .output()
+        .expect("spawn crepus mobile codegen ios");
+    assert!(swift.status.success());
+
+    let compose = crepus()
+        .args([
+            "mobile",
+            "codegen",
+            tpl.to_str().unwrap(),
+            "--platform",
+            "android",
+            "--out",
+            compose_out.to_str().unwrap(),
+            "--view-name",
+            "GreetingScreen",
+            "--var",
+            "name=Ada",
+        ])
+        .output()
+        .expect("spawn crepus mobile codegen android");
+    assert!(compose.status.success());
+
+    assert!(
+        std::fs::read_to_string(swift_out.join("GreetingScreen.swift"))
+            .unwrap()
+            .contains("Hello Ada")
+    );
+    assert!(
+        std::fs::read_to_string(compose_out.join("GreetingScreen.kt"))
+            .unwrap()
+            .contains("Hello Ada")
+    );
+}
