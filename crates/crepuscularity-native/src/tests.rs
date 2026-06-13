@@ -5,8 +5,9 @@ use crepuscularity_core::context::{TemplateContext, TemplateValue};
 use serde_json::json;
 
 use crate::{
-    apply_mutations, ast_shape_compatible, diff_ir, plan_hot_reload, render_from_files,
-    render_template_to_ir, to_json, HotReloadMessage, ViewIr, IR_VERSION,
+    apply_mutations, ast_shape_compatible, diff_ir, generate_native_source, plan_hot_reload,
+    render_from_files, render_template_to_ir, to_json, HotReloadMessage, NativeCodegenTarget,
+    ViewIr, IR_VERSION,
 };
 
 #[test]
@@ -33,6 +34,39 @@ fn plain_text_stack() {
     });
     let v: serde_json::Value = serde_json::to_value(&ir).unwrap();
     assert_eq!(v, expected);
+}
+
+#[test]
+fn codegen_swiftui_emits_standalone_view_source() {
+    let ir = render_template_to_ir(
+        "div flex flex-col gap-4 p-4 bg-blue-500\n  span text-lg font-bold text-white\n    \"Hello Ada\"",
+        &TemplateContext::new(),
+    )
+    .unwrap();
+    let source = generate_native_source(&ir, NativeCodegenTarget::SwiftUi, "HelloScreen");
+    assert!(source.contains("import SwiftUI"));
+    assert!(source.contains("public struct HelloScreen: View"));
+    assert!(source.contains("VStack(alignment: .leading, spacing: 16.0)"));
+    assert!(source.contains("Text(\"Hello Ada\")"));
+    assert!(source.contains(".fontWeight(.bold)"));
+    assert!(source.contains("Color(red:"));
+}
+
+#[test]
+fn codegen_compose_emits_composable_source() {
+    let ir = render_template_to_ir(
+        "div flex flex-row gap-2 p-2\n  span text-lg font-bold\n    \"Hello Ada\"\n  button\n    \"Tap\"",
+        &TemplateContext::new(),
+    )
+    .unwrap();
+    let source = generate_native_source(&ir, NativeCodegenTarget::Compose, "HelloScreen");
+    assert!(source.contains("@Composable"));
+    assert!(source.contains("fun HelloScreen()"));
+    assert!(source.contains("Row(modifier = Modifier.padding(8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp))"));
+    assert!(
+        source.contains("Text(\"Hello Ada\", fontSize = 18.0.sp, fontWeight = FontWeight.Bold)")
+    );
+    assert!(source.contains("Button(onClick = {})"));
 }
 
 fn round_trip(ir: &ViewIr) {

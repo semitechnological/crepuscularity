@@ -21,6 +21,7 @@
 //!   crepus tui preview FILE                      hot-reload preview a .crepus template in the terminal
 //!   crepus native new NAME                       scaffold cross-platform native app
 //!   crepus native ir FILE                        emit View IR JSON
+//!   crepus native codegen FILE --platform P --out DIR --view-name N
 //!   crepus native build ios [--scheme S]         build iOS app
 //!   crepus native build android [--flavor F]     build Android app
 //!   crepus native run ios                        run iOS app (Xcode)

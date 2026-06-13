@@ -21,7 +21,8 @@ use console::style;
 use crepuscularity_core::context::{TemplateContext, TemplateValue};
 use crepuscularity_core::{DriverCache, Fingerprint};
 use crepuscularity_native::{
-    render_component_file_to_ir, render_from_files, render_template_to_ir, to_json, to_json_pretty,
+    generate_native_source, render_component_file_to_ir, render_from_files, render_template_to_ir,
+    to_json, to_json_pretty, NativeCodegenTarget,
 };
 use serde::Deserialize;
 use serde_json::Value;
@@ -42,6 +43,11 @@ pub fn run(args: &[String]) {
         }
         Some("sync") => {
             if let Err(e) = sync_native_fixture_inner(&args[1..]) {
+                ui::error(&e);
+            }
+        }
+        Some("codegen") => {
+            if let Err(e) = codegen_native_source_inner(&args[1..]) {
                 ui::error(&e);
             }
         }
@@ -123,6 +129,16 @@ struct SyncArgs {
     ctx_file: Option<PathBuf>,
     vars: Vec<(String, String)>,
     pretty: bool,
+}
+
+struct CodegenArgs {
+    template: PathBuf,
+    platform: NativeCodegenTarget,
+    out_dir: PathBuf,
+    view_name: String,
+    component: Option<String>,
+    ctx_file: Option<PathBuf>,
+    vars: Vec<(String, String)>,
 }
 
 fn run_ir(args: &[String]) {
@@ -426,6 +442,142 @@ fn sync_native_fixture_inner(args: &[String]) -> Result<(), String> {
         template_path.display()
     ));
     Ok(())
+}
+
+fn codegen_native_source_inner(args: &[String]) -> Result<PathBuf, String> {
+    let parsed = parse_codegen_args(args)?;
+    let template = fs::read_to_string(&parsed.template)
+        .map_err(|e| format!("read {}: {e}", parsed.template.display()))?;
+
+    let mut ctx = TemplateContext::new();
+    if let Some(path) = &parsed.ctx_file {
+        load_json_ctx(path, &mut ctx)?;
+    }
+    for (key, raw) in parsed.vars {
+        ctx.set(key, parse_var_value(&raw));
+    }
+    ctx.base_dir = parsed.template.parent().map(Path::to_path_buf);
+
+    let ir = if let Some(component) = &parsed.component {
+        render_component_file_to_ir(&template, component, &ctx).map_err(|e| e.to_string())?
+    } else {
+        render_template_to_ir(&template, &ctx).map_err(|e| e.to_string())?
+    };
+    let mut source = generate_native_source(&ir, parsed.platform, &parsed.view_name);
+    if !source.ends_with('\n') {
+        source.push('\n');
+    }
+    fs::create_dir_all(&parsed.out_dir)
+        .map_err(|e| format!("create {}: {e}", parsed.out_dir.display()))?;
+    let ext = match parsed.platform {
+        NativeCodegenTarget::SwiftUi => "swift",
+        NativeCodegenTarget::Compose => "kt",
+    };
+    let path = parsed.out_dir.join(format!("{}.{}", parsed.view_name, ext));
+    fs::write(&path, source).map_err(|e| format!("write {}: {e}", path.display()))?;
+    ui::success(&format!("generated native source at {}", path.display()));
+    Ok(path)
+}
+
+fn parse_codegen_args(args: &[String]) -> Result<CodegenArgs, String> {
+    let mut template = None;
+    let mut platform = None;
+    let mut out_dir = None;
+    let mut view_name = None;
+    let mut component = None;
+    let mut ctx_file = None;
+    let mut vars = Vec::new();
+    let mut i = 0;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--platform" => {
+                i += 1;
+                let raw = args
+                    .get(i)
+                    .ok_or_else(|| "--platform expects swiftui or compose".to_string())?;
+                platform = Some(parse_codegen_platform(raw)?);
+            }
+            "--out" => {
+                i += 1;
+                out_dir = Some(
+                    args.get(i)
+                        .map(PathBuf::from)
+                        .ok_or_else(|| "--out expects a directory".to_string())?,
+                );
+            }
+            "--view-name" => {
+                i += 1;
+                view_name = args.get(i).cloned();
+                if view_name.is_none() {
+                    return Err("--view-name expects a type/function name".to_string());
+                }
+            }
+            "--component" => {
+                i += 1;
+                component = args.get(i).cloned();
+                if component.is_none() {
+                    return Err("--component expects a name".to_string());
+                }
+            }
+            "--ctx" => {
+                i += 1;
+                ctx_file = args.get(i).map(PathBuf::from);
+                if ctx_file.is_none() {
+                    return Err("--ctx expects a file path".to_string());
+                }
+            }
+            "--var" => {
+                i += 1;
+                let Some(raw) = args.get(i) else {
+                    return Err("--var expects key=value".to_string());
+                };
+                let Some((key, value)) = raw.split_once('=') else {
+                    return Err(format!("--var expects key=value, got: {raw}"));
+                };
+                vars.push((key.to_string(), value.to_string()));
+            }
+            other => {
+                if let Some(value) = other.strip_prefix("--platform=") {
+                    platform = Some(parse_codegen_platform(value)?);
+                } else if let Some(value) = other.strip_prefix("--out=") {
+                    out_dir = Some(PathBuf::from(value));
+                } else if let Some(value) = other.strip_prefix("--view-name=") {
+                    view_name = Some(value.to_string());
+                } else if other.starts_with('-') {
+                    return Err(format!("unknown option: {other}"));
+                } else if template.is_some() {
+                    return Err(format!("unexpected argument: {other}"));
+                } else {
+                    template = Some(PathBuf::from(other));
+                }
+            }
+        }
+        i += 1;
+    }
+
+    let template = template.ok_or_else(|| {
+        "Usage: crepus native codegen <file.crepus> --platform swiftui|compose --out DIR --view-name NAME [--component Name] [--ctx FILE] [--var k=v]".to_string()
+    })?;
+    let platform = platform.ok_or_else(|| "--platform swiftui|compose is required".to_string())?;
+    let out_dir = out_dir.ok_or_else(|| "--out DIR is required".to_string())?;
+    let view_name = view_name.ok_or_else(|| "--view-name NAME is required".to_string())?;
+    Ok(CodegenArgs {
+        template,
+        platform,
+        out_dir,
+        view_name,
+        component,
+        ctx_file,
+        vars,
+    })
+}
+
+fn parse_codegen_platform(raw: &str) -> Result<NativeCodegenTarget, String> {
+    match raw {
+        "swiftui" | "swift" | "ios" => Ok(NativeCodegenTarget::SwiftUi),
+        "compose" | "kotlin" | "android" => Ok(NativeCodegenTarget::Compose),
+        _ => Err(format!("unknown codegen platform: {raw}")),
+    }
 }
 
 fn parse_sync_args(args: &[String]) -> Result<SyncArgs, String> {
@@ -850,6 +1002,11 @@ fn print_native_usage() {
     );
     eprintln!(
         "  {}  {}",
+        style("codegen <file.crepus> --platform P --out DIR --view-name N").green(),
+        style("generate SwiftUI or Compose source from View IR").dim()
+    );
+    eprintln!(
+        "  {}  {}",
         style("build ios [--dir <path>]    ").green(),
         style("swift build inside <dir>/ios").dim()
     );
@@ -873,6 +1030,8 @@ fn print_native_usage() {
     eprintln!("  crepus native new my-mobile-app");
     eprintln!("  crepus native ir views/main.crepus --ctx context.json --pretty");
     eprintln!("  crepus native sync views/main.crepus --dir my-mobile-app --out app/Resources/dashboard.view-ir.json --no-defaults --var name=Ada --pretty");
+    eprintln!("  crepus native codegen views/main.crepus --platform swiftui --out Generated --view-name DashboardView --var name=Ada");
+    eprintln!("  crepus native codegen views/main.crepus --platform compose --out app/src/main/java/dev/example/generated --view-name DashboardView --var name=Ada");
     eprintln!("  crepus native build ios --dir my-mobile-app");
     eprintln!("  crepus native build android --dir my-mobile-app --flavor Debug");
     eprintln!("  crepus native run android --dir my-mobile-app");
