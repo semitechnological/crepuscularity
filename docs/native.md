@@ -27,6 +27,15 @@ For non-Rust hosts, the stable boundary is the same View IR JSON emitted by `cre
 
 ## Quick Start
 
+Prefer the unified mobile workflow for new iOS + Android apps:
+
+```bash
+crepus mobile new my-mobile-app
+cd my-mobile-app
+crepus mobile dev --platform all
+crepus mobile build --platform android
+```
+
 ### Cross-platform scaffold (iOS + Android in one command)
 
 ```bash

@@ -1,6 +1,6 @@
 # Native shell scaffold
 
-Scaffolded by `crepus native new`. This is a starter for iOS (SwiftPM) and
+Scaffolded by `crepus mobile new` or `crepus native new`. This is a starter for iOS (SwiftPM) and
 Android (Gradle) apps that decode **View IR** produced by the Rust crate
 [`crepuscularity-native`](https://crates.io/crates/crepuscularity-native).
 
@@ -12,6 +12,16 @@ Android (Gradle) apps that decode **View IR** produced by the Rust crate
 | `fixture.json` | Shared View IR fixture used by both shells. Regenerate with `crepus native sync views/main.crepus --dir . --pretty` after editing your template. |
 | `ios/` | Swift Package (open `Package.swift` in Xcode, or `swift build` from this directory). |
 | `android/` | Gradle module (open in Android Studio, or run `./gradlew :app:assembleDebug` after generating the Gradle wrapper). |
+
+## Dev server
+
+From the scaffold root:
+
+```bash
+crepus mobile dev --platform all --port 4001
+```
+
+The SwiftUI and Compose shells load `fixture.json` first, then connect to the local dev server in debug builds. The server exposes `/health`, `/ir`, and `/events`.
 
 ## iOS
 
@@ -73,6 +83,9 @@ add `--no-defaults` when only explicit host resources should be written.
 ## Build via the `crepus` CLI
 
 ```bash
+crepus mobile build --platform ios --dir .
+crepus mobile build --platform android --dir .
+crepus mobile run --platform android --dir .
 crepus native build ios --dir .
 crepus native build android --dir . --flavor Debug
 crepus native run android --dir .          # gradle install + adb launch hint

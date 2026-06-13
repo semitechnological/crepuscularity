@@ -330,6 +330,31 @@ To refresh bundled fixtures after template changes, regenerate IR with **`crepus
 
 The example catalog lives in [`examples/examples.toml`](../examples/examples.toml), grouped by output target. External browser extensions ([undivisible/anywhere](https://github.com/undivisible/anywhere), [undivisible/rs_vimium](https://github.com/undivisible/rs_vimium)) are symlinked under `examples/extensions/` — see [`examples/README.md`](../examples/README.md) and `./scripts/examples-link.sh`.
 
+## Mobile Apps (`crepus mobile`)
+
+Use `crepus mobile` as the unified iOS + Android workflow:
+
+```bash
+crepus mobile new my-mobile-app
+cd my-mobile-app
+crepus mobile dev --platform all --port 4001
+crepus mobile sync --var name=Ada --pretty
+crepus mobile codegen --platform ios --out ios/Sources/NativeShell/Generated --view-name DashboardView
+crepus mobile codegen --platform android --out android/app/src/main/java/dev/example/generated --view-name DashboardView
+crepus mobile build --platform android
+crepus mobile run --platform android
+```
+
+`crepus mobile dev` watches `views/main.crepus` by default, writes current fixtures/generated source, and serves:
+
+```text
+GET /health
+GET /ir
+GET /events
+```
+
+The scaffolded SwiftUI and Compose runtimes load bundled `fixture.json` first, then poll the local dev server in debug builds.
+
 ## Native View IR and Source (`crepus native`)
 
 Emit the same **View IR** JSON contract used by native shells and polyglot plugins:

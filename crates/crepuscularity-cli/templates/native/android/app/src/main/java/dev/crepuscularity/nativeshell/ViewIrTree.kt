@@ -126,7 +126,7 @@ private fun styledText(content: String, style: ViewStyle?) {
 
 private fun textModifier(s: ViewStyle?): Modifier {
     if (s == null) return Modifier
-    var m = Modifier
+    var m: Modifier = Modifier
     val pt = s.paddingTop ?: s.paddingVertical ?: s.padding ?: 0f
     val pb = s.paddingBottom ?: s.paddingVertical ?: s.padding ?: 0f
     val pl = s.paddingLeft ?: s.paddingHorizontal ?: s.padding ?: 0f
@@ -142,7 +142,7 @@ private fun textModifier(s: ViewStyle?): Modifier {
 
 private fun stackModifier(s: ViewStyle?): Modifier {
     if (s == null) return Modifier
-    var m = Modifier
+    var m: Modifier = Modifier
     val pt = s.paddingTop ?: s.paddingVertical ?: s.padding ?: 0f
     val pb = s.paddingBottom ?: s.paddingVertical ?: s.padding ?: 0f
     val pl = s.paddingLeft ?: s.paddingHorizontal ?: s.padding ?: 0f
