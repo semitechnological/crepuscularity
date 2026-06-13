@@ -15,6 +15,6 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 crepuscularity-core = { path = "../crepuscularity-core", version = "0.4.15" }
-crepuscularity-native = { path = "../crepuscularity-native", version = "0.4.10" }
+crepuscularity-native = { path = "../crepuscularity-native", version = "0.5.0" }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
