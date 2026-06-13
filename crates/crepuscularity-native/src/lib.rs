@@ -21,6 +21,7 @@
 //! ## Coverage vs GPUI / web
 //! Not 100% parity with GPUI `styler.rs`—expand [`style`].
 
+pub mod codegen;
 pub mod colors;
 pub mod hot_reload;
 mod include_expand;
@@ -29,6 +30,7 @@ pub mod mutations;
 mod render;
 pub mod style;
 
+pub use codegen::{generate_native_source, NativeCodegenTarget};
 pub use colors::resolve_rgba;
 pub use crepuscularity_core::CrepusError;
 pub use hot_reload::{ast_shape_compatible, plan_hot_reload, HotReloadEnvelope, HotReloadMessage};

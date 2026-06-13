@@ -82,6 +82,8 @@ Convert `.crepus` templates to View IR JSON:
 ```bash
 crepus native ir views/main.crepus --ctx context.json --pretty
 crepus native sync views/main.crepus --dir my-mobile-app --out desktop/share/dashboard.view-ir.json --var name=Ada --pretty
+crepus native codegen views/main.crepus --platform swiftui --out Generated --view-name DashboardView --var name=Ada
+crepus native codegen views/main.crepus --platform compose --out android/app/src/main/java/dev/example/generated --view-name DashboardView --var name=Ada
 ```
 
 ```rust
@@ -213,6 +215,17 @@ class MainActivity : ComponentActivity() {
 - **Slots**: Component slots with caller context
 
 The example SwiftUI and Jetpack Compose shells are intentionally small interpreters for the IR. They decode and render the core nodes, while app-specific image loading, navigation, action routing, accessibility, and animation behavior belong in the host shell.
+
+## Generated Source
+
+For production mobile shells that should compile native source instead of interpreting JSON at runtime, generate SwiftUI or Jetpack Compose from the same View IR:
+
+```bash
+crepus native codegen views/main.crepus --platform swiftui --out Generated --view-name DashboardView --var name=Ada
+crepus native codegen views/main.crepus --platform compose --out android/app/src/main/java/dev/example/generated --view-name DashboardView --var name=Ada
+```
+
+The generator keeps View IR as the stable compiler boundary, then writes `DashboardView.swift` or `DashboardView.kt`. The generated source covers current IR nodes with native SwiftUI/Compose controls and conservative textual fallbacks for host-specific surfaces like image loading and drop handling.
 
 ## Runtime Updates
 

@@ -173,3 +173,92 @@ fn native_ir_rejects_nested_context_object() {
     let err: serde_json::Value = serde_json::from_slice(&out.stderr).expect("error JSON");
     assert!(err["error"].as_str().unwrap().contains("object values"));
 }
+
+#[test]
+#[cfg_attr(
+    windows,
+    ignore = "default desktop crepus.exe does not spawn reliably on Windows CI"
+)]
+fn native_codegen_writes_swiftui_source() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let tpl = tmp.path().join("screen.crepus");
+    let out_dir = tmp.path().join("Generated");
+    std::fs::write(
+        &tpl,
+        "div flex flex-col gap-4 p-4\n  span text-lg font-bold\n    \"Hello {name}\"\n  button @click=tap\n    \"Tap\"",
+    )
+    .expect("write template");
+
+    let out = crepus()
+        .args([
+            "native",
+            "codegen",
+            tpl.to_str().unwrap(),
+            "--platform",
+            "swiftui",
+            "--out",
+            out_dir.to_str().unwrap(),
+            "--view-name",
+            "GreetingScreen",
+            "--var",
+            "name=Ada",
+        ])
+        .output()
+        .expect("spawn crepus native codegen");
+    assert!(
+        out.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let generated = std::fs::read_to_string(out_dir.join("GreetingScreen.swift")).unwrap();
+    assert!(generated.contains("public struct GreetingScreen: View"));
+    assert!(generated.contains("Text(\"Hello Ada\")"));
+    assert!(generated.contains("Button(action: {})"));
+    assert!(generated.contains(".padding(16)"));
+}
+
+#[test]
+#[cfg_attr(
+    windows,
+    ignore = "default desktop crepus.exe does not spawn reliably on Windows CI"
+)]
+fn native_codegen_writes_compose_source() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let tpl = tmp.path().join("screen.crepus");
+    let out_dir = tmp.path().join("generated");
+    std::fs::write(
+        &tpl,
+        "div flex flex-row gap-2 p-2\n  span text-lg\n    \"Hello {name}\"\n  button @click=tap\n    \"Tap\"",
+    )
+    .expect("write template");
+
+    let out = crepus()
+        .args([
+            "native",
+            "codegen",
+            tpl.to_str().unwrap(),
+            "--platform",
+            "compose",
+            "--out",
+            out_dir.to_str().unwrap(),
+            "--view-name",
+            "GreetingScreen",
+            "--var",
+            "name=Ada",
+        ])
+        .output()
+        .expect("spawn crepus native codegen");
+    assert!(
+        out.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let generated = std::fs::read_to_string(out_dir.join("GreetingScreen.kt")).unwrap();
+    assert!(generated.contains("@Composable"));
+    assert!(generated.contains("fun GreetingScreen()"));
+    assert!(generated.contains("Text(\"Hello Ada\""));
+    assert!(generated.contains("Button(onClick = {})"));
+    assert!(generated.contains("Modifier.padding(8.dp)"));
+}

@@ -330,7 +330,7 @@ To refresh bundled fixtures after template changes, regenerate IR with **`crepus
 
 The example catalog lives in [`examples/examples.toml`](../examples/examples.toml), grouped by output target. External browser extensions ([undivisible/anywhere](https://github.com/undivisible/anywhere), [undivisible/rs_vimium](https://github.com/undivisible/rs_vimium)) are symlinked under `examples/extensions/` — see [`examples/README.md`](../examples/README.md) and `./scripts/examples-link.sh`.
 
-## View IR JSON (`crepus native ir`)
+## Native View IR and Source (`crepus native`)
 
 Emit the same **View IR** JSON contract used by native shells and polyglot plugins:
 
@@ -339,9 +339,13 @@ crepus native ir views/main.crepus --ctx context.json --pretty
 crepus native ir views/ui.crepus --component Card --var title=Hello
 cat views/main.crepus | crepus native ir --stdin --base-dir views
 crepus native sync views/main.crepus --dir my-mobile-app --out desktop/share/dashboard.view-ir.json --no-defaults --var name=Ada --pretty
+crepus native codegen views/main.crepus --platform swiftui --out Generated --view-name DashboardView --var name=Ada
+crepus native codegen views/main.crepus --platform compose --out android/app/src/main/java/dev/example/generated --view-name DashboardView --var name=Ada
 ```
 
 For tool integrations, `crepus native ir --stdin-json` accepts an envelope with `entry`, `files`, `template`, `context`, and `pretty`. Successful output is JSON on stdout only; failures are JSON on stderr. See [Polyglot plugins](polyglot.md).
+
+`crepus native codegen` lowers through the same View IR and writes generated SwiftUI (`.swift`) or Jetpack Compose (`.kt`) source for production host apps.
 
 ## Embedded framebuffer (`crepus embedded`) — UNSTABLE
 
