@@ -1,0 +1,27 @@
+name: CrepusMobileApp
+options:
+  bundleIdPrefix: dev.crepuscularity
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    TARGETED_DEVICE_FAMILY: "1,2"
+packages:
+  NativeShell:
+    path: .
+targets:
+  CrepusMobileApp:
+    type: application
+    platform: iOS
+    sources:
+      - path: App
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        PRODUCT_BUNDLE_IDENTIFIER: dev.crepuscularity.mobile
+    dependencies:
+      - package: NativeShell
+        product: NativeShell

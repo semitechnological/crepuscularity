@@ -303,6 +303,10 @@ fn mobile_new_scaffolds_runtime_files() {
     assert!(root
         .join("ios/Sources/NativeShell/CrepusMobileRuntime.swift")
         .is_file());
+    assert!(root.join("ios/project.yml").is_file());
+    assert!(root.join("ios/crepus.toml").is_file());
+    assert!(root.join("ios/App/CrepusMobileApp.swift").is_file());
+    assert!(root.join("ios/App/ContentView.swift").is_file());
     assert!(root
         .join("android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusMobileRuntime.kt")
         .is_file());

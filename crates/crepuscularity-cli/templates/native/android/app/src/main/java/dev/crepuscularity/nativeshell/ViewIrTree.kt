@@ -5,6 +5,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -25,7 +26,7 @@ import androidx.compose.ui.unit.sp
 
 @Composable
 fun ViewIrRoot(ir: ViewIr, modifier: Modifier = Modifier) {
-    Column(modifier = modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(0.dp)) {
+    Column(modifier = modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(0.dp)) {
         ir.root.forEach { node -> ViewNodeView(node) }
     }
 }

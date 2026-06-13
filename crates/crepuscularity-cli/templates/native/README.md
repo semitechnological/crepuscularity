@@ -1,7 +1,7 @@
 # Native shell scaffold
 
-Scaffolded by `crepus mobile new` or `crepus native new`. This is a starter for iOS (SwiftPM) and
-Android (Gradle) apps that decode **View IR** produced by the Rust crate
+Scaffolded by `crepus mobile new` or `crepus native new`. This is a starter for iOS (XcodeGen + SwiftUI) and
+Android (Gradle + Compose) apps that decode **View IR** produced by the Rust crate
 [`crepuscularity-native`](https://crates.io/crates/crepuscularity-native).
 
 ## Layout
@@ -10,7 +10,7 @@ Android (Gradle) apps that decode **View IR** produced by the Rust crate
 |---|---|
 | `views/main.crepus` | Starter Crepuscularity template that owns the UI source. |
 | `fixture.json` | Shared View IR fixture used by both shells. Regenerate with `crepus native sync views/main.crepus --dir . --pretty` after editing your template. |
-| `ios/` | Swift Package (open `Package.swift` in Xcode, or `swift build` from this directory). |
+| `ios/` | XcodeGen app target plus local Swift Package runtime. |
 | `android/` | Gradle module (open in Android Studio, or run `./gradlew :app:assembleDebug` after generating the Gradle wrapper). |
 
 ## Dev server
@@ -26,9 +26,8 @@ The SwiftUI and Compose shells load `fixture.json` first, then connect to the lo
 ## iOS
 
 ```bash
-cd ios
-swift build               # CLI build
-# or open ios/Package.swift in Xcode and pick a simulator
+crepus mobile build --platform ios --dir .
+crepus mobile run --platform ios --dir .
 ```
 
 `SwiftUI` views in `ios/Sources/NativeShell/ViewIrTreeView.swift` decode the
@@ -85,8 +84,10 @@ add `--no-defaults` when only explicit host resources should be written.
 ```bash
 crepus mobile build --platform ios --dir .
 crepus mobile build --platform android --dir .
+crepus mobile run --platform ios --dir .
 crepus mobile run --platform android --dir .
 crepus native build ios --dir .
 crepus native build android --dir . --flavor Debug
+crepus native run ios --dir .              # build + simctl install + simctl launch
 crepus native run android --dir .          # gradle install + adb launch hint
 ```

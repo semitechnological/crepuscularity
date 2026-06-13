@@ -33,18 +33,21 @@ Prefer the unified mobile workflow for new iOS + Android apps:
 crepus mobile new my-mobile-app
 cd my-mobile-app
 crepus mobile dev --platform all
+crepus mobile build --platform ios
+crepus mobile run --platform ios
 crepus mobile build --platform android
 ```
 
 ### Cross-platform scaffold (iOS + Android in one command)
 
 ```bash
-# Scaffold an iOS SwiftPM package + Android Gradle module sharing a fixture.json
+# Scaffold an iOS XcodeGen app + Android Gradle module sharing a fixture.json
 crepus native new my-mobile-app
 cd my-mobile-app
 
-# iOS — open in Xcode or build from the CLI
-swift build --package-path ios
+# iOS — build, install, and launch the simulator app
+crepus mobile build --platform ios --dir .
+crepus mobile run --platform ios --dir .
 # or:    crepus native build ios --dir .
 
 # Android — generate the Gradle wrapper (one-time), then build
@@ -68,8 +71,7 @@ crepus native sync views/main.crepus --dir . --out desktop/share/dashboard.view-
 
 ### iOS-only scaffold with XcodeGen + a real `.xcodeproj`
 
-If you want a generated Xcode project (rather than a SwiftPM package), use the
-iOS-specific scaffolder:
+For iOS-only apps, use the iOS-specific scaffolder:
 
 ```bash
 wax install xcodegen
