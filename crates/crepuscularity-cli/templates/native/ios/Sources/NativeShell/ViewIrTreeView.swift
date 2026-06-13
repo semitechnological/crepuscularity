@@ -13,6 +13,7 @@ public struct ViewIrRootView: View {
                 ViewNodeView(node: node)
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .padding()
     }
 }

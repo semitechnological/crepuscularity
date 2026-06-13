@@ -341,6 +341,8 @@ crepus mobile dev --platform all --port 4001
 crepus mobile sync --var name=Ada --pretty
 crepus mobile codegen --platform ios --out ios/Sources/NativeShell/Generated --view-name DashboardView
 crepus mobile codegen --platform android --out android/app/src/main/java/dev/example/generated --view-name DashboardView
+crepus mobile build --platform ios
+crepus mobile run --platform ios
 crepus mobile build --platform android
 crepus mobile run --platform android
 ```

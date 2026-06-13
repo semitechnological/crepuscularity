@@ -15,7 +15,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 use console::style;
 use crepuscularity_core::context::{TemplateContext, TemplateValue};
@@ -139,6 +139,11 @@ struct CodegenArgs {
     component: Option<String>,
     ctx_file: Option<PathBuf>,
     vars: Vec<(String, String)>,
+}
+
+struct MobileIosConfig {
+    scheme: String,
+    bundle_id: String,
 }
 
 fn run_ir(args: &[String]) {
@@ -713,6 +718,22 @@ const TEMPLATE_FILES: &[(&str, &str)] = &[
     ("fixture.json", include_str!("../templates/native/fixture.json")),
     ("ios/Package.swift", include_str!("../templates/native/ios/Package.swift")),
     (
+        "ios/project.yml",
+        include_str!("../templates/native/ios/project.yml"),
+    ),
+    (
+        "ios/crepus.toml",
+        include_str!("../templates/native/ios/crepus.toml"),
+    ),
+    (
+        "ios/App/CrepusMobileApp.swift",
+        include_str!("../templates/native/ios/App/CrepusMobileApp.swift"),
+    ),
+    (
+        "ios/App/ContentView.swift",
+        include_str!("../templates/native/ios/App/ContentView.swift"),
+    ),
+    (
         "ios/Sources/NativeShell/ViewIrModels.swift",
         include_str!("../templates/native/ios/Sources/NativeShell/ViewIrModels.swift"),
     ),
@@ -809,6 +830,10 @@ fn scaffold_native_app(name: &str) {
 
     let gitignore = "# Build outputs and IDE caches kept out of source control.\n\
                      ios/.build/\n\
+                     ios/build/\n\
+                     ios/*.xcodeproj/\n\
+                     ios/*.xcworkspace/\n\
+                     ios/xcuserdata/\n\
                      android/.gradle/\n\
                      android/build/\n\
                      android/app/build/\n\
@@ -826,10 +851,7 @@ fn scaffold_native_app(name: &str) {
     ));
     eprintln!();
     eprintln!("{}", style("Next steps").dim());
-    eprintln!(
-        "  iOS:     cd {dir}/ios && swift build              # or open Package.swift in Xcode",
-        dir = name
-    );
+    eprintln!("  iOS:     crepus mobile build --platform ios --dir {name}");
     eprintln!(
         "  Android: cd {dir}/android && gradle wrapper --gradle-version 8.10 && \\\n           ./gradlew :app:assembleDebug",
         dir = name
@@ -874,6 +896,10 @@ fn parse_flavor(args: &[String]) -> Option<String> {
 
 fn build_ios(dir: &Path, options: BuildOptions) {
     let ios_dir = dir.join("ios");
+    if ios_dir.join("project.yml").exists() {
+        build_ios_app(&ios_dir, options);
+        return;
+    }
     if !ios_dir.join("Package.swift").exists() {
         ui::error(&format!(
             "no Package.swift at '{}'. Pass --dir <path-to-scaffold-root> if the project lives elsewhere.",
@@ -888,6 +914,51 @@ fn build_ios(dir: &Path, options: BuildOptions) {
         cmd.args(["-c", "debug"]);
     }
     delegate(cmd, "swift build");
+}
+
+fn build_ios_app(ios_dir: &Path, options: BuildOptions) {
+    let spec = ios_dir.join("project.yml");
+    if !spec.exists() {
+        ui::error(&format!("no project.yml at '{}'", spec.display()));
+    }
+    let cfg = load_mobile_ios_config(ios_dir);
+    let mut xcodegen = Command::new("xcodegen");
+    xcodegen
+        .current_dir(ios_dir)
+        .args(["generate", "--spec", "project.yml"]);
+    delegate(xcodegen, "xcodegen generate");
+
+    let project = ios_dir.join(format!("{}.xcodeproj", cfg.scheme));
+    let project_name = if project.exists() {
+        project
+    } else {
+        find_xcodeproj(ios_dir).unwrap_or_else(|| {
+            ui::error(&format!(
+                "no .xcodeproj generated in '{}'",
+                ios_dir.display()
+            ));
+        })
+    };
+    let mut build = Command::new("xcodebuild");
+    build.current_dir(ios_dir).args([
+        "-project",
+        project_name
+            .file_name()
+            .and_then(|s| s.to_str())
+            .unwrap_or("CrepusMobileApp.xcodeproj"),
+        "-target",
+        &cfg.scheme,
+        "-sdk",
+        "iphonesimulator",
+        "-configuration",
+        if options.release() {
+            "Release"
+        } else {
+            "Debug"
+        },
+        "build",
+    ]);
+    delegate(build, "xcodebuild");
 }
 
 fn build_android(dir: &Path, flavor: &str) {
@@ -924,21 +995,187 @@ fn build_android(dir: &Path, flavor: &str) {
 }
 
 fn run_ios_help(dir: &Path) {
+    let ios_dir = dir.join("ios");
+    if !ios_dir.join("project.yml").exists() {
+        eprintln!(
+            "{}",
+            style("crepus native run ios — open in Xcode").cyan().bold()
+        );
+        eprintln!();
+        eprintln!("  open {dir}/ios/Package.swift", dir = dir.display());
+        eprintln!();
+        eprintln!(
+            "{} SwiftPM-only scaffold has no installable app target.",
+            style("note:").yellow()
+        );
+        return;
+    }
+    let options = BuildOptions::debug();
+    build_ios_app(&ios_dir, options);
+    run_ios_app(&ios_dir);
+}
+
+fn run_ios_app(ios_dir: &Path) {
+    let cfg = load_mobile_ios_config(ios_dir);
+    let app = find_built_ios_app(ios_dir, &cfg).unwrap_or_else(|| {
+        ui::error(&format!(
+            "no built .app under '{}'",
+            ios_dir.join("build").display()
+        ));
+    });
+    let device = booted_or_available_ios_device().unwrap_or_else(|| {
+        ui::error("no available iOS simulator device found");
+    });
+    let _ = Command::new("xcrun")
+        .args(["simctl", "boot", &device])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status();
+    let bootstatus = Command::new("xcrun")
+        .args(["simctl", "bootstatus", &device, "-b"])
+        .status()
+        .unwrap_or_else(|e| ui::error(&format!("simctl bootstatus: {e}")));
+    if !bootstatus.success() {
+        ui::error("iOS simulator failed to boot");
+    }
+    let install = Command::new("xcrun")
+        .args(["simctl", "install", &device])
+        .arg(&app)
+        .status()
+        .unwrap_or_else(|e| ui::error(&format!("simctl install: {e}")));
+    if !install.success() {
+        ui::error("simctl install failed");
+    }
+    let launch = Command::new("xcrun")
+        .args(["simctl", "launch", &device, &cfg.bundle_id])
+        .status()
+        .unwrap_or_else(|e| ui::error(&format!("simctl launch: {e}")));
+    if !launch.success() {
+        ui::error("simctl launch failed");
+    }
     eprintln!(
-        "{}",
-        style("crepus native run ios — open in Xcode").cyan().bold()
+        "{} installed and launched {} on {}",
+        style("ios:").green(),
+        app.display(),
+        device
     );
-    eprintln!();
-    eprintln!("  open {dir}/ios/Package.swift", dir = dir.display());
-    eprintln!();
-    eprintln!(
-        "{} SwiftPM does not run apps directly; opening Package.swift in Xcode lets you pick a simulator and Run.",
-        style("note:").yellow()
-    );
-    eprintln!(
-        "{} for a fresh iOS app target with a generated `.xcodeproj`, see `crepus ios new`.",
-        style("hint:").dim()
-    );
+}
+
+fn load_mobile_ios_config(ios_dir: &Path) -> MobileIosConfig {
+    let toml = fs::read_to_string(ios_dir.join("crepus.toml")).unwrap_or_default();
+    let project = fs::read_to_string(ios_dir.join("project.yml")).unwrap_or_default();
+    MobileIosConfig {
+        scheme: toml_value(&toml, "scheme")
+            .or_else(|| project_name(&project))
+            .unwrap_or_else(|| "CrepusMobileApp".to_string()),
+        bundle_id: project_bundle_id(&project)
+            .unwrap_or_else(|| "dev.crepuscularity.mobile".to_string()),
+    }
+}
+
+fn toml_value(src: &str, key: &str) -> Option<String> {
+    src.lines().find_map(|line| {
+        let line = line.trim();
+        let rest = line.strip_prefix(key)?.trim_start();
+        let rest = rest.strip_prefix('=')?.trim();
+        Some(rest.trim_matches('"').to_string())
+    })
+}
+
+fn project_name(src: &str) -> Option<String> {
+    src.lines().find_map(|line| {
+        let line = line.trim();
+        let rest = line.strip_prefix("name:")?.trim();
+        if rest.is_empty() {
+            None
+        } else {
+            Some(rest.to_string())
+        }
+    })
+}
+
+fn project_bundle_id(src: &str) -> Option<String> {
+    src.lines().find_map(|line| {
+        let line = line.trim();
+        let rest = line.strip_prefix("PRODUCT_BUNDLE_IDENTIFIER:")?.trim();
+        if rest.is_empty() {
+            None
+        } else {
+            Some(rest.to_string())
+        }
+    })
+}
+
+fn find_xcodeproj(dir: &Path) -> Option<PathBuf> {
+    fs::read_dir(dir).ok()?.flatten().find_map(|entry| {
+        let path = entry.path();
+        if path.extension().is_some_and(|ext| ext == "xcodeproj") {
+            Some(path)
+        } else {
+            None
+        }
+    })
+}
+
+fn find_built_ios_app(ios_dir: &Path, cfg: &MobileIosConfig) -> Option<PathBuf> {
+    let direct = ios_dir
+        .join("build/Debug-iphonesimulator")
+        .join(format!("{}.app", cfg.scheme));
+    if direct.exists() {
+        return Some(direct);
+    }
+    find_app_under(&ios_dir.join("build"))
+}
+
+fn find_app_under(dir: &Path) -> Option<PathBuf> {
+    for entry in fs::read_dir(dir).ok()?.flatten() {
+        let path = entry.path();
+        if path.extension().is_some_and(|ext| ext == "app") {
+            return Some(path);
+        }
+        if path.is_dir() {
+            if let Some(app) = find_app_under(&path) {
+                return Some(app);
+            }
+        }
+    }
+    None
+}
+
+fn booted_or_available_ios_device() -> Option<String> {
+    let output = Command::new("xcrun")
+        .args(["simctl", "list", "devices", "available"])
+        .output()
+        .ok()?;
+    let text = String::from_utf8_lossy(&output.stdout);
+    let mut first = None;
+    for line in text.lines() {
+        if !line.contains("(Booted)") && !line.contains("(Shutdown)") {
+            continue;
+        }
+        let Some(id) = simulator_id_from_line(line) else {
+            continue;
+        };
+        if line.contains("(Booted)") {
+            return Some(id);
+        }
+        if first.is_none() {
+            first = Some(id);
+        }
+    }
+    first
+}
+
+fn simulator_id_from_line(line: &str) -> Option<String> {
+    let start = line.find('(')? + 1;
+    let rest = &line[start..];
+    let end = rest.find(')')?;
+    let candidate = &rest[..end];
+    if candidate.chars().filter(|c| *c == '-').count() == 4 {
+        Some(candidate.to_string())
+    } else {
+        None
+    }
 }
 
 fn run_android(dir: &Path, flavor: &str) {
