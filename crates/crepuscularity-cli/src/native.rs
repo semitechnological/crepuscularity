@@ -1182,6 +1182,8 @@ fn run_android(dir: &Path, flavor: &str) {
     let android_dir = dir.join("android");
     let gradlew = android_dir.join("gradlew");
     let task = format!(":app:install{}", capitalize_ascii(flavor));
+    let application_id = load_android_application_id(&android_dir)
+        .unwrap_or_else(|| "dev.crepuscularity.nativeshell".to_string());
 
     let mut cmd = if gradlew.exists() {
         let mut c = Command::new(&gradlew);
@@ -1197,10 +1199,30 @@ fn run_android(dir: &Path, flavor: &str) {
     cmd.arg("--quiet");
     delegate(cmd, "gradle install");
 
+    let component = format!("{application_id}/.MainActivity");
+    let mut launch = Command::new("adb");
+    launch.args(["shell", "am", "start", "-n", &component]);
+    delegate(launch, "adb launch");
+
     eprintln!(
-        "\n{} APK installed; launch with:\n  adb shell am start -n dev.crepuscularity.nativeshell/.MainActivity",
-        style("note:").dim()
+        "\n{} installed and launched {}",
+        style("android:").green(),
+        component
     );
+}
+
+fn load_android_application_id(android_dir: &Path) -> Option<String> {
+    let gradle = fs::read_to_string(android_dir.join("app/build.gradle.kts")).ok()?;
+    gradle_kts_value(&gradle, "applicationId")
+}
+
+fn gradle_kts_value(src: &str, key: &str) -> Option<String> {
+    src.lines().find_map(|line| {
+        let line = line.trim();
+        let rest = line.strip_prefix(key)?.trim_start();
+        let rest = rest.strip_prefix('=')?.trim();
+        Some(rest.trim_matches('"').to_string())
+    })
 }
 
 fn delegate(mut cmd: Command, label: &str) {
@@ -1321,6 +1343,21 @@ mod tests {
         assert_eq!(parse_flavor(&v), Some("Debug".to_string()));
         let v: Vec<String> = vec![];
         assert_eq!(parse_flavor(&v), None);
+    }
+
+    #[test]
+    fn gradle_kts_value_reads_application_id() {
+        let src = r#"
+android {
+    defaultConfig {
+        applicationId = "dev.crepuscularity.nativeshell"
+    }
+}
+"#;
+        assert_eq!(
+            gradle_kts_value(src, "applicationId"),
+            Some("dev.crepuscularity.nativeshell".to_string())
+        );
     }
 
     #[test]

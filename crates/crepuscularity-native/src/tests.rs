@@ -45,6 +45,7 @@ fn codegen_swiftui_emits_standalone_view_source() {
     .unwrap();
     let source = generate_native_source(&ir, NativeCodegenTarget::SwiftUi, "HelloScreen");
     assert!(source.contains("import SwiftUI"));
+    assert!(source.contains("public enum CrepusActions"));
     assert!(source.contains("public struct HelloScreen: View"));
     assert!(source.contains("VStack(alignment: .leading, spacing: 16.0)"));
     assert!(source.contains("Text(\"Hello Ada\")"));
@@ -55,7 +56,7 @@ fn codegen_swiftui_emits_standalone_view_source() {
 #[test]
 fn codegen_compose_emits_composable_source() {
     let ir = render_template_to_ir(
-        "div flex flex-row gap-2 p-2\n  span text-lg font-bold\n    \"Hello Ada\"\n  button\n    \"Tap\"",
+        "div flex flex-row gap-2 p-2\n  span text-lg font-bold\n    \"Hello Ada\"\n  button @click=\"tap\"\n    \"Tap\"",
         &TemplateContext::new(),
     )
     .unwrap();
@@ -66,7 +67,8 @@ fn codegen_compose_emits_composable_source() {
     assert!(
         source.contains("Text(\"Hello Ada\", fontSize = 18.0.sp, fontWeight = FontWeight.Bold)")
     );
-    assert!(source.contains("Button(onClick = {})"));
+    assert!(source.contains("object CrepusActions"));
+    assert!(source.contains("Button(onClick = { CrepusActions.dispatch(\"tap\") })"));
 }
 
 fn round_trip(ir: &ViewIr) {
