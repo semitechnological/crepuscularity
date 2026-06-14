@@ -1,5 +1,5 @@
 use crepuscularity_gpui::prelude::*;
-use gpui::{bounds, point, px, size, App, Application, ClickEvent, WindowOptions};
+use gpui::{bounds, point, px, size, App, Application, ClickEvent};
 
 const DEMO_ITEMS: &[&str] = &[
     "Buy groceries",
@@ -164,25 +164,15 @@ impl Render for TodoView {
 
 fn main() {
     Application::new().run(|cx: &mut App| {
-        let opts = WindowOptions {
-            window_bounds: Some(gpui::WindowBounds::Windowed(bounds(
+        let opts = gpui_window_options(
+            "crepuscularity.todo",
+            "Todo",
+            Some(gpui::WindowBounds::Windowed(bounds(
                 point(px(100.), px(100.)),
                 size(px(640.), px(700.)),
             ))),
-            titlebar: None,
-            focus: true,
-            show: true,
-            kind: gpui::WindowKind::Normal,
-            is_movable: true,
-            is_resizable: true,
-            is_minimizable: true,
-            display_id: None,
-            window_background: gpui::WindowBackgroundAppearance::Opaque,
-            app_id: Some("crepuscularity.todo".to_string()),
-            window_min_size: None,
-            window_decorations: None,
-            tabbing_identifier: None,
-        };
+            None,
+        );
 
         cx.open_window(opts, |_window, cx| cx.new(TodoView::new))
             .unwrap();

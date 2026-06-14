@@ -471,10 +471,7 @@ fn print_usage() {
 #[cfg(feature = "desktop")]
 fn run_preview(path: std::path::PathBuf) {
     use crepuscularity_runtime::{HotReloadState, HotReloadView, TemplateContext};
-    use gpui::{
-        bounds, point, prelude::*, px, size, Application, WindowBackgroundAppearance, WindowKind,
-        WindowOptions,
-    };
+    use gpui::{bounds, point, prelude::*, px, size, Application, WindowOptions};
 
     let display_name = path
         .file_name()
@@ -492,23 +489,16 @@ fn run_preview(path: std::path::PathBuf) {
 
     Application::new().run(move |cx: &mut gpui::App| {
         let opts = WindowOptions {
+            app_id: Some(format!("crepuscularity.preview.{display_name}")),
+            titlebar: Some(gpui::TitlebarOptions {
+                title: Some(format!("Crepus Preview - {display_name}").into()),
+                ..Default::default()
+            }),
             window_bounds: Some(gpui::WindowBounds::Windowed(bounds(
                 point(px(100.), px(100.)),
                 size(px(1200.), px(800.)),
             ))),
-            titlebar: None,
-            focus: true,
-            show: true,
-            kind: WindowKind::Normal,
-            is_movable: true,
-            is_resizable: true,
-            is_minimizable: true,
-            display_id: None,
-            window_background: WindowBackgroundAppearance::Opaque,
-            app_id: Some(format!("crepuscularity.preview.{display_name}")),
-            window_min_size: None,
-            window_decorations: None,
-            tabbing_identifier: None,
+            ..Default::default()
         };
 
         let p = path.clone();
