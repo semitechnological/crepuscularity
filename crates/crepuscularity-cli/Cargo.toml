@@ -7,6 +7,7 @@ description = "crepus CLI — scaffolding and builds for Crepuscularity (UNSTABL
 repository = "https://github.com/tschk/crepuscularity"
 documentation = "https://docs.rs/crepuscularity-cli"
 readme = "../../README.md"
+include = ["assets/**", "build.rs", "src/**", "templates/**", "tests/**", "Cargo.toml"]
 
 [[bin]]
 name = "crepus"
