@@ -30,6 +30,48 @@ android {
     kotlin { jvmToolchain(17) }
 
     buildFeatures { compose = true }
+
+    sourceSets["main"].jniLibs.srcDir(layout.buildDirectory.dir("rustJniLibs"))
+}
+
+val rustCrateDir = layout.projectDirectory.dir("../../rust")
+val rustTargetDir = rustCrateDir.dir("target")
+val rustAndroidTarget = "aarch64-linux-android"
+val rustJniOutputDir = layout.buildDirectory.dir("rustJniLibs/arm64-v8a")
+
+tasks.register<Exec>("buildRustActions") {
+    val sdkDir = providers.environmentVariable("ANDROID_HOME").orElse(providers.environmentVariable("ANDROID_SDK_ROOT"))
+    val ndkDir = providers.environmentVariable("ANDROID_NDK_HOME").orElse(
+        sdkDir.map { sdk ->
+            file("$sdk/ndk").listFiles()?.filter { it.isDirectory }?.maxByOrNull { it.name }?.absolutePath ?: ""
+        }
+    )
+    doFirst {
+        val ndk = ndkDir.orNull.orEmpty()
+        require(ndk.isNotBlank()) { "ANDROID_NDK_HOME or ANDROID_HOME/ndk/<version> is required to build Rust mobile actions" }
+        val prebuilt = file("$ndk/toolchains/llvm/prebuilt").listFiles()?.firstOrNull { it.isDirectory }?.absolutePath
+            ?: error("NDK toolchain prebuilt directory not found under $ndk")
+        file(rustJniOutputDir).mkdirs()
+        environment("CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER", "$prebuilt/bin/aarch64-linux-android26-clang")
+    }
+    commandLine(
+        "cargo",
+        "build",
+        "--manifest-path",
+        rustCrateDir.file("Cargo.toml").asFile.absolutePath,
+        "--target",
+        rustAndroidTarget,
+    )
+    doLast {
+        copy {
+            from(rustTargetDir.file("$rustAndroidTarget/debug/libcrepus_mobile_actions.so"))
+            into(rustJniOutputDir)
+        }
+    }
+}
+
+tasks.named("preBuild") {
+    dependsOn("buildRustActions")
 }
 
 dependencies {

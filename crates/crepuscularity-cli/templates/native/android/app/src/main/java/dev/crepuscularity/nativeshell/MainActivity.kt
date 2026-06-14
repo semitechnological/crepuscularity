@@ -20,6 +20,7 @@ class MainActivity : ComponentActivity() {
             navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
         )
         super.onCreate(savedInstanceState)
+        CrepusRustActions.install()
         setContent {
             MaterialTheme {
                 Box(

@@ -19,9 +19,23 @@ targets:
       - path: App
     settings:
       base:
+        LIBRARY_SEARCH_PATHS: "$(PROJECT_DIR)/build/rust/aarch64-apple-ios-sim"
+        OTHER_LDFLAGS: "-lcrepus_mobile_actions"
+        EXCLUDED_ARCHS[sdk=iphonesimulator*]: "x86_64"
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         PRODUCT_BUNDLE_IDENTIFIER: dev.crepuscularity.mobile
     dependencies:
       - package: NativeShell
         product: NativeShell
+    preBuildScripts:
+      - name: Build Rust Actions
+        outputFiles:
+          - "$(PROJECT_DIR)/build/rust/aarch64-apple-ios-sim/libcrepus_mobile_actions.a"
+        script: |
+          set -euo pipefail
+          export PATH="$HOME/.cargo/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
+          rustup target add aarch64-apple-ios-sim >/dev/null
+          cargo build --manifest-path "$PROJECT_DIR/../rust/Cargo.toml" --target aarch64-apple-ios-sim
+          mkdir -p "$PROJECT_DIR/build/rust/aarch64-apple-ios-sim"
+          cp "$PROJECT_DIR/../rust/target/aarch64-apple-ios-sim/debug/libcrepus_mobile_actions.a" "$PROJECT_DIR/build/rust/aarch64-apple-ios-sim/"
