@@ -71,6 +71,64 @@ fn codegen_compose_emits_composable_source() {
     assert!(source.contains("Button(onClick = { CrepusActions.dispatch(\"tap\") })"));
 }
 
+#[test]
+fn web_style_classes_lower_to_typed_native_codegen() {
+    let ir = render_template_to_ir(
+        "div flex flex-col w-full h-full px-4 pt-6 mb-2 bg-[#101624] border border-[#334155] rounded-xl opacity-75 shadow-lg translate-x-2 translate-y-1 rotate-6 scale-95 overflow-hidden\n  span text-center text-lg font-semibold italic underline line-through leading-tight line-clamp-2 text-[#f8fafc]\n    \"Literal web-style UI\"",
+        &TemplateContext::new(),
+    )
+    .unwrap();
+    let value = serde_json::to_value(&ir).unwrap();
+    let root_style = &value["root"][0]["style"];
+    assert_eq!(root_style["width"], -1.0);
+    assert_eq!(root_style["height"], -1.0);
+    assert_eq!(root_style["paddingHorizontal"], 16.0);
+    assert_eq!(root_style["paddingTop"], 24.0);
+    assert_eq!(root_style["marginBottom"], 8.0);
+    assert_eq!(root_style["borderWidth"], 1.0);
+    assert_eq!(root_style["opacity"], 0.75);
+    assert_eq!(root_style["translateX"], 8.0);
+    assert_eq!(root_style["translateY"], 4.0);
+    assert_eq!(root_style["rotate"], 6.0);
+    assert!((root_style["scaleX"].as_f64().unwrap() - 0.95).abs() < 0.001);
+    assert!((root_style["scaleY"].as_f64().unwrap() - 0.95).abs() < 0.001);
+    let text_style = &value["root"][0]["children"][0]["style"];
+    assert_eq!(text_style["textAlign"], "center");
+    assert_eq!(text_style["italic"], true);
+    assert_eq!(text_style["underline"], true);
+    assert_eq!(text_style["strikethrough"], true);
+    assert_eq!(text_style["lineClamp"], 2);
+
+    let swift = generate_native_source(&ir, NativeCodegenTarget::SwiftUi, "WebParityView");
+    assert!(swift.contains(".padding(.horizontal, 16)"));
+    assert!(swift.contains(".padding(.top, 24)"));
+    assert!(swift.contains(".padding(.bottom, 8)"));
+    assert!(swift.contains(".opacity(0.750)"));
+    assert!(swift.contains(".border(Color(red:"));
+    assert!(swift.contains(".offset(x: 8.0, y: 4.0)"));
+    assert!(swift.contains(".rotationEffect(.degrees(6.0))"));
+    assert!(swift.contains(".scaleEffect(x: 0.950, y: 0.950)"));
+    assert!(swift.contains(".multilineTextAlignment(.center)"));
+    assert!(swift.contains(".italic()"));
+    assert!(swift.contains(".underline()"));
+    assert!(swift.contains(".strikethrough()"));
+    assert!(swift.contains(".lineLimit(2)"));
+
+    let compose = generate_native_source(&ir, NativeCodegenTarget::Compose, "WebParityView");
+    assert!(compose.contains(".padding(horizontal = 16.dp, vertical = 0.dp)"));
+    assert!(compose.contains(".padding(start = 0.dp, top = 24.dp, end = 0.dp, bottom = 0.dp)"));
+    assert!(compose.contains(".padding(start = 0.dp, top = 0.dp, end = 0.dp, bottom = 8.dp)"));
+    assert!(compose.contains(".border(1.dp, Color(0xFF334155), RoundedCornerShape(12.dp))"));
+    assert!(compose.contains(".alpha(0.750f)"));
+    assert!(compose.contains(".offset(x = 8.dp, y = 4.dp)"));
+    assert!(compose.contains(".rotate(6.0f)"));
+    assert!(compose.contains(".scale(scaleX = 0.950f, scaleY = 0.950f)"));
+    assert!(compose.contains("textAlign = TextAlign.Center"));
+    assert!(compose.contains("fontStyle = FontStyle.Italic"));
+    assert!(compose.contains("TextDecoration.combine"));
+    assert!(compose.contains("maxLines = 2"));
+}
+
 fn round_trip(ir: &ViewIr) {
     let s = to_json(ir).unwrap();
     let back: ViewIr = serde_json::from_str(&s).unwrap();
