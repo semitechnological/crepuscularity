@@ -62,8 +62,7 @@ pub fn run(args: &[String]) {
             native::run(&forwarded);
         }
         Some("codegen") => {
-            let forwarded = forward_codegen_args(&args[1..]).unwrap_or_else(|e| ui::error(&e));
-            native::run(&forwarded);
+            run_codegen(&args[1..]).unwrap_or_else(|e| ui::error(&e));
         }
         Some("build") => run_build(&args[1..]),
         Some("run") => run_mobile_app(&args[1..]),
@@ -123,6 +122,67 @@ fn run_mobile_app(args: &[String]) {
         }
         MobilePlatform::All => ui::error("crepus mobile run expects --platform ios or android"),
     }
+}
+
+fn run_codegen(args: &[String]) -> Result<(), String> {
+    let platform = parse_platform_arg(args).unwrap_or(MobilePlatform::All);
+    let dir = parse_dir_arg(args)?;
+    let stripped = strip_mobile_codegen_args(args);
+    let template = stripped
+        .first()
+        .filter(|arg| !arg.starts_with('-'))
+        .cloned()
+        .unwrap_or_else(|| DEFAULT_TEMPLATE.to_string());
+    let extra = if stripped
+        .first()
+        .filter(|arg| !arg.starts_with('-'))
+        .is_some()
+    {
+        stripped[1..].to_vec()
+    } else {
+        stripped
+    };
+    let template_path = resolve_template_path(&dir, Path::new(&template));
+    match platform {
+        MobilePlatform::Ios | MobilePlatform::All => {
+            let mut forwarded = vec![
+                "codegen".to_string(),
+                template_path.display().to_string(),
+                "--platform".to_string(),
+                "swiftui".to_string(),
+                "--out".to_string(),
+                dir.join("ios/Sources/NativeShell/Generated")
+                    .display()
+                    .to_string(),
+                "--view-name".to_string(),
+                "CrepusGeneratedView".to_string(),
+            ];
+            forwarded.extend(extra.clone());
+            native::run(&forwarded);
+        }
+        _ => {}
+    }
+    match platform {
+        MobilePlatform::Android | MobilePlatform::All => {
+            let out_dir =
+                dir.join("android/app/src/main/java/dev/crepuscularity/nativeshell/generated");
+            let mut forwarded = vec![
+                "codegen".to_string(),
+                template_path.display().to_string(),
+                "--platform".to_string(),
+                "compose".to_string(),
+                "--out".to_string(),
+                out_dir.display().to_string(),
+                "--view-name".to_string(),
+                "CrepusGeneratedView".to_string(),
+            ];
+            forwarded.extend(extra);
+            native::run(&forwarded);
+            prepend_kotlin_package(&out_dir.join("CrepusGeneratedView.kt"));
+        }
+        _ => {}
+    }
+    Ok(())
 }
 
 fn run_dev(args: MobileDevArgs) -> Result<(), String> {
@@ -369,36 +429,34 @@ fn sync_outputs(root: &Path, template_path: &Path, platform: MobilePlatform) {
     }
     match platform {
         MobilePlatform::Android | MobilePlatform::All => {
+            let out_dir =
+                root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/generated");
             let args = vec![
                 "codegen".to_string(),
                 template_path.display().to_string(),
                 "--platform".to_string(),
                 "compose".to_string(),
                 "--out".to_string(),
-                root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/generated")
-                    .display()
-                    .to_string(),
+                out_dir.display().to_string(),
                 "--view-name".to_string(),
                 "CrepusGeneratedView".to_string(),
             ];
             native::run(&args);
+            prepend_kotlin_package(&out_dir.join("CrepusGeneratedView.kt"));
         }
         _ => {}
     }
 }
 
-fn forward_codegen_args(args: &[String]) -> Result<Vec<String>, String> {
-    if args.first().is_none_or(|arg| arg.starts_with('-')) {
-        let mut forwarded = vec!["codegen".to_string(), DEFAULT_TEMPLATE.to_string()];
-        forwarded.extend(args.iter().cloned());
-        normalize_platform_values(&mut forwarded);
-        Ok(forwarded)
-    } else {
-        let mut forwarded = vec!["codegen".to_string()];
-        forwarded.extend(args.iter().cloned());
-        normalize_platform_values(&mut forwarded);
-        Ok(forwarded)
+fn prepend_kotlin_package(path: &Path) {
+    let Ok(source) = fs::read_to_string(path) else {
+        return;
+    };
+    if source.starts_with("package ") {
+        return;
     }
+    let updated = format!("package dev.crepuscularity.nativeshell\n\n{source}");
+    let _ = fs::write(path, updated);
 }
 
 fn with_default_template_arg(command: &str, args: &[String]) -> Vec<String> {
@@ -415,27 +473,6 @@ fn append_build_mode(args: &mut Vec<String>, options: BuildOptions) {
         args.push("--release".to_string());
     } else {
         args.push("--debug".to_string());
-    }
-}
-
-fn normalize_platform_values(args: &mut [String]) {
-    let mut i = 0;
-    while i < args.len() {
-        if args[i] == "--platform" {
-            if let Some(next) = args.get_mut(i + 1) {
-                if next == "ios" {
-                    *next = "swiftui".to_string();
-                } else if next == "android" {
-                    *next = "compose".to_string();
-                }
-            }
-            i += 1;
-        } else if args[i] == "--platform=ios" {
-            args[i] = "--platform=swiftui".to_string();
-        } else if args[i] == "--platform=android" {
-            args[i] = "--platform=compose".to_string();
-        }
-        i += 1;
     }
 }
 
@@ -524,6 +561,24 @@ fn parse_dev_args(args: &[String]) -> Result<MobileDevArgs, String> {
     })
 }
 
+fn parse_dir_arg(args: &[String]) -> Result<PathBuf, String> {
+    let mut i = 0;
+    while i < args.len() {
+        let arg = &args[i];
+        if arg == "--dir" {
+            return args
+                .get(i + 1)
+                .map(PathBuf::from)
+                .ok_or_else(|| "--dir expects a path".to_string());
+        }
+        if let Some(value) = arg.strip_prefix("--dir=") {
+            return Ok(PathBuf::from(value));
+        }
+        i += 1;
+    }
+    Ok(PathBuf::from("."))
+}
+
 fn parse_platform_arg(args: &[String]) -> Option<MobilePlatform> {
     let mut i = 0;
     while i < args.len() {
@@ -548,6 +603,25 @@ fn parse_platform_value(raw: &str) -> Result<MobilePlatform, String> {
         "all" => Ok(MobilePlatform::All),
         _ => Err(format!("unknown mobile platform: {raw}")),
     }
+}
+
+fn strip_mobile_codegen_args(args: &[String]) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut i = 0;
+    while i < args.len() {
+        let arg = &args[i];
+        if arg == "--platform" || arg == "--dir" {
+            i += 2;
+            continue;
+        }
+        if arg.starts_with("--platform=") || arg.starts_with("--dir=") {
+            i += 1;
+            continue;
+        }
+        out.push(arg.clone());
+        i += 1;
+    }
+    out
 }
 
 fn strip_mobile_only_args(args: &[String]) -> Vec<String> {

@@ -62,8 +62,8 @@ fn codegen_compose_emits_composable_source() {
     .unwrap();
     let source = generate_native_source(&ir, NativeCodegenTarget::Compose, "HelloScreen");
     assert!(source.contains("@Composable"));
-    assert!(source.contains("fun HelloScreen()"));
-    assert!(source.contains("Row(modifier = Modifier.padding(8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp))"));
+    assert!(source.contains("fun HelloScreen(modifier: Modifier = Modifier)"));
+    assert!(source.contains("Row(modifier = modifier.padding(8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp))"));
     assert!(
         source.contains("Text(\"Hello Ada\", fontSize = 18.0.sp, fontWeight = FontWeight.Bold)")
     );
