@@ -36,6 +36,12 @@ targets:
           set -euo pipefail
           export PATH="$HOME/.cargo/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
           rustup target add aarch64-apple-ios-sim >/dev/null
-          cargo build --manifest-path "$PROJECT_DIR/../rust/Cargo.toml" --target aarch64-apple-ios-sim
+          cargo_profile=debug
+          cargo_args=()
+          if [ "${CONFIGURATION:-Debug}" = "Release" ]; then
+            cargo_profile=release
+            cargo_args+=(--release)
+          fi
+          cargo build --manifest-path "$PROJECT_DIR/../rust/Cargo.toml" --target aarch64-apple-ios-sim "${cargo_args[@]}"
           mkdir -p "$PROJECT_DIR/build/rust/aarch64-apple-ios-sim"
-          cp "$PROJECT_DIR/../rust/target/aarch64-apple-ios-sim/debug/libcrepus_mobile_actions.a" "$PROJECT_DIR/build/rust/aarch64-apple-ios-sim/"
+          cp "$PROJECT_DIR/../rust/target/aarch64-apple-ios-sim/$cargo_profile/libcrepus_mobile_actions.a" "$PROJECT_DIR/build/rust/aarch64-apple-ios-sim/"

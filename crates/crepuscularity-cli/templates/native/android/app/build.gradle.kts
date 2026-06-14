@@ -40,6 +40,7 @@ val rustAndroidTarget = "aarch64-linux-android"
 val rustJniOutputDir = layout.buildDirectory.dir("rustJniLibs/arm64-v8a")
 
 tasks.register<Exec>("buildRustActions") {
+    val releaseBuild = gradle.startParameter.taskNames.any { it.contains("Release", ignoreCase = true) }
     val sdkDir = providers.environmentVariable("ANDROID_HOME").orElse(providers.environmentVariable("ANDROID_SDK_ROOT"))
     val ndkDir = providers.environmentVariable("ANDROID_NDK_HOME").orElse(
         sdkDir.map { sdk ->
@@ -62,9 +63,13 @@ tasks.register<Exec>("buildRustActions") {
         "--target",
         rustAndroidTarget,
     )
+    if (releaseBuild) {
+        args("--release")
+    }
     doLast {
+        val profile = if (releaseBuild) "release" else "debug"
         copy {
-            from(rustTargetDir.file("$rustAndroidTarget/debug/libcrepus_mobile_actions.so"))
+            from(rustTargetDir.file("$rustAndroidTarget/$profile/libcrepus_mobile_actions.so"))
             into(rustJniOutputDir)
         }
     }

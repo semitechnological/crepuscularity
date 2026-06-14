@@ -1,7 +1,7 @@
 import SwiftUI
 
 public enum CrepusActions {
-    public static var dispatch: (String) -> Void = { _ in }
+    public static var dispatch: (String) -> String = { _ in "{}" }
 }
 
 public struct CrepusGeneratedView: View {
@@ -63,13 +63,13 @@ public struct CrepusGeneratedView: View {
                 .background(Color(red: 0.122, green: 0.161, blue: 0.216, opacity: 1.000))
                 .clipShape(RoundedRectangle(cornerRadius: 8.0))
             HStack(alignment: .top, spacing: 16.0) {
-                Button(action: { CrepusActions.dispatch("sync") }) {
+                Button(action: { _ = CrepusActions.dispatch("sync") }) {
                     Text("Sync")
                 }
                     .padding(16)
                     .background(Color(red: 1.000, green: 1.000, blue: 1.000, opacity: 1.000))
                     .clipShape(RoundedRectangle(cornerRadius: 8.0))
-                Button(action: { CrepusActions.dispatch("preview") }) {
+                Button(action: { _ = CrepusActions.dispatch("preview") }) {
                     Text("Preview")
                 }
                     .padding(16)

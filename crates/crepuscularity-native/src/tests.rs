@@ -46,6 +46,7 @@ fn codegen_swiftui_emits_standalone_view_source() {
     let source = generate_native_source(&ir, NativeCodegenTarget::SwiftUi, "HelloScreen");
     assert!(source.contains("import SwiftUI"));
     assert!(source.contains("public enum CrepusActions"));
+    assert!(source.contains("public static var dispatch: (String) -> String"));
     assert!(source.contains("public struct HelloScreen: View"));
     assert!(source.contains("VStack(alignment: .leading, spacing: 16.0)"));
     assert!(source.contains("Text(\"Hello Ada\")"));
@@ -68,6 +69,7 @@ fn codegen_compose_emits_composable_source() {
         source.contains("Text(\"Hello Ada\", fontSize = 18.0.sp, fontWeight = FontWeight.Bold)")
     );
     assert!(source.contains("object CrepusActions"));
+    assert!(source.contains("var dispatch: (String) -> String"));
     assert!(source.contains("Button(onClick = { CrepusActions.dispatch(\"tap\") })"));
 }
 

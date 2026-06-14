@@ -39,7 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 object CrepusActions {
-    var dispatch: (String) -> Unit = {}
+    var dispatch: (String) -> String = { "{}" }
 }
 
 @Composable
