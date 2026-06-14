@@ -14,7 +14,6 @@ public struct ViewIrRootView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .padding()
     }
 }
 
@@ -158,7 +157,19 @@ private struct ViewStyleModifier: ViewModifier {
             || style.paddingVertical != nil || style.paddingTop != nil || style.paddingBottom != nil
             || style.paddingLeft != nil || style.paddingRight != nil
 
+        let frameWidth = frameAxis(width: style.width, min: style.minWidth, max: style.maxWidth)
+        let frameHeight = frameAxis(width: style.height, min: style.minHeight, max: style.maxHeight)
+
         let base = content
+            .frame(
+                minWidth: frameWidth.min,
+                idealWidth: frameWidth.ideal,
+                maxWidth: frameWidth.max,
+                minHeight: frameHeight.min,
+                idealHeight: frameHeight.ideal,
+                maxHeight: frameHeight.max,
+                alignment: .topLeading
+            )
             .modifier(ConditionalPadding(pad: pad, enabled: hasPadding))
             .background((style.backgroundColor.flatMap { Color(hex: $0) }) ?? Color.clear)
             .clipShape(RoundedRectangle(cornerRadius: CGFloat(style.cornerRadius ?? 0)))
@@ -191,6 +202,18 @@ private struct ViewStyleModifier: ViewModifier {
             withFont
         }
     }
+}
+
+private func frameAxis(width: Float?, min: Float?, max: Float?) -> (min: CGFloat?, ideal: CGFloat?, max: CGFloat?) {
+    let minValue = min.map { CGFloat($0) }
+    let idealValue = width.flatMap { $0 > 0 ? CGFloat($0) : nil }
+    let maxValue: CGFloat?
+    if width == -1 || max == -1 {
+        maxValue = .infinity
+    } else {
+        maxValue = max.flatMap { $0 > 0 ? CGFloat($0) : nil }
+    }
+    return (minValue, idealValue, maxValue)
 }
 
 private struct ConditionalPadding: ViewModifier {

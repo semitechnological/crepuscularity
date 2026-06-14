@@ -41,6 +41,12 @@ public struct ViewStyle: Decodable, Sendable, Hashable {
     public let marginBottom: Float?
     public let marginLeft: Float?
     public let marginRight: Float?
+    public let width: Float?
+    public let height: Float?
+    public let minWidth: Float?
+    public let minHeight: Float?
+    public let maxWidth: Float?
+    public let maxHeight: Float?
     public let fontSize: Float?
     public let fontWeight: UInt16?
     public let textAlign: String?
@@ -66,6 +72,12 @@ public struct ViewStyle: Decodable, Sendable, Hashable {
         case marginBottom
         case marginLeft
         case marginRight
+        case width
+        case height
+        case minWidth
+        case minHeight
+        case maxWidth
+        case maxHeight
         case fontSize
         case fontWeight
         case textAlign
