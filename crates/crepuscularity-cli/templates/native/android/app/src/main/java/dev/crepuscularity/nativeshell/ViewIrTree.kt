@@ -6,7 +6,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -26,7 +30,7 @@ import androidx.compose.ui.unit.sp
 
 @Composable
 fun ViewIrRoot(ir: ViewIr, modifier: Modifier = Modifier) {
-    Column(modifier = modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(0.dp)) {
+    Column(modifier = modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(0.dp)) {
         ir.root.forEach { node -> ViewNodeView(node) }
     }
 }
@@ -144,6 +148,7 @@ private fun textModifier(s: ViewStyle?): Modifier {
 private fun stackModifier(s: ViewStyle?): Modifier {
     if (s == null) return Modifier
     var m: Modifier = Modifier
+    m = m.applySize(s)
     val pt = s.paddingTop ?: s.paddingVertical ?: s.padding ?: 0f
     val pb = s.paddingBottom ?: s.paddingVertical ?: s.padding ?: 0f
     val pl = s.paddingLeft ?: s.paddingHorizontal ?: s.padding ?: 0f
@@ -157,6 +162,21 @@ private fun stackModifier(s: ViewStyle?): Modifier {
         m = m.clip(RoundedCornerShape(r.dp)).background(bg)
     } else if (bg != null) {
         m = m.background(bg)
+    }
+    return m
+}
+
+private fun Modifier.applySize(s: ViewStyle): Modifier {
+    var m = this
+    if (s.width == -1f || s.maxWidth == -1f) {
+        m = m.fillMaxWidth()
+    } else if (s.width != null && s.width > 0f) {
+        m = m.width(s.width.dp)
+    }
+    if (s.height == -1f || s.maxHeight == -1f) {
+        m = m.fillMaxHeight()
+    } else if (s.height != null && s.height > 0f) {
+        m = m.height(s.height.dp)
     }
     return m
 }

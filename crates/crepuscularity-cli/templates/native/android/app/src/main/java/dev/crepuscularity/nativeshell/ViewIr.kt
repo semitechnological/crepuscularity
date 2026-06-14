@@ -26,6 +26,12 @@ data class ViewStyle(
     val marginBottom: Float? = null,
     val marginLeft: Float? = null,
     val marginRight: Float? = null,
+    val width: Float? = null,
+    val height: Float? = null,
+    val minWidth: Float? = null,
+    val minHeight: Float? = null,
+    val maxWidth: Float? = null,
+    val maxHeight: Float? = null,
     val fontSize: Float? = null,
     val fontWeight: Int? = null,
     val textAlign: String? = null,
@@ -110,6 +116,12 @@ private fun decodeStyle(o: JsonObject?): ViewStyle? {
         marginBottom = f("marginBottom"),
         marginLeft = f("marginLeft"),
         marginRight = f("marginRight"),
+        width = f("width"),
+        height = f("height"),
+        minWidth = f("minWidth"),
+        minHeight = f("minHeight"),
+        maxWidth = f("maxWidth"),
+        maxHeight = f("maxHeight"),
         fontSize = f("fontSize"),
         fontWeight = i("fontWeight"),
         textAlign = s("textAlign"),
@@ -127,6 +139,8 @@ private fun ViewStyle.isEmpty(): Boolean =
         paddingTop == null && paddingBottom == null && paddingLeft == null && paddingRight == null &&
         margin == null && marginHorizontal == null && marginVertical == null &&
         marginTop == null && marginBottom == null && marginLeft == null && marginRight == null &&
+        width == null && height == null && minWidth == null && minHeight == null &&
+        maxWidth == null && maxHeight == null &&
         fontSize == null && fontWeight == null && textAlign == null &&
         foregroundColor == null && backgroundColor == null && cornerRadius == null &&
         italic == null && underline == null && strikethrough == null
