@@ -70,7 +70,7 @@ fn codegen_compose_emits_composable_source() {
     );
     assert!(source.contains("object CrepusActions"));
     assert!(source.contains("var dispatch: (String) -> String"));
-    assert!(source.contains("Button(onClick = { CrepusActions.dispatch(\"tap\") })"));
+    assert!(source.contains("Button(onClick = { CrepusActions.perform(\"tap\") })"));
 }
 
 #[test]

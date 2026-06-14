@@ -19,6 +19,7 @@ public struct ViewIrRootView: View {
 
 public struct ViewNodeView: View {
     let node: ViewNode
+    @ObservedObject private var actionStore = CrepusActionStore.shared
 
     public init(node: ViewNode) {
         self.node = node
@@ -54,7 +55,7 @@ public struct ViewNodeView: View {
 
         case .button(let label, let onClick, let style):
             Button(action: {
-                if let onClick { _ = CrepusActions.dispatch(onClick) }
+                if let onClick { actionStore.dispatch(onClick) }
             }) {
                 Text(label)
             }
