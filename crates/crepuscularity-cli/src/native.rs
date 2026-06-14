@@ -829,7 +829,7 @@ const TEMPLATE_FILES: &[(&str, &str)] = &[
     ),
     (
         "rust/Cargo.toml",
-        include_str!("../templates/native/rust/Cargo.toml"),
+        include_str!("../templates/native/rust/Cargo.toml.template"),
     ),
     (
         "rust/src/lib.rs",
