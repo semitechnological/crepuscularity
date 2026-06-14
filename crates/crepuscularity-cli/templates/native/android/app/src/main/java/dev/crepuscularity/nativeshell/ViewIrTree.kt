@@ -65,7 +65,7 @@ fun ViewNodeView(node: ViewNode) {
             }
         }
         is ViewNode.Button ->
-            Button(onClick = { /* shell demo: ${node.onClick} */ }) {
+            Button(onClick = { node.onClick?.let { CrepusActions.dispatch(it) } }) {
                 Text(node.label)
             }
         is ViewNode.Image ->

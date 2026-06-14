@@ -6,8 +6,9 @@ object CrepusRustActions {
     }
 
     external fun dispatchAction(action: String): Boolean
+    external fun dispatchActionJson(action: String): String
 
     fun install() {
-        CrepusActions.dispatch = { action -> dispatchAction(action) }
+        CrepusActions.dispatch = { action -> dispatchActionJson(action) }
     }
 }

@@ -54,7 +54,7 @@ public struct ViewNodeView: View {
 
         case .button(let label, let onClick, let style):
             Button(action: {
-                if let onClick { print("native shell: click \(onClick)") }
+                if let onClick { _ = CrepusActions.dispatch(onClick) }
             }) {
                 Text(label)
             }

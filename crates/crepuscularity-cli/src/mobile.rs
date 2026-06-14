@@ -2,6 +2,7 @@ use std::fs;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{mpsc, Arc, RwLock};
 use std::time::{Duration, Instant};
@@ -66,12 +67,213 @@ pub fn run(args: &[String]) {
         }
         Some("build") => run_build(&args[1..]),
         Some("run") => run_mobile_app(&args[1..]),
+        Some("doctor") => run_doctor(&args[1..]),
         Some("dev") => {
             let parsed = parse_dev_args(&args[1..]).unwrap_or_else(|e| ui::error(&e));
             run_dev(parsed).unwrap_or_else(|e| ui::error(&e));
         }
         Some(other) => ui::error(&format!("unknown mobile command: {other}")),
     }
+}
+
+fn run_doctor(args: &[String]) {
+    let platform = parse_platform_arg(args).unwrap_or(MobilePlatform::All);
+    let mut ok = true;
+    eprintln!("{}", style("crepus mobile doctor").cyan().bold());
+    ok &= doctor_command("cargo", &["--version"]);
+    match platform {
+        MobilePlatform::Ios | MobilePlatform::All => {
+            ok &= doctor_rust_target("aarch64-apple-ios");
+            ok &= doctor_command("xcodebuild", &["-version"]);
+            ok &= doctor_command("xcodegen", &["--version"]);
+            ok &= doctor_command("xcrun", &["simctl", "list", "runtimes"]);
+        }
+        _ => {}
+    }
+    match platform {
+        MobilePlatform::Android | MobilePlatform::All => {
+            ok &= doctor_rust_target("aarch64-linux-android");
+            ok &= doctor_command("java", &["-version"]);
+            ok &= doctor_java17();
+            ok &= doctor_java_home();
+            ok &= doctor_command("gradle", &["--version"]);
+            ok &= doctor_android_sdk();
+            ok &= doctor_android_ndk();
+        }
+        _ => {}
+    }
+    if !ok {
+        std::process::exit(1);
+    }
+}
+
+fn doctor_command(command: &str, args: &[&str]) -> bool {
+    match Command::new(command).args(args).output() {
+        Ok(out) if out.status.success() => {
+            eprintln!("{} {command}", style("✓").green());
+            true
+        }
+        Ok(out) => {
+            let stderr = String::from_utf8_lossy(&out.stderr);
+            eprintln!("{} {command}: {}", style("✗").red(), stderr.trim());
+            false
+        }
+        Err(e) => {
+            eprintln!("{} {command}: {e}", style("✗").red());
+            false
+        }
+    }
+}
+
+fn doctor_rust_target(target: &str) -> bool {
+    match Command::new("rustup")
+        .args(["target", "list", "--installed"])
+        .output()
+    {
+        Ok(out) if out.status.success() => {
+            let stdout = String::from_utf8_lossy(&out.stdout);
+            if stdout.lines().any(|line| line.trim() == target) {
+                eprintln!("{} rust target {target}", style("✓").green());
+                true
+            } else {
+                eprintln!(
+                    "{} rust target {target}: install with `rustup target add {target}`",
+                    style("✗").red()
+                );
+                false
+            }
+        }
+        Ok(out) => {
+            let stderr = String::from_utf8_lossy(&out.stderr);
+            eprintln!("{} rustup: {}", style("✗").red(), stderr.trim());
+            false
+        }
+        Err(e) => {
+            eprintln!("{} rustup: {e}", style("✗").red());
+            false
+        }
+    }
+}
+
+fn doctor_java17() -> bool {
+    match Command::new("/usr/libexec/java_home")
+        .args(["-v", "17"])
+        .output()
+    {
+        Ok(out) if out.status.success() => {
+            let path = String::from_utf8_lossy(&out.stdout);
+            eprintln!("{} Java 17 {}", style("✓").green(), path.trim());
+            true
+        }
+        _ => {
+            let cellar = Path::new("/opt/homebrew/Cellar/openjdk@17");
+            let home = find_java_home_in_cellar(cellar);
+            if let Some(home) = home {
+                eprintln!("{} Java 17 {}", style("✓").green(), home.display());
+                true
+            } else {
+                eprintln!(
+                    "{} Java 17: install openjdk@17 and expose it to Gradle",
+                    style("✗").red()
+                );
+                false
+            }
+        }
+    }
+}
+
+fn find_java_home_in_cellar(cellar: &Path) -> Option<PathBuf> {
+    let entries = cellar.read_dir().ok()?;
+    for entry in entries.flatten() {
+        let home = entry.path().join("libexec/openjdk.jdk/Contents/Home");
+        if home.join("bin/java").exists() {
+            return Some(home);
+        }
+    }
+    None
+}
+
+fn doctor_java_home() -> bool {
+    match std::env::var("JAVA_HOME") {
+        Ok(raw) => {
+            let path = PathBuf::from(&raw);
+            if path.join("bin/java").exists() {
+                eprintln!("{} JAVA_HOME {}", style("✓").green(), path.display());
+                true
+            } else {
+                eprintln!(
+                    "{} JAVA_HOME {} does not contain bin/java",
+                    style("✗").red(),
+                    path.display()
+                );
+                false
+            }
+        }
+        Err(_) => {
+            eprintln!(
+                "{} JAVA_HOME not set; Gradle will use java from PATH",
+                style("✓").green()
+            );
+            true
+        }
+    }
+}
+
+fn doctor_android_sdk() -> bool {
+    let sdk = std::env::var("ANDROID_HOME")
+        .or_else(|_| std::env::var("ANDROID_SDK_ROOT"))
+        .ok()
+        .map(PathBuf::from);
+    match sdk {
+        Some(path) if path.join("platforms").exists() => {
+            eprintln!("{} Android SDK {}", style("✓").green(), path.display());
+            true
+        }
+        Some(path) => {
+            eprintln!(
+                "{} Android SDK {} missing platforms/",
+                style("✗").red(),
+                path.display()
+            );
+            false
+        }
+        None => {
+            eprintln!(
+                "{} Android SDK: set ANDROID_HOME or ANDROID_SDK_ROOT",
+                style("✗").red()
+            );
+            false
+        }
+    }
+}
+
+fn doctor_android_ndk() -> bool {
+    if let Ok(path) = std::env::var("ANDROID_NDK_HOME").map(PathBuf::from) {
+        if path.exists() {
+            eprintln!("{} Android NDK {}", style("✓").green(), path.display());
+            return true;
+        }
+    }
+    let sdk = std::env::var("ANDROID_HOME")
+        .or_else(|_| std::env::var("ANDROID_SDK_ROOT"))
+        .ok()
+        .map(PathBuf::from);
+    if let Some(sdk) = sdk {
+        let ndk = sdk.join("ndk");
+        if ndk
+            .read_dir()
+            .map(|mut entries| entries.next().is_some())
+            .unwrap_or(false)
+        {
+            eprintln!("{} Android NDK {}", style("✓").green(), ndk.display());
+            return true;
+        }
+    }
+    eprintln!(
+        "{} Android NDK: install via Android Studio SDK Manager or set ANDROID_NDK_HOME",
+        style("✗").red()
+    );
+    false
 }
 
 fn run_build(args: &[String]) {
@@ -738,6 +940,11 @@ fn print_mobile_usage() {
         "  {}  {}",
         style("run --platform ios|android                    ").green(),
         style("run/install one native target").dim()
+    );
+    eprintln!(
+        "  {}  {}",
+        style("doctor [--platform ios|android|all]           ").green(),
+        style("check Rust, Xcode, Java, Android SDK/NDK prerequisites").dim()
     );
     eprintln!(
         "  {}  {}",

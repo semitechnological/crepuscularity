@@ -214,7 +214,7 @@ fn native_codegen_writes_swiftui_source() {
     let generated = std::fs::read_to_string(out_dir.join("GreetingScreen.swift")).unwrap();
     assert!(generated.contains("public struct GreetingScreen: View"));
     assert!(generated.contains("Text(\"Hello Ada\")"));
-    assert!(generated.contains("Button(action: { CrepusActions.dispatch(\"tap\") })"));
+    assert!(generated.contains("Button(action: { _ = CrepusActions.dispatch(\"tap\") })"));
     assert!(generated.contains(".padding(16)"));
 }
 
@@ -278,6 +278,7 @@ fn mobile_help_lists_core_commands() {
     assert!(stderr.contains("crepus mobile"));
     assert!(stderr.contains("new <name>"));
     assert!(stderr.contains("dev [--platform"));
+    assert!(stderr.contains("doctor [--platform"));
     assert!(stderr.contains("codegen"));
 }
 
