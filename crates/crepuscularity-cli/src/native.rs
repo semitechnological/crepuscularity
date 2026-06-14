@@ -746,6 +746,12 @@ const TEMPLATE_FILES: &[(&str, &str)] = &[
         include_str!("../templates/native/ios/Sources/NativeShell/ViewIrTreeView.swift"),
     ),
     (
+        "ios/Sources/NativeShell/Generated/CrepusGeneratedView.swift",
+        include_str!(
+            "../templates/native/ios/Sources/NativeShell/Generated/CrepusGeneratedView.swift"
+        ),
+    ),
+    (
         "ios/Sources/NativeShell/fixture.json",
         include_str!("../templates/native/ios/Sources/NativeShell/fixture.json"),
     ),
@@ -799,6 +805,12 @@ const TEMPLATE_FILES: &[(&str, &str)] = &[
         "android/app/src/main/java/dev/crepuscularity/nativeshell/ViewIrTree.kt",
         include_str!(
             "../templates/native/android/app/src/main/java/dev/crepuscularity/nativeshell/ViewIrTree.kt"
+        ),
+    ),
+    (
+        "android/app/src/main/java/dev/crepuscularity/nativeshell/generated/CrepusGeneratedView.kt",
+        include_str!(
+            "../templates/native/android/app/src/main/java/dev/crepuscularity/nativeshell/generated/CrepusGeneratedView.kt"
         ),
     ),
     (

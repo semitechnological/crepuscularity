@@ -367,6 +367,14 @@ fn swiftui_style(out: &mut String, style: Option<&ViewStyle>, is_text: bool, ind
             out.push_str(&format!("\n{pad}.foregroundStyle({})", swift_color(color)));
         }
     }
+    swiftui_frame(out, style, &pad);
+    let padding = style
+        .padding
+        .or(style.padding_vertical)
+        .or(style.padding_horizontal);
+    if let Some(padding) = padding {
+        out.push_str(&format!("\n{pad}.padding({padding:.0})"));
+    }
     if let Some(background) = &style.background_color {
         out.push_str(&format!("\n{pad}.background({})", swift_color(background)));
     }
@@ -375,12 +383,39 @@ fn swiftui_style(out: &mut String, style: Option<&ViewStyle>, is_text: bool, ind
             "\n{pad}.clipShape(RoundedRectangle(cornerRadius: {radius:.1}))"
         ));
     }
-    let padding = style
-        .padding
-        .or(style.padding_vertical)
-        .or(style.padding_horizontal);
-    if let Some(padding) = padding {
-        out.push_str(&format!("\n{pad}.padding({padding:.0})"));
+}
+
+fn swiftui_frame(out: &mut String, style: &ViewStyle, pad: &str) {
+    if style.width == Some(-1.0) || style.height == Some(-1.0) {
+        let max_width = if style.width == Some(-1.0) {
+            ".infinity".to_string()
+        } else {
+            "nil".to_string()
+        };
+        let max_height = if style.height == Some(-1.0) {
+            ".infinity".to_string()
+        } else {
+            "nil".to_string()
+        };
+        out.push_str(&format!(
+            "\n{pad}.frame(maxWidth: {max_width}, maxHeight: {max_height}, alignment: .topLeading)"
+        ));
+        return;
+    }
+    if style.width.is_some() || style.height.is_some() {
+        let width = style
+            .width
+            .filter(|v| *v > 0.0)
+            .map(|v| format!("{v:.1}"))
+            .unwrap_or_else(|| "nil".to_string());
+        let height = style
+            .height
+            .filter(|v| *v > 0.0)
+            .map(|v| format!("{v:.1}"))
+            .unwrap_or_else(|| "nil".to_string());
+        out.push_str(&format!(
+            "\n{pad}.frame(width: {width}, height: {height}, alignment: .topLeading)"
+        ));
     }
 }
 
@@ -399,13 +434,13 @@ fn swiftui_font_weight(weight: u16) -> &'static str {
 fn generate_compose(ir: &ViewIr, view_name: &str) -> String {
     let body = compose_nodes(&ir.root, 1);
     format!(
-        "import androidx.compose.foundation.background\nimport androidx.compose.foundation.horizontalScroll\nimport androidx.compose.foundation.layout.Arrangement\nimport androidx.compose.foundation.layout.Column\nimport androidx.compose.foundation.layout.Row\nimport androidx.compose.foundation.layout.Spacer\nimport androidx.compose.foundation.layout.height\nimport androidx.compose.foundation.layout.padding\nimport androidx.compose.foundation.rememberScrollState\nimport androidx.compose.foundation.verticalScroll\nimport androidx.compose.material3.Button\nimport androidx.compose.material3.Divider\nimport androidx.compose.material3.LinearProgressIndicator\nimport androidx.compose.material3.Slider\nimport androidx.compose.material3.Switch\nimport androidx.compose.material3.Text\nimport androidx.compose.material3.TextField\nimport androidx.compose.runtime.Composable\nimport androidx.compose.ui.Modifier\nimport androidx.compose.ui.graphics.Color\nimport androidx.compose.ui.text.font.FontWeight\nimport androidx.compose.ui.unit.dp\nimport androidx.compose.ui.unit.sp\n\nobject CrepusActions {{\n    var dispatch: (String) -> Unit = {{}}\n}}\n\n@Composable\nfun {view_name}() {{\n{body}\n}}\n"
+        "import androidx.compose.foundation.background\nimport androidx.compose.foundation.horizontalScroll\nimport androidx.compose.foundation.layout.Arrangement\nimport androidx.compose.foundation.layout.Column\nimport androidx.compose.foundation.layout.Row\nimport androidx.compose.foundation.layout.Spacer\nimport androidx.compose.foundation.layout.fillMaxHeight\nimport androidx.compose.foundation.layout.fillMaxSize\nimport androidx.compose.foundation.layout.fillMaxWidth\nimport androidx.compose.foundation.layout.height\nimport androidx.compose.foundation.layout.padding\nimport androidx.compose.foundation.layout.width\nimport androidx.compose.foundation.rememberScrollState\nimport androidx.compose.foundation.shape.RoundedCornerShape\nimport androidx.compose.foundation.verticalScroll\nimport androidx.compose.material3.Button\nimport androidx.compose.material3.Divider\nimport androidx.compose.material3.LinearProgressIndicator\nimport androidx.compose.material3.Slider\nimport androidx.compose.material3.Switch\nimport androidx.compose.material3.Text\nimport androidx.compose.material3.TextField\nimport androidx.compose.runtime.Composable\nimport androidx.compose.ui.Modifier\nimport androidx.compose.ui.draw.clip\nimport androidx.compose.ui.graphics.Color\nimport androidx.compose.ui.text.font.FontWeight\nimport androidx.compose.ui.unit.dp\nimport androidx.compose.ui.unit.sp\n\nobject CrepusActions {{\n    var dispatch: (String) -> Unit = {{}}\n}}\n\n@Composable\nfun {view_name}(modifier: Modifier = Modifier) {{\n{body}\n}}\n"
     )
 }
 
 fn compose_nodes(nodes: &[ViewNode], indent: usize) -> String {
     if nodes.len() == 1 {
-        compose_node(&nodes[0], indent)
+        compose_node_with_base(&nodes[0], indent, Some("modifier".to_string()))
     } else {
         let pad = indent_str(indent);
         let inner = compose_children(nodes, indent + 1);
@@ -414,6 +449,10 @@ fn compose_nodes(nodes: &[ViewNode], indent: usize) -> String {
 }
 
 fn compose_node(node: &ViewNode, indent: usize) -> String {
+    compose_node_with_base(node, indent, None)
+}
+
+fn compose_node_with_base(node: &ViewNode, indent: usize, base_modifier: Option<String>) -> String {
     let pad = indent_str(indent);
     match node {
         ViewNode::Text { content, style } => {
@@ -432,7 +471,7 @@ fn compose_node(node: &ViewNode, indent: usize) -> String {
                 StackAxis::Column => "Column",
             };
             let mut args = Vec::new();
-            if let Some(modifier) = compose_modifier(style.as_ref()) {
+            if let Some(modifier) = compose_modifier_chain(base_modifier, style.as_ref()) {
                 args.push(format!("modifier = {modifier}"));
             }
             let arrangement = match axis {
@@ -689,19 +728,41 @@ fn compose_modifier_chain(base: Option<String>, style: Option<&ViewStyle>) -> Op
     let mut modifier = base.unwrap_or_else(|| "Modifier".to_string());
     let mut used = modifier != "Modifier";
     if let Some(style) = style {
+        if style.width == Some(-1.0) && style.height == Some(-1.0) {
+            modifier.push_str(".fillMaxSize()");
+            used = true;
+        } else {
+            if style.width == Some(-1.0) || style.max_width == Some(-1.0) {
+                modifier.push_str(".fillMaxWidth()");
+                used = true;
+            } else if let Some(width) = style.width.filter(|v| *v > 0.0) {
+                modifier.push_str(&format!(".width({width:.0}.dp)"));
+                used = true;
+            }
+            if style.height == Some(-1.0) || style.max_height == Some(-1.0) {
+                modifier.push_str(".fillMaxHeight()");
+                used = true;
+            } else if let Some(height) = style.height.filter(|v| *v > 0.0) {
+                modifier.push_str(&format!(".height({height:.0}.dp)"));
+                used = true;
+            }
+        }
+        if let Some(color) = &style.background_color {
+            if let Some(radius) = style.corner_radius {
+                modifier.push_str(&format!(".clip(RoundedCornerShape({radius:.0}.dp))"));
+            }
+            modifier.push_str(&format!(
+                ".background(Color(0x{}))",
+                compose_hex_argb(color)
+            ));
+            used = true;
+        }
         if let Some(padding) = style
             .padding
             .or(style.padding_vertical)
             .or(style.padding_horizontal)
         {
             modifier.push_str(&format!(".padding({padding:.0}.dp)"));
-            used = true;
-        }
-        if let Some(color) = &style.background_color {
-            modifier.push_str(&format!(
-                ".background(Color(0x{}))",
-                compose_hex_argb(color)
-            ));
             used = true;
         }
     }
