@@ -214,7 +214,7 @@ fn native_codegen_writes_swiftui_source() {
     let generated = std::fs::read_to_string(out_dir.join("GreetingScreen.swift")).unwrap();
     assert!(generated.contains("public struct GreetingScreen: View"));
     assert!(generated.contains("Text(\"Hello Ada\")"));
-    assert!(generated.contains("Button(action: {})"));
+    assert!(generated.contains("Button(action: { CrepusActions.dispatch(\"tap\") })"));
     assert!(generated.contains(".padding(16)"));
 }
 
@@ -257,10 +257,10 @@ fn native_codegen_writes_compose_source() {
 
     let generated = std::fs::read_to_string(out_dir.join("GreetingScreen.kt")).unwrap();
     assert!(generated.contains("@Composable"));
-    assert!(generated.contains("fun GreetingScreen()"));
+    assert!(generated.contains("fun GreetingScreen(modifier: Modifier = Modifier)"));
     assert!(generated.contains("Text(\"Hello Ada\""));
-    assert!(generated.contains("Button(onClick = {})"));
-    assert!(generated.contains("Modifier.padding(8.dp)"));
+    assert!(generated.contains("Button(onClick = { CrepusActions.dispatch(\"tap\") })"));
+    assert!(generated.contains("modifier.padding(8.dp)"));
 }
 
 #[test]

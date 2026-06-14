@@ -742,6 +742,10 @@ const TEMPLATE_FILES: &[(&str, &str)] = &[
         include_str!("../templates/native/ios/Sources/NativeShell/CrepusMobileRuntime.swift"),
     ),
     (
+        "ios/Sources/NativeShell/CrepusRustActions.swift",
+        include_str!("../templates/native/ios/Sources/NativeShell/CrepusRustActions.swift"),
+    ),
+    (
         "ios/Sources/NativeShell/ViewIrTreeView.swift",
         include_str!("../templates/native/ios/Sources/NativeShell/ViewIrTreeView.swift"),
     ),
@@ -796,6 +800,12 @@ const TEMPLATE_FILES: &[(&str, &str)] = &[
         ),
     ),
     (
+        "android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusRustActions.kt",
+        include_str!(
+            "../templates/native/android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusRustActions.kt"
+        ),
+    ),
+    (
         "android/app/src/main/java/dev/crepuscularity/nativeshell/ViewIr.kt",
         include_str!(
             "../templates/native/android/app/src/main/java/dev/crepuscularity/nativeshell/ViewIr.kt"
@@ -816,6 +826,14 @@ const TEMPLATE_FILES: &[(&str, &str)] = &[
     (
         "android/app/src/main/res/values/themes.xml",
         include_str!("../templates/native/android/app/src/main/res/values/themes.xml"),
+    ),
+    (
+        "rust/Cargo.toml",
+        include_str!("../templates/native/rust/Cargo.toml"),
+    ),
+    (
+        "rust/src/lib.rs",
+        include_str!("../templates/native/rust/src/lib.rs"),
     ),
 ];
 
