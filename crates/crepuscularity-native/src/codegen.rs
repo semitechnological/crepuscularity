@@ -16,7 +16,7 @@ pub fn generate_native_source(ir: &ViewIr, target: NativeCodegenTarget, view_nam
 fn generate_swiftui(ir: &ViewIr, view_name: &str) -> String {
     let body = swiftui_nodes(&ir.root, 2);
     format!(
-        "import SwiftUI\n\npublic struct {view_name}: View {{\n    public init() {{}}\n\n    public var body: some View {{\n{body}\n    }}\n}}\n"
+        "import SwiftUI\n\npublic enum CrepusActions {{\n    public static var dispatch: (String) -> Void = {{ _ in }}\n}}\n\npublic struct {view_name}: View {{\n    public init() {{}}\n\n    public var body: some View {{\n{body}\n    }}\n}}\n"
     )
 }
 
@@ -62,9 +62,14 @@ fn swiftui_node(node: &ViewNode, indent: usize) -> String {
             swiftui_style(&mut out, style.as_ref(), false, indent);
             out
         }
-        ViewNode::Button { label, style, .. } => {
+        ViewNode::Button {
+            label,
+            on_click,
+            style,
+        } => {
+            let action = swiftui_action(on_click.as_deref());
             let mut out = format!(
-                "{pad}Button(action: {{}}) {{\n{}Text(\"{}\")\n{pad}}}",
+                "{pad}Button(action: {{ {action} }}) {{\n{}Text(\"{}\")\n{pad}}}",
                 indent_str(indent + 1),
                 swift_escape(label)
             );
@@ -314,6 +319,12 @@ fn swiftui_node(node: &ViewNode, indent: usize) -> String {
     }
 }
 
+fn swiftui_action(on_click: Option<&str>) -> String {
+    on_click
+        .map(|action| format!("CrepusActions.dispatch(\"{}\")", swift_escape(action)))
+        .unwrap_or_default()
+}
+
 fn swiftui_children(children: &[ViewNode], indent: usize) -> String {
     children
         .iter()
@@ -388,7 +399,7 @@ fn swiftui_font_weight(weight: u16) -> &'static str {
 fn generate_compose(ir: &ViewIr, view_name: &str) -> String {
     let body = compose_nodes(&ir.root, 1);
     format!(
-        "import androidx.compose.foundation.background\nimport androidx.compose.foundation.horizontalScroll\nimport androidx.compose.foundation.layout.Arrangement\nimport androidx.compose.foundation.layout.Column\nimport androidx.compose.foundation.layout.Row\nimport androidx.compose.foundation.layout.Spacer\nimport androidx.compose.foundation.layout.height\nimport androidx.compose.foundation.layout.padding\nimport androidx.compose.foundation.rememberScrollState\nimport androidx.compose.foundation.verticalScroll\nimport androidx.compose.material3.Button\nimport androidx.compose.material3.Divider\nimport androidx.compose.material3.LinearProgressIndicator\nimport androidx.compose.material3.Slider\nimport androidx.compose.material3.Switch\nimport androidx.compose.material3.Text\nimport androidx.compose.material3.TextField\nimport androidx.compose.runtime.Composable\nimport androidx.compose.ui.Modifier\nimport androidx.compose.ui.graphics.Color\nimport androidx.compose.ui.text.font.FontWeight\nimport androidx.compose.ui.unit.dp\nimport androidx.compose.ui.unit.sp\n\n@Composable\nfun {view_name}() {{\n{body}\n}}\n"
+        "import androidx.compose.foundation.background\nimport androidx.compose.foundation.horizontalScroll\nimport androidx.compose.foundation.layout.Arrangement\nimport androidx.compose.foundation.layout.Column\nimport androidx.compose.foundation.layout.Row\nimport androidx.compose.foundation.layout.Spacer\nimport androidx.compose.foundation.layout.height\nimport androidx.compose.foundation.layout.padding\nimport androidx.compose.foundation.rememberScrollState\nimport androidx.compose.foundation.verticalScroll\nimport androidx.compose.material3.Button\nimport androidx.compose.material3.Divider\nimport androidx.compose.material3.LinearProgressIndicator\nimport androidx.compose.material3.Slider\nimport androidx.compose.material3.Switch\nimport androidx.compose.material3.Text\nimport androidx.compose.material3.TextField\nimport androidx.compose.runtime.Composable\nimport androidx.compose.ui.Modifier\nimport androidx.compose.ui.graphics.Color\nimport androidx.compose.ui.text.font.FontWeight\nimport androidx.compose.ui.unit.dp\nimport androidx.compose.ui.unit.sp\n\nobject CrepusActions {{\n    var dispatch: (String) -> Unit = {{}}\n}}\n\n@Composable\nfun {view_name}() {{\n{body}\n}}\n"
     )
 }
 
@@ -436,11 +447,15 @@ fn compose_node(node: &ViewNode, indent: usize) -> String {
             let inner = compose_children(children, indent + 1);
             format!("{pad}{view}({args}) {{\n{inner}\n{pad}}}")
         }
-        ViewNode::Button { label, style, .. } => {
+        ViewNode::Button {
+            label,
+            on_click,
+            style,
+        } => {
             let modifier = compose_modifier_param(style.as_ref());
+            let action = compose_action(on_click.as_deref());
             format!(
-                "{pad}Button(onClick = {{{}}}{modifier}) {{\n{}Text(\"{}\")\n{pad}}}",
-                "",
+                "{pad}Button(onClick = {{ {action} }}{modifier}) {{\n{}Text(\"{}\")\n{pad}}}",
                 indent_str(indent + 1),
                 kotlin_escape(label)
             )
@@ -615,6 +630,12 @@ fn compose_node(node: &ViewNode, indent: usize) -> String {
             format!("{pad}Column{modifier} {{\n{inner}\n{pad}}}")
         }
     }
+}
+
+fn compose_action(on_click: Option<&str>) -> String {
+    on_click
+        .map(|action| format!("CrepusActions.dispatch(\"{}\")", kotlin_escape(action)))
+        .unwrap_or_default()
 }
 
 fn compose_children(children: &[ViewNode], indent: usize) -> String {
