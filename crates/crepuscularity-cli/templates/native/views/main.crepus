@@ -1,4 +1,4 @@
-div flex flex-col gap-4 p-6 pt-[112px] pb-[40px] w-full h-full bg-[#101624]
+div flex flex-col gap-4 p-6 w-full h-full bg-[#101624]
   div flex flex-col gap-2
     span text-xs text-[#c7d2fe]
       "Crepus Mobile"

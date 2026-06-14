@@ -366,14 +366,30 @@ fn swiftui_style(out: &mut String, style: Option<&ViewStyle>, is_text: bool, ind
         if let Some(color) = &style.foreground_color {
             out.push_str(&format!("\n{pad}.foregroundStyle({})", swift_color(color)));
         }
+        if let Some(align) = swiftui_text_align(style.text_align.as_deref()) {
+            out.push_str(&format!("\n{pad}.multilineTextAlignment({align})"));
+        }
+        if style.italic == Some(true) {
+            out.push_str(&format!("\n{pad}.italic()"));
+        }
+        if style.underline == Some(true) {
+            out.push_str(&format!("\n{pad}.underline()"));
+        }
+        if style.strikethrough == Some(true) {
+            out.push_str(&format!("\n{pad}.strikethrough()"));
+        }
+        if let Some(lines) = style.line_clamp {
+            out.push_str(&format!("\n{pad}.lineLimit({lines})"));
+        }
     }
     swiftui_frame(out, style, &pad);
-    let padding = style
-        .padding
-        .or(style.padding_vertical)
-        .or(style.padding_horizontal);
-    if let Some(padding) = padding {
-        out.push_str(&format!("\n{pad}.padding({padding:.0})"));
+    swiftui_spacing(out, style, &pad, "padding");
+    swiftui_spacing(out, style, &pad, "margin");
+    if let Some(opacity) = style.opacity {
+        out.push_str(&format!("\n{pad}.opacity({opacity:.3})"));
+    }
+    if style.hidden == Some(true) {
+        out.push_str(&format!("\n{pad}.opacity(0)"));
     }
     if let Some(background) = &style.background_color {
         out.push_str(&format!("\n{pad}.background({})", swift_color(background)));
@@ -382,6 +398,79 @@ fn swiftui_style(out: &mut String, style: Option<&ViewStyle>, is_text: bool, ind
         out.push_str(&format!(
             "\n{pad}.clipShape(RoundedRectangle(cornerRadius: {radius:.1}))"
         ));
+    }
+    if let Some(width) = style.border_width {
+        let color = style
+            .border_color
+            .as_deref()
+            .map(swift_color)
+            .unwrap_or_else(|| "Color.gray".to_string());
+        out.push_str(&format!("\n{pad}.border({color}, width: {width:.1})"));
+    }
+    if style.overflow_hidden == Some(true) {
+        out.push_str(&format!("\n{pad}.clipped()"));
+    }
+    if let Some(radius) = style.shadow_radius {
+        let color = style
+            .shadow_color
+            .as_deref()
+            .map(swift_color)
+            .unwrap_or_else(|| "Color.black.opacity(0.25)".to_string());
+        let x = style.shadow_offset_x.unwrap_or(0.0);
+        let y = style.shadow_offset_y.unwrap_or(0.0);
+        out.push_str(&format!(
+            "\n{pad}.shadow(color: {color}, radius: {radius:.1}, x: {x:.1}, y: {y:.1})"
+        ));
+    }
+    if style.translate_x.is_some() || style.translate_y.is_some() {
+        out.push_str(&format!(
+            "\n{pad}.offset(x: {:.1}, y: {:.1})",
+            style.translate_x.unwrap_or(0.0),
+            style.translate_y.unwrap_or(0.0)
+        ));
+    }
+    if let Some(rotate) = style.rotate {
+        out.push_str(&format!("\n{pad}.rotationEffect(.degrees({rotate:.1}))"));
+    }
+    if style.scale_x.is_some() || style.scale_y.is_some() {
+        out.push_str(&format!(
+            "\n{pad}.scaleEffect(x: {:.3}, y: {:.3})",
+            style.scale_x.unwrap_or(1.0),
+            style.scale_y.unwrap_or(1.0)
+        ));
+    }
+}
+
+fn swiftui_spacing(out: &mut String, style: &ViewStyle, pad: &str, kind: &str) {
+    let values = if kind == "padding" {
+        [
+            (style.padding, ""),
+            (style.padding_horizontal, ".horizontal"),
+            (style.padding_vertical, ".vertical"),
+            (style.padding_top, ".top"),
+            (style.padding_bottom, ".bottom"),
+            (style.padding_left, ".leading"),
+            (style.padding_right, ".trailing"),
+        ]
+    } else {
+        [
+            (style.margin, ""),
+            (style.margin_horizontal, ".horizontal"),
+            (style.margin_vertical, ".vertical"),
+            (style.margin_top, ".top"),
+            (style.margin_bottom, ".bottom"),
+            (style.margin_left, ".leading"),
+            (style.margin_right, ".trailing"),
+        ]
+    };
+    for (value, edge) in values {
+        if let Some(value) = value {
+            if edge.is_empty() {
+                out.push_str(&format!("\n{pad}.padding({value:.0})"));
+            } else {
+                out.push_str(&format!("\n{pad}.padding({edge}, {value:.0})"));
+            }
+        }
     }
 }
 
@@ -419,6 +508,16 @@ fn swiftui_frame(out: &mut String, style: &ViewStyle, pad: &str) {
     }
 }
 
+fn swiftui_text_align(value: Option<&str>) -> Option<&'static str> {
+    match value {
+        Some("center") => Some(".center"),
+        Some("right") | Some("end") | Some("trailing") => Some(".trailing"),
+        Some("justify") => Some(".leading"),
+        Some("left") | Some("start") | Some("leading") => Some(".leading"),
+        _ => None,
+    }
+}
+
 fn swiftui_font_weight(weight: u16) -> &'static str {
     match weight {
         0..=299 => ".thin",
@@ -434,7 +533,7 @@ fn swiftui_font_weight(weight: u16) -> &'static str {
 fn generate_compose(ir: &ViewIr, view_name: &str) -> String {
     let body = compose_nodes(&ir.root, 1);
     format!(
-        "import androidx.compose.foundation.background\nimport androidx.compose.foundation.horizontalScroll\nimport androidx.compose.foundation.layout.Arrangement\nimport androidx.compose.foundation.layout.Column\nimport androidx.compose.foundation.layout.Row\nimport androidx.compose.foundation.layout.Spacer\nimport androidx.compose.foundation.layout.fillMaxHeight\nimport androidx.compose.foundation.layout.fillMaxSize\nimport androidx.compose.foundation.layout.fillMaxWidth\nimport androidx.compose.foundation.layout.height\nimport androidx.compose.foundation.layout.padding\nimport androidx.compose.foundation.layout.width\nimport androidx.compose.foundation.rememberScrollState\nimport androidx.compose.foundation.shape.RoundedCornerShape\nimport androidx.compose.foundation.verticalScroll\nimport androidx.compose.material3.Button\nimport androidx.compose.material3.Divider\nimport androidx.compose.material3.LinearProgressIndicator\nimport androidx.compose.material3.Slider\nimport androidx.compose.material3.Switch\nimport androidx.compose.material3.Text\nimport androidx.compose.material3.TextField\nimport androidx.compose.runtime.Composable\nimport androidx.compose.ui.Modifier\nimport androidx.compose.ui.draw.clip\nimport androidx.compose.ui.graphics.Color\nimport androidx.compose.ui.text.font.FontWeight\nimport androidx.compose.ui.unit.dp\nimport androidx.compose.ui.unit.sp\n\nobject CrepusActions {{\n    var dispatch: (String) -> Unit = {{}}\n}}\n\n@Composable\nfun {view_name}(modifier: Modifier = Modifier) {{\n{body}\n}}\n"
+        "import androidx.compose.foundation.background\nimport androidx.compose.foundation.border\nimport androidx.compose.foundation.horizontalScroll\nimport androidx.compose.foundation.layout.Arrangement\nimport androidx.compose.foundation.layout.Column\nimport androidx.compose.foundation.layout.Row\nimport androidx.compose.foundation.layout.Spacer\nimport androidx.compose.foundation.layout.fillMaxHeight\nimport androidx.compose.foundation.layout.fillMaxSize\nimport androidx.compose.foundation.layout.fillMaxWidth\nimport androidx.compose.foundation.layout.height\nimport androidx.compose.foundation.layout.offset\nimport androidx.compose.foundation.layout.padding\nimport androidx.compose.foundation.layout.width\nimport androidx.compose.foundation.rememberScrollState\nimport androidx.compose.foundation.shape.RoundedCornerShape\nimport androidx.compose.foundation.verticalScroll\nimport androidx.compose.material3.Button\nimport androidx.compose.material3.Divider\nimport androidx.compose.material3.LinearProgressIndicator\nimport androidx.compose.material3.Slider\nimport androidx.compose.material3.Switch\nimport androidx.compose.material3.Text\nimport androidx.compose.material3.TextField\nimport androidx.compose.runtime.Composable\nimport androidx.compose.ui.Modifier\nimport androidx.compose.ui.draw.alpha\nimport androidx.compose.ui.draw.clip\nimport androidx.compose.ui.draw.rotate\nimport androidx.compose.ui.draw.scale\nimport androidx.compose.ui.graphics.Color\nimport androidx.compose.ui.text.font.FontStyle\nimport androidx.compose.ui.text.font.FontWeight\nimport androidx.compose.ui.text.style.TextAlign\nimport androidx.compose.ui.text.style.TextDecoration\nimport androidx.compose.ui.unit.dp\nimport androidx.compose.ui.unit.sp\n\nobject CrepusActions {{\n    var dispatch: (String) -> Unit = {{}}\n}}\n\n@Composable\nfun {view_name}(modifier: Modifier = Modifier) {{\n{body}\n}}\n"
     )
 }
 
@@ -700,6 +799,28 @@ fn compose_text_args(style: Option<&ViewStyle>) -> String {
         if let Some(color) = &style.foreground_color {
             args.push(format!("color = Color(0x{})", compose_hex_argb(color)));
         }
+        if let Some(align) = compose_text_align(style.text_align.as_deref()) {
+            args.push(format!("textAlign = {align}"));
+        }
+        if style.italic == Some(true) {
+            args.push("fontStyle = FontStyle.Italic".to_string());
+        }
+        if style.underline == Some(true) && style.strikethrough == Some(true) {
+            args.push(
+                "textDecoration = TextDecoration.combine(listOf(TextDecoration.Underline, TextDecoration.LineThrough))"
+                    .to_string(),
+            );
+        } else if style.underline == Some(true) {
+            args.push("textDecoration = TextDecoration.Underline".to_string());
+        } else if style.strikethrough == Some(true) {
+            args.push("textDecoration = TextDecoration.LineThrough".to_string());
+        }
+        if let Some(line_height) = style.line_height {
+            args.push(format!("lineHeight = {:.1}.sp", line_height * 16.0));
+        }
+        if let Some(lines) = style.line_clamp {
+            args.push(format!("maxLines = {lines}"));
+        }
     }
     if args.is_empty() {
         String::new()
@@ -728,6 +849,10 @@ fn compose_modifier_chain(base: Option<String>, style: Option<&ViewStyle>) -> Op
     let mut modifier = base.unwrap_or_else(|| "Modifier".to_string());
     let mut used = modifier != "Modifier";
     if let Some(style) = style {
+        for value in compose_spacing_values(style, "margin") {
+            modifier.push_str(&format!(".padding({value})"));
+            used = true;
+        }
         if style.width == Some(-1.0) && style.height == Some(-1.0) {
             modifier.push_str(".fillMaxSize()");
             used = true;
@@ -757,16 +882,107 @@ fn compose_modifier_chain(base: Option<String>, style: Option<&ViewStyle>) -> Op
             ));
             used = true;
         }
-        if let Some(padding) = style
-            .padding
-            .or(style.padding_vertical)
-            .or(style.padding_horizontal)
-        {
-            modifier.push_str(&format!(".padding({padding:.0}.dp)"));
+        if let Some(width) = style.border_width {
+            let color = style
+                .border_color
+                .as_deref()
+                .map(compose_hex_argb)
+                .unwrap_or_else(|| "FF888888".to_string());
+            let radius = style.corner_radius.unwrap_or(0.0);
+            modifier.push_str(&format!(
+                ".border({width:.0}.dp, Color(0x{color}), RoundedCornerShape({radius:.0}.dp))"
+            ));
+            used = true;
+        }
+        for value in compose_spacing_values(style, "padding") {
+            modifier.push_str(&format!(".padding({value})"));
+            used = true;
+        }
+        if let Some(opacity) = style.opacity {
+            modifier.push_str(&format!(".alpha({opacity:.3}f)"));
+            used = true;
+        }
+        if style.hidden == Some(true) {
+            modifier.push_str(".alpha(0f)");
+            used = true;
+        }
+        if style.translate_x.is_some() || style.translate_y.is_some() {
+            modifier.push_str(&format!(
+                ".offset(x = {:.0}.dp, y = {:.0}.dp)",
+                style.translate_x.unwrap_or(0.0),
+                style.translate_y.unwrap_or(0.0)
+            ));
+            used = true;
+        }
+        if let Some(rotate) = style.rotate {
+            modifier.push_str(&format!(".rotate({rotate:.1}f)"));
+            used = true;
+        }
+        if style.scale_x.is_some() || style.scale_y.is_some() {
+            modifier.push_str(&format!(
+                ".scale(scaleX = {:.3}f, scaleY = {:.3}f)",
+                style.scale_x.unwrap_or(1.0),
+                style.scale_y.unwrap_or(1.0)
+            ));
             used = true;
         }
     }
     used.then_some(modifier)
+}
+
+fn compose_spacing_values(style: &ViewStyle, kind: &str) -> Vec<String> {
+    let (all, horizontal, vertical, top, bottom, left, right) = if kind == "padding" {
+        (
+            style.padding,
+            style.padding_horizontal,
+            style.padding_vertical,
+            style.padding_top,
+            style.padding_bottom,
+            style.padding_left,
+            style.padding_right,
+        )
+    } else {
+        (
+            style.margin,
+            style.margin_horizontal,
+            style.margin_vertical,
+            style.margin_top,
+            style.margin_bottom,
+            style.margin_left,
+            style.margin_right,
+        )
+    };
+    let mut out = Vec::new();
+    if let Some(value) = all {
+        out.push(format!("{value:.0}.dp"));
+    }
+    if horizontal.is_some() || vertical.is_some() {
+        out.push(format!(
+            "horizontal = {:.0}.dp, vertical = {:.0}.dp",
+            horizontal.unwrap_or(0.0),
+            vertical.unwrap_or(0.0)
+        ));
+    }
+    if top.is_some() || bottom.is_some() || left.is_some() || right.is_some() {
+        out.push(format!(
+            "start = {:.0}.dp, top = {:.0}.dp, end = {:.0}.dp, bottom = {:.0}.dp",
+            left.unwrap_or(0.0),
+            top.unwrap_or(0.0),
+            right.unwrap_or(0.0),
+            bottom.unwrap_or(0.0)
+        ));
+    }
+    out
+}
+
+fn compose_text_align(value: Option<&str>) -> Option<&'static str> {
+    match value {
+        Some("center") => Some("TextAlign.Center"),
+        Some("right") | Some("end") | Some("trailing") => Some("TextAlign.End"),
+        Some("justify") => Some("TextAlign.Justify"),
+        Some("left") | Some("start") | Some("leading") => Some("TextAlign.Start"),
+        _ => None,
+    }
 }
 
 fn compose_font_weight(weight: u16) -> &'static str {

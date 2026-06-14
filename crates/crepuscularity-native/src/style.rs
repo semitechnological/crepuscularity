@@ -33,6 +33,12 @@ pub(crate) fn extract_text_style(classes: &[String], ctx: Option<&TemplateContex
     let mut s = ViewStyle::default();
     for c in classes {
         apply_text_class(&mut s, c, ctx);
+        apply_position_class(&mut s, c);
+        apply_transform_class(&mut s, c);
+        apply_shadow_class(&mut s, c);
+        apply_text_layout_class(&mut s, c);
+        apply_cursor_class(&mut s, c);
+        apply_user_select_class(&mut s, c);
     }
     s
 }
@@ -896,20 +902,21 @@ fn apply_transform_class(s: &mut ViewStyle, class: &str) {
     }
     if let Some(rest) = class.strip_prefix("scale-") {
         if let Ok(v) = rest.parse::<f32>() {
-            s.scale_x = Some(v);
-            s.scale_y = Some(v);
+            let value = if v > 10.0 { v / 100.0 } else { v };
+            s.scale_x = Some(value);
+            s.scale_y = Some(value);
             return;
         }
     }
     if let Some(rest) = class.strip_prefix("scale-x-") {
         if let Ok(v) = rest.parse::<f32>() {
-            s.scale_x = Some(v);
+            s.scale_x = Some(if v > 10.0 { v / 100.0 } else { v });
             return;
         }
     }
     if let Some(rest) = class.strip_prefix("scale-y-") {
         if let Ok(v) = rest.parse::<f32>() {
-            s.scale_y = Some(v);
+            s.scale_y = Some(if v > 10.0 { v / 100.0 } else { v });
             return;
         }
     }
