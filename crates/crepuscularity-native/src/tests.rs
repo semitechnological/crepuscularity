@@ -47,6 +47,7 @@ fn codegen_swiftui_emits_standalone_view_source() {
     assert!(source.contains("import SwiftUI"));
     assert!(source.contains("public enum CrepusActions"));
     assert!(source.contains("public static var dispatch: (String) -> String"));
+    assert!(source.contains("public static let knownActions: Set<String> = []"));
     assert!(source.contains("public struct HelloScreen: View"));
     assert!(source.contains("VStack(alignment: .leading, spacing: 16.0)"));
     assert!(source.contains("Text(\"Hello Ada\")"));
@@ -70,6 +71,8 @@ fn codegen_compose_emits_composable_source() {
     );
     assert!(source.contains("object CrepusActions"));
     assert!(source.contains("var dispatch: (String) -> String"));
+    assert!(source.contains("val knownActions: Set<String> = setOf(\"tap\")"));
+    assert!(source.contains("if (!knownActions.contains(action))"));
     assert!(source.contains("Button(onClick = { CrepusActions.perform(\"tap\") })"));
 }
 

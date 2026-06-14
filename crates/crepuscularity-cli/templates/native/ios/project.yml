@@ -32,7 +32,8 @@ targets:
     preBuildScripts:
       - name: Build Rust Actions
         outputFiles:
-          - "$(PROJECT_DIR)/build/rust/$(PLATFORM_NAME)/libcrepus_mobile_actions.a"
+          - "$(PROJECT_DIR)/build/rust/aarch64-apple-ios/libcrepus_mobile_actions.a"
+          - "$(PROJECT_DIR)/build/rust/aarch64-apple-ios-sim/libcrepus_mobile_actions.a"
         script: |
           set -euo pipefail
           export PATH="$HOME/.cargo/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"

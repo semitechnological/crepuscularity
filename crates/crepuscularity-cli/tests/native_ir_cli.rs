@@ -311,6 +311,70 @@ fn mobile_new_scaffolds_runtime_files() {
     assert!(root
         .join("android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusMobileRuntime.kt")
         .is_file());
+
+    let rust_actions =
+        std::fs::read_to_string(root.join("ios/Sources/NativeShell/CrepusRustActions.swift"))
+            .expect("read CrepusRustActions.swift");
+    assert!(rust_actions.contains("JSONSerialization.data(withJSONObject:"));
+    assert!(rust_actions.contains("let data = Data(result.utf8)"));
+    assert!(rust_actions.contains("lastError = payload.error"));
+    assert!(!rust_actions.contains(r#""action":"\(action)""#));
+    assert!(!rust_actions.contains("result.contains"));
+
+    let project_yml =
+        std::fs::read_to_string(root.join("ios/project.yml")).expect("read project.yml");
+    assert!(project_yml
+        .contains("$(PROJECT_DIR)/build/rust/aarch64-apple-ios/libcrepus_mobile_actions.a"));
+    assert!(project_yml
+        .contains("$(PROJECT_DIR)/build/rust/aarch64-apple-ios-sim/libcrepus_mobile_actions.a"));
+    assert!(!project_yml
+        .contains("$(PROJECT_DIR)/build/rust/$(PLATFORM_NAME)/libcrepus_mobile_actions.a"));
+}
+
+#[test]
+#[cfg_attr(
+    windows,
+    ignore = "default desktop crepus.exe does not spawn reliably on Windows CI"
+)]
+fn mobile_new_scaffolds_android_runtime_audit_fixes() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let out = crepus()
+        .current_dir(tmp.path())
+        .args(["mobile", "new", "phone"])
+        .output()
+        .expect("spawn crepus mobile new");
+    assert!(
+        out.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let root = tmp.path().join("phone");
+    let android_actions = std::fs::read_to_string(
+        root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusRustActions.kt"),
+    )
+    .expect("read CrepusRustActions.kt");
+    assert!(android_actions.contains("parseToJsonElement(result).jsonObject"));
+    assert!(android_actions.contains("jsonPrimitive?.booleanOrNull == false"));
+    assert!(!android_actions.contains("contains(\"\\\"ok\\\":false\")"));
+
+    let android_tree = std::fs::read_to_string(
+        root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/ViewIrTree.kt"),
+    )
+    .expect("read ViewIrTree.kt");
+    assert!(android_tree.contains("Button(onClick = { node.onClick?.let { CrepusActionState.dispatch(it) } }, modifier = stackModifier(node.style))"));
+    assert!(android_tree.contains("contentDescription = node.alt ?: node.src"));
+    assert!(android_tree.contains("Unsupported remote image"));
+
+    let android_gradle = std::fs::read_to_string(root.join("android/app/build.gradle.kts"))
+        .expect("read build.gradle.kts");
+    assert!(android_gradle.contains("rustJniOutputDir(profile)"));
+    assert!(android_gradle.contains("rustJniLibs/$profile"));
+    assert!(android_gradle.contains("it.dir(\"arm64-v8a\")"));
+    assert!(
+        android_gradle.contains("sourceSets[\"debug\"].jniLibs.srcDir(rustJniLibsDir(\"debug\"))")
+    );
+    assert!(android_gradle
+        .contains("sourceSets[\"release\"].jniLibs.srcDir(rustJniLibsDir(\"release\"))"));
 }
 
 #[test]

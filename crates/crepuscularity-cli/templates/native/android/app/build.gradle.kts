@@ -31,16 +31,21 @@ android {
 
     buildFeatures { compose = true }
 
-    sourceSets["main"].jniLibs.srcDir(layout.buildDirectory.dir("rustJniLibs"))
+    sourceSets["debug"].jniLibs.srcDir(rustJniLibsDir("debug"))
+    sourceSets["release"].jniLibs.srcDir(rustJniLibsDir("release"))
 }
 
 val rustCrateDir = layout.projectDirectory.dir("../../rust")
 val rustTargetDir = rustCrateDir.dir("target")
 val rustAndroidTarget = "aarch64-linux-android"
-val rustJniOutputDir = layout.buildDirectory.dir("rustJniLibs/arm64-v8a")
+
+fun rustJniLibsDir(profile: String) = layout.buildDirectory.dir("rustJniLibs/$profile")
+
+fun rustJniOutputDir(profile: String) = rustJniLibsDir(profile).map { it.dir("arm64-v8a") }
 
 fun registerRustActionsTask(variantName: String, profile: String) {
     val capitalized = variantName.replaceFirstChar { it.uppercase() }
+    val rustJniOutputDir = rustJniOutputDir(profile)
     val sdkDir = providers.environmentVariable("ANDROID_HOME").orElse(providers.environmentVariable("ANDROID_SDK_ROOT"))
     val ndkDir = providers.environmentVariable("ANDROID_NDK_HOME").orElse(
         sdkDir.map { sdk ->

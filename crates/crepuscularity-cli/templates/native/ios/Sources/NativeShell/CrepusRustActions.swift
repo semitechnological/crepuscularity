@@ -16,7 +16,7 @@ public enum CrepusRustActions {
                 defer { output.deallocate() }
                 let written = crepusMobileDispatchJson(pointer, UInt(strlen(pointer)), output, UInt(capacity))
                 if written >= capacity {
-                    return "{\"ok\":false,\"action\":\"\(action)\",\"error\":\"action result too large\"}"
+                    return oversizedResultJson(action: action)
                 }
                 return String(cString: output)
             }
@@ -27,6 +27,24 @@ public enum CrepusRustActions {
             }
         }
     }
+
+    private static func oversizedResultJson(action: String) -> String {
+        let payload: [String: Any] = [
+            "ok": false,
+            "action": action,
+            "error": "action result too large",
+        ]
+        if let data = try? JSONSerialization.data(withJSONObject: payload),
+           let json = String(data: data, encoding: .utf8) {
+            return json
+        }
+        return "{\"ok\":false,\"error\":\"action result too large\"}"
+    }
+}
+
+private struct CrepusActionResult: Decodable {
+    let ok: Bool?
+    let error: String?
 }
 
 @MainActor
@@ -42,6 +60,12 @@ public final class CrepusActionStore: ObservableObject {
 
     public func record(_ result: String) {
         lastResult = result
-        lastError = result.contains("\"ok\":false") ? result : nil
+        let data = Data(result.utf8)
+        if let payload = try? JSONDecoder().decode(CrepusActionResult.self, from: data),
+           payload.ok == false {
+            lastError = payload.error ?? result
+        } else {
+            lastError = nil
+        }
     }
 }
