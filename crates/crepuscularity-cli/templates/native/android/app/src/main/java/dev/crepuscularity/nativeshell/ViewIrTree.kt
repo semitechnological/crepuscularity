@@ -3,6 +3,7 @@ package dev.crepuscularity.nativeshell
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -21,6 +22,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -65,13 +68,17 @@ fun ViewNodeView(node: ViewNode) {
             }
         }
         is ViewNode.Button ->
-            Button(onClick = { node.onClick?.let { CrepusActionState.dispatch(it) } }) {
+            Button(onClick = { node.onClick?.let { CrepusActionState.dispatch(it) } }, modifier = stackModifier(node.style)) {
                 Text(node.label)
             }
         is ViewNode.Image ->
-            Column(modifier = stackModifier(node.style)) {
-                Text(node.alt ?: node.src, fontSize = 12.sp, color = Color.Gray)
-                Text("[image: ${node.src}]", fontSize = 10.sp)
+            Box(
+                modifier =
+                    stackModifier(node.style)
+                        .semantics { contentDescription = node.alt ?: node.src },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("Unsupported remote image: ${node.alt ?: node.src}", fontSize = 12.sp, color = Color.Gray)
             }
         is ViewNode.Scroll -> {
             val scroll = rememberScrollState()

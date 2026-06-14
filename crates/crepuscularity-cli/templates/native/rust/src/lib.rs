@@ -1,6 +1,6 @@
 use std::ffi::CStr;
 use std::os::raw::c_char;
-use std::sync::{Mutex, OnceLock};
+use std::sync::{Mutex, MutexGuard, OnceLock};
 
 #[cfg(target_os = "android")]
 use jni::objects::{JClass, JString};
@@ -23,6 +23,12 @@ fn action_state() -> &'static Mutex<MobileActionState> {
     ACTION_STATE.get_or_init(|| Mutex::new(MobileActionState::default()))
 }
 
+fn lock_action_state() -> MutexGuard<'static, MobileActionState> {
+    action_state()
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
 pub fn dispatch_action(action: &str) -> bool {
     action_handler(action).is_some()
 }
@@ -34,7 +40,7 @@ pub fn dispatch_action_json(action: &str) -> String {
         .and_then(|value| value.as_str())
         .unwrap_or(action);
     let payload = request.get("payload");
-    let mut state = action_state().lock().unwrap();
+    let mut state = lock_action_state();
     let Some(handler) = action_handler(action_name) else {
         return action_json(false, action_name, None, Some("unknown action"), &state);
     };
@@ -131,7 +137,15 @@ pub extern "C" fn crepus_mobile_dispatch_json(
 ) -> usize {
     let result = action_from_ffi(action_ptr, action_len)
         .map(|action| dispatch_action_json(action.as_ref()))
-        .unwrap_or_else(|| "{\"ok\":false,\"action\":\"\",\"error\":\"invalid action pointer\",\"state\":{\"syncCount\":0,\"previewCount\":0,\"lastAction\":\"\"}}".to_string());
+        .unwrap_or_else(|| {
+            action_json(
+                false,
+                "",
+                None,
+                Some("invalid action pointer"),
+                &MobileActionState::default(),
+            )
+        });
     copy_json_to_output(&result, output_ptr, output_len)
 }
 
@@ -166,7 +180,7 @@ fn copy_json_to_output(result: &str, output_ptr: *mut c_char, output_len: usize)
 
 #[cfg(test)]
 fn reset_action_state() {
-    *action_state().lock().unwrap() = MobileActionState::default();
+    *lock_action_state() = MobileActionState::default();
 }
 
 #[cfg(test)]
@@ -244,7 +258,7 @@ mod tests {
         reset_action_state();
         assert!(dispatch_action("sync"));
         assert!(dispatch_action("preview"));
-        let state = action_state().lock().unwrap();
+        let state = lock_action_state();
         assert_eq!(state.sync_count, 0);
         assert_eq!(state.preview_count, 0);
     }
@@ -260,6 +274,44 @@ mod tests {
         assert_eq!(result["action"], "sync");
         assert_eq!(result["value"]["message"], "hydrate");
         assert_eq!(result["state"]["lastPayload"], r#"{"message":"hydrate"}"#);
+    }
+
+    #[test]
+    fn dispatch_action_json_recovers_from_poisoned_state_lock() {
+        let _guard = test_lock();
+        reset_action_state();
+        let _ = std::thread::spawn(|| {
+            let _state = action_state().lock().unwrap();
+            panic!("poison state lock");
+        })
+        .join();
+
+        let result = dispatch_action_json("sync");
+
+        let result: serde_json::Value = serde_json::from_str(&result).expect("json");
+        assert_eq!(result["ok"], true);
+        assert_eq!(result["action"], "sync");
+        assert_eq!(result["state"]["syncCount"], 1);
+        reset_action_state();
+    }
+
+    #[test]
+    fn c_abi_json_null_pointer_reports_full_state_shape() {
+        let _guard = test_lock();
+        reset_action_state();
+        let mut output = [0 as c_char; 256];
+
+        let written = crepus_mobile_dispatch_json(std::ptr::null(), 0, output.as_mut_ptr(), output.len());
+
+        assert!(written > 0);
+        let result = unsafe { CStr::from_ptr(output.as_ptr()) }.to_string_lossy();
+        let result: serde_json::Value = serde_json::from_str(&result).expect("json");
+        assert_eq!(result["ok"], false);
+        assert_eq!(result["error"], "invalid action pointer");
+        assert_eq!(result["state"]["syncCount"], 0);
+        assert_eq!(result["state"]["previewCount"], 0);
+        assert_eq!(result["state"]["lastAction"], "");
+        assert!(result["state"].get("lastPayload").is_some());
     }
 
     #[test]
