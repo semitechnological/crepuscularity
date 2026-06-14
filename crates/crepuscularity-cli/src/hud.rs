@@ -206,26 +206,23 @@ pub fn open_hud_window(
     shutdown: Arc<AtomicBool>,
     cx: &mut gpui::App,
 ) {
-    use gpui::{bounds, point, WindowBackgroundAppearance, WindowKind, WindowOptions};
+    use gpui::{bounds, point, WindowOptions};
 
     let window_options = WindowOptions {
+        focus: false,
+        is_resizable: false,
+        is_minimizable: false,
+        app_id: Some("crepuscularity.crepus.hud".to_string()),
+        titlebar: Some(gpui::TitlebarOptions {
+            title: Some("Crepus HUD".into()),
+            ..Default::default()
+        }),
         window_bounds: Some(gpui::WindowBounds::Windowed(bounds(
             point(px(20.), px(20.)),
             size(px(400.), px(72.)),
         ))),
-        titlebar: None,
-        focus: false,
-        show: true,
-        kind: WindowKind::Normal,
-        is_movable: true,
-        is_resizable: false,
-        is_minimizable: false,
-        display_id: None,
-        window_background: WindowBackgroundAppearance::Opaque,
-        app_id: Some("crepuscularity.crepus.hud".to_string()),
         window_min_size: Some(size(px(400.), px(72.))),
-        window_decorations: None,
-        tabbing_identifier: None,
+        ..Default::default()
     };
 
     match cx.open_window(window_options, move |_window, cx| {

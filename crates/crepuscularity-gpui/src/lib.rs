@@ -9,6 +9,24 @@ pub use pollster::block_on;
 
 pub const GPUI_MANIFEST_DIR: &str = env!("CARGO_MANIFEST_DIR");
 
+pub fn gpui_window_options(
+    app_id: impl Into<String>,
+    title: impl Into<SharedString>,
+    window_bounds: Option<WindowBounds>,
+    window_min_size: Option<Size<Pixels>>,
+) -> WindowOptions {
+    WindowOptions {
+        app_id: Some(app_id.into()),
+        titlebar: Some(TitlebarOptions {
+            title: Some(title.into()),
+            ..Default::default()
+        }),
+        window_bounds,
+        window_min_size,
+        ..Default::default()
+    }
+}
+
 #[derive(
     Clone, Debug, PartialEq, serde::Deserialize, gpui::private::schemars::JsonSchema, gpui::Action,
 )]
@@ -20,8 +38,8 @@ pub use gpui_symbols::Icon;
 
 pub mod prelude {
     pub use crate::{
-        ZedAnchoredCompat, ZedForegroundExecutorCompat, ZedGpuiCompat, ZedStyledTextCompat,
-        ZedSvgCompat, ZedWindowCompat,
+        gpui_window_options, ZedAnchoredCompat, ZedForegroundExecutorCompat, ZedGpuiCompat,
+        ZedStyledTextCompat, ZedSvgCompat, ZedWindowCompat,
     };
     pub use crepuscularity_macros::view;
     pub use gpui::prelude::*;

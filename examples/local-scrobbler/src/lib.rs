@@ -1,7 +1,7 @@
 use std::ffi::c_void;
 
 use crepuscularity_gpui::prelude::*;
-use gpui::{bounds, point, size, Application, ClickEvent, WindowOptions};
+use gpui::{bounds, point, size, Application, ClickEvent};
 
 type CurrentTrackCallback = unsafe extern "C" fn(*mut c_void, i32, *mut u8, usize) -> i32;
 type TrackActionCallback = unsafe extern "C" fn(
@@ -271,25 +271,15 @@ impl Render for ScrobblerApp {
 #[no_mangle]
 pub extern "C" fn crepus_local_scrobbler_run(callbacks: CrepusScrobblerCallbacks) -> i32 {
     Application::new().run(move |cx: &mut App| {
-        let options = WindowOptions {
-            window_bounds: Some(gpui::WindowBounds::Windowed(bounds(
+        let options = gpui_window_options(
+            "crepuscularity.local-scrobbler.zig",
+            "Local Scrobbler",
+            Some(gpui::WindowBounds::Windowed(bounds(
                 point(gpui::px(80.), gpui::px(80.)),
                 size(gpui::px(860.), gpui::px(620.)),
             ))),
-            titlebar: None,
-            focus: true,
-            show: true,
-            kind: gpui::WindowKind::Normal,
-            is_movable: true,
-            is_resizable: true,
-            is_minimizable: true,
-            display_id: None,
-            window_background: gpui::WindowBackgroundAppearance::Opaque,
-            app_id: Some("crepuscularity.local-scrobbler.zig".to_string()),
-            window_min_size: Some(size(gpui::px(720.), gpui::px(540.))),
-            window_decorations: None,
-            tabbing_identifier: None,
-        };
+            Some(size(gpui::px(720.), gpui::px(540.))),
+        );
 
         cx.open_window(options, |_window, cx| {
             cx.new(|cx| ScrobblerApp::new(callbacks, cx))

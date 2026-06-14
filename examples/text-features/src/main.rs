@@ -1,5 +1,5 @@
 use crepuscularity_gpui::prelude::*;
-use gpui::{bounds, point, size, App, Application, WindowOptions};
+use gpui::{bounds, point, size, App, Application};
 
 struct TextFeaturesView;
 
@@ -109,25 +109,15 @@ impl Render for TextFeaturesView {
 
 fn main() {
     Application::new().run(|cx: &mut App| {
-        let window_options = WindowOptions {
-            window_bounds: Some(gpui::WindowBounds::Windowed(bounds(
+        let window_options = gpui_window_options(
+            "crepuscularity.text-features",
+            "Text Features",
+            Some(gpui::WindowBounds::Windowed(bounds(
                 point(gpui::px(80.), gpui::px(80.)),
                 size(gpui::px(1600.), gpui::px(1120.)),
             ))),
-            titlebar: None,
-            focus: true,
-            show: true,
-            kind: gpui::WindowKind::Normal,
-            is_movable: true,
-            is_resizable: true,
-            is_minimizable: true,
-            display_id: None,
-            window_background: gpui::WindowBackgroundAppearance::Opaque,
-            app_id: Some("crepuscularity.text-features".to_string()),
-            window_min_size: Some(size(gpui::px(1320.), gpui::px(980.))),
-            window_decorations: None,
-            tabbing_identifier: None,
-        };
+            Some(size(gpui::px(1320.), gpui::px(980.))),
+        );
 
         cx.open_window(window_options, |_window, cx| cx.new(TextFeaturesView::new))
             .unwrap();

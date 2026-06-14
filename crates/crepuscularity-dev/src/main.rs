@@ -112,23 +112,16 @@ fn main() {
 
     Application::new().run(move |cx: &mut gpui::App| {
         let window_options = WindowOptions {
+            app_id: Some(format!("crepuscularity.dev.{}", display_name)),
+            titlebar: Some(gpui::TitlebarOptions {
+                title: Some(format!("Crepus Dev - {}", display_name).into()),
+                ..Default::default()
+            }),
             window_bounds: Some(gpui::WindowBounds::Windowed(bounds(
                 point(gpui::px(100.), gpui::px(100.)),
                 size(gpui::px(width), gpui::px(height)),
             ))),
-            titlebar: None,
-            focus: true,
-            show: true,
-            kind: gpui::WindowKind::Normal,
-            is_movable: true,
-            is_resizable: true,
-            is_minimizable: true,
-            display_id: None,
-            window_background: gpui::WindowBackgroundAppearance::Opaque,
-            app_id: Some(format!("crepuscularity.dev.{}", display_name)),
-            window_min_size: None,
-            window_decorations: None,
-            tabbing_identifier: None,
+            ..Default::default()
         };
 
         let path = template_path.clone();

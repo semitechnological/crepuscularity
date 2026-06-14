@@ -1,5 +1,5 @@
 use crepuscularity_gpui::prelude::*;
-use gpui::{actions, bounds, point, size, Application, ClickEvent, WindowOptions};
+use gpui::{actions, bounds, point, size, Application, ClickEvent};
 
 actions!(weather, [FetchWeather]);
 
@@ -86,25 +86,15 @@ impl Render for WeatherView {
 
 fn main() {
     Application::new().run(|cx: &mut App| {
-        let window_options = WindowOptions {
-            window_bounds: Some(gpui::WindowBounds::Windowed(bounds(
+        let window_options = gpui_window_options(
+            "crepuscularity.weather",
+            "Weather",
+            Some(gpui::WindowBounds::Windowed(bounds(
                 point(gpui::px(0.), gpui::px(0.)),
                 size(gpui::px(800.), gpui::px(600.)),
             ))),
-            titlebar: None,
-            focus: true,
-            show: true,
-            kind: gpui::WindowKind::Normal,
-            is_movable: true,
-            is_resizable: true,
-            is_minimizable: true,
-            display_id: None,
-            window_background: gpui::WindowBackgroundAppearance::Opaque,
-            app_id: Some("crepuscularity.weather".to_string()),
-            window_min_size: None,
-            window_decorations: None,
-            tabbing_identifier: None,
-        };
+            None,
+        );
 
         cx.open_window(window_options, |_window, cx| cx.new(WeatherView::new))
             .unwrap();
