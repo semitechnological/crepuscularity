@@ -15,7 +15,6 @@ use crepuscularity_native::{
 use notify::{Event, EventKind, RecursiveMode, Watcher};
 use serde_json::Value;
 
-use crate::build_options::{strip_build_options_or_exit, BuildOptions};
 use crate::{native, ui};
 
 const DEFAULT_PORT: u16 = 4001;
@@ -156,22 +155,33 @@ fn doctor_rust_target(target: &str) -> bool {
 }
 
 fn doctor_java17() -> bool {
-    match Command::new("/usr/libexec/java_home")
-        .args(["-v", "17"])
-        .output()
-    {
-        Ok(out) if out.status.success() => {
-            let path = String::from_utf8_lossy(&out.stdout);
-            eprintln!("{} Java 17 {}", style("✓").green(), path.trim());
+    if let Ok(java_home) = std::env::var("JAVA_HOME") {
+        let java = PathBuf::from(&java_home).join("bin/java");
+        if java_version_at_least(&java, 17) {
+            eprintln!("{} Java 17 {}", style("✓").green(), java_home);
             true
+        } else {
+            eprintln!(
+                "{} Java 17: JAVA_HOME does not point to Java 17+",
+                style("✗").red()
+            );
+            false
         }
-        _ => {
-            let cellar = Path::new("/opt/homebrew/Cellar/openjdk@17");
-            let home = find_java_home_in_cellar(cellar);
-            if let Some(home) = home {
-                eprintln!("{} Java 17 {}", style("✓").green(), home.display());
+    } else {
+        match Command::new("/usr/libexec/java_home")
+            .args(["-v", "17"])
+            .output()
+        {
+            Ok(out) if out.status.success() => {
+                let path = String::from_utf8_lossy(&out.stdout);
+                eprintln!("{} Java 17 {}", style("✓").green(), path.trim());
                 true
-            } else {
+            }
+            _ if java_version_at_least(Path::new("java"), 17) => {
+                eprintln!("{} Java 17 java on PATH", style("✓").green());
+                true
+            }
+            _ => {
                 eprintln!(
                     "{} Java 17: install openjdk@17 and expose it to Gradle",
                     style("✗").red()
@@ -182,15 +192,26 @@ fn doctor_java17() -> bool {
     }
 }
 
-fn find_java_home_in_cellar(cellar: &Path) -> Option<PathBuf> {
-    let entries = cellar.read_dir().ok()?;
-    for entry in entries.flatten() {
-        let home = entry.path().join("libexec/openjdk.jdk/Contents/Home");
-        if home.join("bin/java").exists() {
-            return Some(home);
-        }
+fn java_version_at_least(java: &Path, major: u32) -> bool {
+    let Ok(out) = Command::new(java).arg("-version").output() else {
+        return false;
+    };
+    let text = format!(
+        "{}{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    text.split(|ch: char| !(ch.is_ascii_digit() || ch == '.'))
+        .find_map(parse_java_major)
+        .is_some_and(|found| found >= major)
+}
+
+fn parse_java_major(raw: &str) -> Option<u32> {
+    if raw.is_empty() {
+        return None;
     }
-    None
+    let first = raw.split('.').next()?;
+    first.parse().ok()
 }
 
 fn doctor_java_home() -> bool {
@@ -249,7 +270,7 @@ fn doctor_android_sdk() -> bool {
 
 fn doctor_android_ndk() -> bool {
     if let Ok(path) = std::env::var("ANDROID_NDK_HOME").map(PathBuf::from) {
-        if path.exists() {
+        if android_ndk_clang(&path).is_some() {
             eprintln!("{} Android NDK {}", style("✓").green(), path.display());
             return true;
         }
@@ -260,12 +281,8 @@ fn doctor_android_ndk() -> bool {
         .map(PathBuf::from);
     if let Some(sdk) = sdk {
         let ndk = sdk.join("ndk");
-        if ndk
-            .read_dir()
-            .map(|mut entries| entries.next().is_some())
-            .unwrap_or(false)
-        {
-            eprintln!("{} Android NDK {}", style("✓").green(), ndk.display());
+        if let Some(path) = latest_android_ndk(&ndk) {
+            eprintln!("{} Android NDK {}", style("✓").green(), path.display());
             return true;
         }
     }
@@ -276,32 +293,55 @@ fn doctor_android_ndk() -> bool {
     false
 }
 
+fn latest_android_ndk(ndk_dir: &Path) -> Option<PathBuf> {
+    let mut entries = ndk_dir
+        .read_dir()
+        .ok()?
+        .flatten()
+        .map(|entry| entry.path())
+        .filter(|path| path.is_dir() && android_ndk_clang(path).is_some())
+        .collect::<Vec<_>>();
+    entries.sort();
+    entries.pop()
+}
+
+fn android_ndk_clang(ndk: &Path) -> Option<PathBuf> {
+    let prebuilt = ndk.join("toolchains/llvm/prebuilt");
+    prebuilt
+        .read_dir()
+        .ok()?
+        .flatten()
+        .map(|entry| {
+            entry
+                .path()
+                .join("bin")
+                .join("aarch64-linux-android26-clang")
+        })
+        .find(|path| path.exists())
+}
+
 fn run_build(args: &[String]) {
     let platform = parse_platform_arg(args).unwrap_or(MobilePlatform::All);
     let stripped = strip_mobile_only_args(args);
-    let options = BuildOptions::parse_or_exit(&stripped);
-    let build_args = strip_build_options_or_exit(&stripped);
+    reject_mobile_release_flag(&stripped);
+    let build_args = stripped;
     match platform {
         MobilePlatform::Ios => {
             let mut forwarded = vec!["build".to_string(), "ios".to_string()];
             forwarded.extend(build_args);
-            append_build_mode(&mut forwarded, options);
             native::run(&forwarded);
         }
         MobilePlatform::Android => {
             let mut forwarded = vec!["build".to_string(), "android".to_string()];
             forwarded.extend(build_args);
-            append_build_mode(&mut forwarded, options);
             native::run(&forwarded);
         }
         MobilePlatform::All => {
             let mut ios = vec!["build".to_string(), "ios".to_string()];
             ios.extend(build_args.clone());
-            append_build_mode(&mut ios, options);
             native::run(&ios);
             let mut android = vec!["build".to_string(), "android".to_string()];
             android.extend(build_args);
-            append_build_mode(&mut android, options);
             native::run(&android);
         }
     }
@@ -310,7 +350,8 @@ fn run_build(args: &[String]) {
 fn run_mobile_app(args: &[String]) {
     let platform = parse_platform_arg(args).unwrap_or(MobilePlatform::Android);
     let stripped = strip_mobile_only_args(args);
-    let run_args = strip_build_options_or_exit(&stripped);
+    reject_mobile_release_flag(&stripped);
+    let run_args = stripped;
     match platform {
         MobilePlatform::Ios => {
             let mut forwarded = vec!["run".to_string(), "ios".to_string()];
@@ -323,6 +364,12 @@ fn run_mobile_app(args: &[String]) {
             native::run(&forwarded);
         }
         MobilePlatform::All => ui::error("crepus mobile run expects --platform ios or android"),
+    }
+}
+
+fn reject_mobile_release_flag(args: &[String]) {
+    if args.iter().any(|arg| arg == "--release") {
+        ui::error("crepus mobile build does not use --release; use --configuration Release for iOS or --flavor Release for Android");
     }
 }
 
@@ -670,14 +717,6 @@ fn with_default_template_arg(command: &str, args: &[String]) -> Vec<String> {
     forwarded
 }
 
-fn append_build_mode(args: &mut Vec<String>, options: BuildOptions) {
-    if options.release() {
-        args.push("--release".to_string());
-    } else {
-        args.push("--debug".to_string());
-    }
-}
-
 fn parse_dev_args(args: &[String]) -> Result<MobileDevArgs, String> {
     let mut dir = PathBuf::from(".");
     let mut port = DEFAULT_PORT;
@@ -933,7 +972,7 @@ fn print_mobile_usage() {
     );
     eprintln!(
         "  {}  {}",
-        style("build [--platform ios|android|all] [--release]").green(),
+        style("build [--platform ios|android|all]            ").green(),
         style("build native app targets").dim()
     );
     eprintln!(

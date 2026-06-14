@@ -27,7 +27,6 @@ use crepuscularity_native::{
 use serde::Deserialize;
 use serde_json::Value;
 
-use crate::build_options::{strip_build_options_or_exit, BuildOptions};
 use crate::ui;
 
 pub fn run(args: &[String]) {
@@ -53,22 +52,17 @@ pub fn run(args: &[String]) {
         }
         Some("build") => match args.get(1).map(|s| s.as_str()) {
             Some("ios") => {
-                let options = BuildOptions::parse_or_exit(&args[2..]);
-                let stripped = strip_build_options_or_exit(&args[2..]);
-                let dir = parse_dir_arg(&stripped);
-                build_ios(&dir, options);
+                reject_native_release_flag(&args[2..]);
+                let dir = parse_dir_arg(&args[2..]);
+                let target = parse_ios_target(&args[2..]).unwrap_or(IosBuildTarget::Simulator);
+                let configuration =
+                    parse_configuration(&args[2..]).unwrap_or_else(|| "Debug".to_string());
+                build_ios(&dir, target, &configuration);
             }
             Some("android") => {
-                let options = BuildOptions::parse_or_exit(&args[2..]);
-                let stripped = strip_build_options_or_exit(&args[2..]);
-                let dir = parse_dir_arg(&stripped);
-                let flavor = parse_flavor(&stripped).unwrap_or_else(|| {
-                    if options.release() {
-                        "Release".to_string()
-                    } else {
-                        "Debug".to_string()
-                    }
-                });
+                reject_native_release_flag(&args[2..]);
+                let dir = parse_dir_arg(&args[2..]);
+                let flavor = parse_flavor(&args[2..]).unwrap_or_else(|| "Debug".to_string());
                 build_android(&dir, &flavor);
             }
             _ => ui::error("Usage: crepus native build ios|android [--dir <path>]"),
@@ -79,16 +73,9 @@ pub fn run(args: &[String]) {
                 run_ios_help(&dir);
             }
             Some("android") => {
-                let options = BuildOptions::parse_or_exit(&args[2..]);
-                let stripped = strip_build_options_or_exit(&args[2..]);
-                let dir = parse_dir_arg(&stripped);
-                let flavor = parse_flavor(&stripped).unwrap_or_else(|| {
-                    if options.release() {
-                        "Release".to_string()
-                    } else {
-                        "Debug".to_string()
-                    }
-                });
+                reject_native_release_flag(&args[2..]);
+                let dir = parse_dir_arg(&args[2..]);
+                let flavor = parse_flavor(&args[2..]).unwrap_or_else(|| "Debug".to_string());
                 run_android(&dir, &flavor);
             }
             _ => ui::error("Usage: crepus native run ios|android [--dir <path>]"),
@@ -139,6 +126,28 @@ struct CodegenArgs {
     component: Option<String>,
     ctx_file: Option<PathBuf>,
     vars: Vec<(String, String)>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum IosBuildTarget {
+    Simulator,
+    Device,
+}
+
+impl IosBuildTarget {
+    fn sdk(self) -> &'static str {
+        match self {
+            Self::Simulator => "iphonesimulator",
+            Self::Device => "iphoneos",
+        }
+    }
+
+    fn destination(self) -> &'static str {
+        match self {
+            Self::Simulator => "generic/platform=iOS Simulator",
+            Self::Device => "generic/platform=iOS",
+        }
+    }
 }
 
 struct MobileIosConfig {
@@ -881,13 +890,13 @@ fn scaffold_native_app(name: &str) {
     ));
     eprintln!();
     eprintln!("{}", style("Next steps").dim());
-    eprintln!("  iOS:     crepus mobile build --platform ios --dir {name}");
+    eprintln!("  iOS:     crepus mobile build --platform ios --dir {name} --target simulator");
     eprintln!(
         "  Android: cd {dir}/android && gradle wrapper --gradle-version 8.10 && \\\n           ./gradlew :app:assembleDebug",
         dir = name
     );
     eprintln!(
-        "  Build via crepus: crepus native build ios --dir {dir}",
+        "  Build via crepus: crepus native build ios --dir {dir} --target simulator",
         dir = name
     );
     eprintln!(
@@ -924,10 +933,69 @@ fn parse_flavor(args: &[String]) -> Option<String> {
     None
 }
 
-fn build_ios(dir: &Path, options: BuildOptions) {
+fn parse_ios_target(args: &[String]) -> Option<IosBuildTarget> {
+    for window in args.windows(2) {
+        if window[0] == "--target" {
+            return Some(parse_ios_target_value(&window[1]));
+        }
+    }
+    for arg in args {
+        if let Some(rest) = arg.strip_prefix("--target=") {
+            return Some(parse_ios_target_value(rest));
+        }
+        match arg.as_str() {
+            "--simulator" => return Some(IosBuildTarget::Simulator),
+            "--device" => return Some(IosBuildTarget::Device),
+            _ => {}
+        }
+    }
+    None
+}
+
+fn parse_ios_target_value(value: &str) -> IosBuildTarget {
+    match value {
+        "simulator" | "sim" => IosBuildTarget::Simulator,
+        "device" | "ios" => IosBuildTarget::Device,
+        other => ui::error(&format!(
+            "unknown iOS target '{other}'; expected simulator or device"
+        )),
+    }
+}
+
+fn parse_configuration(args: &[String]) -> Option<String> {
+    for window in args.windows(2) {
+        if window[0] == "--configuration" {
+            return Some(normalize_configuration(&window[1]));
+        }
+    }
+    for arg in args {
+        if let Some(rest) = arg.strip_prefix("--configuration=") {
+            return Some(normalize_configuration(rest));
+        }
+    }
+    None
+}
+
+fn normalize_configuration(value: &str) -> String {
+    match value {
+        "Debug" | "debug" => "Debug".to_string(),
+        "Release" | "release" => "Release".to_string(),
+        other => ui::error(&format!(
+            "unknown iOS configuration '{other}'; expected Debug or Release"
+        )),
+    }
+}
+
+fn reject_native_release_flag(args: &[String]) {
+    if args.iter().any(|arg| arg == "--release") {
+        ui::error("native/mobile builds do not use --release; use --configuration Release for iOS or --flavor Release for Android");
+    }
+}
+
+fn build_ios(dir: &Path, target: IosBuildTarget, configuration: &str) {
     let ios_dir = dir.join("ios");
     if ios_dir.join("project.yml").exists() {
-        build_ios_app(&ios_dir, options);
+        build_ios_app(&ios_dir, target, configuration);
         return;
     }
     if !ios_dir.join("Package.swift").exists() {
@@ -938,7 +1006,7 @@ fn build_ios(dir: &Path, options: BuildOptions) {
     }
     let mut cmd = Command::new("swift");
     cmd.arg("build").current_dir(&ios_dir);
-    if options.release() {
+    if configuration == "Release" {
         cmd.args(["-c", "release"]);
     } else {
         cmd.args(["-c", "debug"]);
@@ -946,7 +1014,7 @@ fn build_ios(dir: &Path, options: BuildOptions) {
     delegate(cmd, "swift build");
 }
 
-fn build_ios_app(ios_dir: &Path, options: BuildOptions) {
+fn build_ios_app(ios_dir: &Path, target: IosBuildTarget, configuration: &str) {
     let spec = ios_dir.join("project.yml");
     if !spec.exists() {
         ui::error(&format!("no project.yml at '{}'", spec.display()));
@@ -979,13 +1047,11 @@ fn build_ios_app(ios_dir: &Path, options: BuildOptions) {
         "-target",
         &cfg.scheme,
         "-sdk",
-        "iphonesimulator",
+        target.sdk(),
         "-configuration",
-        if options.release() {
-            "Release"
-        } else {
-            "Debug"
-        },
+        configuration,
+        "-destination",
+        target.destination(),
         "build",
     ]);
     delegate(build, "xcodebuild");
@@ -1040,8 +1106,7 @@ fn run_ios_help(dir: &Path) {
         );
         return;
     }
-    let options = BuildOptions::debug();
-    build_ios_app(&ios_dir, options);
+    build_ios_app(&ios_dir, IosBuildTarget::Simulator, "Debug");
     run_ios_app(&ios_dir);
 }
 
@@ -1306,8 +1371,8 @@ fn print_native_usage() {
     );
     eprintln!(
         "  {}  {}",
-        style("build ios [--dir <path>]    ").green(),
-        style("swift build inside <dir>/ios").dim()
+        style("build ios [--target simulator|device]").green(),
+        style("xcodegen + xcodebuild inside <dir>/ios").dim()
     );
     eprintln!(
         "  {}  {}",
@@ -1331,7 +1396,10 @@ fn print_native_usage() {
     eprintln!("  crepus native sync views/main.crepus --dir my-mobile-app --out app/Resources/dashboard.view-ir.json --no-defaults --var name=Ada --pretty");
     eprintln!("  crepus native codegen views/main.crepus --platform swiftui --out Generated --view-name DashboardView --var name=Ada");
     eprintln!("  crepus native codegen views/main.crepus --platform compose --out app/src/main/java/dev/example/generated --view-name DashboardView --var name=Ada");
-    eprintln!("  crepus native build ios --dir my-mobile-app");
+    eprintln!("  crepus native build ios --dir my-mobile-app --target simulator");
+    eprintln!(
+        "  crepus native build ios --dir my-mobile-app --target device --configuration Release"
+    );
     eprintln!("  crepus native build android --dir my-mobile-app --flavor Debug");
     eprintln!("  crepus native run android --dir my-mobile-app");
     eprintln!();
@@ -1373,6 +1441,26 @@ mod tests {
         assert_eq!(parse_flavor(&v), Some("Debug".to_string()));
         let v: Vec<String> = vec![];
         assert_eq!(parse_flavor(&v), None);
+    }
+
+    #[test]
+    fn parse_ios_target_handles_device_and_simulator() {
+        let v = vec!["--target".to_string(), "device".to_string()];
+        assert_eq!(parse_ios_target(&v), Some(IosBuildTarget::Device));
+        let v = vec!["--target=simulator".to_string()];
+        assert_eq!(parse_ios_target(&v), Some(IosBuildTarget::Simulator));
+        let v = vec!["--device".to_string()];
+        assert_eq!(parse_ios_target(&v), Some(IosBuildTarget::Device));
+    }
+
+    #[test]
+    fn parse_configuration_handles_both_styles() {
+        let v = vec!["--configuration".to_string(), "release".to_string()];
+        assert_eq!(parse_configuration(&v), Some("Release".to_string()));
+        let v = vec!["--configuration=Debug".to_string()];
+        assert_eq!(parse_configuration(&v), Some("Debug".to_string()));
+        let v: Vec<String> = vec![];
+        assert_eq!(parse_configuration(&v), None);
     }
 
     #[test]

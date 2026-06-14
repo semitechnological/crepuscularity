@@ -40,6 +40,11 @@ import androidx.compose.ui.unit.sp
 
 object CrepusActions {
     var dispatch: (String) -> String = { "{}" }
+    var resultSink: (String) -> Unit = {}
+
+    fun perform(action: String) {
+        resultSink(dispatch(action))
+    }
 }
 
 @Composable
@@ -66,10 +71,10 @@ fun CrepusGeneratedView(modifier: Modifier = Modifier) {
             Text("Ship one View IR tree to iOS and Android.", fontSize = 14.0.sp, color = Color(0xFFE5E7EB))
         }
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            Button(onClick = { CrepusActions.dispatch("sync") }, modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(Color(0xFFFFFFFF)).padding(16.dp)) {
+            Button(onClick = { CrepusActions.perform("sync") }, modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(Color(0xFFFFFFFF)).padding(16.dp)) {
                 Text("Sync")
             }
-            Button(onClick = { CrepusActions.dispatch("preview") }, modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(Color(0xFF334155)).padding(16.dp)) {
+            Button(onClick = { CrepusActions.perform("preview") }, modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(Color(0xFF334155)).padding(16.dp)) {
                 Text("Preview")
             }
         }
