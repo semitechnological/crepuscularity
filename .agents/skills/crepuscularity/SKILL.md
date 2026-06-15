@@ -1,4 +1,8 @@
 ```markdown
+---
+description: Development patterns and conventions for the crepuscularity Rust repository
+---
+
 # crepuscularity Development Patterns
 
 > Auto-generated skill from repository analysis
