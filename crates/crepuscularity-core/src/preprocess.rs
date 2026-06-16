@@ -625,6 +625,54 @@ mod tests {
     }
 
     #[test]
+    fn extract_head_block_basic() {
+        let input = "head\n  title \"Notes\"\n  meta charset=\"utf-8\"\n\ndiv wrap\n  \"content\"";
+        let (head, body) = extract_head_block(input);
+        assert_eq!(head.unwrap(), "title \"Notes\"\nmeta charset=\"utf-8\"\n");
+        assert_eq!(body, "# head block removed\ndiv wrap\n  \"content\"");
+    }
+
+    #[test]
+    fn extract_head_block_empty_head() {
+        let input = "head\ndiv wrap\n  \"content\"";
+        let (head, body) = extract_head_block(input);
+        assert_eq!(head, None);
+        assert_eq!(body, "# head block removed\ndiv wrap\n  \"content\"");
+    }
+
+    #[test]
+    fn extract_head_block_no_head() {
+        let input = "div wrap\n  \"content\"\n  p \"hello\"";
+        let (head, body) = extract_head_block(input);
+        assert_eq!(head, None);
+        assert_eq!(body, "div wrap\n  \"content\"\n  p \"hello\"");
+    }
+
+    #[test]
+    fn extract_head_block_with_comments_before() {
+        let input = "# a comment\n\nhead\n  title \"Notes\"\n\ndiv wrap";
+        let (head, body) = extract_head_block(input);
+        assert_eq!(head.unwrap(), "title \"Notes\"\n");
+        assert_eq!(body, "# head block removed\ndiv wrap");
+    }
+
+    #[test]
+    fn extract_head_block_only_head() {
+        let input = "head\n  title \"Notes\"";
+        let (head, body) = extract_head_block(input);
+        assert_eq!(head.unwrap(), "title \"Notes\"");
+        assert_eq!(body, "");
+    }
+
+    #[test]
+    fn extract_head_block_nested_indent() {
+        let input = "head\n  script\n    \"console.log('hi');\"\n\ndiv wrap";
+        let (head, body) = extract_head_block(input);
+        assert_eq!(head.unwrap(), "script\n  \"console.log('hi');\"\n");
+        assert_eq!(body, "# head block removed\ndiv wrap");
+    }
+
+    #[test]
     fn strips_fonts_and_aliases() {
         let s = r#"google-font Inter
 google-font JetBrains Mono
