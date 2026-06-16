@@ -98,3 +98,74 @@ pub fn clear() {
     FILE_CACHE.with(|cache| cache.borrow_mut().clear());
     CONTENT_CACHE.with(|cache| cache.borrow_mut().clear());
 }
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+    use tempfile::NamedTempFile;
+
+    #[test]
+    fn test_parse_content_cache() {
+        clear();
+        let content1 = "div\n  span Hello";
+        let content2 = "div\n  span World";
+
+        let ast1 = parse_content(content1).unwrap();
+        let ast1_cached = parse_content(content1).unwrap();
+        assert!(Arc::ptr_eq(&ast1, &ast1_cached), "Cache hit should return the same Arc");
+
+        let ast2 = parse_content(content2).unwrap();
+        assert!(!Arc::ptr_eq(&ast1, &ast2), "Different content should have different Arc");
+    }
+
+    #[test]
+    fn test_parse_file_cache() {
+        clear();
+        let mut file = NamedTempFile::new().unwrap();
+        write!(file, "div\n  span File").unwrap();
+        file.flush().unwrap();
+
+        let path = file.path().to_path_buf();
+
+        let ast1 = parse_file(&path).unwrap();
+        let ast1_cached = parse_file(&path).unwrap();
+        assert!(Arc::ptr_eq(&ast1, &ast1_cached), "Cache hit should return the same Arc");
+
+        // Wait a bit and modify file to change mtime and length
+        std::thread::sleep(std::time::Duration::from_millis(10));
+        write!(file, " Extra content").unwrap();
+        file.flush().unwrap();
+
+        let ast2 = parse_file(&path).unwrap();
+        assert!(!Arc::ptr_eq(&ast1, &ast2), "Cache should miss after file modification");
+    }
+
+    #[test]
+    fn test_invalidate_file() {
+        clear();
+        let mut file = NamedTempFile::new().unwrap();
+        write!(file, "div").unwrap();
+        file.flush().unwrap();
+
+        let path = file.path().to_path_buf();
+
+        let ast1 = parse_file(&path).unwrap();
+
+        invalidate_file(&path);
+
+        let ast2 = parse_file(&path).unwrap();
+        assert!(!Arc::ptr_eq(&ast1, &ast2), "Cache should miss after invalidation");
+    }
+
+    #[test]
+    fn test_clear() {
+        clear();
+        let content = "span Test";
+        let ast1 = parse_content(content).unwrap();
+
+        clear();
+
+        let ast2 = parse_content(content).unwrap();
+        assert!(!Arc::ptr_eq(&ast1, &ast2), "Cache should miss after clear");
+    }
+}
