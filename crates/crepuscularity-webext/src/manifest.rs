@@ -581,7 +581,7 @@ impl ManifestV3 {
             permissions,
             host_permissions,
             content_security_policy: Some(ContentSecurityPolicy {
-                extension_pages: "script-src 'self' 'wasm-unsafe-eval'; object-src 'self';"
+                extension_pages: "script-src 'self' 'wasm-unsafe-eval'; object-src 'none';"
                     .to_string(),
             }),
             background,
@@ -1002,7 +1002,7 @@ host-permissions = ["https://example.com/*"]
         let json = mv3.to_json();
         assert!(json.contains("\"manifest_version\": 3"));
         assert!(json.contains("wasm-unsafe-eval"));
-        assert!(json.contains("object-src 'self'"));
+        assert!(json.contains("object-src 'none'"));
     }
 
     #[test]
