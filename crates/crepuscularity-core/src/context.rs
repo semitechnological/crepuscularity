@@ -256,7 +256,10 @@ mod tests {
     #[test]
     fn test_value_to_str() {
         // Str
-        assert_eq!(value_to_str(&TemplateValue::Str("hello".to_string())), "hello");
+        assert_eq!(
+            value_to_str(&TemplateValue::Str("hello".to_string())),
+            "hello"
+        );
 
         // Int
         assert_eq!(value_to_str(&TemplateValue::Int(42)), "42");
@@ -265,8 +268,14 @@ mod tests {
         // Float
         assert_eq!(value_to_str(&TemplateValue::Float(42.0)), "42"); // Integer-like float
         assert_eq!(value_to_str(&TemplateValue::Float(42.5)), "42.5"); // Regular float
-        assert_eq!(value_to_str(&TemplateValue::Float(1e16)), "10000000000000000"); // Large integer-like float >= 1e15
-        assert_eq!(value_to_str(&TemplateValue::Float(1e20)), "100000000000000000000");
+        assert_eq!(
+            value_to_str(&TemplateValue::Float(1e16)),
+            "10000000000000000"
+        ); // Large integer-like float >= 1e15
+        assert_eq!(
+            value_to_str(&TemplateValue::Float(1e20)),
+            "100000000000000000000"
+        );
 
         // Bool
         assert_eq!(value_to_str(&TemplateValue::Bool(true)), "true");
@@ -277,9 +286,18 @@ mod tests {
 
         // List
         assert_eq!(value_to_str(&TemplateValue::List(vec![])), "[0 items]");
-        assert_eq!(value_to_str(&TemplateValue::List(vec![TemplateContext::new(), TemplateContext::new()])), "[2 items]");
+        assert_eq!(
+            value_to_str(&TemplateValue::List(vec![
+                TemplateContext::new(),
+                TemplateContext::new()
+            ])),
+            "[2 items]"
+        );
 
         // Scope
-        assert_eq!(value_to_str(&TemplateValue::Scope(TemplateContext::new())), "");
+        assert_eq!(
+            value_to_str(&TemplateValue::Scope(TemplateContext::new())),
+            ""
+        );
     }
 }
