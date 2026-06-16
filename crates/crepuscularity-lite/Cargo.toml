@@ -43,6 +43,7 @@ clap = { version = "4.5", optional = true, features = ["derive"] }
 crossterm = { version = "0.28", optional = true }
 ratatui = { version = "0.30", optional = true }
 rayon = { version = "1", optional = true }
+which = "8.0.3"
 
 [[bin]]
 name = "crepus-bench"
