@@ -117,6 +117,136 @@ fn host_element_id(key: &str) -> (&'static str, u64) {
     ("host", hasher.finish())
 }
 
+fn render_scroll_view(
+    base: gpui::Div,
+    node: &HostNode,
+    entity: &Entity<LiteRoot>,
+    node_id: &str,
+) -> AnyElement {
+    base.id(host_element_id(node_id))
+        .overflow_scroll()
+        .children(render_host_children(&node.children, entity))
+        .into_any_element()
+}
+
+fn render_button(
+    base: gpui::Div,
+    node: &HostNode,
+    entity: &Entity<LiteRoot>,
+    node_id: &str,
+) -> AnyElement {
+    let mut button = base
+        .id(host_element_id(node_id))
+        .cursor_pointer()
+        .flex()
+        .items_center()
+        .justify_center()
+        .rounded_md()
+        .px_4()
+        .py_2();
+    if node.style.background.is_none() {
+        button = button.bg(rgb(0x2563eb));
+    }
+    if node.style.color.is_none() {
+        button = button.text_color(rgb(0xf8fafc));
+    }
+    let label = node
+        .title
+        .as_ref()
+        .or(node.text.as_ref())
+        .cloned()
+        .unwrap_or_else(|| "Button".to_string());
+    if let Some(handler_id) = node.on_press.clone() {
+        let click_entity = entity.clone();
+        button = button.on_click(move |_: &ClickEvent, window: &mut Window, app: &mut App| {
+            let payload = json!({ "source": "press" });
+            app.update_entity(&click_entity, |root, cx| {
+                root.dispatch_host_event(&handler_id, payload, window, cx);
+            });
+        });
+    }
+    button.child(label).into_any_element()
+}
+
+fn render_text_input(
+    base: gpui::Div,
+    node: &HostNode,
+    entity: &Entity<LiteRoot>,
+    node_id: &str,
+) -> AnyElement {
+    let mut field = base
+        .id(host_element_id(node_id))
+        .rounded_md()
+        .border_1()
+        .border_color(rgb(0x334155))
+        .bg(rgb(0x020617))
+        .px_3()
+        .py_2();
+    let content = node
+        .value
+        .as_ref()
+        .filter(|value| !value.is_empty())
+        .cloned()
+        .or_else(|| node.placeholder.as_ref().map(|value| format!("<{value}>")))
+        .unwrap_or_else(|| "<input>".to_string());
+    if let Some(handler_id) = node.on_press.clone() {
+        let click_entity = entity.clone();
+        field = field.cursor_pointer().on_click(
+            move |_: &ClickEvent, window: &mut Window, app: &mut App| {
+                let payload = json!({ "source": "focus" });
+                app.update_entity(&click_entity, |root, cx| {
+                    root.dispatch_host_event(&handler_id, payload, window, cx);
+                });
+            },
+        );
+    }
+    field.child(content).into_any_element()
+}
+
+fn render_container(
+    base: gpui::Div,
+    node: &HostNode,
+    entity: &Entity<LiteRoot>,
+    node_id: &str,
+) -> AnyElement {
+    let mut container = if node.style.direction.is_none() {
+        base.id(host_element_id(node_id)).flex().flex_col()
+    } else {
+        base.id(host_element_id(node_id))
+    };
+    if let Some(handler_id) = node.on_press.clone() {
+        let click_entity = entity.clone();
+        container = container.cursor_pointer().on_click(
+            move |_: &ClickEvent, window: &mut Window, app: &mut App| {
+                let payload = json!({ "source": "press" });
+                app.update_entity(&click_entity, |root, cx| {
+                    root.dispatch_host_event(&handler_id, payload, window, cx);
+                });
+            },
+        );
+    }
+    if let Some(handler_id) = node.on_key_down.clone() {
+        let key_entity = entity.clone();
+        container = container.on_key_down(
+            move |event: &KeyDownEvent, window: &mut Window, app: &mut App| {
+                let payload = json!({
+                    "kind": "keyDown",
+                    "keystroke": event.keystroke.to_string(),
+                });
+                app.update_entity(&key_entity, |root, cx| {
+                    root.dispatch_host_event(&handler_id, payload, window, cx);
+                });
+            },
+        );
+    }
+    if let Some(text) = &node.text {
+        container = container.child(text.clone());
+    }
+    container
+        .children(render_host_children(&node.children, entity))
+        .into_any_element()
+}
+
 fn render_host_node(node: &HostNode, entity: Entity<LiteRoot>) -> AnyElement {
     let mut base = apply_host_style(div(), &node.style);
     base = add_gap(base, node.style.gap);
@@ -129,115 +259,13 @@ fn render_host_node(node: &HostNode, entity: Entity<LiteRoot>) -> AnyElement {
         .unwrap_or_else(|| format!("host-{}", node.node_type.to_lowercase()));
 
     match node.node_type.as_str() {
-        "ScrollView" => base
-            .id(host_element_id(&node_id))
-            .overflow_scroll()
-            .children(render_host_children(&node.children, &entity))
-            .into_any_element(),
-        "Button" => {
-            let mut button = base
-                .id(host_element_id(&node_id))
-                .cursor_pointer()
-                .flex()
-                .items_center()
-                .justify_center()
-                .rounded_md()
-                .px_4()
-                .py_2();
-            if node.style.background.is_none() {
-                button = button.bg(rgb(0x2563eb));
-            }
-            if node.style.color.is_none() {
-                button = button.text_color(rgb(0xf8fafc));
-            }
-            let label = node
-                .title
-                .as_ref()
-                .or(node.text.as_ref())
-                .cloned()
-                .unwrap_or_else(|| "Button".to_string());
-            if let Some(handler_id) = node.on_press.clone() {
-                let click_entity = entity.clone();
-                button =
-                    button.on_click(move |_: &ClickEvent, window: &mut Window, app: &mut App| {
-                        let payload = json!({ "source": "press" });
-                        app.update_entity(&click_entity, |root, cx| {
-                            root.dispatch_host_event(&handler_id, payload, window, cx);
-                        });
-                    });
-            }
-            button.child(label).into_any_element()
-        }
+        "ScrollView" => render_scroll_view(base, node, &entity, &node_id),
+        "Button" => render_button(base, node, &entity, &node_id),
         "Text" => base
             .child(node.text.clone().unwrap_or_default())
             .into_any_element(),
-        "TextInput" => {
-            let mut field = base
-                .id(host_element_id(&node_id))
-                .rounded_md()
-                .border_1()
-                .border_color(rgb(0x334155))
-                .bg(rgb(0x020617))
-                .px_3()
-                .py_2();
-            let content = node
-                .value
-                .as_ref()
-                .filter(|value| !value.is_empty())
-                .cloned()
-                .or_else(|| node.placeholder.as_ref().map(|value| format!("<{value}>")))
-                .unwrap_or_else(|| "<input>".to_string());
-            if let Some(handler_id) = node.on_press.clone() {
-                let click_entity = entity.clone();
-                field = field.cursor_pointer().on_click(
-                    move |_: &ClickEvent, window: &mut Window, app: &mut App| {
-                        let payload = json!({ "source": "focus" });
-                        app.update_entity(&click_entity, |root, cx| {
-                            root.dispatch_host_event(&handler_id, payload, window, cx);
-                        });
-                    },
-                );
-            }
-            field.child(content).into_any_element()
-        }
-        _ => {
-            let mut container = if node.style.direction.is_none() {
-                base.id(host_element_id(&node_id)).flex().flex_col()
-            } else {
-                base.id(host_element_id(&node_id))
-            };
-            if let Some(handler_id) = node.on_press.clone() {
-                let click_entity = entity.clone();
-                container = container.cursor_pointer().on_click(
-                    move |_: &ClickEvent, window: &mut Window, app: &mut App| {
-                        let payload = json!({ "source": "press" });
-                        app.update_entity(&click_entity, |root, cx| {
-                            root.dispatch_host_event(&handler_id, payload, window, cx);
-                        });
-                    },
-                );
-            }
-            if let Some(handler_id) = node.on_key_down.clone() {
-                let key_entity = entity.clone();
-                container = container.on_key_down(
-                    move |event: &KeyDownEvent, window: &mut Window, app: &mut App| {
-                        let payload = json!({
-                            "kind": "keyDown",
-                            "keystroke": event.keystroke.to_string(),
-                        });
-                        app.update_entity(&key_entity, |root, cx| {
-                            root.dispatch_host_event(&handler_id, payload, window, cx);
-                        });
-                    },
-                );
-            }
-            if let Some(text) = &node.text {
-                container = container.child(text.clone());
-            }
-            container
-                .children(render_host_children(&node.children, &entity))
-                .into_any_element()
-        }
+        "TextInput" => render_text_input(base, node, &entity, &node_id),
+        _ => render_container(base, node, &entity, &node_id),
     }
 }
 
