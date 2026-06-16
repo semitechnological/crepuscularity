@@ -284,6 +284,173 @@ enum Screen {
     },
 }
 
+fn draw_ui(f: &mut Frame, screen: &Screen, sort_mode: &SortBy, repo: &Path, menu_items: &[&str]) {
+    let area = f.area();
+    match screen {
+        Screen::Menu { idx } => {
+            let list_items: Vec<ListItem> = menu_items
+                .iter()
+                .enumerate()
+                .map(|(i, s)| {
+                    let style = if i == *idx {
+                        Style::default().black().on_cyan()
+                    } else {
+                        Style::default()
+                    };
+                    ListItem::new(Line::from((*s).to_string()).style(style))
+                })
+                .collect();
+            let list = List::new(list_items).block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title(" crepus-bench — ↑/↓ enter — q quit "),
+            );
+            let hint = Paragraph::new(Line::from(format!(
+                "repo: {} │ sort preset: {:?}",
+                repo.display(),
+                sort_mode,
+            )))
+            .block(Block::default().borders(Borders::ALL).title(" status "));
+            let chunks = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([Constraint::Min(8), Constraint::Length(3)])
+                .split(area);
+            f.render_widget(list, chunks[0]);
+            f.render_widget(hint, chunks[1]);
+        }
+        Screen::Matrix {
+            rows,
+            sort,
+            parallel,
+        } => {
+            let header = Row::new(vec!["guestStarter", "ms", "score", "note"]);
+            let table_rows: Vec<Row> = rows
+                .iter()
+                .map(|r| {
+                    if let Some(e) = &r.err {
+                        Row::new(vec![r.label.clone(), "—".into(), "—".into(), e.clone()])
+                    } else {
+                        Row::new(vec![
+                            r.label.clone(),
+                            format!("{:.3}", r.sort_ms),
+                            format!("{}", r.sort_score as i64),
+                            "ok".into(),
+                        ])
+                    }
+                })
+                .collect();
+            let t = Table::new(
+                table_rows,
+                [
+                    Constraint::Length(14),
+                    Constraint::Length(12),
+                    Constraint::Length(12),
+                    Constraint::Min(20),
+                ],
+            )
+            .header(header)
+            .block(Block::default().borders(Borders::ALL).title(format!(
+                " V8 matrix parallel={parallel} sort={sort:?} — b menu — q quit "
+            )));
+            f.render_widget(t, area);
+        }
+        Screen::Log { title, body } => {
+            let p = Paragraph::new(body.as_str())
+                .block(Block::default().borders(Borders::ALL).title(title.as_str()));
+            f.render_widget(p, area);
+        }
+    }
+}
+
+fn handle_key_event(
+    key: event::KeyEvent,
+    screen: &mut Screen,
+    sort_mode: &mut SortBy,
+    repo: &Path,
+    menu_items: &[&str],
+) -> bool {
+    if key.kind != KeyEventKind::Press {
+        return false;
+    }
+
+    match screen {
+        Screen::Menu { idx } => match key.code {
+            KeyCode::Char('q') => return true,
+            KeyCode::Up => *idx = idx.saturating_sub(1),
+            KeyCode::Down => *idx = (*idx + 1).min(menu_items.len() - 1),
+            KeyCode::Enter => match *idx {
+                0 => {
+                    let rows = collect_matrix(repo, true, *sort_mode);
+                    *screen = Screen::Matrix {
+                        rows,
+                        sort: *sort_mode,
+                        parallel: true,
+                    };
+                }
+                1 => {
+                    let rows = collect_matrix(repo, false, *sort_mode);
+                    *screen = Screen::Matrix {
+                        rows,
+                        sort: *sort_mode,
+                        parallel: false,
+                    };
+                }
+                2 => {
+                    *sort_mode = SortBy::Ms;
+                }
+                3 => {
+                    *sort_mode = SortBy::ScoreAsc;
+                }
+                4 => {
+                    *sort_mode = SortBy::ScoreDesc;
+                }
+                5 => {
+                    let body = run_compare_sh(repo, "disk").unwrap_or_else(|e| e.to_string());
+                    *screen = Screen::Log {
+                        title: "compare.sh disk".into(),
+                        body,
+                    };
+                }
+                6 => {
+                    let body = run_compare_sh(repo, "memory").unwrap_or_else(|e| e.to_string());
+                    *screen = Screen::Log {
+                        title: "compare.sh memory".into(),
+                        body,
+                    };
+                }
+                7 => return true,
+                _ => {}
+            },
+            KeyCode::Esc => return true,
+            _ => {}
+        },
+        Screen::Matrix {
+            rows,
+            sort,
+            parallel,
+        } => match key.code {
+            KeyCode::Char('q') => return true,
+            KeyCode::Char('b') => {
+                *screen = Screen::Menu { idx: 0 };
+            }
+            KeyCode::Char('r') => {
+                // re-run with current sort / parallel
+                let new_rows = collect_matrix(repo, *parallel, *sort);
+                *rows = new_rows;
+            }
+            _ => {}
+        },
+        Screen::Log { .. } => match key.code {
+            KeyCode::Char('q') => return true,
+            KeyCode::Char('b') | KeyCode::Esc => {
+                *screen = Screen::Menu { idx: 0 };
+            }
+            _ => {}
+        },
+    }
+    false
+}
+
 fn run_tui(repo: PathBuf) -> io::Result<()> {
     enable_raw_mode()?;
     let mut out = stdout();
@@ -306,81 +473,7 @@ fn run_tui(repo: PathBuf) -> io::Result<()> {
 
     loop {
         terminal.draw(|f| {
-            let area = f.area();
-            match &screen {
-                Screen::Menu { idx } => {
-                    let list_items: Vec<ListItem> = menu_items
-                        .iter()
-                        .enumerate()
-                        .map(|(i, s)| {
-                            let style = if i == *idx {
-                                Style::default().black().on_cyan()
-                            } else {
-                                Style::default()
-                            };
-                            ListItem::new(Line::from((*s).to_string()).style(style))
-                        })
-                        .collect();
-                    let list = List::new(list_items).block(
-                        Block::default()
-                            .borders(Borders::ALL)
-                            .title(" crepus-bench — ↑/↓ enter — q quit "),
-                    );
-                    let hint = Paragraph::new(Line::from(format!(
-                        "repo: {} │ sort preset: {:?}",
-                        repo.display(),
-                        sort_mode,
-                    )))
-                    .block(Block::default().borders(Borders::ALL).title(" status "));
-                    let chunks = Layout::default()
-                        .direction(Direction::Vertical)
-                        .constraints([Constraint::Min(8), Constraint::Length(3)])
-                        .split(area);
-                    f.render_widget(list, chunks[0]);
-                    f.render_widget(hint, chunks[1]);
-                }
-                Screen::Matrix {
-                    rows,
-                    sort,
-                    parallel,
-                } => {
-                    let header = Row::new(vec!["guestStarter", "ms", "score", "note"]);
-                    let table_rows: Vec<Row> = rows
-                        .iter()
-                        .map(|r| {
-                            if let Some(e) = &r.err {
-                                Row::new(vec![r.label.clone(), "—".into(), "—".into(), e.clone()])
-                            } else {
-                                Row::new(vec![
-                                    r.label.clone(),
-                                    format!("{:.3}", r.sort_ms),
-                                    format!("{}", r.sort_score as i64),
-                                    "ok".into(),
-                                ])
-                            }
-                        })
-                        .collect();
-                    let t = Table::new(
-                        table_rows,
-                        [
-                            Constraint::Length(14),
-                            Constraint::Length(12),
-                            Constraint::Length(12),
-                            Constraint::Min(20),
-                        ],
-                    )
-                    .header(header)
-                    .block(Block::default().borders(Borders::ALL).title(format!(
-                        " V8 matrix parallel={parallel} sort={sort:?} — b menu — q quit "
-                    )));
-                    f.render_widget(t, area);
-                }
-                Screen::Log { title, body } => {
-                    let p = Paragraph::new(body.as_str())
-                        .block(Block::default().borders(Borders::ALL).title(title.as_str()));
-                    f.render_widget(p, area);
-                }
-            }
+            draw_ui(f, &screen, &sort_mode, &repo, &menu_items);
         })?;
 
         if !event::poll(Duration::from_millis(200))? {
@@ -389,85 +482,9 @@ fn run_tui(repo: PathBuf) -> io::Result<()> {
         let Event::Key(key) = event::read()? else {
             continue;
         };
-        if key.kind != KeyEventKind::Press {
-            continue;
-        }
 
-        match &mut screen {
-            Screen::Menu { idx } => match key.code {
-                KeyCode::Char('q') => break,
-                KeyCode::Up => *idx = idx.saturating_sub(1),
-                KeyCode::Down => *idx = (*idx + 1).min(menu_items.len() - 1),
-                KeyCode::Enter => match *idx {
-                    0 => {
-                        let rows = collect_matrix(&repo, true, sort_mode);
-                        screen = Screen::Matrix {
-                            rows,
-                            sort: sort_mode,
-                            parallel: true,
-                        };
-                    }
-                    1 => {
-                        let rows = collect_matrix(&repo, false, sort_mode);
-                        screen = Screen::Matrix {
-                            rows,
-                            sort: sort_mode,
-                            parallel: false,
-                        };
-                    }
-                    2 => {
-                        sort_mode = SortBy::Ms;
-                    }
-                    3 => {
-                        sort_mode = SortBy::ScoreAsc;
-                    }
-                    4 => {
-                        sort_mode = SortBy::ScoreDesc;
-                    }
-                    5 => {
-                        let body = run_compare_sh(&repo, "disk").unwrap_or_else(|e| e.to_string());
-                        screen = Screen::Log {
-                            title: "compare.sh disk".into(),
-                            body,
-                        };
-                    }
-                    6 => {
-                        let body =
-                            run_compare_sh(&repo, "memory").unwrap_or_else(|e| e.to_string());
-                        screen = Screen::Log {
-                            title: "compare.sh memory".into(),
-                            body,
-                        };
-                    }
-                    7 => break,
-                    _ => {}
-                },
-                KeyCode::Esc => break,
-                _ => {}
-            },
-            Screen::Matrix {
-                rows,
-                sort,
-                parallel,
-            } => match key.code {
-                KeyCode::Char('q') => break,
-                KeyCode::Char('b') => {
-                    screen = Screen::Menu { idx: 0 };
-                }
-                KeyCode::Char('r') => {
-                    // re-run with current sort / parallel
-                    let new_rows = collect_matrix(&repo, *parallel, *sort);
-                    *rows = new_rows;
-                }
-                _ => {}
-            },
-            Screen::Log { .. } => match key.code {
-                KeyCode::Char('q') => break,
-                KeyCode::Char('b') | KeyCode::Esc => {
-                    screen = Screen::Menu { idx: 0 };
-                }
-                _ => {}
-            },
+        if handle_key_event(key, &mut screen, &mut sort_mode, &repo, &menu_items) {
+            break;
         }
     }
 
