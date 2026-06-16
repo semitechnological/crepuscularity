@@ -57,6 +57,40 @@ pub(crate) enum AnyNode {
     Effect(EffectNode),
 }
 
+impl AnyNode {
+    pub(crate) fn subscribers(&self) -> Option<&[NodeId]> {
+        match self {
+            AnyNode::Signal(s) => Some(&s.subscribers),
+            AnyNode::Memo(m) => Some(&m.subscribers),
+            AnyNode::Effect(_) => None,
+        }
+    }
+
+    pub(crate) fn subscribers_mut(&mut self) -> Option<&mut Vec<NodeId>> {
+        match self {
+            AnyNode::Signal(s) => Some(&mut s.subscribers),
+            AnyNode::Memo(m) => Some(&mut m.subscribers),
+            AnyNode::Effect(_) => None,
+        }
+    }
+
+    pub(crate) fn sources(&self) -> Option<&[NodeId]> {
+        match self {
+            AnyNode::Memo(m) => Some(&m.sources),
+            AnyNode::Effect(e) => Some(&e.sources),
+            AnyNode::Signal(_) => None,
+        }
+    }
+
+    pub(crate) fn sources_mut(&mut self) -> Option<&mut Vec<NodeId>> {
+        match self {
+            AnyNode::Memo(m) => Some(&mut m.sources),
+            AnyNode::Effect(e) => Some(&mut e.sources),
+            AnyNode::Signal(_) => None,
+        }
+    }
+}
+
 thread_local! {
     pub(crate) static RUNTIME: std::cell::RefCell<ReactiveRuntime> =
         std::cell::RefCell::new(ReactiveRuntime::new());
@@ -97,30 +131,30 @@ pub(crate) fn enter_observer(id: NodeId) -> ObserverGuard {
 pub(crate) fn clear_observer_sources(id: NodeId) {
     let old_sources = NODES.with(|nodes| {
         let nodes = nodes.borrow();
-        match nodes.get(&id) {
-            Some(AnyNode::Memo(m)) => m.sources.clone(),
-            Some(AnyNode::Effect(e)) => e.sources.clone(),
-            _ => vec![],
-        }
+        nodes
+            .get(&id)
+            .and_then(|n| n.sources())
+            .map(|s| s.to_vec())
+            .unwrap_or_default()
     });
 
     for source_id in &old_sources {
         NODES.with(|nodes| {
             let mut nodes = nodes.borrow_mut();
-            match nodes.get_mut(source_id) {
-                Some(AnyNode::Signal(s)) => s.subscribers.retain(|&x| x != id),
-                Some(AnyNode::Memo(m)) => m.subscribers.retain(|&x| x != id),
-                _ => {}
+            if let Some(node) = nodes.get_mut(source_id) {
+                if let Some(subs) = node.subscribers_mut() {
+                    subs.retain(|&x| x != id);
+                }
             }
         });
     }
 
     NODES.with(|nodes| {
         let mut nodes = nodes.borrow_mut();
-        match nodes.get_mut(&id) {
-            Some(AnyNode::Memo(m)) => m.sources.clear(),
-            Some(AnyNode::Effect(e)) => e.sources.clear(),
-            _ => {}
+        if let Some(node) = nodes.get_mut(&id) {
+            if let Some(sources) = node.sources_mut() {
+                sources.clear();
+            }
         }
     });
 }
@@ -138,10 +172,8 @@ pub(crate) fn remove_node(id: NodeId) {
         let mut nodes = nodes.borrow_mut();
         nodes.remove(&id);
         for node in nodes.values_mut() {
-            match node {
-                AnyNode::Signal(signal) => signal.subscribers.retain(|&x| x != id),
-                AnyNode::Memo(memo) => memo.subscribers.retain(|&x| x != id),
-                AnyNode::Effect(_) => {}
+            if let Some(subs) = node.subscribers_mut() {
+                subs.retain(|&x| x != id);
             }
         }
     });
@@ -157,25 +189,21 @@ pub(crate) fn track_read(source_id: NodeId) {
         let mut nodes = nodes.borrow_mut();
 
         // Add source_id to observer's sources list
-        match nodes.get_mut(&observer_id) {
-            Some(AnyNode::Memo(m)) if !m.sources.contains(&source_id) => {
-                m.sources.push(source_id);
+        if let Some(node) = nodes.get_mut(&observer_id) {
+            if let Some(sources) = node.sources_mut() {
+                if !sources.contains(&source_id) {
+                    sources.push(source_id);
+                }
             }
-            Some(AnyNode::Effect(e)) if !e.sources.contains(&source_id) => {
-                e.sources.push(source_id);
-            }
-            _ => {}
         }
 
         // Add observer_id to source's subscribers list
-        match nodes.get_mut(&source_id) {
-            Some(AnyNode::Signal(s)) if !s.subscribers.contains(&observer_id) => {
-                s.subscribers.push(observer_id);
+        if let Some(node) = nodes.get_mut(&source_id) {
+            if let Some(subs) = node.subscribers_mut() {
+                if !subs.contains(&observer_id) {
+                    subs.push(observer_id);
+                }
             }
-            Some(AnyNode::Memo(m)) if !m.subscribers.contains(&observer_id) => {
-                m.subscribers.push(observer_id);
-            }
-            _ => {}
         }
     });
 }
@@ -184,11 +212,11 @@ pub(crate) fn track_read(source_id: NodeId) {
 pub(crate) fn mark_subscribers_dirty(source_id: NodeId) {
     let subscribers = NODES.with(|nodes| {
         let nodes = nodes.borrow();
-        match nodes.get(&source_id) {
-            Some(AnyNode::Signal(s)) => s.subscribers.clone(),
-            Some(AnyNode::Memo(m)) => m.subscribers.clone(),
-            _ => vec![],
-        }
+        nodes
+            .get(&source_id)
+            .and_then(|n| n.subscribers())
+            .map(|s| s.to_vec())
+            .unwrap_or_default()
     });
 
     for sub_id in subscribers {
