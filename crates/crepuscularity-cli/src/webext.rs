@@ -985,17 +985,56 @@ try {{
       const output = await render({{}});
       const root = document.getElementById("root");
       if (root) {{
-        if (typeof output === "string") {{
-          root.innerHTML = output;
-        }} else {{
-          const html = output?.html ?? output?.get?.("html");
-          const cssText = output?.css ?? output?.get?.("css");
-          if (typeof html === "string") {{
-            const css = cssText ? `<style>${{cssText}}</style>` : "";
-            root.innerHTML = `${{css}}${{html}}`;
-          }} else {{
-            root.textContent = JSON.stringify(output ?? null);
+        const rawHtml = typeof output === "string" ? output : (output?.html ?? output?.get?.("html"));
+        const cssText = typeof output === "string" ? "" : (output?.css ?? output?.get?.("css"));
+        if (typeof rawHtml === "string") {{
+          const css = cssText ? `<style>${{cssText}}</style>` : "";
+          const combined = typeof output === "string" ? output : `${{css}}${{rawHtml}}`;
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(combined, "text/html");
+
+          const scripts = doc.querySelectorAll("script");
+          for (let i = 0; i < scripts.length; i++) {{
+            scripts[i].remove();
           }}
+
+          const allElements = doc.querySelectorAll("*");
+          for (let i = 0; i < allElements.length; i++) {{
+            const el = allElements[i];
+
+            if (el.tagName === "IFRAME" || el.tagName === "OBJECT" || el.tagName === "EMBED" || el.tagName === "APPLET" || el.tagName === "MATH" || el.tagName === "SVG" || el.tagName === "META" || el.tagName === "BASE") {{
+              el.remove();
+              continue;
+            }}
+
+            const attrs = el.attributes;
+            for (let j = attrs.length - 1; j >= 0; j--) {{
+              const attrName = attrs[j].name.toLowerCase();
+              const attrValue = attrs[j].value.toLowerCase().trim();
+              if (attrName.startsWith("on")) {{
+                el.removeAttribute(attrs[j].name);
+              }} else if ((attrName === "src" || attrName === "href" || attrName === "data") && (attrValue.startsWith("javascript:") || attrValue.startsWith("data:text/html") || attrValue.startsWith("vbscript:"))) {{
+                el.removeAttribute(attrs[j].name);
+              }}
+            }}
+          }}
+
+          const nodes = [];
+          if (doc.head) {{
+            const children = Array.from(doc.head.childNodes);
+            for (let i = 0; i < children.length; i++) {{
+              nodes.push(children[i]);
+            }}
+          }}
+          if (doc.body) {{
+            const children = Array.from(doc.body.childNodes);
+            for (let i = 0; i < children.length; i++) {{
+              nodes.push(children[i]);
+            }}
+          }}
+          root.replaceChildren(...nodes);
+        }} else {{
+          root.textContent = JSON.stringify(output ?? null);
         }}
       }}
     }}
