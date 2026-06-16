@@ -112,15 +112,19 @@ fn collect_nodes(nodes: &[Node], out: &mut BTreeMap<String, WebIslandRef>) {
             }
             Node::Include(include) => collect_nodes(&include.slot, out),
             Node::Embed(embed) => {
-                let adapter = embed
-                    .adapter
-                    .clone()
-                    .unwrap_or_else(|| "module".to_string());
-                out.entry(embed.src.clone())
-                    .or_insert_with(|| WebIslandRef {
-                        src: embed.src.clone(),
-                        adapter,
-                    });
+                if !out.contains_key(&embed.src) {
+                    let adapter = embed
+                        .adapter
+                        .clone()
+                        .unwrap_or_else(|| "module".to_string());
+                    out.insert(
+                        embed.src.clone(),
+                        WebIslandRef {
+                            src: embed.src.clone(),
+                            adapter,
+                        },
+                    );
+                }
             }
             Node::Text(_) | Node::LetDecl(_) | Node::RawText(_) | Node::RawHtml(_) => {}
         }
