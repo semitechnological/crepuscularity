@@ -16,6 +16,7 @@ concurrency:
 env:
   CARGO_TERM_COLOR: always
   WASM_BINDGEN_VERSION: 0.2.121
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   test:
@@ -175,6 +176,7 @@ jobs:
       - name: Install V
         run: |
           git clone --depth 1 https://github.com/vlang/v.git /tmp/v
+          sed -i.bak 's|https://github.com/vlang/vc|https://github.com/vlang/vc.git|g' /tmp/v/Makefile
           make -C /tmp/v
           echo "/tmp/v" >> "$GITHUB_PATH"
 
