@@ -11,22 +11,30 @@ use std::path::PathBuf;
 use crepuscularity_runtime::{HotReloadState, HotReloadView, TemplateContext, TemplateValue};
 use gpui::{bounds, point, prelude::*, size, Application, WindowOptions};
 
-fn main() {
-    let args: Vec<String> = std::env::args().collect();
+struct DevConfig {
+    template_path: PathBuf,
+    width: f32,
+    height: f32,
+    ctx: TemplateContext,
+}
 
-    // Parse args: crepus-dev <file> [--width N] [--height N] [--var key=value ...]
+fn print_usage() {
+    eprintln!("Usage: crepus-dev <template.crepus> [--width N] [--height N] [--var key=value]");
+    eprintln!();
+    eprintln!("Options:");
+    eprintln!("  --width N      Window width in pixels (default: 1200)");
+    eprintln!("  --height N     Window height in pixels (default: 800)");
+    eprintln!("  --var k=v      Set a string template variable (repeatable)");
+    eprintln!("  --bool k=true  Set a boolean template variable");
+    eprintln!("  --int k=42     Set an integer template variable");
+    eprintln!();
+    eprintln!("Example:");
+    eprintln!("  crepus-dev my-view.crepus --width 800 --height 600 --var title=Hello --bool show_button=true");
+}
+
+fn parse_args(args: &[String]) -> DevConfig {
     if args.len() < 2 || args[1] == "--help" || args[1] == "-h" {
-        eprintln!("Usage: crepus-dev <template.crepus> [--width N] [--height N] [--var key=value]");
-        eprintln!();
-        eprintln!("Options:");
-        eprintln!("  --width N      Window width in pixels (default: 1200)");
-        eprintln!("  --height N     Window height in pixels (default: 800)");
-        eprintln!("  --var k=v      Set a string template variable (repeatable)");
-        eprintln!("  --bool k=true  Set a boolean template variable");
-        eprintln!("  --int k=42     Set an integer template variable");
-        eprintln!();
-        eprintln!("Example:");
-        eprintln!("  crepus-dev my-view.crepus --width 800 --height 600 --var title=Hello --bool show_button=true");
+        print_usage();
         std::process::exit(0);
     }
 
@@ -100,14 +108,30 @@ fn main() {
         }
     }
 
-    let display_name = template_path
+    DevConfig {
+        template_path,
+        width,
+        height,
+        ctx,
+    }
+}
+
+fn main() {
+    let args: Vec<String> = std::env::args().collect();
+    let config = parse_args(&args);
+
+    let display_name = config
+        .template_path
         .file_name()
         .and_then(|n| n.to_str())
         .unwrap_or("template")
         .to_string();
 
-    eprintln!("crepus-dev: watching {:?}", template_path);
-    eprintln!("crepus-dev: window {}x{}", width as u32, height as u32);
+    eprintln!("crepus-dev: watching {:?}", config.template_path);
+    eprintln!(
+        "crepus-dev: window {}x{}",
+        config.width as u32, config.height as u32
+    );
     eprintln!("crepus-dev: edit and save to hot-reload");
 
     Application::new().run(move |cx: &mut gpui::App| {
@@ -119,13 +143,13 @@ fn main() {
             }),
             window_bounds: Some(gpui::WindowBounds::Windowed(bounds(
                 point(gpui::px(100.), gpui::px(100.)),
-                size(gpui::px(width), gpui::px(height)),
+                size(gpui::px(config.width), gpui::px(config.height)),
             ))),
             ..Default::default()
         };
 
-        let path = template_path.clone();
-        let ctx = ctx.clone();
+        let path = config.template_path.clone();
+        let ctx = config.ctx.clone();
 
         cx.open_window(window_options, move |_window, cx| {
             let state = cx.new(|cx| HotReloadState::new(path.clone(), ctx.clone(), cx));
