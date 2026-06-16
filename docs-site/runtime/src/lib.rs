@@ -454,45 +454,63 @@ fn url_encode_path_segment(value: &str) -> String {
 }
 
 #[cfg(target_arch = "wasm32")]
-fn schedule_initial_downloads_refresh(delay_ms: i32, remaining_attempts: u32) {
+fn set_window_timeout<F>(callback: F, timeout_ms: i32)
+where
+    F: FnMut() + 'static,
+{
     use wasm_bindgen::{closure::Closure, JsCast};
+    if let Some(window) = web_sys::window() {
+        let closure = Closure::<dyn FnMut()>::wrap(Box::new(callback));
+        let _ = window.set_timeout_with_callback_and_timeout_and_arguments_0(
+            closure.as_ref().unchecked_ref(),
+            timeout_ms,
+        );
+        closure.forget();
+    }
+}
 
-    let Some(window) = web_sys::window() else {
-        return;
-    };
-    let callback = Closure::<dyn FnMut()>::wrap(Box::new(move || {
-        if downloads_root().ok().flatten().is_some() {
-            wasm_bindgen_futures::spawn_local(async {
-                let _ = refresh_downloads().await;
-            });
-        } else if remaining_attempts > 0 {
-            schedule_initial_downloads_refresh(INITIAL_RETRY_MS, remaining_attempts - 1);
-        }
-    }));
-    let _ = window.set_timeout_with_callback_and_timeout_and_arguments_0(
-        callback.as_ref().unchecked_ref(),
+#[cfg(target_arch = "wasm32")]
+fn set_window_interval<F>(callback: F, timeout_ms: i32)
+where
+    F: FnMut() + 'static,
+{
+    use wasm_bindgen::{closure::Closure, JsCast};
+    if let Some(window) = web_sys::window() {
+        let closure = Closure::<dyn FnMut()>::wrap(Box::new(callback));
+        let _ = window.set_interval_with_callback_and_timeout_and_arguments_0(
+            closure.as_ref().unchecked_ref(),
+            timeout_ms,
+        );
+        closure.forget();
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+fn schedule_initial_downloads_refresh(delay_ms: i32, remaining_attempts: u32) {
+    set_window_timeout(
+        move || {
+            if downloads_root().ok().flatten().is_some() {
+                wasm_bindgen_futures::spawn_local(async {
+                    let _ = refresh_downloads().await;
+                });
+            } else if remaining_attempts > 0 {
+                schedule_initial_downloads_refresh(INITIAL_RETRY_MS, remaining_attempts - 1);
+            }
+        },
         delay_ms,
     );
-    callback.forget();
 }
 
 #[cfg(target_arch = "wasm32")]
 fn schedule_downloads_interval() {
-    use wasm_bindgen::{closure::Closure, JsCast};
-
-    let Some(window) = web_sys::window() else {
-        return;
-    };
-    let callback = Closure::<dyn FnMut()>::wrap(Box::new(move || {
-        wasm_bindgen_futures::spawn_local(async {
-            let _ = refresh_downloads().await;
-        });
-    }));
-    let _ = window.set_interval_with_callback_and_timeout_and_arguments_0(
-        callback.as_ref().unchecked_ref(),
+    set_window_interval(
+        || {
+            wasm_bindgen_futures::spawn_local(async {
+                let _ = refresh_downloads().await;
+            });
+        },
         UPDATE_INTERVAL_MS,
     );
-    callback.forget();
 }
 
 #[cfg(target_arch = "wasm32")]
