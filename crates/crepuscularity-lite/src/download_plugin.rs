@@ -187,202 +187,184 @@ impl DownloadPlugin {
     fn start_download(&self, task: Arc<Mutex<DownloadTask>>) {
         let manager = self.manager.clone();
         thread::spawn(move || {
-            let client = match Client::builder().timeout(Duration::from_secs(60)).build() {
-                Ok(c) => c,
-                Err(err) => {
-                    if let Ok(mut t) = task.lock() {
-                        t.status = STATUS_ERROR.to_string();
-                        t.error = Some(format!("client build failed: {err}"));
-                    }
-                    if let Ok(mut m) = manager.lock() {
-                        m.bump_revision();
-                    }
-                    return;
-                }
-            };
-
-            let (url, output_path) = {
-                let mut t = task.lock().expect("download task mutex poisoned");
-                t.status = STATUS_ACTIVE.to_string();
-                t.error = None;
-                (t.url.clone(), t.output_path.clone())
-            };
-
-            if let Some(parent) = output_path.parent() {
-                if let Err(err) = std::fs::create_dir_all(parent) {
-                    if let Ok(mut t) = task.lock() {
-                        t.status = STATUS_ERROR.to_string();
-                        t.error = Some(format!("create_dir_all failed: {err}"));
-                    }
-                    if let Ok(mut m) = manager.lock() {
-                        m.bump_revision();
-                    }
-                    return;
-                }
-            }
-
-            let mut existing_len = std::fs::metadata(&output_path)
-                .map(|m| m.len())
-                .unwrap_or(0);
-            let mut req = client.get(&url);
-            if existing_len > 0 {
-                req = req.header(RANGE, format!("bytes={existing_len}-"));
-            }
-
-            let response = match req.send() {
-                Ok(resp) => resp,
-                Err(err) => {
-                    if let Ok(mut t) = task.lock() {
-                        t.status = STATUS_ERROR.to_string();
-                        t.error = Some(format!("request failed: {err}"));
-                    }
-                    if let Ok(mut m) = manager.lock() {
-                        m.bump_revision();
-                    }
-                    return;
-                }
-            };
-
-            if !response.status().is_success()
-                && response.status() != reqwest::StatusCode::PARTIAL_CONTENT
-            {
+            if let Err(err) = Self::run_download(manager.clone(), task.clone()) {
                 if let Ok(mut t) = task.lock() {
                     t.status = STATUS_ERROR.to_string();
-                    t.error = Some(format!("http status {}", response.status()));
+                    t.error = Some(err);
                 }
                 if let Ok(mut m) = manager.lock() {
                     m.bump_revision();
                 }
-                return;
-            }
-
-            let resume_supported = response.status() == reqwest::StatusCode::PARTIAL_CONTENT;
-            if !resume_supported {
-                existing_len = 0;
-            }
-            let total_length = response
-                .headers()
-                .get(CONTENT_LENGTH)
-                .and_then(|v| v.to_str().ok())
-                .and_then(|v| v.parse::<u64>().ok())
-                .map(|len| len + existing_len)
-                .unwrap_or(existing_len);
-
-            if let Ok(mut t) = task.lock() {
-                if total_length > t.total_length {
-                    t.total_length = total_length;
-                }
-            }
-
-            let mut file = match OpenOptions::new()
-                .create(true)
-                .truncate(!resume_supported)
-                .append(resume_supported)
-                .write(true)
-                .open(&output_path)
-            {
-                Ok(f) => f,
-                Err(err) => {
-                    if let Ok(mut t) = task.lock() {
-                        t.status = STATUS_ERROR.to_string();
-                        t.error = Some(format!("open output failed: {err}"));
-                    }
-                    if let Ok(mut m) = manager.lock() {
-                        m.bump_revision();
-                    }
-                    return;
-                }
-            };
-
-            let mut body = response;
-            let mut buf = [0u8; 8192];
-            let mut last_tick = Instant::now();
-            let mut last_completed = existing_len;
-            loop {
-                let (paused, removed) = {
-                    let t = task.lock().expect("download task mutex poisoned");
-                    (t.paused, t.removed)
-                };
-                if removed {
-                    let _ = std::fs::remove_file(&output_path);
-                    if let Ok(mut t) = task.lock() {
-                        t.status = STATUS_REMOVED.to_string();
-                        t.download_speed = 0;
-                    }
-                    if let Ok(mut m) = manager.lock() {
-                        m.bump_revision();
-                    }
-                    return;
-                }
-                if paused {
-                    if let Ok(mut t) = task.lock() {
-                        t.status = STATUS_PAUSED.to_string();
-                        t.download_speed = 0;
-                    }
-                    if let Ok(mut m) = manager.lock() {
-                        m.bump_revision();
-                    }
-                    return;
-                }
-
-                let read = match body.read(&mut buf) {
-                    Ok(n) => n,
-                    Err(err) => {
-                        if let Ok(mut t) = task.lock() {
-                            t.status = STATUS_ERROR.to_string();
-                            t.error = Some(format!("read failed: {err}"));
-                        }
-                        if let Ok(mut m) = manager.lock() {
-                            m.bump_revision();
-                        }
-                        return;
-                    }
-                };
-                if read == 0 {
-                    break;
-                }
-                if let Err(err) = file.write_all(&buf[..read]) {
-                    if let Ok(mut t) = task.lock() {
-                        t.status = STATUS_ERROR.to_string();
-                        t.error = Some(format!("write failed: {err}"));
-                    }
-                    return;
-                }
-                existing_len += read as u64;
-                let elapsed = last_tick.elapsed().as_secs_f32();
-                if elapsed >= 0.25 {
-                    let delta = existing_len.saturating_sub(last_completed);
-                    let speed = if elapsed > 0.0 {
-                        (delta as f32 / elapsed) as u64
-                    } else {
-                        0
-                    };
-                    if let Ok(mut t) = task.lock() {
-                        t.completed_length = existing_len;
-                        t.download_speed = speed;
-                        if total_length == 0 {
-                            t.total_length = existing_len;
-                        }
-                    }
-                    if let Ok(mut m) = manager.lock() {
-                        m.bump_revision();
-                    }
-                    last_tick = Instant::now();
-                    last_completed = existing_len;
-                }
-            }
-
-            if let Ok(mut t) = task.lock() {
-                t.completed_length = existing_len;
-                t.total_length = t.total_length.max(existing_len);
-                t.status = STATUS_COMPLETE.to_string();
-                t.download_speed = 0;
-                t.error = None;
-            }
-            if let Ok(mut m) = manager.lock() {
-                m.bump_revision();
             }
         });
+    }
+
+    fn run_download(
+        manager: Arc<Mutex<DownloadManager>>,
+        task: Arc<Mutex<DownloadTask>>,
+    ) -> Result<(), String> {
+        let client = Client::builder()
+            .timeout(Duration::from_secs(60))
+            .build()
+            .map_err(|e| format!("client build failed: {e}"))?;
+
+        let (url, output_path) = {
+            let mut t = task.lock().expect("download task mutex poisoned");
+            t.status = STATUS_ACTIVE.to_string();
+            t.error = None;
+            (t.url.clone(), t.output_path.clone())
+        };
+
+        if let Some(parent) = output_path.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| format!("create_dir_all failed: {e}"))?;
+        }
+
+        let mut existing_len = std::fs::metadata(&output_path)
+            .map(|m| m.len())
+            .unwrap_or(0);
+        let mut req = client.get(&url);
+        if existing_len > 0 {
+            req = req.header(RANGE, format!("bytes={existing_len}-"));
+        }
+
+        let response = req.send().map_err(|e| format!("request failed: {e}"))?;
+
+        if !response.status().is_success()
+            && response.status() != reqwest::StatusCode::PARTIAL_CONTENT
+        {
+            return Err(format!("http status {}", response.status()));
+        }
+
+        let resume_supported = response.status() == reqwest::StatusCode::PARTIAL_CONTENT;
+        if !resume_supported {
+            existing_len = 0;
+        }
+        let total_length = response
+            .headers()
+            .get(CONTENT_LENGTH)
+            .and_then(|v| v.to_str().ok())
+            .and_then(|v| v.parse::<u64>().ok())
+            .map(|len| len + existing_len)
+            .unwrap_or(existing_len);
+
+        if let Ok(mut t) = task.lock() {
+            if total_length > t.total_length {
+                t.total_length = total_length;
+            }
+        }
+
+        let file = OpenOptions::new()
+            .create(true)
+            .truncate(!resume_supported)
+            .append(resume_supported)
+            .write(true)
+            .open(&output_path)
+            .map_err(|e| format!("open output failed: {e}"))?;
+
+        let completed = Self::transfer_loop(
+            manager.clone(),
+            task.clone(),
+            response,
+            file,
+            existing_len,
+            total_length,
+            output_path,
+        )?;
+
+        if !completed {
+            return Ok(());
+        }
+
+        if let Ok(mut t) = task.lock() {
+            t.status = STATUS_COMPLETE.to_string();
+            t.download_speed = 0;
+            t.error = None;
+        }
+        if let Ok(mut m) = manager.lock() {
+            m.bump_revision();
+        }
+
+        Ok(())
+    }
+
+    fn transfer_loop(
+        manager: Arc<Mutex<DownloadManager>>,
+        task: Arc<Mutex<DownloadTask>>,
+        mut body: reqwest::blocking::Response,
+        mut file: std::fs::File,
+        mut existing_len: u64,
+        total_length: u64,
+        output_path: std::path::PathBuf,
+    ) -> Result<bool, String> {
+        let mut buf = [0u8; 8192];
+        let mut last_tick = Instant::now();
+        let mut last_completed = existing_len;
+        loop {
+            let (paused, removed) = {
+                let t = task.lock().expect("download task mutex poisoned");
+                (t.paused, t.removed)
+            };
+            if removed {
+                let _ = std::fs::remove_file(&output_path);
+                if let Ok(mut t) = task.lock() {
+                    t.status = STATUS_REMOVED.to_string();
+                    t.download_speed = 0;
+                }
+                if let Ok(mut m) = manager.lock() {
+                    m.bump_revision();
+                }
+                return Ok(false);
+            }
+            if paused {
+                if let Ok(mut t) = task.lock() {
+                    t.status = STATUS_PAUSED.to_string();
+                    t.download_speed = 0;
+                }
+                if let Ok(mut m) = manager.lock() {
+                    m.bump_revision();
+                }
+                return Ok(false);
+            }
+
+            let read = body
+                .read(&mut buf)
+                .map_err(|e| format!("read failed: {e}"))?;
+            if read == 0 {
+                break;
+            }
+            file.write_all(&buf[..read])
+                .map_err(|e| format!("write failed: {e}"))?;
+
+            existing_len += read as u64;
+            let elapsed = last_tick.elapsed().as_secs_f32();
+            if elapsed >= 0.25 {
+                let delta = existing_len.saturating_sub(last_completed);
+                let speed = if elapsed > 0.0 {
+                    (delta as f32 / elapsed) as u64
+                } else {
+                    0
+                };
+                if let Ok(mut t) = task.lock() {
+                    t.completed_length = existing_len;
+                    t.download_speed = speed;
+                    if total_length == 0 {
+                        t.total_length = existing_len;
+                    }
+                }
+                if let Ok(mut m) = manager.lock() {
+                    m.bump_revision();
+                }
+                last_tick = Instant::now();
+                last_completed = existing_len;
+            }
+        }
+
+        if let Ok(mut t) = task.lock() {
+            t.completed_length = existing_len;
+            t.total_length = t.total_length.max(existing_len);
+        }
+
+        Ok(true)
     }
 }
 
