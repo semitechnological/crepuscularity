@@ -280,3 +280,17 @@ fn button_collects_on_click_id() {
     let node = doc.node_by_id("submit").expect("submit id");
     assert_eq!(node.on_click.as_deref(), Some("handle_submit"));
 }
+
+#[test]
+fn template_reload_error_paths() {
+    // Test 1: Template created without path
+    let mut tpl_no_path = Template::from_source("div", screen());
+    let err = tpl_no_path.reload().unwrap_err();
+    assert_eq!(err, "template has no path; reload requires `from_path`");
+
+    // Test 2: Template with non-existent path
+    let path = PathBuf::from("does_not_exist_xyz.crepus");
+    let mut tpl_bad_path = Template::from_source_with_path("div", &path, screen());
+    let err = tpl_bad_path.reload().unwrap_err();
+    assert!(err.starts_with(&format!("template error: {:?}", path)));
+}
