@@ -662,6 +662,59 @@ fn build_match(
     vec![]
 }
 
+fn prepare_include_context(
+    inc: &IncludeNode,
+    ctx: &TemplateContext,
+    full_path: &std::path::Path,
+) -> TemplateContext {
+    let mut child_ctx = TemplateContext::new();
+    child_ctx.base_dir = full_path.parent().map(|p| p.to_path_buf());
+    child_ctx.virtual_files = ctx.virtual_files.clone();
+    for (key, expr) in &inc.props {
+        child_ctx.vars.insert(key.clone(), eval_value(expr, ctx));
+    }
+    if !inc.slot.is_empty() {
+        child_ctx.slot = Some((inc.slot.clone(), Box::new(ctx.clone())));
+    }
+    child_ctx
+}
+
+fn parse_included_nodes(
+    component_name: Option<&str>,
+    content: &str,
+    file_path: &str,
+    child_ctx: &mut TemplateContext,
+) -> Result<Vec<Node>, Vec<WidgetChild>> {
+    match component_name {
+        Some(name) => match parse_component_file(content) {
+            Ok(file) => match file.components.get(name) {
+                Some(comp) => {
+                    for (k, v) in &comp.meta.defaults {
+                        if !child_ctx.vars.contains_key(k) {
+                            child_ctx
+                                .vars
+                                .insert(k.clone(), eval_value(v, &TemplateContext::default()));
+                        }
+                    }
+                    Ok(comp.nodes.clone())
+                }
+                None => Err(error_children(&format!("component not found: {name}"))),
+            },
+            Err(e) => Err(error_children(&format!(
+                "parse error in '{file_path}': {}",
+                e
+            ))),
+        },
+        None => match parse_template(content) {
+            Ok(n) => Ok(n),
+            Err(e) => Err(error_children(&format!(
+                "parse error in '{file_path}': {}",
+                e
+            ))),
+        },
+    }
+}
+
 fn build_include(
     inc: &IncludeNode,
     ctx: &TemplateContext,
@@ -686,38 +739,12 @@ fn build_include(
         Err(e) => return error_children(&e.to_string()),
     };
 
-    let mut child_ctx = TemplateContext::new();
-    child_ctx.base_dir = full_path.parent().map(|p| p.to_path_buf());
-    child_ctx.virtual_files = ctx.virtual_files.clone();
-    for (key, expr) in &inc.props {
-        child_ctx.vars.insert(key.clone(), eval_value(expr, ctx));
-    }
-    if !inc.slot.is_empty() {
-        child_ctx.slot = Some((inc.slot.clone(), Box::new(ctx.clone())));
-    }
+    let mut child_ctx = prepare_include_context(inc, ctx, &full_path);
 
     // Parse and recurse.
-    let nodes = match component_name {
-        Some(name) => match parse_component_file(&content) {
-            Ok(file) => match file.components.get(name) {
-                Some(comp) => {
-                    for (k, v) in &comp.meta.defaults {
-                        if !child_ctx.vars.contains_key(k) {
-                            child_ctx
-                                .vars
-                                .insert(k.clone(), eval_value(v, &TemplateContext::default()));
-                        }
-                    }
-                    comp.nodes.clone()
-                }
-                None => return error_children(&format!("component not found: {name}")),
-            },
-            Err(e) => return error_children(&format!("parse error in '{file_path}': {}", e)),
-        },
-        None => match parse_template(&content) {
-            Ok(n) => n,
-            Err(e) => return error_children(&format!("parse error in '{file_path}': {}", e)),
-        },
+    let nodes = match parse_included_nodes(component_name, &content, file_path, &mut child_ctx) {
+        Ok(nodes) => nodes,
+        Err(error_nodes) => return error_nodes,
     };
 
     build_children(&nodes, &child_ctx, parent_dir, inherited)
