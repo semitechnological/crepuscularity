@@ -564,6 +564,16 @@ pub fn emit_markdown_docs(
 
     fs::create_dir_all(out_docs_dir)?;
 
+    let paths = gather_markdown_paths(docs_src)?;
+    let items = extract_doc_items(&paths)?;
+
+    write_index_page(out_docs_dir, theme, site_name, &items)?;
+    render_pages_and_search_index(&paths, out_docs_dir, theme, site_name, &items)?;
+
+    Ok(())
+}
+
+fn gather_markdown_paths(docs_src: &Path) -> std::io::Result<Vec<PathBuf>> {
     let mut paths: Vec<std::path::PathBuf> = fs::read_dir(docs_src)?
         .flatten()
         .map(|e| e.path())
@@ -575,9 +585,12 @@ pub fn emit_markdown_docs(
         !name.eq_ignore_ascii_case("README.md")
             && !name.eq_ignore_ascii_case("CREPUS_WEB_IMPLEMENTATION_SPEC.md")
     });
+    Ok(paths)
+}
 
+fn extract_doc_items(paths: &[PathBuf]) -> std::io::Result<Vec<DocNavItem>> {
     let mut items: Vec<DocNavItem> = Vec::with_capacity(paths.len());
-    for path in &paths {
+    for path in paths {
         let stem = path
             .file_stem()
             .unwrap_or_default()
@@ -594,8 +607,16 @@ pub fn emit_markdown_docs(
             ),
         });
     }
+    Ok(items)
+}
 
-    let index_body = render_docs_landing_body(site_name, &items);
+fn write_index_page(
+    out_docs_dir: &Path,
+    theme: &DocsSiteTheme,
+    site_name: &str,
+    items: &[DocNavItem],
+) -> std::io::Result<()> {
+    let index_body = render_docs_landing_body(site_name, items);
     let index_description =
         "Guides and references for the .crepus DSL, native and WASM renderers, and the crepus CLI.";
     let index_html = render_doc_shell(
@@ -608,19 +629,27 @@ pub fn emit_markdown_docs(
             wide: true,
         },
         theme,
-        &render_nav_list(&items, Some("index.html")),
+        &render_nav_list(items, Some("index.html")),
         "",
         &index_body,
     );
-    fs::write(out_docs_dir.join("index.html"), index_html)?;
+    fs::write(out_docs_dir.join("index.html"), index_html)
+}
 
+fn render_pages_and_search_index(
+    paths: &[PathBuf],
+    out_docs_dir: &Path,
+    theme: &DocsSiteTheme,
+    site_name: &str,
+    items: &[DocNavItem],
+) -> std::io::Result<()> {
     let mut search_entries = vec![json!({
         "title": "Documentation — overview",
         "href": "index.html",
         "text": "Guides and references for the .crepus DSL, crepus CLI, GPUI, WASM sites, and web extensions."
     })];
 
-    for (path, item) in paths.iter().zip(&items) {
+    for (path, item) in paths.iter().zip(items) {
         let raw = fs::read_to_string(path)?;
         let plain = strip_markdown_plain(&raw);
         let text: String = plain.chars().take(480).collect();
@@ -636,7 +665,7 @@ pub fn emit_markdown_docs(
         let body_html = markdown_to_html(&raw);
         let body_html = inject_heading_ids(&body_html, &outline);
         let toc = render_toc_nav(&outline);
-        let nav = render_nav_list(&items, Some(&item.href));
+        let nav = render_nav_list(items, Some(&item.href));
         let doc_html = render_doc_shell(
             site_name,
             DocShellMeta {
@@ -658,9 +687,7 @@ pub fn emit_markdown_docs(
     fs::write(
         out_docs_dir.join("docs-search-index.json"),
         search_json.as_bytes(),
-    )?;
-
-    Ok(())
+    )
 }
 
 fn strip_markdown_plain(md: &str) -> String {
