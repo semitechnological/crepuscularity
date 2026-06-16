@@ -282,6 +282,48 @@
     return mount;
   }
 
+  function sanitizeHTML(html) {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, "text/html");
+    const elements = doc.body.querySelectorAll("*");
+
+    const ALLOWED_TAGS = new Set([
+      "DIV", "SPAN", "P", "B", "I", "EM", "STRONG", "A", "UL", "OL", "LI",
+      "H1", "H2", "H3", "H4", "H5", "H6", "BR", "HR", "TABLE", "THEAD",
+      "TBODY", "TR", "TH", "TD", "BLOCKQUOTE", "PRE", "CODE"
+    ]);
+
+    for (const el of elements) {
+      const nodeName = el.nodeName.toUpperCase();
+      if (!ALLOWED_TAGS.has(nodeName)) {
+        el.remove();
+        continue;
+      }
+
+      for (const attr of [...el.attributes]) {
+        const name = attr.name.toLowerCase();
+        const value = attr.value.trim().toLowerCase();
+
+        if (name.startsWith("on")) {
+          el.removeAttribute(attr.name);
+          continue;
+        }
+
+        if (name === "href" || name === "src") {
+          const isSafeUrl = value.startsWith("http://") ||
+                            value.startsWith("https://") ||
+                            value.startsWith("mailto:") ||
+                            value.startsWith("#") ||
+                            value.startsWith("/");
+          if (!isSafeUrl) {
+            el.removeAttribute(attr.name);
+          }
+        }
+      }
+    }
+    return doc.body.innerHTML;
+  }
+
   function createInlineAnywhereMount(widget) {
     let parts;
     try {
@@ -310,7 +352,7 @@
     style.textContent = `${INLINE_HOST_CSS}${parts.css || ""}`;
     const root = document.createElement("div");
     root.className = "aa-widget-root";
-    root.innerHTML = html;
+    root.innerHTML = sanitizeHTML(html);
     shadow.append(style, root);
     return host;
   }
