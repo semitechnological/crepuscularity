@@ -841,6 +841,36 @@ div
     }
 
     #[test]
+    fn test_google_font_css_family_name() {
+        assert_eq!(super::google_font_css_family_name("Inter"), "Inter");
+        assert_eq!(
+            super::google_font_css_family_name("JetBrains Mono:wght@400;700"),
+            "JetBrains Mono"
+        );
+        assert_eq!(
+            super::google_font_css_family_name("Roboto:ital,wght@0,400;1,700"),
+            "Roboto"
+        );
+        assert_eq!(
+            super::google_font_css_family_name("Material Symbols Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"),
+            "Material Symbols Outlined"
+        );
+        assert_eq!(super::google_font_css_family_name("  Inter  "), "Inter");
+        assert_eq!(
+            super::google_font_css_family_name("  Inter : wght@400  "),
+            "Inter"
+        );
+        assert_eq!(super::google_font_css_family_name(""), "");
+        assert_eq!(super::google_font_css_family_name("  "), "");
+        assert_eq!(
+            super::google_font_css_family_name("Multiple:Colons:Here"),
+            "Multiple"
+        );
+        assert_eq!(super::google_font_css_family_name(":startsWithColon"), "");
+        assert_eq!(super::google_font_css_family_name("endsWithColon:"), "endsWithColon");
+    }
+
+    #[test]
     fn test_merge_unique_font_families() {
         let input = vec![
             "  Inter  ".to_string(), // Trimming
