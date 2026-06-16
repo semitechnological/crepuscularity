@@ -72,4 +72,22 @@ mod tests {
         let err = compile_path(&file).unwrap_err();
         assert!(err.contains("bad.crepus"));
     }
+
+    #[test]
+    fn compile_crepus_success() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("view.crepus");
+        fs::write(&file, "div\n  \"hello\"").unwrap();
+        // PathBuf::join with an absolute path replaces the base path,
+        // so this will ignore CARGO_MANIFEST_DIR and resolve correctly.
+        compile_crepus(&file).unwrap();
+    }
+
+    #[test]
+    fn compile_crepus_missing_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("nonexistent.crepus");
+        let err = compile_crepus(&file).unwrap_err();
+        assert!(err.contains("could not stat"));
+    }
 }
