@@ -321,7 +321,11 @@ pub fn run(args: &[String]) {
                 continue;
             }
         }
-        by_suite.entry(t.suite.clone()).or_default().push(t);
+        if let Some(vec) = by_suite.get_mut(&t.suite) {
+            vec.push(t);
+        } else {
+            by_suite.insert(t.suite.clone(), vec![t]);
+        }
     }
 
     let mut json_suites: Vec<JsonSuite> = Vec::new();
