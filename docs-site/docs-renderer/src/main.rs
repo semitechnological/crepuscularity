@@ -440,9 +440,14 @@ fn extract_outline(md: &str) -> Vec<OutlineItem> {
         }
         let text = title_raw.to_string();
         let base = slugify_heading_title(title_raw);
-        let n = seen.entry(base.clone()).or_insert(0);
-        *n += 1;
-        let id = if *n == 1 {
+        let n = if let Some(n) = seen.get_mut(&base) {
+            *n += 1;
+            *n
+        } else {
+            seen.insert(base.clone(), 1);
+            1
+        };
+        let id = if n == 1 {
             base
         } else {
             format!("{}-{}", base, n)
