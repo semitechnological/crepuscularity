@@ -401,107 +401,119 @@ impl NativePlugin for DownloadPlugin {
 
     fn invoke(&self, method: &str, payload: &Value) -> Result<Value, BridgeError> {
         match method {
-            "addUri" => {
-                let url = payload.get("url").and_then(Value::as_str).ok_or_else(|| {
-                    BridgeError::with_details(
-                        "invalid_payload",
-                        "addUri requires string field \"url\"",
-                        payload.clone(),
-                    )
-                })?;
-                let filename = payload.get("filename").and_then(Value::as_str);
-                let task = self.create_task(url, filename)?;
-                self.start_download(task.clone());
-                let snapshot = task
-                    .lock()
-                    .expect("download task mutex poisoned")
-                    .snapshot();
-                Ok(snapshot)
-            }
-            "list" => {
-                let guard = self
-                    .manager
-                    .lock()
-                    .expect("download manager mutex poisoned");
-                Ok(json!({ "revision": guard.revision, "tasks": guard.snapshot() }))
-            }
-            "pause" => {
-                let gid = payload.get("gid").and_then(Value::as_str).ok_or_else(|| {
-                    BridgeError::with_details(
-                        "invalid_payload",
-                        "pause requires string field \"gid\"",
-                        payload.clone(),
-                    )
-                })?;
-                let guard = self
-                    .manager
-                    .lock()
-                    .expect("download manager mutex poisoned");
-                let task = guard.get(gid).ok_or_else(|| {
-                    BridgeError::new("not_found", format!("unknown download gid {gid:?}"))
-                })?;
-                if let Ok(mut t) = task.lock() {
-                    t.paused = true;
-                }
-                if let Ok(mut m) = self.manager.lock() {
-                    m.bump_revision();
-                }
-                Ok(json!({"gid": gid, "paused": true}))
-            }
-            "resume" => {
-                let gid = payload.get("gid").and_then(Value::as_str).ok_or_else(|| {
-                    BridgeError::with_details(
-                        "invalid_payload",
-                        "resume requires string field \"gid\"",
-                        payload.clone(),
-                    )
-                })?;
-                let guard = self
-                    .manager
-                    .lock()
-                    .expect("download manager mutex poisoned");
-                let task = guard.get(gid).ok_or_else(|| {
-                    BridgeError::new("not_found", format!("unknown download gid {gid:?}"))
-                })?;
-                if let Ok(mut t) = task.lock() {
-                    t.paused = false;
-                    t.status = STATUS_WAITING.to_string();
-                }
-                if let Ok(mut m) = self.manager.lock() {
-                    m.bump_revision();
-                }
-                self.start_download(task.clone());
-                Ok(json!({"gid": gid, "resumed": true}))
-            }
-            "remove" => {
-                let gid = payload.get("gid").and_then(Value::as_str).ok_or_else(|| {
-                    BridgeError::with_details(
-                        "invalid_payload",
-                        "remove requires string field \"gid\"",
-                        payload.clone(),
-                    )
-                })?;
-                let guard = self
-                    .manager
-                    .lock()
-                    .expect("download manager mutex poisoned");
-                let task = guard.get(gid).ok_or_else(|| {
-                    BridgeError::new("not_found", format!("unknown download gid {gid:?}"))
-                })?;
-                if let Ok(mut t) = task.lock() {
-                    t.removed = true;
-                    t.status = STATUS_REMOVED.to_string();
-                }
-                if let Ok(mut m) = self.manager.lock() {
-                    m.bump_revision();
-                }
-                Ok(json!({"gid": gid, "removed": true}))
-            }
+            "addUri" => self.handle_add_uri(payload),
+            "list" => self.handle_list(payload),
+            "pause" => self.handle_pause(payload),
+            "resume" => self.handle_resume(payload),
+            "remove" => self.handle_remove(payload),
             _ => Err(BridgeError::new(
                 "internal",
                 "method routed but not handled",
             )),
         }
+    }
+}
+
+impl DownloadPlugin {
+    fn handle_add_uri(&self, payload: &Value) -> Result<Value, BridgeError> {
+        let url = payload.get("url").and_then(Value::as_str).ok_or_else(|| {
+            BridgeError::with_details(
+                "invalid_payload",
+                "addUri requires string field \"url\"",
+                payload.clone(),
+            )
+        })?;
+        let filename = payload.get("filename").and_then(Value::as_str);
+        let task = self.create_task(url, filename)?;
+        self.start_download(task.clone());
+        let snapshot = task
+            .lock()
+            .expect("download task mutex poisoned")
+            .snapshot();
+        Ok(snapshot)
+    }
+
+    fn handle_list(&self, _payload: &Value) -> Result<Value, BridgeError> {
+        let guard = self
+            .manager
+            .lock()
+            .expect("download manager mutex poisoned");
+        Ok(json!({ "revision": guard.revision, "tasks": guard.snapshot() }))
+    }
+
+    fn handle_pause(&self, payload: &Value) -> Result<Value, BridgeError> {
+        let gid = payload.get("gid").and_then(Value::as_str).ok_or_else(|| {
+            BridgeError::with_details(
+                "invalid_payload",
+                "pause requires string field \"gid\"",
+                payload.clone(),
+            )
+        })?;
+        let guard = self
+            .manager
+            .lock()
+            .expect("download manager mutex poisoned");
+        let task = guard.get(gid).ok_or_else(|| {
+            BridgeError::new("not_found", format!("unknown download gid {gid:?}"))
+        })?;
+        if let Ok(mut t) = task.lock() {
+            t.paused = true;
+        }
+        if let Ok(mut m) = self.manager.lock() {
+            m.bump_revision();
+        }
+        Ok(json!({"gid": gid, "paused": true}))
+    }
+
+    fn handle_resume(&self, payload: &Value) -> Result<Value, BridgeError> {
+        let gid = payload.get("gid").and_then(Value::as_str).ok_or_else(|| {
+            BridgeError::with_details(
+                "invalid_payload",
+                "resume requires string field \"gid\"",
+                payload.clone(),
+            )
+        })?;
+        let guard = self
+            .manager
+            .lock()
+            .expect("download manager mutex poisoned");
+        let task = guard.get(gid).ok_or_else(|| {
+            BridgeError::new("not_found", format!("unknown download gid {gid:?}"))
+        })?;
+        if let Ok(mut t) = task.lock() {
+            t.paused = false;
+            t.status = STATUS_WAITING.to_string();
+        }
+        if let Ok(mut m) = self.manager.lock() {
+            m.bump_revision();
+        }
+        self.start_download(task.clone());
+        Ok(json!({"gid": gid, "resumed": true}))
+    }
+
+    fn handle_remove(&self, payload: &Value) -> Result<Value, BridgeError> {
+        let gid = payload.get("gid").and_then(Value::as_str).ok_or_else(|| {
+            BridgeError::with_details(
+                "invalid_payload",
+                "remove requires string field \"gid\"",
+                payload.clone(),
+            )
+        })?;
+        let guard = self
+            .manager
+            .lock()
+            .expect("download manager mutex poisoned");
+        let task = guard.get(gid).ok_or_else(|| {
+            BridgeError::new("not_found", format!("unknown download gid {gid:?}"))
+        })?;
+        if let Ok(mut t) = task.lock() {
+            t.removed = true;
+            t.status = STATUS_REMOVED.to_string();
+        }
+        if let Ok(mut m) = self.manager.lock() {
+            m.bump_revision();
+        }
+        Ok(json!({"gid": gid, "removed": true}))
     }
 }
 
