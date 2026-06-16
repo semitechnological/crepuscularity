@@ -53,17 +53,22 @@ where
         let active = Rc::new(Cell::new(false));
         let mut lock = self.0.borrow_mut();
         let subscriber_id = post_inc(&mut lock.next_subscriber_id);
-        lock.subscribers
-            .entry(emitter_key.clone())
-            .or_default()
-            .get_or_insert_with(Default::default)
-            .insert(
-                subscriber_id,
-                Subscriber {
-                    active: active.clone(),
-                    callback,
-                },
-            );
+
+        let subscriber = Subscriber {
+            active: active.clone(),
+            callback,
+        };
+
+        if let Some(entry) = lock.subscribers.get_mut(&emitter_key) {
+            entry
+                .get_or_insert_with(Default::default)
+                .insert(subscriber_id, subscriber);
+        } else {
+            let mut inner = Default::default();
+            inner.insert(subscriber_id, subscriber);
+            lock.subscribers.insert(emitter_key.clone(), Some(inner));
+        }
+
         let this = self.0.clone();
 
         let subscription = Subscription {
