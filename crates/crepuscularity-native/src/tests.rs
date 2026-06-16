@@ -335,6 +335,37 @@ fn render_from_files_entry() {
 }
 
 #[test]
+fn render_from_files_component_entry() {
+    let mut files = HashMap::new();
+    files.insert(
+        "components.crepus".into(),
+        "--- Card\ndiv\n  \"card\"".into(),
+    );
+    let ir = render_from_files(&files, "components.crepus#Card", &TemplateContext::new()).unwrap();
+    assert_eq!(ir.root.len(), 1);
+    let v = serde_json::to_value(&ir).unwrap();
+    assert_eq!(v["root"][0]["children"][0]["content"], "card");
+}
+
+#[test]
+fn render_from_files_missing_file() {
+    let files = HashMap::new();
+    let err = render_from_files(&files, "missing.crepus", &TemplateContext::new())
+        .unwrap_err()
+        .to_string();
+    assert!(err.contains("file not found in virtual fs: missing.crepus"));
+}
+
+#[test]
+fn render_from_files_missing_component_file() {
+    let files = HashMap::new();
+    let err = render_from_files(&files, "missing.crepus#Component", &TemplateContext::new())
+        .unwrap_err()
+        .to_string();
+    assert!(err.contains("file not found in virtual fs: missing.crepus"));
+}
+
+#[test]
 fn ir_patch_round_trip_text_update() {
     let old = render_template_to_ir("div\n  \"Hello\"", &TemplateContext::new()).unwrap();
     let new = render_template_to_ir("div\n  \"Hello world\"", &TemplateContext::new()).unwrap();
