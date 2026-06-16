@@ -196,115 +196,127 @@ impl NativePlugin for FsPlugin {
             })
         };
         match method {
-            "readText" => {
-                let rel = path()?;
-                let p = self.resolve(rel)?;
-                let text = std::fs::read_to_string(&p)
-                    .map_err(|e| BridgeError::new("fs_error", format!("read failed: {e}")))?;
-                Ok(json!({ "path": rel, "text": text }))
-            }
-            "writeText" => {
-                let rel = path()?;
-                let content = payload
-                    .get("content")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| {
-                        BridgeError::with_details(
-                            "invalid_payload",
-                            "writeText requires string field \"content\"",
-                            payload.clone(),
-                        )
-                    })?;
-                let p = self.resolve(rel)?;
-                if let Some(parent) = p.parent() {
-                    std::fs::create_dir_all(parent).map_err(|e| {
-                        BridgeError::new("fs_error", format!("create_dir_all: {e}"))
-                    })?;
-                }
-                std::fs::write(&p, content.as_bytes())
-                    .map_err(|e| BridgeError::new("fs_error", format!("write failed: {e}")))?;
-                Ok(json!({ "path": rel, "bytes": content.len() }))
-            }
+            "readText" => self.handle_read_text(path()?),
+            "writeText" => self.handle_write_text(path()?, payload),
             "list" => {
                 let rel = payload.get("path").and_then(|v| v.as_str()).unwrap_or("");
-                let dir = self.resolve(rel)?;
-                let read = std::fs::read_dir(&dir)
-                    .map_err(|e| BridgeError::new("fs_error", format!("list failed: {e}")))?;
-                let mut entries = Vec::new();
-                for e in read {
-                    let e = e.map_err(|err| {
-                        BridgeError::new("fs_error", format!("read_dir entry: {err}"))
-                    })?;
-                    let t = e
-                        .file_type()
-                        .map_err(|err| BridgeError::new("fs_error", format!("file_type: {err}")))?;
-                    entries.push(json!({
-                        "name": e.file_name().to_string_lossy(),
-                        "isDir": t.is_dir(),
-                    }));
-                }
-                Ok(json!({ "path": rel, "entries": entries }))
+                self.handle_list(rel)
             }
-            "mkdir" => {
-                let p = self.resolve(path()?)?;
-                std::fs::create_dir_all(&p)
-                    .map_err(|e| BridgeError::new("fs_error", format!("mkdir: {e}")))?;
-                Ok(json!({ "path": path()? }))
-            }
-            "removeFile" => {
-                let rel = path()?;
-                let p = self.resolve(rel)?;
-                if p.is_dir() {
-                    return Err(BridgeError::new(
-                        "fs_error",
-                        "removeFile only deletes files; use removeDir for directories",
-                    ));
-                }
-                std::fs::remove_file(&p)
-                    .map_err(|e| BridgeError::new("fs_error", format!("remove_file: {e}")))?;
-                Ok(json!({ "path": rel }))
-            }
-            "removeDir" => {
-                let rel = path()?;
-                let p = self.resolve(rel)?;
-                if !p.is_dir() {
-                    return Err(BridgeError::new(
-                        "fs_error",
-                        "removeDir expects a directory path",
-                    ));
-                }
-                std::fs::remove_dir_all(&p)
-                    .map_err(|e| BridgeError::new("fs_error", format!("remove_dir_all: {e}")))?;
-                Ok(json!({ "path": rel }))
-            }
-            "exists" => {
-                let rel = path()?;
-                let p = self.resolve(rel)?;
-                Ok(json!({ "path": rel, "exists": p.exists() }))
-            }
-            "stat" => {
-                let rel = path()?;
-                let p = self.resolve(rel)?;
-                let meta = std::fs::metadata(&p)
-                    .map_err(|e| BridgeError::new("fs_error", format!("metadata failed: {e}")))?;
-                let modified_ms = meta
-                    .modified()
-                    .ok()
-                    .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
-                    .map(|d| d.as_millis());
-                Ok(json!({
-                    "path": rel,
-                    "isFile": meta.is_file(),
-                    "isDir": meta.is_dir(),
-                    "len": meta.len(),
-                    "modifiedMs": modified_ms,
-                }))
-            }
+            "mkdir" => self.handle_mkdir(path()?),
+            "removeFile" => self.handle_remove_file(path()?),
+            "removeDir" => self.handle_remove_dir(path()?),
+            "exists" => self.handle_exists(path()?),
+            "stat" => self.handle_stat(path()?),
             _ => Err(BridgeError::new(
                 "internal",
                 "method routed but not handled",
             )),
         }
+    }
+}
+
+impl FsPlugin {
+    fn handle_read_text(&self, rel: &str) -> Result<Value, BridgeError> {
+        let p = self.resolve(rel)?;
+        let text = std::fs::read_to_string(&p)
+            .map_err(|e| BridgeError::new("fs_error", format!("read failed: {e}")))?;
+        Ok(json!({ "path": rel, "text": text }))
+    }
+
+    fn handle_write_text(&self, rel: &str, payload: &Value) -> Result<Value, BridgeError> {
+        let content = payload
+            .get("content")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| {
+                BridgeError::with_details(
+                    "invalid_payload",
+                    "writeText requires string field \"content\"",
+                    payload.clone(),
+                )
+            })?;
+        let p = self.resolve(rel)?;
+        if let Some(parent) = p.parent() {
+            std::fs::create_dir_all(parent)
+                .map_err(|e| BridgeError::new("fs_error", format!("create_dir_all: {e}")))?;
+        }
+        std::fs::write(&p, content.as_bytes())
+            .map_err(|e| BridgeError::new("fs_error", format!("write failed: {e}")))?;
+        Ok(json!({ "path": rel, "bytes": content.len() }))
+    }
+
+    fn handle_list(&self, rel: &str) -> Result<Value, BridgeError> {
+        let dir = self.resolve(rel)?;
+        let read = std::fs::read_dir(&dir)
+            .map_err(|e| BridgeError::new("fs_error", format!("list failed: {e}")))?;
+        let mut entries = Vec::new();
+        for e in read {
+            let e =
+                e.map_err(|err| BridgeError::new("fs_error", format!("read_dir entry: {err}")))?;
+            let t = e
+                .file_type()
+                .map_err(|err| BridgeError::new("fs_error", format!("file_type: {err}")))?;
+            entries.push(json!({
+                "name": e.file_name().to_string_lossy(),
+                "isDir": t.is_dir(),
+            }));
+        }
+        Ok(json!({ "path": rel, "entries": entries }))
+    }
+
+    fn handle_mkdir(&self, path: &str) -> Result<Value, BridgeError> {
+        let p = self.resolve(path)?;
+        std::fs::create_dir_all(&p)
+            .map_err(|e| BridgeError::new("fs_error", format!("mkdir: {e}")))?;
+        Ok(json!({ "path": path }))
+    }
+
+    fn handle_remove_file(&self, rel: &str) -> Result<Value, BridgeError> {
+        let p = self.resolve(rel)?;
+        if p.is_dir() {
+            return Err(BridgeError::new(
+                "fs_error",
+                "removeFile only deletes files; use removeDir for directories",
+            ));
+        }
+        std::fs::remove_file(&p)
+            .map_err(|e| BridgeError::new("fs_error", format!("remove_file: {e}")))?;
+        Ok(json!({ "path": rel }))
+    }
+
+    fn handle_remove_dir(&self, rel: &str) -> Result<Value, BridgeError> {
+        let p = self.resolve(rel)?;
+        if !p.is_dir() {
+            return Err(BridgeError::new(
+                "fs_error",
+                "removeDir expects a directory path",
+            ));
+        }
+        std::fs::remove_dir_all(&p)
+            .map_err(|e| BridgeError::new("fs_error", format!("remove_dir_all: {e}")))?;
+        Ok(json!({ "path": rel }))
+    }
+
+    fn handle_exists(&self, rel: &str) -> Result<Value, BridgeError> {
+        let p = self.resolve(rel)?;
+        Ok(json!({ "path": rel, "exists": p.exists() }))
+    }
+
+    fn handle_stat(&self, rel: &str) -> Result<Value, BridgeError> {
+        let p = self.resolve(rel)?;
+        let meta = std::fs::metadata(&p)
+            .map_err(|e| BridgeError::new("fs_error", format!("metadata failed: {e}")))?;
+        let modified_ms = meta
+            .modified()
+            .ok()
+            .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+            .map(|d| d.as_millis());
+        Ok(json!({
+            "path": rel,
+            "isFile": meta.is_file(),
+            "isDir": meta.is_dir(),
+            "len": meta.len(),
+            "modifiedMs": modified_ms,
+        }))
     }
 }
 
