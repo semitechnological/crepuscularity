@@ -679,11 +679,11 @@ fn render_nodes_with_hydration_impl(
                 None
             };
             html.push_str(&render_element_with_hydration(
-                el, ctx, counter, is_first, dyn_id,
+                el, &ctx, counter, is_first, dyn_id,
             )?);
             is_first = false;
         } else {
-            html.push_str(&render_node(node, ctx)?);
+            html.push_str(&render_node(node, &ctx)?);
             is_first = false;
         }
     }
