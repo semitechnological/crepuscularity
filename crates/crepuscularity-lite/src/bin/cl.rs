@@ -8,6 +8,18 @@ use clap::{Parser, Subcommand};
 use crepuscularity_lite::config::CrepusLiteConfig;
 use serde_json::Value;
 
+fn bun_exe() -> Result<PathBuf, String> {
+    which::which("bun").map_err(|_| "bun not found in PATH".to_string())
+}
+
+fn cargo_exe() -> Result<PathBuf, String> {
+    which::which("cargo").map_err(|_| "cargo not found in PATH".to_string())
+}
+
+fn xcrun_exe() -> Result<PathBuf, String> {
+    which::which("xcrun").map_err(|_| "xcrun not found in PATH".to_string())
+}
+
 #[derive(Parser, Debug)]
 #[command(name = "cl", about = "crepuscularity-lite CLI")]
 struct Cli {
@@ -51,12 +63,16 @@ fn sdkroot() -> String {
         .ok()
         .filter(|s| !s.is_empty())
         .unwrap_or_else(|| {
-            Command::new("xcrun")
-                .arg("--show-sdk-path")
-                .output()
-                .ok()
-                .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
-                .unwrap_or_default()
+            if let Ok(xcrun) = xcrun_exe() {
+                Command::new(xcrun)
+                    .arg("--show-sdk-path")
+                    .output()
+                    .ok()
+                    .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+                    .unwrap_or_default()
+            } else {
+                String::new()
+            }
         })
 }
 
@@ -118,7 +134,7 @@ fn run_bun_build(dir: &Path, install: bool, watch: bool) -> Result<(), String> {
     let script = resolve_build_script(dir)?;
 
     if install {
-        let status = Command::new("bun")
+        let status = Command::new(bun_exe()?)
             .arg("install")
             .current_dir(dir)
             .status()
@@ -128,7 +144,7 @@ fn run_bun_build(dir: &Path, install: bool, watch: bool) -> Result<(), String> {
         }
     }
 
-    let mut build = Command::new("bun");
+    let mut build = Command::new(bun_exe()?);
     build.arg("run").arg(script);
     if watch {
         build.arg("--watch");
@@ -145,7 +161,7 @@ fn run_bun_build(dir: &Path, install: bool, watch: bool) -> Result<(), String> {
 
 fn spawn_bun_watch(dir: &Path) -> Result<Child, String> {
     let script = resolve_build_script(dir)?;
-    Command::new("bun")
+    Command::new(bun_exe()?)
         .arg("install")
         .current_dir(dir)
         .status()
@@ -158,7 +174,7 @@ fn spawn_bun_watch(dir: &Path) -> Result<Child, String> {
             }
         })?;
 
-    Command::new("bun")
+    Command::new(bun_exe()?)
         .arg("run")
         .arg(script)
         .arg("--watch")
@@ -223,7 +239,7 @@ fn spawn_gui(config_path: &Path, verbose: bool, dev: bool) -> Result<Child, Stri
         .unwrap_or_else(|| PathBuf::from("."));
     eprintln!("CLI: CREPUS_LITE_CONFIG={}", abs_config_canon.display());
 
-    Command::new("cargo")
+    Command::new(cargo_exe()?)
         .arg("run")
         .arg("--bin")
         .arg("crepuscularity-lite")
