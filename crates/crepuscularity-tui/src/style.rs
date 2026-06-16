@@ -256,49 +256,60 @@ fn apply_named_colors(class: &str, h: &mut StyleHints) -> bool {
 }
 
 fn apply_parametric(class: &str, h: &mut StyleHints) {
-    // ── Colour prefixes ───────────────────────────────────────────────────────
+    if apply_color_parametric(class, h) {
+        return;
+    }
+    if apply_padding_parametric(class, h) {
+        return;
+    }
+    apply_layout_parametric(class, h);
+}
+
+fn apply_color_parametric(class: &str, h: &mut StyleHints) -> bool {
     if let Some(rest) = class.strip_prefix("text-") {
         if let Some(c) = parse_color(rest) {
             h.fg = Some(c);
-            return;
+            return true;
         }
     }
     if let Some(rest) = class.strip_prefix("bg-") {
         if let Some(c) = parse_color(rest) {
             h.bg = Some(c);
-            return;
+            return true;
         }
     }
     if let Some(rest) = class.strip_prefix("background-") {
         if let Some(c) = parse_color(rest) {
             h.bg = Some(c);
-            return;
+            return true;
         }
     }
     if let Some(rest) = class.strip_prefix("border-") {
         if let Some(c) = parse_color(rest) {
             h.border_fg = Some(c);
-            return;
+            return true;
         }
     }
+    false
+}
 
-    // ── Padding ───────────────────────────────────────────────────────────────
+fn apply_padding_parametric(class: &str, h: &mut StyleHints) -> bool {
     if let Some(rest) = class.strip_prefix("p-") {
         if let Some(n) = parse_spacing(rest) {
             h.padding = Padding::uniform(n);
-            return;
+            return true;
         }
     }
     if let Some(rest) = class.strip_prefix("px-") {
         if let Some(n) = parse_spacing(rest) {
             h.padding = Padding::horizontal(n);
-            return;
+            return true;
         }
     }
     if let Some(rest) = class.strip_prefix("py-") {
         if let Some(n) = parse_spacing(rest) {
             h.padding = Padding::vertical(n);
-            return;
+            return true;
         }
     }
     if let Some(rest) = class.strip_prefix("pt-") {
@@ -310,7 +321,7 @@ fn apply_parametric(class: &str, h: &mut StyleHints) {
                 ..
             } = h.padding;
             h.padding = Padding::new(left, right, n, bottom);
-            return;
+            return true;
         }
     }
     if let Some(rest) = class.strip_prefix("pb-") {
@@ -319,7 +330,7 @@ fn apply_parametric(class: &str, h: &mut StyleHints) {
                 right, top, left, ..
             } = h.padding;
             h.padding = Padding::new(left, right, top, n);
-            return;
+            return true;
         }
     }
     if let Some(rest) = class.strip_prefix("pl-") {
@@ -328,7 +339,7 @@ fn apply_parametric(class: &str, h: &mut StyleHints) {
                 right, top, bottom, ..
             } = h.padding;
             h.padding = Padding::new(n, right, top, bottom);
-            return;
+            return true;
         }
     }
     if let Some(rest) = class.strip_prefix("pr-") {
@@ -337,28 +348,28 @@ fn apply_parametric(class: &str, h: &mut StyleHints) {
                 left, top, bottom, ..
             } = h.padding;
             h.padding = Padding::new(left, n, top, bottom);
-            return;
+            return true;
         }
     }
+    false
+}
 
-    // ── Gap ───────────────────────────────────────────────────────────────────
+fn apply_layout_parametric(class: &str, h: &mut StyleHints) -> bool {
     if let Some(rest) = class.strip_prefix("gap-") {
         if let Some(n) = parse_spacing(rest) {
             h.gap = n;
-            return;
+            return true;
         }
     }
-
-    // ── Width ─────────────────────────────────────────────────────────────────
     if let Some(rest) = class.strip_prefix("w-") {
         h.width = parse_size_hint(rest);
-        return;
+        return true;
     }
-
-    // ── Height ────────────────────────────────────────────────────────────────
     if let Some(rest) = class.strip_prefix("h-") {
         h.height = parse_size_hint(rest);
+        return true;
     }
+    false
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
