@@ -112,10 +112,16 @@ mod tests {
 
         let ast1 = parse_content(content1).unwrap();
         let ast1_cached = parse_content(content1).unwrap();
-        assert!(Arc::ptr_eq(&ast1, &ast1_cached), "Cache hit should return the same Arc");
+        assert!(
+            Arc::ptr_eq(&ast1, &ast1_cached),
+            "Cache hit should return the same Arc"
+        );
 
         let ast2 = parse_content(content2).unwrap();
-        assert!(!Arc::ptr_eq(&ast1, &ast2), "Different content should have different Arc");
+        assert!(
+            !Arc::ptr_eq(&ast1, &ast2),
+            "Different content should have different Arc"
+        );
     }
 
     #[test]
@@ -129,7 +135,10 @@ mod tests {
 
         let ast1 = parse_file(&path).unwrap();
         let ast1_cached = parse_file(&path).unwrap();
-        assert!(Arc::ptr_eq(&ast1, &ast1_cached), "Cache hit should return the same Arc");
+        assert!(
+            Arc::ptr_eq(&ast1, &ast1_cached),
+            "Cache hit should return the same Arc"
+        );
 
         // Wait a bit and modify file to change mtime and length
         std::thread::sleep(std::time::Duration::from_millis(10));
@@ -137,7 +146,10 @@ mod tests {
         file.flush().unwrap();
 
         let ast2 = parse_file(&path).unwrap();
-        assert!(!Arc::ptr_eq(&ast1, &ast2), "Cache should miss after file modification");
+        assert!(
+            !Arc::ptr_eq(&ast1, &ast2),
+            "Cache should miss after file modification"
+        );
     }
 
     #[test]
@@ -154,7 +166,10 @@ mod tests {
         invalidate_file(&path);
 
         let ast2 = parse_file(&path).unwrap();
-        assert!(!Arc::ptr_eq(&ast1, &ast2), "Cache should miss after invalidation");
+        assert!(
+            !Arc::ptr_eq(&ast1, &ast2),
+            "Cache should miss after invalidation"
+        );
     }
 
     #[test]
