@@ -59,6 +59,7 @@ pub mod color;
 pub mod display;
 pub mod document;
 pub mod font;
+pub(crate) mod font_data;
 pub mod framebuffer;
 pub mod layout;
 pub mod paint;
