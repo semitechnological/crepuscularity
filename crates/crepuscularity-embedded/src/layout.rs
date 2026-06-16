@@ -44,16 +44,41 @@ fn layout_children(parent: &mut EmbeddedNode) {
     let gap = parent.style.gap;
     let row = parent.style.flex_dir == FlexDir::Row;
 
-    let n = parent.children.len();
-    let mut main_sizes: Vec<u16> = parent
-        .children
+    let main_sizes = compute_main_sizes(&parent.children, row, gap, inner);
+    let offsets = compute_offsets(&main_sizes, parent.style.justify, gap, inner, row);
+
+    for (i, child) in parent.children.iter_mut().enumerate() {
+        let cross = cross_size(child, row, inner);
+        let (x, y, w, h) = if row {
+            (
+                inner.x.saturating_add(offsets[i]),
+                align_cross(child, inner.y, cross, inner.h, parent.style.align),
+                main_sizes[i],
+                cross,
+            )
+        } else {
+            (
+                align_cross(child, inner.x, cross, inner.w, parent.style.align),
+                inner.y.saturating_add(offsets[i]),
+                cross,
+                main_sizes[i],
+            )
+        };
+        child.bounds = Rect::new(x, y, w, h);
+        layout_children(child);
+    }
+}
+
+fn compute_main_sizes(children: &[EmbeddedNode], row: bool, gap: u16, inner: Rect) -> Vec<u16> {
+    let n = children.len();
+    let mut main_sizes: Vec<u16> = children
         .iter()
         .map(|c| desired_main(c, row, inner))
         .collect();
 
     let mut flex_count = 0usize;
     let mut fixed_sum = 0u16;
-    for (i, child) in parent.children.iter().enumerate() {
+    for (i, child) in children.iter().enumerate() {
         let hint = main_hint(child, row);
         if hint == SizeHint::Flex1 || hint == SizeHint::Fill {
             flex_count += 1;
@@ -67,7 +92,7 @@ fn layout_children(parent: &mut EmbeddedNode) {
             .saturating_sub(fixed_sum)
             .saturating_sub(gaps);
         let each = avail_main / flex_count as u16;
-        for (i, child) in parent.children.iter().enumerate() {
+        for (i, child) in children.iter().enumerate() {
             let hint = main_hint(child, row);
             if hint == SizeHint::Flex1 || hint == SizeHint::Fill {
                 main_sizes[i] = each.max(1);
@@ -75,12 +100,23 @@ fn layout_children(parent: &mut EmbeddedNode) {
         }
     }
 
+    main_sizes
+}
+
+fn compute_offsets(
+    main_sizes: &[u16],
+    justify: Justify,
+    gap: u16,
+    inner: Rect,
+    row: bool,
+) -> Vec<u16> {
+    let n = main_sizes.len();
     let total_main: u16 =
         main_sizes.iter().sum::<u16>() + gap.saturating_mul((n.saturating_sub(1)) as u16);
     let free_main = inner_main(inner, row).saturating_sub(total_main);
 
     let mut offsets: Vec<u16> = vec![0; n];
-    match parent.style.justify {
+    match justify {
         Justify::Center if free_main > 0 => {
             let lead = free_main / 2;
             offsets[0] = lead;
@@ -117,26 +153,7 @@ fn layout_children(parent: &mut EmbeddedNode) {
         }
     }
 
-    for (i, child) in parent.children.iter_mut().enumerate() {
-        let cross = cross_size(child, row, inner);
-        let (x, y, w, h) = if row {
-            (
-                inner.x.saturating_add(offsets[i]),
-                align_cross(child, inner.y, cross, inner.h, parent.style.align),
-                main_sizes[i],
-                cross,
-            )
-        } else {
-            (
-                align_cross(child, inner.x, cross, inner.w, parent.style.align),
-                inner.y.saturating_add(offsets[i]),
-                cross,
-                main_sizes[i],
-            )
-        };
-        child.bounds = Rect::new(x, y, w, h);
-        layout_children(child);
-    }
+    offsets
 }
 
 fn inner_main(inner: Rect, row: bool) -> u16 {
