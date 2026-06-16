@@ -4477,13 +4477,14 @@ impl Window {
     ) -> crate::InspectorElementId {
         self.invalidator.debug_assert_paint_or_prepaint();
         let path = Rc::new(path);
-        let next_instance_id = self
-            .next_frame
-            .next_inspector_instance_ids
-            .entry(path.clone())
-            .or_insert(0);
-        let instance_id = *next_instance_id;
-        *next_instance_id += 1;
+        let instance_id = if let Some(id) = self.next_frame.next_inspector_instance_ids.get_mut(&path) {
+            let instance_id = *id;
+            *id += 1;
+            instance_id
+        } else {
+            self.next_frame.next_inspector_instance_ids.insert(path.clone(), 1);
+            0
+        };
         crate::InspectorElementId { path, instance_id }
     }
 
