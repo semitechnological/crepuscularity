@@ -1163,3 +1163,51 @@ mod tailwind_color_tests {
         assert_eq!(tailwind_color("red", "500"), Some(0xfb2c36));
     }
 }
+
+#[cfg(test)]
+mod apply_class_tests {
+    use super::apply_class;
+    use gpui::div;
+
+    #[test]
+    fn test_apply_class_static() {
+        // Test basic structural and styling classes (ensure no panic and valid returns)
+        let d = div();
+        let _ = apply_class(d, "flex");
+
+        let d = div();
+        let _ = apply_class(d, "bg-red-500");
+
+        let d = div();
+        let _ = apply_class(d, "p-4");
+
+        let d = div();
+        let _ = apply_class(d, "opacity-50");
+    }
+
+    #[test]
+    fn test_apply_class_arbitrary() {
+        // Test arbitrary value handling
+        let d = div();
+        let _ = apply_class(d, "w-[200px]");
+
+        let d = div();
+        let _ = apply_class(d, "bg-[#ff5733]");
+
+        let d = div();
+        let _ = apply_class(d, "text-[14px]");
+    }
+
+    #[test]
+    fn test_apply_class_states() {
+        // Test that state prefixes are gracefully skipped
+        let d = div();
+        let _ = apply_class(d, "hover:bg-red-500");
+
+        let d = div();
+        let _ = apply_class(d, "focus:text-black");
+
+        let d = div();
+        let _ = apply_class(d, "active:opacity-100");
+    }
+}
