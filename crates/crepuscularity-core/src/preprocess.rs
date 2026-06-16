@@ -589,7 +589,10 @@ mod tests {
     #[test]
     fn test_expand_class_token() {
         let mut aliases = HashMap::new();
-        aliases.insert("center".to_string(), "items-center justify-center flex".to_string());
+        aliases.insert(
+            "center".to_string(),
+            "items-center justify-center flex".to_string(),
+        );
         aliases.insert("btn".to_string(), "bg-blue-500".to_string());
         aliases.insert("empty".to_string(), "".to_string());
         aliases.insert("whitespace".to_string(), "   ".to_string());
@@ -597,7 +600,11 @@ mod tests {
         // Existing alias mapping to multiple tokens
         assert_eq!(
             expand_class_token("center", &aliases),
-            vec!["items-center".to_string(), "justify-center".to_string(), "flex".to_string()]
+            vec![
+                "items-center".to_string(),
+                "justify-center".to_string(),
+                "flex".to_string()
+            ]
         );
 
         // Existing alias mapping to a single token
@@ -618,10 +625,7 @@ mod tests {
         );
 
         // Empty token not in the aliases map
-        assert_eq!(
-            expand_class_token("", &aliases),
-            vec!["".to_string()]
-        );
+        assert_eq!(expand_class_token("", &aliases), vec!["".to_string()]);
     }
 
     #[test]
@@ -938,7 +942,9 @@ div
             "Roboto"
         );
         assert_eq!(
-            super::google_font_css_family_name("Material Symbols Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"),
+            super::google_font_css_family_name(
+                "Material Symbols Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"
+            ),
             "Material Symbols Outlined"
         );
         assert_eq!(super::google_font_css_family_name("  Inter  "), "Inter");
@@ -953,7 +959,10 @@ div
             "Multiple"
         );
         assert_eq!(super::google_font_css_family_name(":startsWithColon"), "");
-        assert_eq!(super::google_font_css_family_name("endsWithColon:"), "endsWithColon");
+        assert_eq!(
+            super::google_font_css_family_name("endsWithColon:"),
+            "endsWithColon"
+        );
     }
 
     #[test]
