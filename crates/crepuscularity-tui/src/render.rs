@@ -172,8 +172,10 @@ pub fn render_component(
 fn with_tui_target(ctx: &TemplateContext) -> TemplateContext {
     let mut ctx = ctx.clone();
     if !ctx.vars.contains_key("crepus_target") {
-        ctx.vars
-            .insert("crepus_target".to_string(), TemplateValue::Str("tui".to_string()));
+        ctx.vars.insert(
+            "crepus_target".to_string(),
+            TemplateValue::Str("tui".to_string()),
+        );
     }
     if !ctx.vars.contains_key("is_tui") {
         ctx.vars
@@ -188,20 +190,28 @@ fn with_tui_target(ctx: &TemplateContext) -> TemplateContext {
             .insert("is_web".to_string(), TemplateValue::Bool(false));
     }
     if !ctx.vars.contains_key("crepus_platform") {
-        ctx.vars
-            .insert("crepus_platform".to_string(), TemplateValue::Str(std::env::consts::OS.to_string()));
+        ctx.vars.insert(
+            "crepus_platform".to_string(),
+            TemplateValue::Str(std::env::consts::OS.to_string()),
+        );
     }
     if !ctx.vars.contains_key("is_macos") {
-        ctx.vars
-            .insert("is_macos".to_string(), TemplateValue::Bool(cfg!(target_os = "macos")));
+        ctx.vars.insert(
+            "is_macos".to_string(),
+            TemplateValue::Bool(cfg!(target_os = "macos")),
+        );
     }
     if !ctx.vars.contains_key("is_windows") {
-        ctx.vars
-            .insert("is_windows".to_string(), TemplateValue::Bool(cfg!(target_os = "windows")));
+        ctx.vars.insert(
+            "is_windows".to_string(),
+            TemplateValue::Bool(cfg!(target_os = "windows")),
+        );
     }
     if !ctx.vars.contains_key("is_linux") {
-        ctx.vars
-            .insert("is_linux".to_string(), TemplateValue::Bool(cfg!(target_os = "linux")));
+        ctx.vars.insert(
+            "is_linux".to_string(),
+            TemplateValue::Bool(cfg!(target_os = "linux")),
+        );
     }
     ctx
 }
