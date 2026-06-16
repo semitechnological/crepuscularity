@@ -962,4 +962,43 @@ div
             vec!["Arial".to_string()]
         );
     }
+
+    #[test]
+    fn test_expand_class_list_in_place() {
+        let mut aliases = std::collections::HashMap::new();
+        aliases.insert("btn".to_string(), "px-4 py-2 bg-blue-500".to_string());
+        aliases.insert("text-center".to_string(), "text-center".to_string());
+
+        let mut classes = vec!["btn".to_string(), "mt-2".to_string()];
+        expand_class_list_in_place(&mut classes, &aliases);
+
+        assert_eq!(
+            classes,
+            vec![
+                "px-4".to_string(),
+                "py-2".to_string(),
+                "bg-blue-500".to_string(),
+                "mt-2".to_string(),
+            ]
+        );
+
+        // Test with empty aliases
+        let empty_aliases = std::collections::HashMap::new();
+        let mut original_classes = vec!["btn".to_string(), "mt-2".to_string()];
+        expand_class_list_in_place(&mut original_classes, &empty_aliases);
+        assert_eq!(
+            original_classes,
+            vec!["btn".to_string(), "mt-2".to_string()]
+        );
+
+        // Test with empty input vec
+        let mut empty_classes: Vec<String> = vec![];
+        expand_class_list_in_place(&mut empty_classes, &aliases);
+        assert_eq!(empty_classes, Vec::<String>::new());
+
+        // Test tokens not in aliases pass through unchanged
+        let mut no_match = vec!["flex".to_string(), "gap-4".to_string()];
+        expand_class_list_in_place(&mut no_match, &aliases);
+        assert_eq!(no_match, vec!["flex".to_string(), "gap-4".to_string()]);
+    }
 }
