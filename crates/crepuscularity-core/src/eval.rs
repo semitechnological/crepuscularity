@@ -578,8 +578,10 @@ mod tests {
     #[test]
     fn test_eval_condition_with_context() {
         let mut ctx = TemplateContext::new();
-        ctx.vars.insert("empty_str".into(), TemplateValue::Str("".into()));
-        ctx.vars.insert("full_str".into(), TemplateValue::Str("foo".into()));
+        ctx.vars
+            .insert("empty_str".into(), TemplateValue::Str("".into()));
+        ctx.vars
+            .insert("full_str".into(), TemplateValue::Str("foo".into()));
         ctx.vars.insert("zero".into(), TemplateValue::Int(0));
         ctx.vars.insert("nonzero".into(), TemplateValue::Int(42));
 
