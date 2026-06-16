@@ -114,6 +114,7 @@ impl CrepusLiteConfig {
     /// Merged [`Self::guest_prelude`] text only (each file followed by `\n\n`). Empty when the list is empty.
     /// Returns `None` if any prelude path is missing or unreadable.
     pub fn guest_prelude_merged(&self, base: &Path) -> Option<String> {
+        let canonical_base = base.canonicalize().unwrap_or_else(|_| base.to_path_buf());
         #[cfg(feature = "parallel")]
         {
             if self.guest_prelude.is_empty() {
@@ -124,7 +125,16 @@ impl CrepusLiteConfig {
                 .guest_prelude
                 .par_iter()
                 .enumerate()
-                .filter_map(|(i, pr)| std::fs::read_to_string(base.join(pr)).ok().map(|s| (i, s)))
+                .filter_map(|(i, pr)| {
+                    let joined = base.join(pr);
+                    let canonical_joined = joined.canonicalize().ok()?;
+                    if !canonical_joined.starts_with(&canonical_base) {
+                        return None;
+                    }
+                    std::fs::read_to_string(canonical_joined)
+                        .ok()
+                        .map(|s| (i, s))
+                })
                 .collect();
             if chunks.len() != self.guest_prelude.len() {
                 return None;
@@ -141,7 +151,12 @@ impl CrepusLiteConfig {
         {
             let mut s = String::new();
             for pr in &self.guest_prelude {
-                let chunk = std::fs::read_to_string(base.join(pr)).ok()?;
+                let joined = base.join(pr);
+                let canonical_joined = joined.canonicalize().ok()?;
+                if !canonical_joined.starts_with(&canonical_base) {
+                    return None;
+                }
+                let chunk = std::fs::read_to_string(canonical_joined).ok()?;
                 s.push_str(&chunk);
                 s.push_str("\n\n");
             }
@@ -158,7 +173,13 @@ impl CrepusLiteConfig {
         merged_prelude: &str,
     ) -> Option<String> {
         let rel = self.active_guest_entry()?;
-        let body = std::fs::read_to_string(base.join(rel)).ok()?;
+        let joined = base.join(rel);
+        let canonical_joined = joined.canonicalize().ok()?;
+        let canonical_base = base.canonicalize().unwrap_or_else(|_| base.to_path_buf());
+        if !canonical_joined.starts_with(&canonical_base) {
+            return None;
+        }
+        let body = std::fs::read_to_string(canonical_joined).ok()?;
         let mut out = merged_prelude.to_string();
         out.push_str(&body);
         Some(out)
@@ -170,7 +191,13 @@ impl CrepusLiteConfig {
     pub fn guest_source(&self, base: &Path) -> Option<String> {
         let rel = self.active_guest_entry()?;
         let prelude = self.guest_prelude_merged(base)?;
-        let body = std::fs::read_to_string(base.join(rel)).ok()?;
+        let joined = base.join(rel);
+        let canonical_joined = joined.canonicalize().ok()?;
+        let canonical_base = base.canonicalize().unwrap_or_else(|_| base.to_path_buf());
+        if !canonical_joined.starts_with(&canonical_base) {
+            return None;
+        }
+        let body = std::fs::read_to_string(canonical_joined).ok()?;
         let mut out = prelude;
         out.push_str(&body);
         Some(out)
@@ -193,7 +220,12 @@ impl CrepusLiteConfig {
     pub fn resolved_guest_path(&self, base: &Path) -> Option<PathBuf> {
         let rel = self.active_guest_entry()?;
         let p = base.join(rel);
-        p.canonicalize().ok()
+        let canonical_p = p.canonicalize().ok()?;
+        let canonical_base = base.canonicalize().unwrap_or_else(|_| base.to_path_buf());
+        if !canonical_p.starts_with(&canonical_base) {
+            return None;
+        }
+        Some(canonical_p)
     }
 
     /// All guest file paths to watch for hot reload (entry + preludes).
@@ -202,11 +234,12 @@ impl CrepusLiteConfig {
     pub fn guest_watch_paths(&self, base: &Path) -> Vec<PathBuf> {
         let mut paths = Vec::new();
         let mut seen = HashSet::new();
+        let canonical_base = base.canonicalize().unwrap_or_else(|_| base.to_path_buf());
         if let Some(rel) = self.active_guest_entry() {
             let path = base.join(rel);
             if path.exists() {
                 let path = path.canonicalize().unwrap_or(path);
-                if seen.insert(path.clone()) {
+                if path.starts_with(&canonical_base) && seen.insert(path.clone()) {
                     paths.push(path);
                 }
             }
@@ -215,7 +248,7 @@ impl CrepusLiteConfig {
             let path = base.join(rel);
             if path.exists() {
                 let path = path.canonicalize().unwrap_or(path);
-                if seen.insert(path.clone()) {
+                if path.starts_with(&canonical_base) && seen.insert(path.clone()) {
                     paths.push(path);
                 }
             }
@@ -332,4 +365,31 @@ mod tests {
         assert!(paths.iter().any(|p| p.ends_with("a.js")));
         let _ = fs::remove_dir_all(&dir);
     }
+}
+#[test]
+fn guest_source_rejects_path_traversal() {
+    use std::fs;
+    let dir = std::env::temp_dir().join(format!(
+        "crepus-lite-guest-traversal-{}",
+        std::process::id()
+    ));
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(&dir).unwrap();
+
+    let parent_dir = dir.join("..");
+    let secret_file = parent_dir.join("secret_traversal.txt");
+    fs::write(&secret_file, "secret").unwrap();
+
+    let c = CrepusLiteConfig {
+        guest_prelude: vec!["../secret_traversal.txt".into()],
+        guest_entry: Some("g.js".into()),
+        ..Default::default()
+    };
+
+    assert!(c.guest_prelude_merged(&dir).is_none());
+    assert!(c.guest_source(&dir).is_none());
+    assert!(c.guest_source_with_merged_prelude(&dir, "").is_none());
+
+    fs::remove_file(&secret_file).unwrap();
+    let _ = fs::remove_dir_all(&dir);
 }
