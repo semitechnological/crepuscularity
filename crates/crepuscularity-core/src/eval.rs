@@ -555,6 +555,54 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_eval_condition_truthy_falsy() {
+        let ctx = TemplateContext::new();
+
+        // Truthy values
+        assert!(eval_condition("true", &ctx).unwrap());
+        assert!(eval_condition("1", &ctx).unwrap());
+        assert!(eval_condition("-1", &ctx).unwrap());
+        assert!(eval_condition("0.1", &ctx).unwrap());
+        assert!(eval_condition("-0.1", &ctx).unwrap());
+        assert!(eval_condition("\"hello\"", &ctx).unwrap());
+        assert!(eval_condition("1 + 2", &ctx).unwrap());
+
+        // Falsy values
+        assert!(!eval_condition("false", &ctx).unwrap());
+        assert!(!eval_condition("0", &ctx).unwrap());
+        assert!(!eval_condition("0.0", &ctx).unwrap());
+        assert!(!eval_condition("\"\"", &ctx).unwrap());
+        assert!(!eval_condition("null", &ctx).unwrap());
+    }
+
+    #[test]
+    fn test_eval_condition_with_context() {
+        let mut ctx = TemplateContext::new();
+        ctx.vars.insert("empty_str".into(), TemplateValue::Str("".into()));
+        ctx.vars.insert("full_str".into(), TemplateValue::Str("foo".into()));
+        ctx.vars.insert("zero".into(), TemplateValue::Int(0));
+        ctx.vars.insert("nonzero".into(), TemplateValue::Int(42));
+
+        assert!(!eval_condition("empty_str", &ctx).unwrap());
+        assert!(eval_condition("full_str", &ctx).unwrap());
+        assert!(!eval_condition("zero", &ctx).unwrap());
+        assert!(eval_condition("nonzero", &ctx).unwrap());
+
+        // Compound condition
+        assert!(eval_condition("full_str && nonzero", &ctx).unwrap());
+        assert!(!eval_condition("empty_str && nonzero", &ctx).unwrap());
+        assert!(eval_condition("empty_str || nonzero", &ctx).unwrap());
+    }
+
+    #[test]
+    fn test_eval_condition_errors() {
+        let ctx = TemplateContext::new();
+
+        // Syntax errors (trailing tokens)
+        assert!(eval_condition("true foo", &ctx).is_err());
+    }
+
+    #[test]
     fn string_literal_preserves_multi_byte_utf8() {
         let ctx = TemplateContext::new();
         let v = eval_expr("\"Hola ñ — 你好\"", &ctx).expect("valid literal");
