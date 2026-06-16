@@ -122,12 +122,21 @@ pub fn parse_classes(classes: &[String]) -> StyleHints {
 // ─── Class → hints ────────────────────────────────────────────────────────────
 
 fn apply_class(class: &str, h: &mut StyleHints) {
+    if apply_layout(class, h)
+        || apply_modifiers(class, h)
+        || apply_borders(class, h)
+        || apply_alignment(class, h)
+        || apply_named_colors(class, h)
+    {
+        return;
+    }
+    apply_parametric(class, h);
+}
+
+fn apply_layout(class: &str, h: &mut StyleHints) -> bool {
     match class {
-        // ── Layout direction ──────────────────────────────────────────────
         "flex-col" | "block" => h.direction = Direction::Vertical,
         "flex" | "flex-row" | "inline-flex" => h.direction = Direction::Horizontal,
-
-        // ── Size fill shorthands ──────────────────────────────────────────
         "w-full" => h.width = SizeHint::Percentage(100),
         "h-full" | "h-screen" => h.height = SizeHint::Percentage(100),
         "flex-1" | "grow" | "flex-grow" => {
@@ -135,8 +144,13 @@ fn apply_class(class: &str, h: &mut StyleHints) {
             h.height = SizeHint::Fill;
         }
         "flex-none" | "shrink-0" => {} // no-op in terminal (no shrink concept)
+        _ => return false,
+    }
+    true
+}
 
-        // ── Text modifiers ────────────────────────────────────────────────
+fn apply_modifiers(class: &str, h: &mut StyleHints) -> bool {
+    match class {
         "font-bold" | "bold" => h.modifiers |= Modifier::BOLD,
         "font-semibold" | "font-extrabold" | "font-black" => h.modifiers |= Modifier::BOLD,
         "italic" => h.modifiers |= Modifier::ITALIC,
@@ -151,8 +165,13 @@ fn apply_class(class: &str, h: &mut StyleHints) {
             h.width = SizeHint::Fixed(0);
             h.height = SizeHint::Fixed(0);
         }
+        _ => return false,
+    }
+    true
+}
 
-        // ── Borders ───────────────────────────────────────────────────────
+fn apply_borders(class: &str, h: &mut StyleHints) -> bool {
+    match class {
         "border" => h.borders |= Borders::ALL,
         "border-t" | "border-top" => h.borders |= Borders::TOP,
         "border-b" | "border-bottom" => h.borders |= Borders::BOTTOM,
@@ -161,24 +180,30 @@ fn apply_class(class: &str, h: &mut StyleHints) {
         "border-x" => h.borders |= Borders::LEFT | Borders::RIGHT,
         "border-y" => h.borders |= Borders::TOP | Borders::BOTTOM,
         "border-none" => h.borders = Borders::NONE,
-
-        // Border styles
         "rounded" => h.border_type = BorderType::Rounded,
         "border-double" => h.border_type = BorderType::Double,
         "border-thick" => h.border_type = BorderType::Thick,
         "border-plain" => h.border_type = BorderType::Plain,
+        _ => return false,
+    }
+    true
+}
 
-        // ── Text alignment ────────────────────────────────────────────────
+fn apply_alignment(class: &str, h: &mut StyleHints) -> bool {
+    match class {
         "text-left" => h.alignment = Alignment::Left,
         "text-center" => h.alignment = Alignment::Center,
         "text-right" => h.alignment = Alignment::Right,
-
-        // ── Title alignment ───────────────────────────────────────────────
         "title-left" => h.title_alignment = Alignment::Left,
         "title-center" => h.title_alignment = Alignment::Center,
         "title-right" => h.title_alignment = Alignment::Right,
+        _ => return false,
+    }
+    true
+}
 
-        // ── Colours (named; shades handled below) ─────────────────────────
+fn apply_named_colors(class: &str, h: &mut StyleHints) -> bool {
+    match class {
         "text-white" => h.fg = Some(Color::White),
         "text-black" => h.fg = Some(Color::Black),
         "bg-white" => h.bg = Some(Color::White),
@@ -225,9 +250,9 @@ fn apply_class(class: &str, h: &mut StyleHints) {
             h.padding = Padding::horizontal(1);
             h.modifiers |= Modifier::BOLD;
         }
-
-        _ => apply_parametric(class, h),
+        _ => return false,
     }
+    true
 }
 
 fn apply_parametric(class: &str, h: &mut StyleHints) {
