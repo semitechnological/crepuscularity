@@ -587,6 +587,44 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_expand_class_token() {
+        let mut aliases = HashMap::new();
+        aliases.insert("center".to_string(), "items-center justify-center flex".to_string());
+        aliases.insert("btn".to_string(), "bg-blue-500".to_string());
+        aliases.insert("empty".to_string(), "".to_string());
+        aliases.insert("whitespace".to_string(), "   ".to_string());
+
+        // Existing alias mapping to multiple tokens
+        assert_eq!(
+            expand_class_token("center", &aliases),
+            vec!["items-center".to_string(), "justify-center".to_string(), "flex".to_string()]
+        );
+
+        // Existing alias mapping to a single token
+        assert_eq!(
+            expand_class_token("btn", &aliases),
+            vec!["bg-blue-500".to_string()]
+        );
+
+        // Existing alias mapping to empty string or whitespace
+        let empty_vec: Vec<String> = vec![];
+        assert_eq!(expand_class_token("empty", &aliases), empty_vec);
+        assert_eq!(expand_class_token("whitespace", &aliases), empty_vec);
+
+        // Token that does not exist in the aliases map
+        assert_eq!(
+            expand_class_token("unknown", &aliases),
+            vec!["unknown".to_string()]
+        );
+
+        // Empty token not in the aliases map
+        assert_eq!(
+            expand_class_token("", &aliases),
+            vec!["".to_string()]
+        );
+    }
+
+    #[test]
     fn strips_fonts_and_aliases() {
         let s = r#"google-font Inter
 google-font JetBrains Mono
