@@ -242,4 +242,103 @@ mod tests {
         let fp = Fingerprint::new("src", Some("Card"), "codegen");
         assert!(fp.cache_key().contains("Card"));
     }
+
+    #[test]
+    fn test_classify_node_static_text() {
+        let node = Node::Text(vec![TextPart::Literal("hello".to_string())]);
+        assert_eq!(classify_node(&node), Region::Static);
+    }
+
+    #[test]
+    fn test_classify_node_dynamic_text() {
+        let node = Node::Text(vec![
+            TextPart::Literal("hello ".to_string()),
+            TextPart::Expr("name".to_string()),
+        ]);
+        assert_eq!(classify_node(&node), Region::Dynamic);
+    }
+
+    fn dummy_element() -> Element {
+        Element {
+            tag: "div".to_string(),
+            id: None,
+            classes: vec![],
+            conditional_classes: vec![],
+            event_handlers: vec![],
+            bindings: vec![],
+            animations: vec![],
+            children: vec![],
+        }
+    }
+
+    #[test]
+    fn test_classify_node_static_element() {
+        let node = Node::Element(dummy_element());
+        assert_eq!(classify_node(&node), Region::Static);
+    }
+
+    #[test]
+    fn test_classify_node_dynamic_element() {
+        // test bindings
+        let mut el = dummy_element();
+        el.bindings.push(Binding { prop: "src".to_string(), value: "url".to_string() });
+        assert_eq!(classify_node(&Node::Element(el)), Region::Dynamic);
+
+        // test conditional classes
+        let mut el = dummy_element();
+        el.conditional_classes.push(ConditionalClass { class: "active".to_string(), condition: "is_active".to_string() });
+        assert_eq!(classify_node(&Node::Element(el)), Region::Dynamic);
+
+        // test interpolated classes
+        let mut el = dummy_element();
+        el.classes.push("bg-{color}".to_string());
+        assert_eq!(classify_node(&Node::Element(el)), Region::Dynamic);
+
+        // test animations
+        let mut el = dummy_element();
+        el.animations.push(AnimationSpec { property: "opacity".to_string(), duration_expr: "300ms".to_string(), easing: "linear".to_string(), repeat: false });
+        assert_eq!(classify_node(&Node::Element(el)), Region::Dynamic);
+
+        // test event handlers
+        let mut el = dummy_element();
+        el.event_handlers.push(EventHandler { event: "click".to_string(), modifiers: vec![], handler: "on_click".to_string() });
+        assert_eq!(classify_node(&Node::Element(el)), Region::Dynamic);
+
+        // test slot-rotate
+        let mut el = dummy_element();
+        el.tag = "slot-rotate".to_string();
+        assert_eq!(classify_node(&Node::Element(el)), Region::Dynamic);
+
+        // test dynamic child
+        let mut el = dummy_element();
+        el.children.push(Node::Text(vec![TextPart::Expr("name".to_string())]));
+        assert_eq!(classify_node(&Node::Element(el)), Region::Dynamic);
+    }
+
+    #[test]
+    fn test_classify_node_control_flow_and_others() {
+        let if_node = Node::If(IfBlock { condition: "true".to_string(), then_children: vec![], else_children: None });
+        assert_eq!(classify_node(&if_node), Region::Dynamic);
+
+        let for_node = Node::For(ForBlock { pattern: "item".to_string(), iterator: "items".to_string(), body: vec![] });
+        assert_eq!(classify_node(&for_node), Region::Dynamic);
+
+        let match_node = Node::Match(MatchBlock { expr: "value".to_string(), arms: vec![] });
+        assert_eq!(classify_node(&match_node), Region::Dynamic);
+
+        let let_node = Node::LetDecl(LetDecl { name: "x".to_string(), expr: "1".to_string(), is_default: false });
+        assert_eq!(classify_node(&let_node), Region::Dynamic);
+
+        let include_node = Node::Include(IncludeNode { path: "other.crepus".to_string(), props: vec![], slot: vec![] });
+        assert_eq!(classify_node(&include_node), Region::Dynamic);
+
+        let embed_node = Node::Embed(EmbedNode { src: "foo".to_string(), adapter: None, props: vec![] });
+        assert_eq!(classify_node(&embed_node), Region::Dynamic);
+
+        let raw_text = Node::RawText("text".to_string());
+        assert_eq!(classify_node(&raw_text), Region::Dynamic);
+
+        let raw_html = Node::RawHtml("<div></div>".to_string());
+        assert_eq!(classify_node(&raw_html), Region::Dynamic);
+    }
 }
