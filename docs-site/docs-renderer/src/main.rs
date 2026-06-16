@@ -10,6 +10,473 @@ use serde::Deserialize;
 use serde_json::json;
 
 const DOCS_SEARCH_JS: &str = include_str!("docs_search.js");
+const DOC_SHELL_CSS: &str = r#"
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      overflow-x: hidden;
+      background: var(--surface);
+      color: var(--text);
+      font-family: Inter, system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      line-height: 1.6;
+    }
+    a { color: color-mix(in srgb, var(--text) 88%, transparent); text-decoration: none; }
+    a:hover { color: var(--text); text-decoration: underline; text-underline-offset: 3px; }
+    .doc-shell {
+      display: grid;
+      grid-template-columns: minmax(220px, 280px) 1fr;
+      min-height: 100vh;
+      align-items: stretch;
+    }
+    .doc-shell > * {
+      min-width: 0;
+    }
+    aside {
+      position: sticky;
+      top: 0;
+      align-self: stretch;
+      height: 100vh;
+      min-height: 100vh;
+      overflow-y: auto;
+      padding: 1.5rem 1.25rem 1.35rem;
+      border-right: 1px solid var(--border);
+      background: color-mix(in srgb, var(--surface) 92%, white 8%);
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      min-width: 0;
+    }
+    .brand {
+      font-weight: 700;
+      font-size: 0.95rem;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.25rem;
+      display: block;
+      color: var(--text);
+    }
+    .brand:hover { text-decoration: none; color: var(--text); opacity: 0.85; }
+    .doc-search-trigger {
+      width: 100%;
+      text-align: left;
+      font: inherit;
+      font-size: 0.8125rem;
+      padding: 0.55rem 0.65rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: color-mix(in srgb, var(--surface) 75%, white 25%);
+      color: var(--muted);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+    }
+    .doc-search-trigger:hover {
+      border-color: color-mix(in srgb, var(--text) 25%, var(--border));
+      color: var(--text);
+    }
+    .doc-search-trigger kbd {
+      font-family: ui-monospace, monospace;
+      font-size: 0.7rem;
+      padding: 0.12rem 0.35rem;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--muted);
+    }
+    .doc-nav {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      font-size: 0.875rem;
+    }
+    .doc-nav li { margin: 0.35rem 0; }
+    .doc-nav a {
+      color: var(--muted);
+      display: block;
+      width: 100%;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+    .doc-nav a:hover { color: var(--text); }
+    .doc-nav a.active { color: var(--text); font-weight: 600; }
+    .doc-toc {
+      margin: 0.25rem 0 0;
+      padding-top: 0.75rem;
+      border-top: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+    }
+    .doc-toc-title {
+      font-size: 0.68rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin: 0 0 0.45rem;
+    }
+    .doc-toc ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      font-size: 0.8125rem;
+      line-height: 1.35;
+    }
+    .doc-toc li { margin: 0.3rem 0; }
+    .doc-toc a {
+      color: var(--muted);
+      display: block;
+      width: 100%;
+      text-decoration: none;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+    .doc-toc a:hover { color: var(--text); text-decoration: underline; text-underline-offset: 2px; }
+    .doc-toc li.doc-toc-h3 {
+      padding-left: 0.75rem;
+      font-size: 0.78rem;
+      opacity: 0.95;
+    }
+    .doc-main {
+      padding: clamp(1.5rem, 3vw, 2.5rem) clamp(1rem, 3vw, 2.75rem) clamp(3.25rem, 5vw, 5rem);
+      max-width: 52rem;
+      min-width: 0;
+    }
+    .doc-main.doc-main--wide {
+      max-width: 74rem;
+    }
+    .prose h1 { font-size: 2rem; font-weight: 700; margin: 0 0 1rem; letter-spacing: -0.03em; line-height: 1.2; scroll-margin-top: 1.25rem; }
+    .prose h2 { font-size: 1.35rem; font-weight: 600; margin: 2rem 0 0.75rem; letter-spacing: -0.02em; scroll-margin-top: 1.25rem; }
+    .prose h3 { font-size: 1.05rem; font-weight: 600; margin: 1.5rem 0 0.5rem; scroll-margin-top: 1.25rem; }
+    .prose p { margin: 0.75rem 0; color: color-mix(in srgb, var(--text) 88%, var(--muted)); }
+    .prose ul, .prose ol { margin: 0.75rem 0; padding-left: 1.25rem; color: color-mix(in srgb, var(--text) 88%, var(--muted)); }
+    .prose li { margin: 0.25rem 0; }
+    .prose blockquote {
+      margin: 1rem 0;
+      padding-left: 1rem;
+      border-left: 3px solid var(--accent);
+      color: var(--muted);
+    }
+    .prose code {
+      font-family: "JetBrains Mono", ui-monospace, monospace;
+      font-size: 0.88em;
+      background: color-mix(in srgb, var(--surface) 70%, var(--border));
+      padding: 0.12em 0.35em;
+      border-radius: 4px;
+    }
+    .prose pre {
+      background: #0a0a0a;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 0.95rem 1rem;
+      overflow-x: auto;
+      margin: 1rem 0;
+    }
+    .prose pre code {
+      background: none;
+      padding: 0;
+      font-size: 0.8rem;
+      line-height: 1.5;
+    }
+    .prose table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1rem 0;
+      font-size: 0.9rem;
+    }
+    .prose th, .prose td {
+      border: 1px solid var(--border);
+      padding: 0.5rem 0.65rem;
+      text-align: left;
+    }
+    .prose th {
+      background: color-mix(in srgb, var(--surface) 80%, var(--border));
+      font-weight: 600;
+    }
+    .prose hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+    .prose a { color: color-mix(in srgb, var(--text) 90%, var(--muted)); border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, var(--muted)); }
+    .prose a:hover { color: var(--text); border-bottom-color: var(--text); }
+    .docs-landing .lede {
+      font-size: 1rem;
+      max-width: 48rem;
+      margin: 0 0 2rem;
+      color: color-mix(in srgb, var(--text) 85%, var(--muted));
+    }
+    .docs-landing .lede code {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 0.9em;
+    }
+    .docs-landing .lede a {
+      color: color-mix(in srgb, var(--text) 90%, var(--muted));
+      border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, var(--muted));
+    }
+    .docs-landing .lede a:hover {
+      color: var(--text);
+      border-bottom-color: var(--text);
+    }
+    .doc-grid {
+      display: grid;
+      gap: 1rem;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    }
+    .doc-card {
+      display: block;
+      padding: 1.15rem 1.2rem;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: color-mix(in srgb, var(--surface) 92%, white 8%);
+      transition: border-color 0.15s ease, background 0.15s ease;
+    }
+    .doc-card:hover {
+      border-color: color-mix(in srgb, var(--text) 35%, var(--border));
+      background: color-mix(in srgb, var(--surface) 88%, white 12%);
+      text-decoration: none;
+    }
+    .doc-card h2 {
+      margin: 0 0 0.35rem;
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .doc-card p {
+      margin: 0;
+      font-size: 0.875rem;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+    .footnote {
+      margin-top: 2rem;
+      font-size: 0.875rem;
+      color: var(--muted);
+    }
+    .doc-footer {
+      margin-top: auto;
+      padding-top: 1rem;
+      font-size: 0.75rem;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+    .doc-footer strong { color: color-mix(in srgb, var(--text) 70%, var(--muted)); }
+    .doc-search-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 200;
+      background: rgba(0,0,0,0.55);
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: min(8vh, 4rem) 0.75rem 1rem;
+    }
+    .doc-search-overlay--hidden {
+      display: none !important;
+    }
+    .doc-search-error,
+    .doc-search-empty {
+      padding: 0.75rem 0.65rem;
+      font-size: 0.85rem;
+      color: var(--muted);
+      list-style: none;
+    }
+    .doc-search-error { color: #f87171; }
+    .doc-search-dialog {
+      width: min(560px, 100%);
+      background: color-mix(in srgb, var(--surface) 94%, white 6%);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-shadow: 0 24px 80px rgba(0,0,0,0.45);
+      overflow: hidden;
+    }
+    .doc-search-dialog input {
+      width: 100%;
+      box-sizing: border-box;
+      border: none;
+      border-bottom: 1px solid var(--border);
+      padding: 1rem 1.1rem;
+      font: inherit;
+      font-size: 1rem;
+      background: transparent;
+      color: var(--text);
+    }
+    .doc-search-dialog input:focus { outline: none; }
+    .doc-search-dialog ul {
+      list-style: none;
+      margin: 0;
+      padding: 0.5rem;
+      max-height: min(340px, 48vh);
+      overflow-y: auto;
+    }
+    .doc-search-dialog li {
+      border-radius: 8px;
+    }
+    .doc-search-dialog li a {
+      display: block;
+      padding: 0.55rem 0.65rem;
+      font-weight: 600;
+      font-size: 0.9rem;
+      color: var(--text);
+    }
+    .doc-search-dialog li:hover { background: color-mix(in srgb, var(--surface) 80%, white 20%); }
+    .doc-search-snippet {
+      display: block;
+      padding: 0 0.65rem 0.55rem;
+      font-size: 0.75rem;
+      color: var(--muted);
+      line-height: 1.35;
+    }
+    @media (max-width: 640px) {
+      .doc-shell {
+        min-height: auto;
+      }
+      aside {
+        padding: 0.95rem 0.9rem 1rem;
+        gap: 0.75rem;
+      }
+      .brand {
+        font-size: 0.9rem;
+      }
+      .doc-search-trigger {
+        padding: 0.6rem 0.7rem;
+        font-size: 0.8rem;
+      }
+      .doc-search-trigger kbd {
+        display: none;
+      }
+      .doc-nav {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.35rem 0.75rem;
+        font-size: 0.82rem;
+      }
+      .doc-nav li {
+        margin: 0;
+      }
+      .doc-toc {
+        padding-top: 0.65rem;
+      }
+      .doc-toc ul {
+        font-size: 0.78rem;
+      }
+      .doc-main {
+        padding: 1.1rem 0.9rem 2.5rem;
+      }
+      .prose h1 {
+        font-size: 1.65rem;
+        margin-bottom: 0.85rem;
+      }
+      .prose h2 {
+        font-size: 1.15rem;
+        margin-top: 1.5rem;
+      }
+      .prose h3 {
+        font-size: 0.98rem;
+      }
+      .prose p,
+      .prose ul,
+      .prose ol {
+        margin-top: 0.65rem;
+        margin-bottom: 0.65rem;
+      }
+      .prose pre {
+        padding: 0.8rem 0.85rem;
+        border-radius: 10px;
+      }
+      .prose pre code {
+        font-size: 0.75rem;
+      }
+      .prose table {
+        display: block;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+      .docs-landing .lede {
+        font-size: 0.95rem;
+        margin-bottom: 1.5rem;
+      }
+      .doc-grid {
+        grid-template-columns: 1fr;
+      }
+      .doc-card {
+        padding: 1rem 1.05rem;
+      }
+      .footnote {
+        margin-top: 1.5rem;
+      }
+      .doc-search-overlay {
+        padding-top: 0.75rem;
+      }
+      .doc-search-dialog {
+        width: 100%;
+      }
+      .doc-search-dialog input {
+        padding: 0.9rem 1rem;
+      }
+    }
+    .doc-sidebar-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+    }
+    .doc-nav-toggle {
+      appearance: none;
+      border: 0;
+      background: transparent;
+      color: var(--text);
+      border-radius: 999px;
+      width: 2.25rem;
+      height: 2.25rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      flex: 0 0 auto;
+      padding: 0;
+      line-height: 1;
+      font-size: 1.45rem;
+    }
+    .doc-nav-toggle:hover {
+      color: var(--accent);
+    }
+    .doc-nav-toggle--main { display: none; }
+    .doc-main { min-width: 0; }
+    .doc-search-trigger { min-width: 0; }
+    @media (max-width: 860px) {
+      .doc-shell { grid-template-columns: 1fr; }
+      .doc-nav-toggle--main {
+        display: inline-flex;
+        position: fixed;
+        top: 0.9rem;
+        left: 0.9rem;
+        z-index: 180;
+      }
+      aside.mobile-expanded + .doc-main .doc-nav-toggle--main {
+        left: min(calc(84vw + 0.65rem), 328px);
+      }
+      aside {
+        position: fixed;
+        inset: 0 auto 0 0;
+        width: min(84vw, 320px);
+        transform: translateX(-105%);
+        transition: transform 0.2s ease;
+        z-index: 100;
+        box-shadow: 2px 0 16px rgba(0, 0, 0, 0.18);
+        height: 100vh;
+      }
+      aside.mobile-expanded { transform: translateX(0); }
+      aside .doc-nav,
+      aside .doc-toc,
+      aside .doc-search-trigger,
+      aside .doc-footer { display: none; }
+      aside.mobile-expanded .doc-nav,
+      aside.mobile-expanded .doc-toc,
+      aside.mobile-expanded .doc-search-trigger,
+      aside.mobile-expanded .doc-footer { display: block; }
+      aside.mobile-expanded .doc-search-trigger { display: flex; }
+      .doc-search-trigger { width: 100%; }
+      .doc-main { padding: 4.25rem 1rem 3rem; }
+    }
+"#;
+
 const SITE_BASE_URL: &str = "https://crepuscularity.undivisible.dev";
 const SITE_IMAGE_URL: &str = "https://crepuscularity.undivisible.dev/static/og.png";
 
@@ -613,470 +1080,7 @@ fn render_doc_shell(
       --muted: {m};
       --border: {b};
     }}
-    * {{ box-sizing: border-box; }}
-    body {{
-      margin: 0;
-      min-height: 100vh;
-      overflow-x: hidden;
-      background: var(--surface);
-      color: var(--text);
-      font-family: Inter, system-ui, sans-serif;
-      -webkit-font-smoothing: antialiased;
-      line-height: 1.6;
-    }}
-    a {{ color: color-mix(in srgb, var(--text) 88%, transparent); text-decoration: none; }}
-    a:hover {{ color: var(--text); text-decoration: underline; text-underline-offset: 3px; }}
-    .doc-shell {{
-      display: grid;
-      grid-template-columns: minmax(220px, 280px) 1fr;
-      min-height: 100vh;
-      align-items: stretch;
-    }}
-    .doc-shell > * {{
-      min-width: 0;
-    }}
-    aside {{
-      position: sticky;
-      top: 0;
-      align-self: stretch;
-      height: 100vh;
-      min-height: 100vh;
-      overflow-y: auto;
-      padding: 1.5rem 1.25rem 1.35rem;
-      border-right: 1px solid var(--border);
-      background: color-mix(in srgb, var(--surface) 92%, white 8%);
-      display: flex;
-      flex-direction: column;
-      gap: 1rem;
-      min-width: 0;
-    }}
-    .brand {{
-      font-weight: 700;
-      font-size: 0.95rem;
-      letter-spacing: -0.02em;
-      margin-bottom: 0.25rem;
-      display: block;
-      color: var(--text);
-    }}
-    .brand:hover {{ text-decoration: none; color: var(--text); opacity: 0.85; }}
-    .doc-search-trigger {{
-      width: 100%;
-      text-align: left;
-      font: inherit;
-      font-size: 0.8125rem;
-      padding: 0.55rem 0.65rem;
-      border-radius: 8px;
-      border: 1px solid var(--border);
-      background: color-mix(in srgb, var(--surface) 75%, white 25%);
-      color: var(--muted);
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 0.5rem;
-    }}
-    .doc-search-trigger:hover {{
-      border-color: color-mix(in srgb, var(--text) 25%, var(--border));
-      color: var(--text);
-    }}
-    .doc-search-trigger kbd {{
-      font-family: ui-monospace, monospace;
-      font-size: 0.7rem;
-      padding: 0.12rem 0.35rem;
-      border-radius: 4px;
-      border: 1px solid var(--border);
-      background: var(--surface);
-      color: var(--muted);
-    }}
-    .doc-nav {{
-      list-style: none;
-      padding: 0;
-      margin: 0;
-      font-size: 0.875rem;
-    }}
-    .doc-nav li {{ margin: 0.35rem 0; }}
-    .doc-nav a {{
-      color: var(--muted);
-      display: block;
-      width: 100%;
-      overflow-wrap: anywhere;
-      word-break: break-word;
-    }}
-    .doc-nav a:hover {{ color: var(--text); }}
-    .doc-nav a.active {{ color: var(--text); font-weight: 600; }}
-    .doc-toc {{
-      margin: 0.25rem 0 0;
-      padding-top: 0.75rem;
-      border-top: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
-    }}
-    .doc-toc-title {{
-      font-size: 0.68rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--muted);
-      margin: 0 0 0.45rem;
-    }}
-    .doc-toc ul {{
-      list-style: none;
-      padding: 0;
-      margin: 0;
-      font-size: 0.8125rem;
-      line-height: 1.35;
-    }}
-    .doc-toc li {{ margin: 0.3rem 0; }}
-    .doc-toc a {{
-      color: var(--muted);
-      display: block;
-      width: 100%;
-      text-decoration: none;
-      overflow-wrap: anywhere;
-      word-break: break-word;
-    }}
-    .doc-toc a:hover {{ color: var(--text); text-decoration: underline; text-underline-offset: 2px; }}
-    .doc-toc li.doc-toc-h3 {{
-      padding-left: 0.75rem;
-      font-size: 0.78rem;
-      opacity: 0.95;
-    }}
-    .doc-main {{
-      padding: clamp(1.5rem, 3vw, 2.5rem) clamp(1rem, 3vw, 2.75rem) clamp(3.25rem, 5vw, 5rem);
-      max-width: 52rem;
-      min-width: 0;
-    }}
-    .doc-main.doc-main--wide {{
-      max-width: 74rem;
-    }}
-    .prose h1 {{ font-size: 2rem; font-weight: 700; margin: 0 0 1rem; letter-spacing: -0.03em; line-height: 1.2; scroll-margin-top: 1.25rem; }}
-    .prose h2 {{ font-size: 1.35rem; font-weight: 600; margin: 2rem 0 0.75rem; letter-spacing: -0.02em; scroll-margin-top: 1.25rem; }}
-    .prose h3 {{ font-size: 1.05rem; font-weight: 600; margin: 1.5rem 0 0.5rem; scroll-margin-top: 1.25rem; }}
-    .prose p {{ margin: 0.75rem 0; color: color-mix(in srgb, var(--text) 88%, var(--muted)); }}
-    .prose ul, .prose ol {{ margin: 0.75rem 0; padding-left: 1.25rem; color: color-mix(in srgb, var(--text) 88%, var(--muted)); }}
-    .prose li {{ margin: 0.25rem 0; }}
-    .prose blockquote {{
-      margin: 1rem 0;
-      padding-left: 1rem;
-      border-left: 3px solid var(--accent);
-      color: var(--muted);
-    }}
-    .prose code {{
-      font-family: "JetBrains Mono", ui-monospace, monospace;
-      font-size: 0.88em;
-      background: color-mix(in srgb, var(--surface) 70%, var(--border));
-      padding: 0.12em 0.35em;
-      border-radius: 4px;
-    }}
-    .prose pre {{
-      background: #0a0a0a;
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 0.95rem 1rem;
-      overflow-x: auto;
-      margin: 1rem 0;
-    }}
-    .prose pre code {{
-      background: none;
-      padding: 0;
-      font-size: 0.8rem;
-      line-height: 1.5;
-    }}
-    .prose table {{
-      width: 100%;
-      border-collapse: collapse;
-      margin: 1rem 0;
-      font-size: 0.9rem;
-    }}
-    .prose th, .prose td {{
-      border: 1px solid var(--border);
-      padding: 0.5rem 0.65rem;
-      text-align: left;
-    }}
-    .prose th {{
-      background: color-mix(in srgb, var(--surface) 80%, var(--border));
-      font-weight: 600;
-    }}
-    .prose hr {{ border: none; border-top: 1px solid var(--border); margin: 2rem 0; }}
-    .prose a {{ color: color-mix(in srgb, var(--text) 90%, var(--muted)); border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, var(--muted)); }}
-    .prose a:hover {{ color: var(--text); border-bottom-color: var(--text); }}
-    .docs-landing .lede {{
-      font-size: 1rem;
-      max-width: 48rem;
-      margin: 0 0 2rem;
-      color: color-mix(in srgb, var(--text) 85%, var(--muted));
-    }}
-    .docs-landing .lede code {{
-      font-family: "JetBrains Mono", monospace;
-      font-size: 0.9em;
-    }}
-    .docs-landing .lede a {{
-      color: color-mix(in srgb, var(--text) 90%, var(--muted));
-      border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, var(--muted));
-    }}
-    .docs-landing .lede a:hover {{
-      color: var(--text);
-      border-bottom-color: var(--text);
-    }}
-    .doc-grid {{
-      display: grid;
-      gap: 1rem;
-      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    }}
-    .doc-card {{
-      display: block;
-      padding: 1.15rem 1.2rem;
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      background: color-mix(in srgb, var(--surface) 92%, white 8%);
-      transition: border-color 0.15s ease, background 0.15s ease;
-    }}
-    .doc-card:hover {{
-      border-color: color-mix(in srgb, var(--text) 35%, var(--border));
-      background: color-mix(in srgb, var(--surface) 88%, white 12%);
-      text-decoration: none;
-    }}
-    .doc-card h2 {{
-      margin: 0 0 0.35rem;
-      font-size: 1.05rem;
-      font-weight: 600;
-      color: var(--text);
-    }}
-    .doc-card p {{
-      margin: 0;
-      font-size: 0.875rem;
-      color: var(--muted);
-      line-height: 1.5;
-    }}
-    .footnote {{
-      margin-top: 2rem;
-      font-size: 0.875rem;
-      color: var(--muted);
-    }}
-    .doc-footer {{
-      margin-top: auto;
-      padding-top: 1rem;
-      font-size: 0.75rem;
-      color: var(--muted);
-      line-height: 1.45;
-    }}
-    .doc-footer strong {{ color: color-mix(in srgb, var(--text) 70%, var(--muted)); }}
-    .doc-search-overlay {{
-      position: fixed;
-      inset: 0;
-      z-index: 200;
-      background: rgba(0,0,0,0.55);
-      display: flex;
-      align-items: flex-start;
-      justify-content: center;
-      padding: min(8vh, 4rem) 0.75rem 1rem;
-    }}
-    .doc-search-overlay--hidden {{
-      display: none !important;
-    }}
-    .doc-search-error,
-    .doc-search-empty {{
-      padding: 0.75rem 0.65rem;
-      font-size: 0.85rem;
-      color: var(--muted);
-      list-style: none;
-    }}
-    .doc-search-error {{ color: #f87171; }}
-    .doc-search-dialog {{
-      width: min(560px, 100%);
-      background: color-mix(in srgb, var(--surface) 94%, white 6%);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      box-shadow: 0 24px 80px rgba(0,0,0,0.45);
-      overflow: hidden;
-    }}
-    .doc-search-dialog input {{
-      width: 100%;
-      box-sizing: border-box;
-      border: none;
-      border-bottom: 1px solid var(--border);
-      padding: 1rem 1.1rem;
-      font: inherit;
-      font-size: 1rem;
-      background: transparent;
-      color: var(--text);
-    }}
-    .doc-search-dialog input:focus {{ outline: none; }}
-    .doc-search-dialog ul {{
-      list-style: none;
-      margin: 0;
-      padding: 0.5rem;
-      max-height: min(340px, 48vh);
-      overflow-y: auto;
-    }}
-    .doc-search-dialog li {{
-      border-radius: 8px;
-    }}
-    .doc-search-dialog li a {{
-      display: block;
-      padding: 0.55rem 0.65rem;
-      font-weight: 600;
-      font-size: 0.9rem;
-      color: var(--text);
-    }}
-    .doc-search-dialog li:hover {{ background: color-mix(in srgb, var(--surface) 80%, white 20%); }}
-    .doc-search-snippet {{
-      display: block;
-      padding: 0 0.65rem 0.55rem;
-      font-size: 0.75rem;
-      color: var(--muted);
-      line-height: 1.35;
-    }}
-    @media (max-width: 640px) {{
-      .doc-shell {{
-        min-height: auto;
-      }}
-      aside {{
-        padding: 0.95rem 0.9rem 1rem;
-        gap: 0.75rem;
-      }}
-      .brand {{
-        font-size: 0.9rem;
-      }}
-      .doc-search-trigger {{
-        padding: 0.6rem 0.7rem;
-        font-size: 0.8rem;
-      }}
-      .doc-search-trigger kbd {{
-        display: none;
-      }}
-      .doc-nav {{
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 0.35rem 0.75rem;
-        font-size: 0.82rem;
-      }}
-      .doc-nav li {{
-        margin: 0;
-      }}
-      .doc-toc {{
-        padding-top: 0.65rem;
-      }}
-      .doc-toc ul {{
-        font-size: 0.78rem;
-      }}
-      .doc-main {{
-        padding: 1.1rem 0.9rem 2.5rem;
-      }}
-      .prose h1 {{
-        font-size: 1.65rem;
-        margin-bottom: 0.85rem;
-      }}
-      .prose h2 {{
-        font-size: 1.15rem;
-        margin-top: 1.5rem;
-      }}
-      .prose h3 {{
-        font-size: 0.98rem;
-      }}
-      .prose p,
-      .prose ul,
-      .prose ol {{
-        margin-top: 0.65rem;
-        margin-bottom: 0.65rem;
-      }}
-      .prose pre {{
-        padding: 0.8rem 0.85rem;
-        border-radius: 10px;
-      }}
-      .prose pre code {{
-        font-size: 0.75rem;
-      }}
-      .prose table {{
-        display: block;
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-      }}
-      .docs-landing .lede {{
-        font-size: 0.95rem;
-        margin-bottom: 1.5rem;
-      }}
-      .doc-grid {{
-        grid-template-columns: 1fr;
-      }}
-      .doc-card {{
-        padding: 1rem 1.05rem;
-      }}
-      .footnote {{
-        margin-top: 1.5rem;
-      }}
-      .doc-search-overlay {{
-        padding-top: 0.75rem;
-      }}
-      .doc-search-dialog {{
-        width: 100%;
-      }}
-      .doc-search-dialog input {{
-        padding: 0.9rem 1rem;
-      }}
-    }}
-    .doc-sidebar-header {{
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 0.75rem;
-    }}
-    .doc-nav-toggle {{
-      appearance: none;
-      border: 0;
-      background: transparent;
-      color: var(--text);
-      border-radius: 999px;
-      width: 2.25rem;
-      height: 2.25rem;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      flex: 0 0 auto;
-      padding: 0;
-      line-height: 1;
-      font-size: 1.45rem;
-    }}
-    .doc-nav-toggle:hover {{
-      color: var(--accent);
-    }}
-    .doc-nav-toggle--main {{ display: none; }}
-    .doc-main {{ min-width: 0; }}
-    .doc-search-trigger {{ min-width: 0; }}
-    @media (max-width: 860px) {{
-      .doc-shell {{ grid-template-columns: 1fr; }}
-      .doc-nav-toggle--main {{
-        display: inline-flex;
-        position: fixed;
-        top: 0.9rem;
-        left: 0.9rem;
-        z-index: 180;
-      }}
-      aside.mobile-expanded + .doc-main .doc-nav-toggle--main {{
-        left: min(calc(84vw + 0.65rem), 328px);
-      }}
-      aside {{
-        position: fixed;
-        inset: 0 auto 0 0;
-        width: min(84vw, 320px);
-        transform: translateX(-105%);
-        transition: transform 0.2s ease;
-        z-index: 100;
-        box-shadow: 2px 0 16px rgba(0, 0, 0, 0.18);
-        height: 100vh;
-      }}
-      aside.mobile-expanded {{ transform: translateX(0); }}
-      aside .doc-nav,
-      aside .doc-toc,
-      aside .doc-search-trigger,
-      aside .doc-footer {{ display: none; }}
-      aside.mobile-expanded .doc-nav,
-      aside.mobile-expanded .doc-toc,
-      aside.mobile-expanded .doc-search-trigger,
-      aside.mobile-expanded .doc-footer {{ display: block; }}
-      aside.mobile-expanded .doc-search-trigger {{ display: flex; }}
-      .doc-search-trigger {{ width: 100%; }}
-      .doc-main {{ padding: 4.25rem 1rem 3rem; }}
-    }}
+    {DOC_SHELL_CSS}
   </style>
 </head>
 <body>
@@ -1130,6 +1134,7 @@ fn render_doc_shell(
         t = theme.text,
         m = theme.muted,
         b = theme.border,
+        DOC_SHELL_CSS = DOC_SHELL_CSS,
     );
     html.replace("__CREPUS_DOCS_SEARCH__", DOCS_SEARCH_JS)
 }
