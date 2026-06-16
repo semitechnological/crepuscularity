@@ -932,4 +932,34 @@ div
             ]
         );
     }
+
+    #[test]
+    fn test_merge_unique_font_families_edge_cases() {
+        // Empty iterator
+        let empty_input: Vec<String> = vec![];
+        assert!(merge_unique_font_families(empty_input).is_empty());
+
+        // Iterator with only empty/whitespace strings
+        let whitespace_input = vec![
+            "".to_string(),
+            " ".to_string(),
+            "   ".to_string(),
+            "\n".to_string(),
+            "\t".to_string(),
+        ];
+        assert!(merge_unique_font_families(whitespace_input).is_empty());
+
+        // Duplicates differing only by leading/trailing whitespace
+        let whitespace_dups = vec![
+            "Arial".to_string(),
+            " Arial".to_string(),
+            "Arial ".to_string(),
+            " Arial ".to_string(),
+            "\tArial\n".to_string(),
+        ];
+        assert_eq!(
+            merge_unique_font_families(whitespace_dups),
+            vec!["Arial".to_string()]
+        );
+    }
 }
