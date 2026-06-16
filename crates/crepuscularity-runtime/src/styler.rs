@@ -1163,3 +1163,24 @@ mod tailwind_color_tests {
         assert_eq!(tailwind_color("red", "500"), Some(0xfb2c36));
     }
 }
+
+#[cfg(test)]
+mod parse_duration_ms_tests {
+    use super::parse_duration_ms;
+
+    #[test]
+    fn test_parse_duration_ms() {
+        assert_eq!(parse_duration_ms("500ms"), Some(500));
+        assert_eq!(parse_duration_ms("300ms"), Some(300));
+        assert_eq!(parse_duration_ms("1s"), Some(1000));
+        assert_eq!(parse_duration_ms("2s"), Some(2000));
+        assert_eq!(parse_duration_ms("0.5s"), Some(500));
+        assert_eq!(parse_duration_ms("0.25s"), Some(250));
+        assert_eq!(parse_duration_ms("500"), Some(500));
+        assert_eq!(parse_duration_ms("1000"), Some(1000));
+        assert_eq!(parse_duration_ms("abc"), None);
+        assert_eq!(parse_duration_ms("1.5ms"), None);
+        assert_eq!(parse_duration_ms("-1s"), Some(0));
+        assert_eq!(parse_duration_ms("-100ms"), None);
+    }
+}
