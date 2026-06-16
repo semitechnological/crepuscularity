@@ -1184,3 +1184,42 @@ mod parse_duration_ms_tests {
         assert_eq!(parse_duration_ms("-100ms"), None);
     }
 }
+
+#[cfg(test)]
+mod parse_absolute_length_tests {
+    use super::parse_absolute_length;
+    use gpui::{px, rems};
+
+    #[test]
+    fn test_px_suffix() {
+        assert_eq!(parse_absolute_length("10px"), Some(px(10.0).into()));
+        assert_eq!(parse_absolute_length("15.5px"), Some(px(15.5).into()));
+        assert_eq!(parse_absolute_length("-5px"), Some(px(-5.0).into()));
+    }
+
+    #[test]
+    fn test_rem_suffix() {
+        assert_eq!(parse_absolute_length("2rem"), Some(rems(2.0).into()));
+        assert_eq!(parse_absolute_length("1.25rem"), Some(rems(1.25).into()));
+        assert_eq!(parse_absolute_length("-0.5rem"), Some(rems(-0.5).into()));
+    }
+
+    #[test]
+    fn test_no_suffix_fallback_to_px() {
+        assert_eq!(parse_absolute_length("20"), Some(px(20.0).into()));
+        assert_eq!(parse_absolute_length("2.5"), Some(px(2.5).into()));
+        assert_eq!(parse_absolute_length("-10"), Some(px(-10.0).into()));
+    }
+
+    #[test]
+    fn test_invalid_strings() {
+        assert_eq!(parse_absolute_length(""), None);
+        assert_eq!(parse_absolute_length("px"), None);
+        assert_eq!(parse_absolute_length("rem"), None);
+        assert_eq!(parse_absolute_length("10em"), None);
+        assert_eq!(parse_absolute_length("10vh"), None);
+        assert_eq!(parse_absolute_length("abc"), None);
+        assert_eq!(parse_absolute_length("10.5.5px"), None);
+        assert_eq!(parse_absolute_length("10pxrem"), None);
+    }
+}
