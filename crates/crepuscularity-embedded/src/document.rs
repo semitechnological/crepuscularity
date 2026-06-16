@@ -107,6 +107,18 @@ pub struct EmbeddedStyle {
     pub font_bold: bool,
 }
 
+macro_rules! pad_margin_getter {
+    ($name:ident, $specific:ident, $axis:ident, $shorthand:ident) => {
+        pub fn $name(&self) -> u16 {
+            if self.$specific > 0 {
+                self.$specific
+            } else {
+                Self::axis_or_shorthand(self.$axis, self.$shorthand)
+            }
+        }
+    };
+}
+
 impl EmbeddedStyle {
     fn axis_or_shorthand(axis: u16, shorthand: u16) -> u16 {
         if axis > 0 {
@@ -116,37 +128,10 @@ impl EmbeddedStyle {
         }
     }
 
-    pub fn pad_left(&self) -> u16 {
-        if self.padding_l > 0 {
-            self.padding_l
-        } else {
-            Self::axis_or_shorthand(self.padding_x, self.padding)
-        }
-    }
-
-    pub fn pad_right(&self) -> u16 {
-        if self.padding_r > 0 {
-            self.padding_r
-        } else {
-            Self::axis_or_shorthand(self.padding_x, self.padding)
-        }
-    }
-
-    pub fn pad_top(&self) -> u16 {
-        if self.padding_t > 0 {
-            self.padding_t
-        } else {
-            Self::axis_or_shorthand(self.padding_y, self.padding)
-        }
-    }
-
-    pub fn pad_bottom(&self) -> u16 {
-        if self.padding_b > 0 {
-            self.padding_b
-        } else {
-            Self::axis_or_shorthand(self.padding_y, self.padding)
-        }
-    }
+    pad_margin_getter!(pad_left, padding_l, padding_x, padding);
+    pad_margin_getter!(pad_right, padding_r, padding_x, padding);
+    pad_margin_getter!(pad_top, padding_t, padding_y, padding);
+    pad_margin_getter!(pad_bottom, padding_b, padding_y, padding);
 
     pub fn pad_x(&self) -> u16 {
         self.pad_left().max(self.pad_right())
@@ -156,37 +141,10 @@ impl EmbeddedStyle {
         self.pad_top().max(self.pad_bottom())
     }
 
-    pub fn margin_left(&self) -> u16 {
-        if self.margin_l > 0 {
-            self.margin_l
-        } else {
-            Self::axis_or_shorthand(self.margin_x, self.margin)
-        }
-    }
-
-    pub fn margin_right(&self) -> u16 {
-        if self.margin_r > 0 {
-            self.margin_r
-        } else {
-            Self::axis_or_shorthand(self.margin_x, self.margin)
-        }
-    }
-
-    pub fn margin_top(&self) -> u16 {
-        if self.margin_t > 0 {
-            self.margin_t
-        } else {
-            Self::axis_or_shorthand(self.margin_y, self.margin)
-        }
-    }
-
-    pub fn margin_bottom(&self) -> u16 {
-        if self.margin_b > 0 {
-            self.margin_b
-        } else {
-            Self::axis_or_shorthand(self.margin_y, self.margin)
-        }
-    }
+    pad_margin_getter!(margin_left, margin_l, margin_x, margin);
+    pad_margin_getter!(margin_right, margin_r, margin_x, margin);
+    pad_margin_getter!(margin_top, margin_t, margin_y, margin);
+    pad_margin_getter!(margin_bottom, margin_b, margin_y, margin);
 
     pub fn opacity_fraction(&self) -> u8 {
         match self.opacity_percent {
