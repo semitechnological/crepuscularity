@@ -1877,6 +1877,7 @@ dependencies = [
  "serde_json",
  "toml 1.1.2+spec-1.1.0",
  "v8",
+ "which 8.0.3",
 ]
 
 [[package]]
@@ -9876,6 +9877,15 @@ dependencies = [
  "home",
  "rustix 0.38.44",
  "winsafe",
+]
+
+[[package]]
+name = "which"
+version = "8.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c789537cf2f7f55be8e6192f92e464174ee55f91af622777f7f1ceb0dbccd03e"
+dependencies = [
+ "libc",
 ]
 
 [[package]]
