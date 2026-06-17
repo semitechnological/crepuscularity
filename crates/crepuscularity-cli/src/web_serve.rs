@@ -1091,60 +1091,6 @@ fn guess_mime(ext: &str) -> &'static str {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use crate::crepus_toml::WebTargetMeta;
-    use std::collections::HashMap;
-
-    #[test]
-    fn resolve_static_file_rejects_parent_segments() {
-        let site = tempfile::tempdir().expect("tempdir");
-        assert!(super::resolve_static_file(site.path(), "../secret.txt").is_none());
-        assert!(super::resolve_static_file(site.path(), "static/../../etc/passwd").is_none());
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn resolve_static_file_blocks_symlink_escape() {
-        use std::os::unix::fs::symlink;
-
-        let site = tempfile::tempdir().expect("tempdir");
-        let outside = tempfile::tempdir().expect("outside");
-        std::fs::write(outside.path().join("secret.txt"), "nope").expect("write secret");
-        symlink(outside.path(), site.path().join("escape")).expect("symlink");
-
-        assert!(super::resolve_static_file(site.path(), "escape/secret.txt").is_none());
-    }
-
-    #[test]
-    fn resolve_static_file_allows_in_tree_asset() {
-        let site = tempfile::tempdir().expect("tempdir");
-        let asset = site.path().join("static").join("app.css");
-        std::fs::create_dir_all(asset.parent().expect("parent")).expect("mkdir");
-        std::fs::write(&asset, "body{}").expect("write css");
-
-        let resolved = super::resolve_static_file(site.path(), "static/app.css").expect("asset");
-        assert_eq!(
-            resolved,
-            std::fs::canonicalize(&asset).expect("canonicalize")
-        );
-    }
-
-    #[test]
-    fn dev_index_merges_target_head_html() {
-        let site_dir = tempfile::tempdir().expect("tempdir");
-        let files = HashMap::from([("index.crepus".to_string(), "div\n  \"Hello\"".to_string())]);
-        let meta = WebTargetMeta {
-            head_html: Some(r#"<style>.from-target{color:red}</style>"#.into()),
-            ..WebTargetMeta::default()
-        };
-
-        let html = super::render_dev_index_html(site_dir.path(), &files, Some(&meta), "");
-
-        assert!(html.contains(r#"<style>.from-target{color:red}</style>"#));
-    }
-}
-
 // ── Axum SSR integration ─────────────────────────────────────────────────────
 
 /// Shared state for Axum SSR handlers.
@@ -1250,7 +1196,7 @@ async fn ssr_index_handler(
             title: &title,
             ..Default::default()
         };
-        match render_ssr_document(&files.get(&entry).unwrap_or(&String::new()), &ctx, &doc, true) {
+        match render_ssr_document(files.get(&entry).unwrap_or(&String::new()), &ctx, &doc, true) {
             Ok(html) => axum::response::Html(html),
             Err(e) => axum::response::Html(format!(
                 "<pre style='color:red'>{e}</pre>"
@@ -1378,5 +1324,60 @@ fn watch_crepus_files(
         generation.fetch_add(1, Ordering::Release);
         *last_sse_msg.write().unwrap_or_else(|e| e.into_inner()) =
             runtime_rebuild_sse_message();
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use crate::crepus_toml::WebTargetMeta;
+    use std::collections::HashMap;
+
+    #[test]
+    fn resolve_static_file_rejects_parent_segments() {
+        let site = tempfile::tempdir().expect("tempdir");
+        assert!(super::resolve_static_file(site.path(), "../secret.txt").is_none());
+        assert!(super::resolve_static_file(site.path(), "static/../../etc/passwd").is_none());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn resolve_static_file_blocks_symlink_escape() {
+        use std::os::unix::fs::symlink;
+
+        let site = tempfile::tempdir().expect("tempdir");
+        let outside = tempfile::tempdir().expect("outside");
+        std::fs::write(outside.path().join("secret.txt"), "nope").expect("write secret");
+        symlink(outside.path(), site.path().join("escape")).expect("symlink");
+
+        assert!(super::resolve_static_file(site.path(), "escape/secret.txt").is_none());
+    }
+
+    #[test]
+    fn resolve_static_file_allows_in_tree_asset() {
+        let site = tempfile::tempdir().expect("tempdir");
+        let asset = site.path().join("static").join("app.css");
+        std::fs::create_dir_all(asset.parent().expect("parent")).expect("mkdir");
+        std::fs::write(&asset, "body{}").expect("write css");
+
+        let resolved = super::resolve_static_file(site.path(), "static/app.css").expect("asset");
+        assert_eq!(
+            resolved,
+            std::fs::canonicalize(&asset).expect("canonicalize")
+        );
+    }
+
+    #[test]
+    fn dev_index_merges_target_head_html() {
+        let site_dir = tempfile::tempdir().expect("tempdir");
+        let files = HashMap::from([("index.crepus".to_string(), "div\n  \"Hello\"".to_string())]);
+        let meta = WebTargetMeta {
+            head_html: Some(r#"<style>.from-target{color:red}</style>"#.into()),
+            ..WebTargetMeta::default()
+        };
+
+        let html = super::render_dev_index_html(site_dir.path(), &files, Some(&meta), "");
+
+        assert!(html.contains(r#"<style>.from-target{color:red}</style>"#));
     }
 }
