@@ -95,6 +95,7 @@ fn parse_dev_args(args: &[String]) -> ServeOptions {
     let mut explicit_site = false;
     let mut entry_from_args = false;
     let mut meta = None;
+    let mut axum = false;
 
     let mut i = 0;
     while i < args.len() {
@@ -118,6 +119,9 @@ fn parse_dev_args(args: &[String]) -> ServeOptions {
                     entry_from_args = true;
                     i += 1;
                 }
+            }
+            "--axum" => {
+                axum = true;
             }
             _ => {}
         }
@@ -152,6 +156,7 @@ fn parse_dev_args(args: &[String]) -> ServeOptions {
         port,
         entry,
         meta,
+        axum,
     }
 }
 

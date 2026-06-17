@@ -232,7 +232,7 @@ fn launch_viewer(
 
     let mut ctx = TemplateContext::new();
     for (k, v) in vars {
-        ctx.set_value(k, v);
+        ctx.set(k, v);
     }
 
     let display_name = template_path
