@@ -33,10 +33,10 @@ use gpui::{
 };
 use notify::Watcher;
 
-use crepuscularity_core::ast::Node;
-use crepuscularity_core::context::TemplateContext;
 use crate::renderer::render_nodes;
 use crate::watcher::create_watcher;
+use crepuscularity_core::ast::Node;
+use crepuscularity_core::context::TemplateContext;
 
 /// State model for the hot-reload view.
 pub struct HotReloadState {
