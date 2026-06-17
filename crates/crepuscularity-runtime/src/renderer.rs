@@ -14,9 +14,9 @@ use gpui::{
 use crepuscularity_core::include_paths::resolve_include_path;
 use crepuscularity_core::preprocess::slot_rotate_child_phrases;
 
+use crate::styler::{apply_class_with_ctx, parse_duration_ms};
 use crepuscularity_core::ast::*;
 use crepuscularity_core::context::{value_to_str, TemplateContext, TemplateValue};
-use crate::styler::{apply_class_with_ctx, parse_duration_ms};
 
 fn eval_expr_value(expr: &str, ctx: &TemplateContext) -> TemplateValue {
     crepuscularity_core::eval::eval_expr(expr, ctx).unwrap_or(TemplateValue::Null)

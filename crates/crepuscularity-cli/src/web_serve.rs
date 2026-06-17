@@ -1148,9 +1148,8 @@ pub fn serve_with_axum(opts: ServeOptions) {
                     let full = site_dir.join(path);
                     match tokio::fs::read(&full).await {
                         Ok(bytes) => {
-                            let mime = guess_mime(
-                                full.extension().and_then(|e| e.to_str()).unwrap_or(""),
-                            );
+                            let mime =
+                                guess_mime(full.extension().and_then(|e| e.to_str()).unwrap_or(""));
                             axum::response::Response::builder()
                                 .header(axum::http::header::CONTENT_TYPE, mime)
                                 .body(axum::body::Body::from(bytes))
@@ -1177,9 +1176,7 @@ pub fn serve_with_axum(opts: ServeOptions) {
 }
 
 /// Render the entry template via SSR and wrap in HTML shell.
-async fn ssr_index_handler(
-    State(state): State<Arc<AxumState>>,
-) -> axum::response::Html<String> {
+async fn ssr_index_handler(State(state): State<Arc<AxumState>>) -> axum::response::Html<String> {
     use crepuscularity_web::{render_ssr_document, SsrDocument};
 
     let files = {
@@ -1196,11 +1193,14 @@ async fn ssr_index_handler(
             title: &title,
             ..Default::default()
         };
-        match render_ssr_document(files.get(&entry).unwrap_or(&String::new()), &ctx, &doc, true) {
+        match render_ssr_document(
+            files.get(&entry).unwrap_or(&String::new()),
+            &ctx,
+            &doc,
+            true,
+        ) {
             Ok(html) => axum::response::Html(html),
-            Err(e) => axum::response::Html(format!(
-                "<pre style='color:red'>{e}</pre>"
-            )),
+            Err(e) => axum::response::Html(format!("<pre style='color:red'>{e}</pre>")),
         }
     })
     .await
@@ -1208,9 +1208,7 @@ async fn ssr_index_handler(
 }
 
 /// Return the live virtual `.crepus` map as JSON.
-async fn bundle_handler(
-    State(state): State<Arc<AxumState>>,
-) -> axum::Json<serde_json::Value> {
+async fn bundle_handler(State(state): State<Arc<AxumState>>) -> axum::Json<serde_json::Value> {
     let files = load_vfm(&state.site_dir);
     let files = files.read().unwrap_or_else(|e| e.into_inner()).clone();
     axum::Json(serde_json::json!({ "entry": state.entry, "files": files }))
@@ -1219,7 +1217,9 @@ async fn bundle_handler(
 /// SSE endpoint: sends reload event when templates change.
 async fn sse_handler(
     State(state): State<Arc<AxumState>>,
-) -> axum::response::Sse<impl futures_util::Stream<Item = Result<axum::response::sse::Event, std::convert::Infallible>>> {
+) -> axum::response::Sse<
+    impl futures_util::Stream<Item = Result<axum::response::sse::Event, std::convert::Infallible>>,
+> {
     use axum::response::sse::Event;
     use axum::response::Sse;
     use futures_util::stream;
@@ -1280,8 +1280,10 @@ fn watch_crepus_files(
     let (tx, rx) = mpsc::channel();
     let mut watcher = notify::recommended_watcher(move |res: Result<Event, _>| {
         if let Ok(ev) = res {
-            if matches!(ev.kind, EventKind::Create(_) | EventKind::Modify(_) | EventKind::Remove(_))
-            {
+            if matches!(
+                ev.kind,
+                EventKind::Create(_) | EventKind::Modify(_) | EventKind::Remove(_)
+            ) {
                 let _ = tx.send(());
             }
         }
@@ -1322,11 +1324,9 @@ fn watch_crepus_files(
             }
         }
         generation.fetch_add(1, Ordering::Release);
-        *last_sse_msg.write().unwrap_or_else(|e| e.into_inner()) =
-            runtime_rebuild_sse_message();
+        *last_sse_msg.write().unwrap_or_else(|e| e.into_inner()) = runtime_rebuild_sse_message();
     }
 }
-
 
 #[cfg(test)]
 mod tests {
