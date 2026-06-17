@@ -112,7 +112,11 @@ fn aggregate_daily_downloads(payloads: &[DownloadsResponse]) -> Vec<DailyDownloa
             if row.date.is_empty() {
                 continue;
             }
-            *daily.entry(row.date.clone()).or_insert(0) += row.downloads;
+            if let Some(count) = daily.get_mut(&row.date) {
+                *count += row.downloads;
+            } else {
+                daily.insert(row.date.clone(), row.downloads);
+            }
         }
     }
 
