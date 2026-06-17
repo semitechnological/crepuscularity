@@ -161,7 +161,7 @@ fn render_to_stdout(source: &str, vars: &[(String, TemplateValue)]) {
     }
 }
 
-fn dump_ir(source: &str, path: &PathBuf, vars: &[(String, TemplateValue)]) {
+fn dump_ir(source: &str, path: &Path, vars: &[(String, TemplateValue)]) {
     let mut ctx = TemplateContext::new();
     for (k, v) in vars {
         ctx.set(k, v.clone());
