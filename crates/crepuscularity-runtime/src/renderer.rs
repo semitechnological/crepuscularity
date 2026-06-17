@@ -14,12 +14,12 @@ use gpui::{
 use crepuscularity_core::include_paths::resolve_include_path;
 use crepuscularity_core::preprocess::slot_rotate_child_phrases;
 
-use crate::ast::*;
-use crate::context::{value_to_str, TemplateContext, TemplateValue};
+use crepuscularity_core::ast::*;
+use crepuscularity_core::context::{value_to_str, TemplateContext, TemplateValue};
 use crate::styler::{apply_class_with_ctx, parse_duration_ms};
 
 fn eval_expr_value(expr: &str, ctx: &TemplateContext) -> TemplateValue {
-    crate::eval::eval_expr(expr, ctx).unwrap_or(TemplateValue::Null)
+    crepuscularity_core::eval::eval_expr(expr, ctx).unwrap_or(TemplateValue::Null)
 }
 
 fn eval_condition_bool(ctx: &TemplateContext, expr: &str) -> bool {
@@ -396,7 +396,7 @@ fn render_named_component(
         }
     };
 
-    let comp_file = match crate::parser::parse_component_file(&content) {
+    let comp_file = match crepuscularity_core::parser::parse_component_file(&content) {
         Ok(cf) => cf,
         Err(e) => {
             let msg = format!("component file parse error: {e}");

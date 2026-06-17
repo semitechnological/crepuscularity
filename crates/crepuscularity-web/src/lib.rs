@@ -17,6 +17,16 @@ mod bundle;
 #[cfg(all(target_arch = "wasm32", feature = "dom"))]
 pub mod dom;
 
+/// Reactive DOM bindings re-exported from `crepuscularity-reactive`.
+/// Enable the `reactive` feature to use signals, memos, and effects in WASM.
+#[cfg(all(target_arch = "wasm32", feature = "reactive"))]
+pub mod reactive {
+    pub use crepuscularity_reactive::{
+        batch_begin, batch_end, flush, Effect, Memo, Signal,
+    };
+    pub use crepuscularity_reactive::dom::{bind_attr, bind_class, bind_text};
+}
+
 pub use bundle::{render_bundle, render_bundle_with_context};
 pub use crepuscularity_core::build;
 pub use crepuscularity_core::preprocess::google_fonts_head_markup;

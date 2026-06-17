@@ -39,6 +39,7 @@ use rayon::iter::ParallelIterator;
 use serde_json::json;
 
 use crepuscularity_core::context::TemplateContext;
+use crepuscularity_ssr::SsrOptions;
 use crepuscularity_web::render_from_files;
 
 use crate::crepus_toml::WebTargetMeta;
@@ -1134,5 +1135,165 @@ mod tests {
         let html = super::render_dev_index_html(site_dir.path(), &files, Some(&meta), "");
 
         assert!(html.contains(r#"<style>.from-target{color:red}</style>"#));
+    }
+}
+
+// ── Axum SSR integration ─────────────────────────────────────────────────────
+
+/// Axum-based SSR dev server using `crepuscularity-ssr` handlers.
+///
+/// Starts an Axum HTTP server that renders `.crepus` templates via
+/// [`crepuscularity_ssr::SsrHandler`] with hot-reload SSE support.
+pub fn serve_with_axum(opts: ServeOptions) {
+    use axum::{extract::State, response::IntoResponse, routing::get, Router};
+    use std::net::SocketAddr;
+
+    let site_dir = opts.site_dir.clone();
+    let entry = opts.entry.clone();
+    let vfm = load_vfm(&site_dir);
+    let generation = Arc::new(AtomicU64::new(0));
+    let last_sse_msg = Arc::new(RwLock::new(String::new()));
+
+    // Spawn file watcher
+    let vfm_watcher = Arc::clone(&vfm);
+    let gen_watcher = Arc::clone(&generation);
+    let sse_watcher = Arc::clone(&last_sse_msg);
+    let site_dir_watcher = site_dir.clone();
+    std::thread::spawn(move || {
+        watch_crepus_files(&site_dir_watcher, vfm_watcher, gen_watcher, sse_watcher);
+    });
+
+    // Build SsrOptions for the entry template
+    let entry_src = {
+        let files = vfm.read().unwrap_or_else(std::sync::PoisonError::into_inner);
+        files.get(&entry).cloned().unwrap_or_default()
+    };
+    let ssr_opts = Arc::new(SsrOptions {
+        template: Box::leak(entry_src.into_boxed_str()),
+        defaults: HashMap::new(),
+        title: entry.clone(),
+    });
+
+    // Bundle state for non-handler routes
+
+    let app = Router::new()
+        .route("/", get(crepuscularity_ssr::SsrHandler::handle))
+        .with_state(ssr_opts)
+        .fallback({
+            let site_dir = site_dir.clone();
+            move |uri: axum::http::Uri| {
+                let site_dir = site_dir.clone();
+                async move {
+                    let path = uri.path().trim_start_matches('/');
+                    if path.is_empty() {
+                        return axum::http::StatusCode::NOT_FOUND.into_response();
+                    }
+                    let full = site_dir.join(path);
+                    match tokio::fs::read(&full).await {
+                        Ok(bytes) => {
+                            let mime = guess_mime(
+                                full.extension().and_then(|e| e.to_str()).unwrap_or(""),
+                            );
+                            axum::response::Response::builder()
+                                .header(axum::http::header::CONTENT_TYPE, mime)
+                                .body(axum::body::Body::from(bytes))
+                                .unwrap()
+                                .into_response()
+                        }
+                        Err(_) => axum::http::StatusCode::NOT_FOUND.into_response(),
+                    }
+                }
+            }
+        });
+
+    let addr: SocketAddr = ([127, 0, 0, 1], opts.port).into();
+    eprintln!("crepus-dev (axum): listening on http://{addr}");
+    eprintln!("crepus-dev: entry={}", opts.entry);
+
+    let rt = tokio::runtime::Runtime::new().expect("tokio runtime");
+    rt.block_on(async {
+        let listener = tokio::net::TcpListener::bind(addr).await.expect("bind");
+        axum::serve(listener, app.into_make_service())
+            .await
+            .expect("server error");
+    });
+}
+
+fn load_vfm(site_dir: &Path) -> Arc<RwLock<HashMap<String, String>>> {
+    let mut files = HashMap::new();
+    for entry in walkdir::WalkDir::new(site_dir)
+        .into_iter()
+        .flatten()
+        .filter(|e| {
+            !e.file_type().is_dir()
+                && e.path().extension().and_then(|x| x.to_str()) == Some("crepus")
+        })
+    {
+        let rel = entry
+            .path()
+            .strip_prefix(site_dir)
+            .unwrap_or(entry.path())
+            .to_string_lossy()
+            .to_string();
+        if let Ok(content) = std::fs::read_to_string(entry.path()) {
+            files.insert(rel, content);
+        }
+    }
+    Arc::new(RwLock::new(files))
+}
+
+fn watch_crepus_files(
+    site_dir: &Path,
+    vfm: Arc<RwLock<HashMap<String, String>>>,
+    generation: Arc<AtomicU64>,
+    last_sse_msg: Arc<RwLock<String>>,
+) {
+    let (tx, rx) = mpsc::channel();
+    let mut watcher = notify::recommended_watcher(move |res: Result<Event, _>| {
+        if let Ok(ev) = res {
+            if matches!(ev.kind, EventKind::Create(_) | EventKind::Modify(_) | EventKind::Remove(_))
+            {
+                let _ = tx.send(());
+            }
+        }
+    })
+    .expect("failed to create file watcher");
+
+    let _ = watcher.watch(site_dir, RecursiveMode::Recursive);
+
+    loop {
+        if rx.recv().is_err() {
+            break;
+        }
+        // Debounce
+        while rx.try_recv().is_ok() {
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        // Reload VFM
+        {
+            let mut files = vfm.write().unwrap_or_else(|e| e.into_inner());
+            files.clear();
+            for entry in walkdir::WalkDir::new(site_dir)
+                .into_iter()
+                .flatten()
+                .filter(|e| {
+                    !e.file_type().is_dir()
+                        && e.path().extension().and_then(|x| x.to_str()) == Some("crepus")
+                })
+            {
+                let rel = entry
+                    .path()
+                    .strip_prefix(site_dir)
+                    .unwrap_or(entry.path())
+                    .to_string_lossy()
+                    .to_string();
+                if let Ok(content) = std::fs::read_to_string(entry.path()) {
+                    files.insert(rel, content);
+                }
+            }
+        }
+        generation.fetch_add(1, Ordering::Release);
+        *last_sse_msg.write().unwrap_or_else(|e| e.into_inner()) =
+            runtime_rebuild_sse_message();
     }
 }

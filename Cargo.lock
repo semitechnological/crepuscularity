@@ -1755,18 +1755,21 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-cli"
-version = "0.9.3"
+version = "0.9.4"
 dependencies = [
+ "axum",
  "console",
  "crepuscularity-core",
  "crepuscularity-embedded",
  "crepuscularity-lvgl",
  "crepuscularity-native",
  "crepuscularity-runtime",
+ "crepuscularity-ssr",
  "crepuscularity-tui",
  "crepuscularity-web",
  "crepuscularity-webext",
  "ctrlc",
+ "futures-util",
  "gpui",
  "indicatif",
  "notify",
@@ -1775,6 +1778,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tempfile",
+ "tokio",
  "toml 1.1.2+spec-1.1.0",
  "tracing",
  "tracing-subscriber",
@@ -1783,7 +1787,7 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-core"
-version = "0.4.15"
+version = "0.4.16"
 dependencies = [
  "sha2 0.11.0",
  "tempfile",
@@ -1794,15 +1798,20 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-dev"
-version = "0.4.5"
+version = "0.4.6"
 dependencies = [
+ "crepuscularity-core",
+ "crepuscularity-native",
  "crepuscularity-runtime",
+ "crepuscularity-web",
  "gpui",
+ "serde_json",
+ "toml 1.1.2+spec-1.1.0",
 ]
 
 [[package]]
 name = "crepuscularity-embedded"
-version = "0.1.14"
+version = "0.1.15"
 dependencies = [
  "crepuscularity-core",
  "crepuscularity-embedded-macros",
@@ -1849,7 +1858,7 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-lite"
-version = "0.4.7"
+version = "0.4.8"
 dependencies = [
  "arboard",
  "clap",
@@ -1909,7 +1918,7 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-native"
-version = "0.5.3"
+version = "0.5.4"
 dependencies = [
  "crepuscularity-core",
  "regex",
@@ -1922,7 +1931,7 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-reactive"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "base64 0.22.1",
  "crepuscularity-core",
@@ -1934,7 +1943,7 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-runtime"
-version = "0.4.10"
+version = "0.4.11"
 dependencies = [
  "crepuscularity-core",
  "gpui",
@@ -1962,7 +1971,7 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-tui"
-version = "0.4.10"
+version = "0.4.11"
 dependencies = [
  "crepuscularity-core",
  "crepuscularity_macros",
@@ -1974,11 +1983,12 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-web"
-version = "0.4.7"
+version = "0.4.8"
 dependencies = [
  "ammonia",
  "base64 0.22.1",
  "crepuscularity-core",
+ "crepuscularity-reactive",
  "crepuscularity_macros",
  "js-sys",
  "rayon",
@@ -1991,7 +2001,7 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-webext"
-version = "0.2.9"
+version = "0.2.10"
 dependencies = [
  "crepuscularity-core",
  "crepuscularity-web",

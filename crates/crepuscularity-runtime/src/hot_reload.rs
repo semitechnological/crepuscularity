@@ -33,8 +33,8 @@ use gpui::{
 };
 use notify::Watcher;
 
-use crate::ast::Node;
-use crate::context::TemplateContext;
+use crepuscularity_core::ast::Node;
+use crepuscularity_core::context::TemplateContext;
 use crate::renderer::render_nodes;
 use crate::watcher::create_watcher;
 

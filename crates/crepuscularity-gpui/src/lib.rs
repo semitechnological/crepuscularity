@@ -27,20 +27,11 @@ pub fn gpui_window_options(
     }
 }
 
-#[derive(
-    Clone, Debug, PartialEq, serde::Deserialize, gpui::private::schemars::JsonSchema, gpui::Action,
-)]
-#[action(namespace = zed)]
-pub struct Unbind(pub SharedString);
-
 #[cfg(feature = "symbols")]
 pub use gpui_symbols::Icon;
 
 pub mod prelude {
-    pub use crate::{
-        gpui_window_options, ZedAnchoredCompat, ZedForegroundExecutorCompat, ZedGpuiCompat,
-        ZedStyledTextCompat, ZedSvgCompat, ZedWindowCompat,
-    };
+    pub use crate::gpui_window_options;
     pub use crepuscularity_macros::view;
     pub use gpui::prelude::*;
     pub use gpui::{
@@ -72,55 +63,6 @@ impl From<Anchor> for Corner {
             Anchor::BottomLeft => Corner::BottomLeft,
             Anchor::BottomCenter | Anchor::BottomRight => Corner::BottomRight,
         }
-    }
-}
-
-pub trait ZedAnchoredCompat: Sized {
-    fn anchor(self, anchor: Anchor) -> Self;
-}
-
-impl ZedAnchoredCompat for Anchored {
-    fn anchor(self, anchor: Anchor) -> Self {
-        Anchored::anchor(self, anchor.into())
-    }
-}
-
-pub trait ZedSvgCompat: Sized {
-    fn external_path(self, path: impl Into<SharedString>) -> Self;
-}
-
-pub trait ZedWindowCompat {
-    fn pixel_snap_bounds(&self, bounds: Bounds<Pixels>) -> Bounds<Pixels>;
-    fn pixel_snap_point(&self, point: Point<Pixels>) -> Point<Pixels>;
-    fn input_latency_snapshot(&self) -> InputLatencySnapshot;
-}
-
-pub trait ZedForegroundExecutorCompat {
-    fn block_on<F>(&self, future: F) -> F::Output
-    where
-        F: std::future::Future;
-}
-
-impl ZedForegroundExecutorCompat for ForegroundExecutor {
-    fn block_on<F>(&self, future: F) -> F::Output
-    where
-        F: std::future::Future,
-    {
-        pollster::block_on(future)
-    }
-}
-
-impl ZedWindowCompat for Window {
-    fn pixel_snap_bounds(&self, bounds: Bounds<Pixels>) -> Bounds<Pixels> {
-        bounds
-    }
-
-    fn pixel_snap_point(&self, point: Point<Pixels>) -> Point<Pixels> {
-        point
-    }
-
-    fn input_latency_snapshot(&self) -> InputLatencySnapshot {
-        InputLatencySnapshot::default()
     }
 }
 
@@ -214,58 +156,6 @@ fn parse_window_button_side(side: &str) -> Result<[Option<WindowButton>; MAX_BUT
     }
 
     Ok(buttons)
-}
-
-impl ZedSvgCompat for Svg {
-    fn external_path(self, path: impl Into<SharedString>) -> Self {
-        self.path(path)
-    }
-}
-
-pub trait ZedStyledTextCompat: Sized {
-    fn with_font_family_overrides(
-        self,
-        font_family_overrides: impl IntoIterator<Item = (std::ops::Range<usize>, SharedString)>,
-    ) -> Self;
-}
-
-impl ZedStyledTextCompat for StyledText {
-    fn with_font_family_overrides(
-        self,
-        font_family_overrides: impl IntoIterator<Item = (std::ops::Range<usize>, SharedString)>,
-    ) -> Self {
-        drop(font_family_overrides);
-        self
-    }
-}
-
-pub trait ZedGpuiCompat: Sized {
-    fn flex_grow_1(self) -> Self;
-    fn flex_shrink_1(self) -> Self;
-    fn focus_visible(self, style: impl FnOnce(StyleRefinement) -> StyleRefinement) -> Self;
-    fn text_ellipsis_start(self) -> Self;
-}
-
-impl<T> ZedGpuiCompat for T
-where
-    T: Styled,
-{
-    fn flex_grow_1(self) -> Self {
-        self.flex_grow()
-    }
-
-    fn flex_shrink_1(self) -> Self {
-        self.flex_shrink()
-    }
-
-    fn focus_visible(self, style: impl FnOnce(StyleRefinement) -> StyleRefinement) -> Self {
-        drop(style);
-        self
-    }
-
-    fn text_ellipsis_start(self) -> Self {
-        self.text_ellipsis()
-    }
 }
 
 pub trait TaskExt<T, E> {
