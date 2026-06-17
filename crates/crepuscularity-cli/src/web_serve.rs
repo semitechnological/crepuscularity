@@ -39,8 +39,9 @@ use rayon::iter::ParallelIterator;
 use serde_json::json;
 
 use crepuscularity_core::context::TemplateContext;
-use crepuscularity_ssr::SsrOptions;
 use crepuscularity_web::render_from_files;
+
+use axum::extract::State;
 
 use crate::crepus_toml::WebTargetMeta;
 use crate::web::{
@@ -97,6 +98,8 @@ pub struct ServeOptions {
     /// Entry-point template relative to `site_dir` (default `"index.crepus"`).
     pub entry: String,
     pub meta: Option<WebTargetMeta>,
+    /// Use Axum-based SSR server instead of the raw TCP listener.
+    pub axum: bool,
 }
 
 #[derive(Clone)]
@@ -203,6 +206,10 @@ fn validate_templates(site_dir: &std::path::Path) {
 
 /// Run the dev server, blocking until the process is killed.
 pub fn run(opts: ServeOptions) {
+    if opts.axum {
+        serve_with_axum(opts);
+        return;
+    }
     let site_dir = std::fs::canonicalize(&opts.site_dir).unwrap_or_else(|_| opts.site_dir.clone());
 
     // Validate all templates at startup.
@@ -1140,12 +1147,20 @@ mod tests {
 
 // ── Axum SSR integration ─────────────────────────────────────────────────────
 
-/// Axum-based SSR dev server using `crepuscularity-ssr` handlers.
+/// Shared state for Axum SSR handlers.
+struct AxumState {
+    site_dir: PathBuf,
+    entry: String,
+    generation: Arc<AtomicU64>,
+    last_sse_msg: Arc<RwLock<String>>,
+}
+
+/// Axum-based SSR dev server using `crepuscularity-ssr` rendering.
 ///
 /// Starts an Axum HTTP server that renders `.crepus` templates via
-/// [`crepuscularity_ssr::SsrHandler`] with hot-reload SSE support.
+/// [`crepuscularity_web::render_ssr_document`] with hot-reload SSE support.
 pub fn serve_with_axum(opts: ServeOptions) {
-    use axum::{extract::State, response::IntoResponse, routing::get, Router};
+    use axum::{response::IntoResponse, routing::get, Router};
     use std::net::SocketAddr;
 
     let site_dir = opts.site_dir.clone();
@@ -1163,22 +1178,18 @@ pub fn serve_with_axum(opts: ServeOptions) {
         watch_crepus_files(&site_dir_watcher, vfm_watcher, gen_watcher, sse_watcher);
     });
 
-    // Build SsrOptions for the entry template
-    let entry_src = {
-        let files = vfm.read().unwrap_or_else(std::sync::PoisonError::into_inner);
-        files.get(&entry).cloned().unwrap_or_default()
-    };
-    let ssr_opts = Arc::new(SsrOptions {
-        template: Box::leak(entry_src.into_boxed_str()),
-        defaults: HashMap::new(),
-        title: entry.clone(),
+    let state = Arc::new(AxumState {
+        site_dir: site_dir.clone(),
+        entry: entry.clone(),
+        generation: Arc::clone(&generation),
+        last_sse_msg: Arc::clone(&last_sse_msg),
     });
 
-    // Bundle state for non-handler routes
-
     let app = Router::new()
-        .route("/", get(crepuscularity_ssr::SsrHandler::handle))
-        .with_state(ssr_opts)
+        .route("/", get(ssr_index_handler))
+        .route("/crepus-bundle.json", get(bundle_handler))
+        .route("/dev-reload", get(sse_handler))
+        .with_state(state)
         .fallback({
             let site_dir = site_dir.clone();
             move |uri: axum::http::Uri| {
@@ -1217,6 +1228,78 @@ pub fn serve_with_axum(opts: ServeOptions) {
             .await
             .expect("server error");
     });
+}
+
+/// Render the entry template via SSR and wrap in HTML shell.
+async fn ssr_index_handler(
+    State(state): State<Arc<AxumState>>,
+) -> axum::response::Html<String> {
+    use crepuscularity_web::{render_ssr_document, SsrDocument};
+
+    let files = {
+        let vfm = load_vfm(&state.site_dir);
+        let guard = vfm.read().unwrap_or_else(|e| e.into_inner());
+        guard.clone()
+    };
+    let ctx = TemplateContext::new();
+    let title = state.entry.clone();
+    let entry = state.entry.clone();
+
+    tokio::task::spawn_blocking(move || {
+        let doc = SsrDocument {
+            title: &title,
+            ..Default::default()
+        };
+        match render_ssr_document(&files.get(&entry).unwrap_or(&String::new()), &ctx, &doc, true) {
+            Ok(html) => axum::response::Html(html),
+            Err(e) => axum::response::Html(format!(
+                "<pre style='color:red'>{e}</pre>"
+            )),
+        }
+    })
+    .await
+    .unwrap_or_else(|e| axum::response::Html(format!("<pre>spawn_blocking: {e}</pre>")))
+}
+
+/// Return the live virtual `.crepus` map as JSON.
+async fn bundle_handler(
+    State(state): State<Arc<AxumState>>,
+) -> axum::Json<serde_json::Value> {
+    let files = load_vfm(&state.site_dir);
+    let files = files.read().unwrap_or_else(|e| e.into_inner()).clone();
+    axum::Json(serde_json::json!({ "entry": state.entry, "files": files }))
+}
+
+/// SSE endpoint: sends reload event when templates change.
+async fn sse_handler(
+    State(state): State<Arc<AxumState>>,
+) -> axum::response::Sse<impl futures_util::Stream<Item = Result<axum::response::sse::Event, std::convert::Infallible>>> {
+    use axum::response::sse::Event;
+    use axum::response::Sse;
+    use futures_util::stream;
+
+    let start_gen = state.generation.load(Ordering::Acquire);
+    let generation = Arc::clone(&state.generation);
+    let last_sse_msg = Arc::clone(&state.last_sse_msg);
+
+    let stream = stream::unfold((), move |()| {
+        let generation = Arc::clone(&generation);
+        let last_sse_msg = Arc::clone(&last_sse_msg);
+        async move {
+            loop {
+                tokio::time::sleep(Duration::from_millis(100)).await;
+                if generation.load(Ordering::Acquire) != start_gen {
+                    let msg = last_sse_msg
+                        .read()
+                        .map(|g| g.clone())
+                        .unwrap_or_else(|_| "reload".to_string());
+                    let event = Event::default().data(&msg);
+                    return Some((Ok::<_, std::convert::Infallible>(event), ()));
+                }
+            }
+        }
+    });
+    Sse::new(stream).keep_alive(axum::response::sse::KeepAlive::default())
 }
 
 fn load_vfm(site_dir: &Path) -> Arc<RwLock<HashMap<String, String>>> {
