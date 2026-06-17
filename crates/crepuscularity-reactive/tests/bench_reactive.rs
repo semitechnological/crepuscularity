@@ -25,10 +25,11 @@ fn bench_full_rebuild(label: &str, template: &str, iterations: u32) -> (f64, u32
 
     let mut string_rebuilds = 0u32;
     let start = Instant::now();
+    let mut out = String::with_capacity(128); // Pre-allocate outside the loop
     for i in 0..iterations {
         ctx.set("count", i as i64);
-        // Simulate full render: traverse AST + interpolate into a fresh String.
-        let mut out = String::new();
+        // Simulate full render: traverse AST + interpolate into a cleared String buffer.
+        out.clear();
         string_rebuilds += 1;
         for node in &nodes {
             if let crepuscularity_core::ast::Node::Element(el) = node {
