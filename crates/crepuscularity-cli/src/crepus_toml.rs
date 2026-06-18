@@ -12,6 +12,8 @@ pub struct CrepusManifest {
     #[serde(default)]
     pub ios: Option<IosTomlSection>,
     #[serde(default)]
+    pub android: Option<AndroidTomlSection>,
+    #[serde(default)]
     pub targets: Vec<ManifestTarget>,
     /// Single-site shorthand when you do not use `[[targets]]`.
     #[serde(default)]
@@ -20,11 +22,28 @@ pub struct CrepusManifest {
 
 #[derive(Debug, Deserialize)]
 pub struct IosTomlSection {
+    #[serde(default = "default_ios_scheme")]
     pub scheme: String,
     #[serde(default = "default_xcodegen_spec")]
     pub xcodegen_spec: String,
     #[serde(default = "default_ios_destination")]
     pub destination: String,
+    #[serde(default)]
+    pub bundle_id: Option<String>,
+    #[serde(default)]
+    pub development_team: Option<String>,
+    #[serde(default)]
+    pub code_sign_style: Option<String>,
+    #[serde(default)]
+    pub allow_provisioning_updates: bool,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct AndroidTomlSection {
+    #[serde(default)]
+    pub application_id: Option<String>,
+    #[serde(default)]
+    pub namespace: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -104,6 +123,10 @@ fn default_dot() -> String {
 
 pub(crate) fn default_xcodegen_spec() -> String {
     "project.yml".into()
+}
+
+pub(crate) fn default_ios_scheme() -> String {
+    "CrepusMobileApp".into()
 }
 
 pub(crate) fn default_ios_destination() -> String {

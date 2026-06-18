@@ -153,6 +153,14 @@ impl IosBuildTarget {
 struct MobileIosConfig {
     scheme: String,
     bundle_id: String,
+    development_team: Option<String>,
+    code_sign_style: Option<String>,
+    allow_provisioning_updates: bool,
+}
+
+struct MobileAndroidConfig {
+    application_id: Option<String>,
+    namespace: Option<String>,
 }
 
 fn run_ir(args: &[String]) {
@@ -720,6 +728,7 @@ fn explicit_fixture_output_paths(root: &Path, explicit: &[PathBuf]) -> Vec<PathB
 /// publish` walks the source tree by default and picks them up.
 const TEMPLATE_FILES: &[(&str, &str)] = &[
     ("README.md", include_str!("../templates/native/README.md")),
+    ("crepus.toml", include_str!("../templates/native/crepus.toml")),
     (
         "views/main.crepus",
         include_str!("../templates/native/views/main.crepus"),
@@ -1058,12 +1067,23 @@ fn build_ios_app(ios_dir: &Path, target: IosBuildTarget, configuration: &str) {
         "build",
         "SYMROOT=build",
     ]);
+    build.arg(format!("PRODUCT_BUNDLE_IDENTIFIER={}", cfg.bundle_id));
+    if cfg.allow_provisioning_updates {
+        build.arg("-allowProvisioningUpdates");
+    }
+    if let Some(development_team) = &cfg.development_team {
+        build.arg(format!("DEVELOPMENT_TEAM={development_team}"));
+    }
+    if let Some(code_sign_style) = &cfg.code_sign_style {
+        build.arg(format!("CODE_SIGN_STYLE={code_sign_style}"));
+    }
     delegate(build, "xcodebuild");
 }
 
 fn build_android(dir: &Path, flavor: &str) {
     sync_default_mobile_artifacts(dir, false, true);
     let android_dir = dir.join("android");
+    apply_android_config(&android_dir, &load_mobile_android_config(dir));
     let gradlew = android_dir.join("gradlew");
     if !android_dir.join("settings.gradle.kts").exists() {
         ui::error(&format!(
@@ -1163,14 +1183,100 @@ fn run_ios_app(ios_dir: &Path) {
 
 fn load_mobile_ios_config(ios_dir: &Path) -> MobileIosConfig {
     let toml = fs::read_to_string(ios_dir.join("crepus.toml")).unwrap_or_default();
+    let root_toml = ios_dir
+        .parent()
+        .map(|root| fs::read_to_string(root.join("crepus.toml")).unwrap_or_default())
+        .unwrap_or_default();
     let project = fs::read_to_string(ios_dir.join("project.yml")).unwrap_or_default();
+    let root_manifest = crate::crepus_toml::CrepusManifest::parse(&root_toml)
+        .ok()
+        .and_then(|manifest| manifest.ios);
+    let manifest = crate::crepus_toml::CrepusManifest::parse(&toml)
+        .ok()
+        .and_then(|manifest| manifest.ios);
     MobileIosConfig {
-        scheme: toml_value(&toml, "scheme")
+        scheme: manifest
+            .as_ref()
+            .map(|ios| ios.scheme.clone())
+            .or_else(|| root_manifest.as_ref().map(|ios| ios.scheme.clone()))
+            .or_else(|| toml_value(&toml, "scheme"))
             .or_else(|| project_name(&project))
             .unwrap_or_else(|| "CrepusMobileApp".to_string()),
-        bundle_id: project_bundle_id(&project)
+        bundle_id: manifest
+            .as_ref()
+            .and_then(|ios| ios.bundle_id.clone())
+            .or_else(|| root_manifest.as_ref().and_then(|ios| ios.bundle_id.clone()))
+            .or_else(|| project_bundle_id(&project))
             .unwrap_or_else(|| "dev.crepuscularity.mobile".to_string()),
+        development_team: manifest
+            .as_ref()
+            .and_then(|ios| ios.development_team.clone())
+            .or_else(|| {
+                root_manifest
+                    .as_ref()
+                    .and_then(|ios| ios.development_team.clone())
+            }),
+        code_sign_style: manifest
+            .as_ref()
+            .and_then(|ios| ios.code_sign_style.clone())
+            .or_else(|| {
+                root_manifest
+                    .as_ref()
+                    .and_then(|ios| ios.code_sign_style.clone())
+            }),
+        allow_provisioning_updates: manifest
+            .as_ref()
+            .is_some_and(|ios| ios.allow_provisioning_updates)
+            || root_manifest
+                .as_ref()
+                .is_some_and(|ios| ios.allow_provisioning_updates),
     }
+}
+
+fn load_mobile_android_config(root: &Path) -> MobileAndroidConfig {
+    let toml = fs::read_to_string(root.join("crepus.toml")).unwrap_or_default();
+    let manifest = crate::crepus_toml::CrepusManifest::parse(&toml).ok();
+    let android = manifest.and_then(|manifest| manifest.android);
+    MobileAndroidConfig {
+        application_id: android
+            .as_ref()
+            .and_then(|android| android.application_id.clone()),
+        namespace: android.and_then(|android| android.namespace),
+    }
+}
+
+fn apply_android_config(android_dir: &Path, cfg: &MobileAndroidConfig) {
+    if cfg.application_id.is_none() && cfg.namespace.is_none() {
+        return;
+    }
+    let gradle_path = android_dir.join("app/build.gradle.kts");
+    let Ok(mut gradle) = fs::read_to_string(&gradle_path) else {
+        return;
+    };
+    if let Some(namespace) = &cfg.namespace {
+        gradle = replace_kotlin_string_assignment(&gradle, "namespace", namespace);
+    }
+    if let Some(application_id) = &cfg.application_id {
+        gradle = replace_kotlin_string_assignment(&gradle, "applicationId", application_id);
+    }
+    fs::write(&gradle_path, gradle).unwrap_or_else(|e| {
+        ui::error(&format!("failed to write '{}': {e}", gradle_path.display()));
+    });
+}
+
+fn replace_kotlin_string_assignment(src: &str, key: &str, value: &str) -> String {
+    src.lines()
+        .map(|line| {
+            let trimmed = line.trim_start();
+            if trimmed.starts_with(key) {
+                let indent_len = line.len() - trimmed.len();
+                format!("{}{} = \"{}\"", &line[..indent_len], key, value)
+            } else {
+                line.to_string()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 fn toml_value(src: &str, key: &str) -> Option<String> {
@@ -1538,6 +1644,73 @@ android {
             gradle_kts_value(src, "applicationId"),
             Some("dev.crepuscularity.nativeshell".to_string())
         );
+    }
+
+    #[test]
+    fn mobile_ios_config_reads_root_manifest_identity() {
+        let temp = tempfile::tempdir().unwrap();
+        let root = temp.path();
+        fs::create_dir_all(root.join("ios")).unwrap();
+        fs::write(
+            root.join("crepus.toml"),
+            r#"
+[ios]
+bundle_id = "hk.tsc.acme"
+development_team = "LZ3NL5434Q"
+code_sign_style = "Automatic"
+allow_provisioning_updates = true
+"#,
+        )
+        .unwrap();
+        fs::write(
+            root.join("ios/crepus.toml"),
+            r#"
+[ios]
+scheme = "CrepusMobileApp"
+"#,
+        )
+        .unwrap();
+        fs::write(
+            root.join("ios/project.yml"),
+            "name: CrepusMobileApp\nPRODUCT_BUNDLE_IDENTIFIER: dev.crepuscularity.mobile\n",
+        )
+        .unwrap();
+
+        let cfg = load_mobile_ios_config(&root.join("ios"));
+        assert_eq!(cfg.scheme, "CrepusMobileApp");
+        assert_eq!(cfg.bundle_id, "hk.tsc.acme");
+        assert_eq!(cfg.development_team.as_deref(), Some("LZ3NL5434Q"));
+        assert_eq!(cfg.code_sign_style.as_deref(), Some("Automatic"));
+        assert!(cfg.allow_provisioning_updates);
+    }
+
+    #[test]
+    fn apply_android_config_rewrites_gradle_identity() {
+        let temp = tempfile::tempdir().unwrap();
+        let android_dir = temp.path().join("android");
+        fs::create_dir_all(android_dir.join("app")).unwrap();
+        fs::write(
+            android_dir.join("app/build.gradle.kts"),
+            r#"android {
+    namespace = "dev.crepuscularity.nativeshell"
+    defaultConfig {
+        applicationId = "dev.crepuscularity.nativeshell"
+    }
+}
+"#,
+        )
+        .unwrap();
+
+        apply_android_config(
+            &android_dir,
+            &MobileAndroidConfig {
+                application_id: Some("hk.tsc.acme".to_string()),
+                namespace: Some("hk.tsc.acme".to_string()),
+            },
+        );
+        let gradle = fs::read_to_string(android_dir.join("app/build.gradle.kts")).unwrap();
+        assert!(gradle.contains("namespace = \"hk.tsc.acme\""));
+        assert!(gradle.contains("applicationId = \"hk.tsc.acme\""));
     }
 
     #[test]
