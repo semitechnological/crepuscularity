@@ -300,6 +300,7 @@ fn mobile_new_scaffolds_runtime_files() {
         String::from_utf8_lossy(&out.stderr)
     );
     let root = tmp.path().join("phone");
+    assert!(root.join("crepus.toml").is_file());
     assert!(root.join("views/main.crepus").is_file());
     assert!(root
         .join("ios/Sources/NativeShell/CrepusMobileRuntime.swift")

@@ -22,6 +22,10 @@ struct IosSection {
     scheme: String,
     xcodegen_spec: String,
     ios_destination: String,
+    bundle_id: Option<String>,
+    development_team: Option<String>,
+    code_sign_style: Option<String>,
+    allow_provisioning_updates: bool,
 }
 
 pub fn run(args: &[String]) {
@@ -47,11 +51,11 @@ pub fn run(args: &[String]) {
 
             let (root, cfg) = resolve_ios_root_and_config(&explicit_dir);
             let spec = spec_ov.unwrap_or(cfg.xcodegen_spec.clone());
-            let scheme = scheme_ov.unwrap_or(cfg.scheme);
-            let destination = dest_ov.unwrap_or(cfg.ios_destination);
+            let scheme = scheme_ov.unwrap_or(cfg.scheme.clone());
+            let destination = dest_ov.unwrap_or(cfg.ios_destination.clone());
 
             run_xcodegen(&root, &spec);
-            run_xcodebuild(&root, &scheme, &destination, options);
+            run_xcodebuild(&root, &scheme, &destination, &cfg, options);
         }
         _ => print_ios_usage(),
     }
@@ -121,6 +125,10 @@ fn load_ios_config(root: &Path) -> Option<IosSection> {
         scheme: i.scheme,
         xcodegen_spec: i.xcodegen_spec,
         ios_destination: i.destination,
+        bundle_id: i.bundle_id,
+        development_team: i.development_team,
+        code_sign_style: i.code_sign_style,
+        allow_provisioning_updates: i.allow_provisioning_updates,
     })
 }
 
@@ -137,6 +145,10 @@ fn legacy_config_from_project_yml(root: &Path) -> Option<IosSection> {
         scheme,
         xcodegen_spec: crepus_toml::default_xcodegen_spec(),
         ios_destination: crepus_toml::default_ios_destination(),
+        bundle_id: None,
+        development_team: None,
+        code_sign_style: None,
+        allow_provisioning_updates: false,
     })
 }
 
@@ -477,7 +489,13 @@ fn run_xcodegen(dir: &Path, spec: &str) {
     eprintln!("{}", style("xcodegen: ok").green());
 }
 
-fn run_xcodebuild(dir: &Path, scheme: &str, destination: &str, options: BuildOptions) {
+fn run_xcodebuild(
+    dir: &Path,
+    scheme: &str,
+    destination: &str,
+    cfg: &IosSection,
+    options: BuildOptions,
+) {
     let proj = find_xcodeproj(dir).unwrap_or_else(|| {
         ui::error(&format!(
             "no .xcodeproj in {} — run `crepus ios generate` first",
@@ -485,23 +503,35 @@ fn run_xcodebuild(dir: &Path, scheme: &str, destination: &str, options: BuildOpt
         ));
     });
 
-    let status = Command::new("xcodebuild")
-        .current_dir(dir)
-        .args([
-            "-project",
-            proj.file_name().unwrap().to_str().unwrap(),
-            "-scheme",
-            scheme,
-            "-destination",
-            destination,
-            "-configuration",
-            if options.release() {
-                "Release"
-            } else {
-                "Debug"
-            },
-            "build",
-        ])
+    let mut cmd = Command::new("xcodebuild");
+    cmd.current_dir(dir).args([
+        "-project",
+        proj.file_name().unwrap().to_str().unwrap(),
+        "-scheme",
+        scheme,
+        "-destination",
+        destination,
+        "-configuration",
+        if options.release() {
+            "Release"
+        } else {
+            "Debug"
+        },
+    ]);
+    if cfg.allow_provisioning_updates {
+        cmd.arg("-allowProvisioningUpdates");
+    }
+    if let Some(bundle_id) = &cfg.bundle_id {
+        cmd.arg(format!("PRODUCT_BUNDLE_IDENTIFIER={bundle_id}"));
+    }
+    if let Some(development_team) = &cfg.development_team {
+        cmd.arg(format!("DEVELOPMENT_TEAM={development_team}"));
+    }
+    if let Some(code_sign_style) = &cfg.code_sign_style {
+        cmd.arg(format!("CODE_SIGN_STYLE={code_sign_style}"));
+    }
+    let status = cmd
+        .arg("build")
         .status()
         .unwrap_or_else(|e| ui::error(&format!("xcodebuild: {e}")));
 
