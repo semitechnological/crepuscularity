@@ -1019,6 +1019,9 @@ fn build_ios_app(ios_dir: &Path, target: IosBuildTarget, configuration: &str) {
     if !spec.exists() {
         ui::error(&format!("no project.yml at '{}'", spec.display()));
     }
+    if let Some(root) = ios_dir.parent() {
+        sync_default_mobile_artifacts(root, true, false);
+    }
     let cfg = load_mobile_ios_config(ios_dir);
     let mut xcodegen = Command::new("xcodegen");
     xcodegen
@@ -1053,11 +1056,13 @@ fn build_ios_app(ios_dir: &Path, target: IosBuildTarget, configuration: &str) {
         "-destination",
         target.destination(),
         "build",
+        "SYMROOT=build",
     ]);
     delegate(build, "xcodebuild");
 }
 
 fn build_android(dir: &Path, flavor: &str) {
+    sync_default_mobile_artifacts(dir, false, true);
     let android_dir = dir.join("android");
     let gradlew = android_dir.join("gradlew");
     if !android_dir.join("settings.gradle.kts").exists() {
@@ -1069,7 +1074,7 @@ fn build_android(dir: &Path, flavor: &str) {
 
     let task = format!(":app:assemble{}", capitalize_ascii(flavor));
     let mut cmd = if gradlew.exists() {
-        let mut c = Command::new(&gradlew);
+        let mut c = Command::new("./gradlew");
         c.current_dir(&android_dir);
         c.arg(&task);
         c
@@ -1274,6 +1279,7 @@ fn simulator_id_from_line(line: &str) -> Option<String> {
 }
 
 fn run_android(dir: &Path, flavor: &str) {
+    sync_default_mobile_artifacts(dir, false, true);
     let android_dir = dir.join("android");
     let gradlew = android_dir.join("gradlew");
     let task = format!(":app:install{}", capitalize_ascii(flavor));
@@ -1281,7 +1287,7 @@ fn run_android(dir: &Path, flavor: &str) {
         .unwrap_or_else(|| "dev.crepuscularity.nativeshell".to_string());
 
     let mut cmd = if gradlew.exists() {
-        let mut c = Command::new(&gradlew);
+        let mut c = Command::new("./gradlew");
         c.current_dir(&android_dir);
         c.arg(&task);
         c
@@ -1318,6 +1324,62 @@ fn gradle_kts_value(src: &str, key: &str) -> Option<String> {
         let rest = rest.strip_prefix('=')?.trim();
         Some(rest.trim_matches('"').to_string())
     })
+}
+
+fn sync_default_mobile_artifacts(root: &Path, ios: bool, android: bool) {
+    let template = root.join("views/main.crepus");
+    if !template.exists() {
+        return;
+    }
+    let template_arg = "views/main.crepus".to_string();
+    let root_arg = root.display().to_string();
+    sync_native_fixture_inner(&[
+        template_arg.clone(),
+        "--dir".to_string(),
+        root_arg,
+        "--pretty".to_string(),
+    ])
+    .unwrap_or_else(|e| ui::error(&e));
+    if ios {
+        codegen_native_source_inner(&[
+            template.display().to_string(),
+            "--platform".to_string(),
+            "swiftui".to_string(),
+            "--out".to_string(),
+            root.join("ios/Sources/NativeShell/Generated")
+                .display()
+                .to_string(),
+            "--view-name".to_string(),
+            "CrepusGeneratedView".to_string(),
+        ])
+        .unwrap_or_else(|e| ui::error(&e));
+    }
+    if android {
+        let out_dir =
+            root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/generated");
+        codegen_native_source_inner(&[
+            template.display().to_string(),
+            "--platform".to_string(),
+            "compose".to_string(),
+            "--out".to_string(),
+            out_dir.display().to_string(),
+            "--view-name".to_string(),
+            "CrepusGeneratedView".to_string(),
+        ])
+        .unwrap_or_else(|e| ui::error(&e));
+        prepend_kotlin_package(&out_dir.join("CrepusGeneratedView.kt"));
+    }
+}
+
+fn prepend_kotlin_package(path: &Path) {
+    let Ok(source) = fs::read_to_string(path) else {
+        return;
+    };
+    if source.starts_with("package ") {
+        return;
+    }
+    let updated = format!("package dev.crepuscularity.nativeshell\n\n{source}");
+    let _ = fs::write(path, updated);
 }
 
 fn delegate(mut cmd: Command, label: &str) {
