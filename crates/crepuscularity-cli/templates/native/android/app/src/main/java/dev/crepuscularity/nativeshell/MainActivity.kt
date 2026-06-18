@@ -1,5 +1,6 @@
 package dev.crepuscularity.nativeshell
 
+import android.content.pm.ApplicationInfo
 import android.os.Bundle
 import androidx.activity.SystemBarStyle
 import androidx.activity.ComponentActivity
@@ -10,6 +11,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 
@@ -29,7 +32,20 @@ class MainActivity : ComponentActivity() {
                         .background(Color(0xFF101624))
                         .safeDrawingPadding()
                 ) {
-                    CrepusGeneratedView(modifier = Modifier.fillMaxSize())
+                    if ((applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0) {
+                        val runtime = remember {
+                            CrepusMobileRuntime(this@MainActivity).also { it.start() }
+                        }
+                        val ir = runtime.ir.value
+                        val error = runtime.errorText.value
+                        when {
+                            ir != null -> ViewIrRoot(ir, modifier = Modifier.fillMaxSize())
+                            error != null -> Text(error)
+                            else -> Text("")
+                        }
+                    } else {
+                        CrepusGeneratedView(modifier = Modifier.fillMaxSize())
+                    }
                 }
             }
         }

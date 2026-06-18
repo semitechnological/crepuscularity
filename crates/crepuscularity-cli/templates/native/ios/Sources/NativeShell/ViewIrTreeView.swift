@@ -58,6 +58,7 @@ public struct ViewNodeView: View {
                 if let onClick { actionStore.dispatch(onClick) }
             }) {
                 Text(label)
+                    .modifier(ConditionalForeground(color: style?.foregroundColor.flatMap { Color(hex: $0) }))
             }
             .applyViewStyle(style, isText: false)
 
@@ -173,6 +174,7 @@ private struct ViewStyleModifier: ViewModifier {
             )
             .modifier(ConditionalPadding(pad: pad, enabled: hasPadding))
             .background((style.backgroundColor.flatMap { Color(hex: $0) }) ?? Color.clear)
+            .modifier(ConditionalForeground(color: style.foregroundColor.flatMap { Color(hex: $0) }))
             .clipShape(RoundedRectangle(cornerRadius: CGFloat(style.cornerRadius ?? 0)))
 
         Group {
@@ -190,7 +192,7 @@ private struct ViewStyleModifier: ViewModifier {
         let withFont = v
             .font(style.fontSize.map { .system(size: CGFloat($0)) } ?? .body)
             .fontWeight(w ?? .regular)
-            .foregroundStyle((style.foregroundColor.flatMap { Color(hex: $0) }) ?? Color.primary)
+            .modifier(ConditionalForeground(color: style.foregroundColor.flatMap { Color(hex: $0) }))
             .italic(style.italic == true)
             .underline(style.underline == true)
             .strikethrough(style.strikethrough == true)
@@ -215,6 +217,18 @@ private func frameAxis(width: Float?, min: Float?, max: Float?) -> (min: CGFloat
         maxValue = max.flatMap { $0 > 0 ? CGFloat($0) : nil }
     }
     return (minValue, idealValue, maxValue)
+}
+
+private struct ConditionalForeground: ViewModifier {
+    let color: Color?
+
+    func body(content: Content) -> some View {
+        if let color {
+            content.foregroundStyle(color)
+        } else {
+            content
+        }
+    }
 }
 
 private struct ConditionalPadding: ViewModifier {

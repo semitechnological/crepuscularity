@@ -347,7 +347,7 @@ crepus mobile build --platform android
 crepus mobile run --platform android
 ```
 
-`crepus mobile dev` watches `views/main.crepus` by default, writes current fixtures/generated source, and serves:
+`crepus mobile build` and `crepus mobile run` refresh `fixture.json` and generated SwiftUI/Compose source before invoking `xcodebuild`, Gradle, `simctl`, or `adb`. `crepus mobile dev` watches `views/main.crepus` by default, writes current fixtures/generated source, and serves:
 
 ```text
 GET /health

@@ -16,8 +16,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -50,20 +52,24 @@ fun ViewNodeView(node: ViewNode) {
             val mod = stackModifier(node.style)
             when (node.axis) {
                 "row" ->
-                    Row(
-                        modifier = mod,
-                        horizontalArrangement = arr,
-                        verticalAlignment = rowAlign,
-                    ) {
-                        node.children.forEach { child -> ViewNodeView(child) }
+                    withContentColor(node.style) {
+                        Row(
+                            modifier = mod,
+                            horizontalArrangement = arr,
+                            verticalAlignment = rowAlign,
+                        ) {
+                            node.children.forEach { child -> ViewNodeView(child) }
+                        }
                     }
                 else ->
-                    Column(
-                        modifier = mod,
-                        verticalArrangement = arr,
-                        horizontalAlignment = colAlign,
-                    ) {
-                        node.children.forEach { child -> ViewNodeView(child) }
+                    withContentColor(node.style) {
+                        Column(
+                            modifier = mod,
+                            verticalArrangement = arr,
+                            horizontalAlignment = colAlign,
+                        ) {
+                            node.children.forEach { child -> ViewNodeView(child) }
+                        }
                     }
             }
         }
@@ -134,6 +140,16 @@ private fun styledText(content: String, style: ViewStyle?) {
                 else -> TextAlign.Left
             },
     )
+}
+
+@Composable
+private fun withContentColor(style: ViewStyle?, content: @Composable () -> Unit) {
+    val color = style?.foregroundColor?.let { parseColor(it) }
+    if (color != null) {
+        CompositionLocalProvider(LocalContentColor provides color) { content() }
+    } else {
+        content()
+    }
 }
 
 private fun textModifier(s: ViewStyle?): Modifier {
