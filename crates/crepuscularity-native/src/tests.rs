@@ -429,6 +429,27 @@ div flex flex-col
 }
 
 #[test]
+fn file_picker_ir_and_codegen_actions() {
+    let tpl = r#"
+file-picker accept="image/*,video/*" multiple @pick="pickMedia" "Choose media"
+"#;
+    let ir = render_template_to_ir(tpl, &TemplateContext::new()).unwrap();
+    let v = serde_json::to_value(&ir).unwrap();
+    assert_eq!(v["root"][0]["kind"], "filePicker");
+    assert_eq!(v["root"][0]["accept"][0], "image/*");
+    assert_eq!(v["root"][0]["multiple"], true);
+    assert_eq!(v["root"][0]["onPick"], "pickMedia");
+
+    let swift = generate_native_source(&ir, NativeCodegenTarget::SwiftUi, "PickerView");
+    assert!(swift.contains("\"pickMedia\""));
+    assert!(swift.contains("CrepusActions.perform(\"pickMedia\")"));
+
+    let compose = generate_native_source(&ir, NativeCodegenTarget::Compose, "PickerView");
+    assert!(compose.contains("\"pickMedia\""));
+    assert!(compose.contains("CrepusActions.perform(\"pickMedia\")"));
+}
+
+#[test]
 fn image_object_fit_and_position_classes() {
     let tpl = r#"
 img object-cover object-right-top src="https://example.com/cat.png" placeholder="Loading image…"

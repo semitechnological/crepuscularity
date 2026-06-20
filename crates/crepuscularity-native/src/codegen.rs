@@ -202,6 +202,21 @@ fn swiftui_node(node: &ViewNode, indent: usize) -> String {
             swiftui_style(&mut out, style.as_ref(), false, indent);
             out
         }
+        ViewNode::FilePicker {
+            label,
+            on_pick,
+            style,
+            ..
+        } => {
+            let action = swiftui_action(on_pick.as_deref());
+            let mut out = format!(
+                "{pad}Button(action: {{ {action} }}) {{\n{}Text(\"{}\")\n{pad}}}",
+                indent_str(indent + 1),
+                swift_escape(label)
+            );
+            swiftui_style(&mut out, style.as_ref(), false, indent);
+            out
+        }
         ViewNode::Image {
             src, alt, style, ..
         } => {
@@ -709,6 +724,20 @@ fn compose_node_with_base(node: &ViewNode, indent: usize, base_modifier: Option<
             };
             format!("{pad}Column{modifier} {{\n{inner}\n{pad}}}")
         }
+        ViewNode::FilePicker {
+            label,
+            on_pick,
+            style,
+            ..
+        } => {
+            let modifier = compose_modifier_param(style.as_ref());
+            let action = compose_action(on_pick.as_deref());
+            format!(
+                "{pad}Button(onClick = {{ {action} }}{modifier}) {{\n{}Text(\"{}\")\n{pad}}}",
+                indent_str(indent + 1),
+                kotlin_escape(label)
+            )
+        }
         ViewNode::Image {
             src, alt, style, ..
         } => {
@@ -1116,6 +1145,12 @@ fn collect_node_actions(node: &ViewNode, actions: &mut BTreeSet<String>) {
             for child in children {
                 collect_node_actions(child, actions);
             }
+        }
+        ViewNode::FilePicker {
+            on_pick: Some(action),
+            ..
+        } => {
+            actions.insert(action.clone());
         }
         ViewNode::Stack { children, .. }
         | ViewNode::Scroll { children, .. }

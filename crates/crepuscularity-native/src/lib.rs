@@ -27,6 +27,7 @@ pub mod hot_reload;
 mod include_expand;
 pub mod ir;
 pub mod mutations;
+pub mod native;
 mod render;
 pub mod style;
 
@@ -36,6 +37,9 @@ pub use crepuscularity_core::CrepusError;
 pub use hot_reload::{ast_shape_compatible, plan_hot_reload, HotReloadEnvelope, HotReloadMessage};
 pub use ir::{PickerOption, StackAxis, ViewIr, ViewNode, ViewStyle, IR_VERSION};
 pub use mutations::{apply_mutations, diff_ir, IrMutation};
+pub use native::{
+    FilePickerRequest, FilePickerResponse, NativeRequest, NativeResponse, PickedFile,
+};
 pub use render::{
     render_component_file_to_ir, render_from_files, render_nodes_to_ir, render_template_to_ir,
 };
