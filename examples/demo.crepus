@@ -1,6 +1,7 @@
 # Demo template — shows all supported DSL features.
 # Run with: crepu-dev examples/demo.crepus
 # Or with vars: crepu-dev examples/demo.crepus --var title="Hello" --bool show_badge=true --int score=42
+# Or with context file: crepus render examples/demo.crepus --ctx examples/demo-context.json
 
 div w-full h-full bg-zinc-950 text-white flex flex-col gap-4 p-8
 
@@ -46,24 +47,24 @@ div w-full h-full bg-zinc-950 text-white flex flex-col gap-4 p-8
             "Status:"
 
         match {status}
-            "active" =>
-                div flex items-center gap-2
-                    div w-2 h-2 rounded-full bg-emerald-500
-                    div text-emerald-300 font-semibold
-                        "Active"
-            "paused" =>
-                div flex items-center gap-2
-                    div w-2 h-2 rounded-full bg-amber-400
-                    div text-amber-300 font-semibold
-                        "Paused"
-            "error" =>
-                div flex items-center gap-2
-                    div w-2 h-2 rounded-full bg-red-500
-                    div text-red-300 font-semibold
-                        "Error"
-            _ =>
-                div text-zinc-500 italic
-                    "Unknown"
+        "active" =>
+            div flex items-center gap-2
+                div w-2 h-2 rounded-full bg-emerald-500
+                div text-emerald-300 font-semibold
+                    "Active"
+        "paused" =>
+            div flex items-center gap-2
+                div w-2 h-2 rounded-full bg-amber-400
+                div text-amber-300 font-semibold
+                    "Paused"
+        "error" =>
+            div flex items-center gap-2
+                div w-2 h-2 rounded-full bg-red-500
+                div text-red-300 font-semibold
+                    "Error"
+        _ =>
+            div text-zinc-500 italic
+                "Unknown"
 
     # ── For loop ──────────────────────────────────────────
     div flex flex-col gap-1
