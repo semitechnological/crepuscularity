@@ -294,6 +294,33 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<ViewNode, Crepu
         });
     }
 
+    if tag == "file-picker" || tag == "filepicker" || tag == "media-picker" {
+        let label =
+            collect_primary_text(&el.children, ctx).unwrap_or_else(|_| "Choose file".to_string());
+        let accept = el
+            .bindings
+            .iter()
+            .find(|b| b.prop == "accept")
+            .and_then(|b| eval_expr(&b.value, ctx).ok().map(|v| value_to_str(&v)))
+            .map(|value| split_accept(&value))
+            .unwrap_or_default();
+        let multiple = el.bindings.iter().any(|b| b.prop == "multiple")
+            || classes.iter().any(|c| c == "multiple");
+        let on_pick = el
+            .event_handlers
+            .iter()
+            .find(|e| e.event == "pick" || e.event == "click")
+            .map(|e| e.handler.clone());
+        let hints = style::extract_stack_hints(&classes, Some(ctx));
+        return Ok(ViewNode::FilePicker {
+            label,
+            accept,
+            multiple,
+            on_pick,
+            style: hints.style.opt(),
+        });
+    }
+
     if tag == "input" || tag == "textfield" || tag == "textinput" || tag == "textarea" {
         let bind = el
             .bindings
@@ -574,6 +601,15 @@ fn parse_gap_spacing(classes: &[String]) -> Option<f32> {
         }
     }
     None
+}
+
+fn split_accept(value: &str) -> Vec<String> {
+    value
+        .split(',')
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(ToString::to_string)
+        .collect()
 }
 
 fn render_text_inline(parts: &[TextPart], ctx: &TemplateContext) -> Result<String, CrepusError> {

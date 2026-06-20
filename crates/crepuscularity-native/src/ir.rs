@@ -416,6 +416,18 @@ pub enum ViewNode {
         style: Option<ViewStyle>,
         children: Vec<ViewNode>,
     },
+    #[serde(rename = "filePicker")]
+    FilePicker {
+        label: String,
+        #[serde(default)]
+        accept: Vec<String>,
+        #[serde(default)]
+        multiple: bool,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        on_pick: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        style: Option<ViewStyle>,
+    },
     #[serde(rename = "image")]
     Image {
         src: String,

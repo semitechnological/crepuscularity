@@ -422,6 +422,7 @@ fn node_style_mut(node: &mut ViewNode) -> Option<&mut Option<ViewStyle>> {
         | ViewNode::Divider { style, .. }
         | ViewNode::Spacer { style, .. }
         | ViewNode::Dropzone { style, .. }
+        | ViewNode::FilePicker { style, .. }
         | ViewNode::Image { style, .. }
         | ViewNode::Scroll { style, .. }
         | ViewNode::List { style, .. }
