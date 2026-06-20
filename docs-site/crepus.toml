@@ -36,6 +36,40 @@ command = "cargo"
 args = ["run", "--quiet", "--locked", "--manifest-path", "docs-renderer/Cargo.toml", "--"]
 src = "../docs"
 
+[targets.llms]
+enabled = true
+base_url = "https://crepuscularity.undivisible.dev"
+title = "Crepuscularity"
+description = "Multi-target UI framework for GPUI, web, browser extensions, terminal UIs, embedded displays, and native shells."
+sources = [
+  { path = "../README.md", href = "https://github.com/tschk/crepuscularity/blob/main/README.md", title = "Repository README" },
+  { path = "../docs/README.md", href = "https://crepuscularity.undivisible.dev/docs/", title = "Documentation overview" },
+  { path = "../docs/cli.md", href = "https://crepuscularity.undivisible.dev/docs/cli.html", title = "CLI" },
+  { path = "../docs/dsl.md", href = "https://crepuscularity.undivisible.dev/docs/dsl.html", title = "DSL" },
+  { path = "../docs/components.md", href = "https://crepuscularity.undivisible.dev/docs/components.html", title = "Components" },
+  { path = "../docs/gpui.md", href = "https://crepuscularity.undivisible.dev/docs/gpui.html", title = "GPUI" },
+  { path = "../docs/runtime.md", href = "https://crepuscularity.undivisible.dev/docs/runtime.html", title = "Runtime" },
+  { path = "../docs/native.md", href = "https://crepuscularity.undivisible.dev/docs/native.html", title = "Native" },
+  { path = "../docs/view-ir-contract.md", href = "https://crepuscularity.undivisible.dev/docs/view-ir-contract.html", title = "View IR contract" },
+  { path = "../docs/tui.md", href = "https://crepuscularity.undivisible.dev/docs/tui.html", title = "TUI" },
+  { path = "../docs/embedded.md", href = "https://crepuscularity.undivisible.dev/docs/embedded.html", title = "Embedded" },
+  { path = "../docs/lvgl.md", href = "https://crepuscularity.undivisible.dev/docs/lvgl.html", title = "LVGL" },
+  { path = "../docs/webext.md", href = "https://crepuscularity.undivisible.dev/docs/webext.html", title = "Browser extensions" },
+  { path = "../docs/webext-policy.md", href = "https://crepuscularity.undivisible.dev/docs/webext-policy.html", title = "Browser extension policy" },
+  { path = "../docs/lite.md", href = "https://crepuscularity.undivisible.dev/docs/lite.html", title = "Lite runtime" },
+  { path = "../docs/aurorality.md", href = "https://crepuscularity.undivisible.dev/docs/aurorality.html", title = "Aurorality" },
+  { path = "../docs/production.md", href = "https://crepuscularity.undivisible.dev/docs/production.html", title = "Production" },
+  { path = "../docs/observability.md", href = "https://crepuscularity.undivisible.dev/docs/observability.html", title = "Observability" },
+  { path = "../docs/plugin-surface.md", href = "https://crepuscularity.undivisible.dev/docs/plugin-surface.html", title = "Plugin surface" },
+  { path = "../docs/polyglot.md", href = "https://crepuscularity.undivisible.dev/docs/polyglot.html", title = "Polyglot" },
+  { path = "../docs/timing-profile.md", href = "https://crepuscularity.undivisible.dev/docs/timing-profile.html", title = "Timing profile" },
+  { path = "../docs/ide-extensions.md", href = "https://crepuscularity.undivisible.dev/docs/ide-extensions.html", title = "IDE extensions" },
+]
+
 [[targets.seo.alternates]]
 href = "https://crepuscularity.undivisible.dev/"
 hreflang = "en"
+
+[targets.seo.robots_txt]
+enabled = true
+allow = ["/"]

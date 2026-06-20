@@ -1081,6 +1081,9 @@ fn render_doc_shell(
 	  <title>{esc_page} — {esc_site}</title>
 	  <meta name="description" content="{esc_description}">
 	  <link rel="canonical" href="{esc_canonical}">
+	  <link rel="alternate" type="text/plain" href="{SITE_BASE_URL}/llms.txt" title="LLM index">
+	  <link rel="alternate" type="text/plain" href="{SITE_BASE_URL}/llms-full.txt" title="Full LLM bundle">
+	  <link rel="alternate" type="text/markdown" href="{SITE_BASE_URL}/agent.md" title="Agent guide">
 	  <meta name="robots" content="index,follow">
 	  <meta name="theme-color" content="{s}">
 	  <meta property="og:title" content="{esc_full_title}">

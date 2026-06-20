@@ -546,6 +546,7 @@ pub(crate) fn build_site_wasm(cli: &WebBuildArgs) {
 
     let head = load_site_head(&b.site_dir);
     let head = merge_site_head_meta(head, b.meta.as_ref());
+    let head = merge_llms_alternates(head, b.meta.as_ref());
     let google_fonts = merged_site_google_fonts(&b.site_dir, &files, b.meta.as_ref());
     let inline_css = merged_site_inline_css(&files);
     let vendor_dir = b.out_dir.join("vendor");
@@ -612,6 +613,7 @@ pub(crate) fn build_site_wasm(cli: &WebBuildArgs) {
     }
 
     write_seo_files(&b.out_dir, &head);
+    write_llms_files(&b.site_dir, &b.out_dir, &head, b.meta.as_ref());
 
     {
         let sp = ui::spinner("compiling site WASM (wasm32-unknown-unknown)");
@@ -1126,6 +1128,38 @@ fn render_seo_head(head: &SiteHead) -> String {
     lines.join("\n")
 }
 
+fn merge_llms_alternates(
+    mut head: SiteHead,
+    meta: Option<&crate::crepus_toml::WebTargetMeta>,
+) -> SiteHead {
+    let Some(llms) = meta.and_then(|m| m.llms.as_ref()) else {
+        return head;
+    };
+    if !llms.enabled {
+        return head;
+    }
+    let base = llms_base_url(llms, &head);
+    let alts = [
+        ("llms.txt", "LLM index", "text/plain"),
+        ("llms-full.txt", "Full LLM bundle", "text/plain"),
+        ("agent.md", "Agent guide", "text/markdown"),
+    ];
+    for (path, title, mime_type) in alts {
+        let href = format!("{base}/{path}");
+        if head.seo.alternates.iter().any(|alt| alt.href == href) {
+            continue;
+        }
+        head.seo.alternates.push(crate::crepus_toml::SeoAlternate {
+            href,
+            hreflang: None,
+            media: None,
+            title: Some(title.into()),
+            mime_type: Some(mime_type.into()),
+        });
+    }
+    head
+}
+
 fn write_seo_files(out_dir: &Path, head: &SiteHead) {
     let seo = &head.seo;
     if let Some(sitemap) = &seo.sitemap {
@@ -1144,6 +1178,91 @@ fn write_seo_files(out_dir: &Path, head: &SiteHead) {
                 .unwrap_or_else(|e| ui::error(&format!("write robots.txt: {e}")));
         }
     }
+}
+
+fn write_llms_files(
+    site_dir: &Path,
+    out_dir: &Path,
+    head: &SiteHead,
+    meta: Option<&crate::crepus_toml::WebTargetMeta>,
+) {
+    let Some(llms) = meta.and_then(|m| m.llms.as_ref()) else {
+        return;
+    };
+    if !llms.enabled {
+        return;
+    }
+    let base = llms_base_url(llms, head);
+    let title = llms
+        .title
+        .as_deref()
+        .or(head.seo.title.as_deref())
+        .unwrap_or(&head.page_title);
+    let description = llms
+        .description
+        .as_deref()
+        .or(head.seo.description.as_deref())
+        .unwrap_or(&head.description);
+
+    let mut index = format!(
+        "# {title}\n\n> {description}\n\nStatic Crepus site. Agents should fetch the Markdown/text files below instead of scraping the rendered app shell.\n\n## Markdown\n\n- [Full bundle]({base}/llms-full.txt): One request with the agent guide and source Markdown.\n- [Agent guide]({base}/agent.md): Fetch order and hosting notes.\n"
+    );
+    for source in &llms.sources {
+        let label = source.title.as_deref().unwrap_or(&source.path);
+        let href = source
+            .href
+            .clone()
+            .unwrap_or_else(|| format!("{base}/{}", source.path.trim_start_matches('/')));
+        index.push_str(&format!("- [{label}]({href}): Source Markdown.\n",));
+    }
+
+    let agent = format!(
+        "# {title} — agent guide\n\n> Use direct static files. Do not scrape the HTML shell unless no Markdown file answers the task.\n\n## Best first request\n\n`curl -sL {base}/llms-full.txt`\n\n## Files\n\n- {base}/llms.txt — compact index\n- {base}/llms-full.txt — full bundle\n{}\n",
+        llms.sources
+            .iter()
+            .map(|source| {
+                source
+                    .href
+                    .clone()
+                    .unwrap_or_else(|| format!("{base}/{}", source.path.trim_start_matches('/')))
+            })
+            .map(|href| format!("- {href}"))
+            .collect::<Vec<_>>()
+            .join("\n")
+    );
+
+    let mut full = format!("{index}\n---\n\n{agent}");
+    for source in &llms.sources {
+        let rel = source.path.trim_start_matches('/');
+        let path = site_dir.join(rel);
+        let body = std::fs::read_to_string(&path).unwrap_or_else(|_| String::new());
+        let label = source.title.as_deref().unwrap_or(rel);
+        full.push_str(&format!("\n---\n\n# {label}\n\n{body}\n"));
+        if !body.is_empty() && !rel.split('/').any(|part| part == "..") {
+            if let Some(parent) = Path::new(rel).parent() {
+                std::fs::create_dir_all(out_dir.join(parent))
+                    .unwrap_or_else(|e| ui::error(&format!("mkdir llms source dir: {e}")));
+            }
+            std::fs::write(out_dir.join(rel), body)
+                .unwrap_or_else(|e| ui::error(&format!("write {rel}: {e}")));
+        }
+    }
+
+    std::fs::write(out_dir.join("llms.txt"), index)
+        .unwrap_or_else(|e| ui::error(&format!("write llms.txt: {e}")));
+    std::fs::write(out_dir.join("llms-full.txt"), full)
+        .unwrap_or_else(|e| ui::error(&format!("write llms-full.txt: {e}")));
+    std::fs::write(out_dir.join("agent.md"), agent)
+        .unwrap_or_else(|e| ui::error(&format!("write agent.md: {e}")));
+}
+
+fn llms_base_url(llms: &crate::crepus_toml::LlmsConfig, head: &SiteHead) -> String {
+    llms.base_url
+        .as_deref()
+        .or(head.seo.canonical.as_deref())
+        .unwrap_or("")
+        .trim_end_matches('/')
+        .to_string()
 }
 
 fn render_robots_txt(
@@ -1171,6 +1290,11 @@ fn render_robots_txt(
                     base_url.trim_end_matches('/')
                 ));
             }
+        }
+    }
+    for alt in &seo.alternates {
+        if alt.href.ends_with("/llms.txt") || alt.href.ends_with("/llms-full.txt") {
+            lines.push(format!("# {}", alt.href));
         }
     }
     lines.push(String::new());
@@ -1616,6 +1740,38 @@ mod tests {
         assert!(sitemap.contains("<loc>https://example.com/docs/</loc>"));
         assert!(sitemap.contains("<changefreq>weekly</changefreq>"));
         assert!(sitemap.contains("<priority>0.8</priority>"));
+    }
+
+    #[test]
+    fn llms_mode_emits_alternates_and_markdown_files() {
+        let site = tempfile::tempdir().expect("site");
+        let out = tempfile::tempdir().expect("out");
+        std::fs::write(site.path().join("README.md"), "# Example\n\nReadable docs.")
+            .expect("readme");
+        let meta = crate::crepus_toml::WebTargetMeta {
+            llms: Some(crate::crepus_toml::LlmsConfig {
+                enabled: true,
+                base_url: Some("https://example.com".into()),
+                title: Some("Example".into()),
+                description: Some("Agent-readable example.".into()),
+                sources: vec![crate::crepus_toml::LlmsSource {
+                    path: "README.md".into(),
+                    href: None,
+                    title: Some("README".into()),
+                }],
+            }),
+            ..crate::crepus_toml::WebTargetMeta::default()
+        };
+        let head = merge_llms_alternates(seo_head(), Some(&meta));
+        let html = render_index_html(&head, &[], "", "");
+        assert!(html.contains(r#"<link rel="alternate" href="https://example.com/llms-full.txt" title="Full LLM bundle" type="text/plain">"#));
+        write_llms_files(site.path(), out.path(), &head, Some(&meta));
+        let llms = std::fs::read_to_string(out.path().join("llms.txt")).expect("llms");
+        let full = std::fs::read_to_string(out.path().join("llms-full.txt")).expect("full");
+        assert!(llms.contains("https://example.com/README.md"));
+        assert!(full.contains("# README"));
+        assert!(full.contains("Readable docs."));
+        assert!(out.path().join("README.md").is_file());
     }
 
     #[test]

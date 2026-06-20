@@ -89,6 +89,8 @@ pub struct ManifestTarget {
     #[serde(default)]
     pub docs: Option<DocsHookConfig>,
     #[serde(default)]
+    pub llms: Option<LlmsConfig>,
+    #[serde(default)]
     pub extension: Option<crepuscularity_webext::ExtensionInfo>,
     #[serde(default)]
     pub capabilities: Option<crepuscularity_webext::CapabilitiesSection>,
@@ -151,6 +153,7 @@ pub struct WebTargetMeta {
     pub google_fonts: Vec<String>,
     pub seo: Option<SeoConfig>,
     pub docs: Option<DocsHookConfig>,
+    pub llms: Option<LlmsConfig>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -160,6 +163,29 @@ pub struct DocsHookConfig {
     pub args: Vec<String>,
     #[serde(default)]
     pub src: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct LlmsConfig {
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    #[serde(default)]
+    pub base_url: Option<String>,
+    #[serde(default)]
+    pub title: Option<String>,
+    #[serde(default)]
+    pub description: Option<String>,
+    #[serde(default)]
+    pub sources: Vec<LlmsSource>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct LlmsSource {
+    pub path: String,
+    #[serde(default)]
+    pub href: Option<String>,
+    #[serde(default)]
+    pub title: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -302,6 +328,7 @@ impl CrepusManifest {
                     google_fonts: t.google_fonts.clone(),
                     seo: t.seo.clone(),
                     docs: t.docs.clone(),
+                    llms: t.llms.clone(),
                 },
             ));
         }
@@ -395,6 +422,7 @@ impl CrepusManifest {
                         google_fonts: target.google_fonts.clone(),
                         seo: target.seo.clone(),
                         docs: target.docs.clone(),
+                        llms: target.llms.clone(),
                     },
                     webext: target.extension.clone().map(|extension| {
                         crepuscularity_webext::ExtensionManifest {
