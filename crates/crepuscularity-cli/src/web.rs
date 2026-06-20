@@ -536,6 +536,10 @@ pub(crate) fn build_site_wasm(cli: &WebBuildArgs) {
         }
     }
 
+    let llms_site_text = files
+        .get(&b.entry)
+        .map(|source| render_crepus_readable_text(source));
+
     let bundle = json!({
         "entry": b.entry,
         "files": files,
@@ -613,7 +617,13 @@ pub(crate) fn build_site_wasm(cli: &WebBuildArgs) {
     }
 
     write_seo_files(&b.out_dir, &head);
-    write_llms_files(&b.site_dir, &b.out_dir, &head, b.meta.as_ref());
+    write_llms_files(
+        &b.site_dir,
+        &b.out_dir,
+        &head,
+        b.meta.as_ref(),
+        llms_site_text.as_deref(),
+    );
 
     {
         let sp = ui::spinner("compiling site WASM (wasm32-unknown-unknown)");
@@ -947,6 +957,7 @@ pub(crate) fn render_index_html(
         .replace("__CREPUS_OG__", &seo)
         .replace("__CREPUS_GOOGLE_FONTS__", &font_markup)
         .replace("__CREPUS_EXTRA_HEAD__", &extra_head)
+        .replace("__CREPUS_NOSCRIPT__", &render_llms_noscript(head))
         .replace("__CREPUS_BODY_FONT__", &body_font_css)
         .replace("__THEME_ACCENT__", &escape_html_attr(&t.accent))
         .replace("__THEME_ACCENT_SOFT__", &escape_html_attr(&t.accent_soft))
@@ -1185,6 +1196,7 @@ fn write_llms_files(
     out_dir: &Path,
     head: &SiteHead,
     meta: Option<&crate::crepus_toml::WebTargetMeta>,
+    site_text: Option<&str>,
 ) {
     let Some(llms) = meta.and_then(|m| m.llms.as_ref()) else {
         return;
@@ -1205,7 +1217,7 @@ fn write_llms_files(
         .unwrap_or(&head.description);
 
     let mut index = format!(
-        "# {title}\n\n> {description}\n\nStatic Crepus site. Agents should fetch the Markdown/text files below instead of scraping the rendered app shell.\n\n## Markdown\n\n- [Full bundle]({base}/llms-full.txt): One request with the agent guide and source Markdown.\n- [Agent guide]({base}/agent.md): Fetch order and hosting notes.\n"
+        "# {title}\n\n> {description}\n\nStatic Crepus site. Agents should fetch the Markdown/text files below instead of scraping the rendered app shell.\n\n## Markdown\n\n- [Full bundle]({base}/llms-full.txt): One request with the agent guide and readable site text.\n- [Agent guide]({base}/agent.md): Fetch order and hosting notes.\n"
     );
     for source in &llms.sources {
         let label = source.title.as_deref().unwrap_or(&source.path);
@@ -1232,6 +1244,14 @@ fn write_llms_files(
     );
 
     let mut full = format!("{index}\n---\n\n{agent}");
+    if let Some(site_text) = site_text {
+        if !site_text.trim().is_empty() {
+            full.push_str(&format!(
+                "\n---\n\n# Rendered site text\n\n{}\n",
+                site_text.trim()
+            ));
+        }
+    }
     for source in &llms.sources {
         let rel = source.path.trim_start_matches('/');
         let path = site_dir.join(rel);
@@ -1254,6 +1274,110 @@ fn write_llms_files(
         .unwrap_or_else(|e| ui::error(&format!("write llms-full.txt: {e}")));
     std::fs::write(out_dir.join("agent.md"), agent)
         .unwrap_or_else(|e| ui::error(&format!("write agent.md: {e}")));
+}
+
+fn render_llms_noscript(head: &SiteHead) -> String {
+    let Some(href) = head
+        .seo
+        .alternates
+        .iter()
+        .find(|alt| alt.href.ends_with("/llms-full.txt"))
+        .map(|alt| alt.href.as_str())
+    else {
+        return String::new();
+    };
+    format!(
+        r#"<noscript><p><a href="{}">Agent-readable text version</a></p></noscript>"#,
+        escape_html_attr(href)
+    )
+}
+
+#[derive(Clone)]
+struct ReadableElement {
+    tag: String,
+    href: Option<String>,
+}
+
+fn render_crepus_readable_text(source: &str) -> String {
+    let mut stack: Vec<ReadableElement> = Vec::new();
+    let mut out: Vec<String> = Vec::new();
+    for line in source.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() || trimmed.starts_with('.') {
+            continue;
+        }
+        let depth = (line.len() - line.trim_start().len()) / 2;
+        stack.truncate(depth);
+        if let Some(text) = quoted_crepus_text(trimmed) {
+            push_readable_text(&mut out, &stack, text);
+            continue;
+        }
+        if let Some(element) = readable_element(trimmed) {
+            stack.push(element);
+        }
+    }
+    out.join("\n\n")
+}
+
+fn push_readable_text(out: &mut Vec<String>, stack: &[ReadableElement], text: String) {
+    if text.trim().is_empty() {
+        return;
+    }
+    if let Some(tag) = stack
+        .iter()
+        .rev()
+        .find_map(|element| match element.tag.as_str() {
+            "h1" => Some("#"),
+            "h2" => Some("##"),
+            "h3" => Some("###"),
+            _ => None,
+        })
+    {
+        out.push(format!("{tag} {text}"));
+        return;
+    }
+    if let Some(href) = stack
+        .iter()
+        .rev()
+        .find_map(|element| element.href.as_deref())
+    {
+        let link = format!("[{text}]({href})");
+        if let Some(last) = out.last_mut() {
+            if last.ends_with(&format!("]({href})")) {
+                let insert_at = last.find("](").unwrap_or(last.len());
+                last.insert_str(insert_at, &text);
+                return;
+            }
+        }
+        out.push(link);
+        return;
+    }
+    out.push(text);
+}
+
+fn readable_element(trimmed: &str) -> Option<ReadableElement> {
+    let tag = trimmed.split_whitespace().next()?.to_string();
+    if tag.starts_with('@') {
+        return None;
+    }
+    Some(ReadableElement {
+        tag,
+        href: attr_value(trimmed, "href"),
+    })
+}
+
+fn quoted_crepus_text(trimmed: &str) -> Option<String> {
+    if !trimmed.starts_with('"') || !trimmed.ends_with('"') || trimmed.len() < 2 {
+        return None;
+    }
+    Some(trimmed[1..trimmed.len() - 1].replace("\\\"", "\""))
+}
+
+fn attr_value(line: &str, name: &str) -> Option<String> {
+    let needle = format!("{name}=\"");
+    let start = line.find(&needle)? + needle.len();
+    let end = line[start..].find('"')? + start;
+    Some(line[start..end].to_string())
 }
 
 fn llms_base_url(llms: &crate::crepus_toml::LlmsConfig, head: &SiteHead) -> String {
@@ -1765,10 +1889,34 @@ mod tests {
         let head = merge_llms_alternates(seo_head(), Some(&meta));
         let html = render_index_html(&head, &[], "", "");
         assert!(html.contains(r#"<link rel="alternate" href="https://example.com/llms-full.txt" title="Full LLM bundle" type="text/plain">"#));
-        write_llms_files(site.path(), out.path(), &head, Some(&meta));
+        assert!(html.contains(r#"<noscript><p><a href="https://example.com/llms-full.txt">Agent-readable text version</a></p></noscript>"#));
+        let page_text = render_crepus_readable_text(
+            r#"
+h1
+  "Main title"
+section
+  h2
+    "Projects"
+  a href="https://example.com/project"
+    span
+      "Project"
+    span
+      " — readable link text"
+"#,
+        );
+        write_llms_files(
+            site.path(),
+            out.path(),
+            &head,
+            Some(&meta),
+            Some(&page_text),
+        );
         let llms = std::fs::read_to_string(out.path().join("llms.txt")).expect("llms");
         let full = std::fs::read_to_string(out.path().join("llms-full.txt")).expect("full");
         assert!(llms.contains("https://example.com/README.md"));
+        assert!(full.contains("# Main title"));
+        assert!(full.contains("## Projects"));
+        assert!(full.contains("[Project — readable link text](https://example.com/project)"));
         assert!(full.contains("# README"));
         assert!(full.contains("Readable docs."));
         assert!(out.path().join("README.md").is_file());
