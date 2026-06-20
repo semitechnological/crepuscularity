@@ -340,14 +340,23 @@ fn json_to_template_value(value: &Value) -> Result<TemplateValue, String> {
         Value::Array(values) => {
             let mut items = Vec::new();
             for item in values {
-                let Some(obj) = item.as_object() else {
-                    return Err("context arrays must contain objects".to_string());
-                };
-                let mut child = TemplateContext::new();
-                for (key, value) in obj {
-                    child.set(key.clone(), json_to_template_scalar(value)?);
+                match item {
+                    Value::Object(obj) => {
+                        // Each object becomes a child context
+                        let mut child = TemplateContext::new();
+                        for (key, value) in obj {
+                            child.set(key.clone(), json_to_template_scalar(value)?);
+                        }
+                        items.push(child);
+                    }
+                    Value::String(_) | Value::Number(_) | Value::Bool(_) | Value::Null => {
+                        // Scalar values become item contexts with "value" key
+                        let mut child = TemplateContext::new();
+                        child.set("value", json_to_template_scalar(item)?);
+                        items.push(child);
+                    }
+                    _ => return Err("unsupported array item type".to_string()),
                 }
-                items.push(child);
             }
             Ok(TemplateValue::List(items))
         }
