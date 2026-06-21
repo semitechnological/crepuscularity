@@ -8,23 +8,32 @@ pub const NATIVE_CAPABILITIES: &[NativeCapability] = &[
     NativeCapability::App,
     NativeCapability::AppState,
     NativeCapability::Appearance,
+    NativeCapability::Audio,
+    NativeCapability::Authentication,
     NativeCapability::BackgroundRunner,
     NativeCapability::BarcodeScanner,
+    NativeCapability::Battery,
+    NativeCapability::Biometrics,
     NativeCapability::Browser,
     NativeCapability::Bluetooth,
+    NativeCapability::Calendar,
     NativeCapability::Camera,
     NativeCapability::Clipboard,
+    NativeCapability::Contacts,
     NativeCapability::Cookies,
     NativeCapability::Device,
     NativeCapability::Dialog,
     NativeCapability::Dimensions,
+    NativeCapability::DocumentPicker,
     NativeCapability::Filesystem,
     NativeCapability::FileTransfer,
     NativeCapability::FileViewer,
     NativeCapability::Geolocation,
     NativeCapability::GoogleMaps,
     NativeCapability::Haptics,
+    NativeCapability::Health,
     NativeCapability::Http,
+    NativeCapability::ImagePicker,
     NativeCapability::InAppBrowser,
     NativeCapability::Keyboard,
     NativeCapability::Linking,
@@ -32,7 +41,11 @@ pub const NATIVE_CAPABILITIES: &[NativeCapability] = &[
     NativeCapability::LocalNotifications,
     NativeCapability::Motion,
     NativeCapability::Network,
+    NativeCapability::Nfc,
+    NativeCapability::Payments,
     NativeCapability::Permissions,
+    NativeCapability::Phone,
+    NativeCapability::PhotoLibrary,
     NativeCapability::Platform,
     NativeCapability::Preferences,
     NativeCapability::PrivacyScreen,
@@ -44,10 +57,16 @@ pub const NATIVE_CAPABILITIES: &[NativeCapability] = &[
     NativeCapability::StatusBar,
     NativeCapability::SystemBars,
     NativeCapability::Settings,
+    NativeCapability::Shortcuts,
+    NativeCapability::Sms,
+    NativeCapability::SecureStorage,
     NativeCapability::Sync,
     NativeCapability::TextZoom,
     NativeCapability::Toast,
     NativeCapability::Vibration,
+    NativeCapability::Video,
+    NativeCapability::Wallet,
+    NativeCapability::Widgets,
 ];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -59,23 +78,32 @@ pub enum NativeCapability {
     App,
     AppState,
     Appearance,
+    Audio,
+    Authentication,
     BackgroundRunner,
     BarcodeScanner,
+    Battery,
+    Biometrics,
     Browser,
     Bluetooth,
+    Calendar,
     Camera,
     Clipboard,
+    Contacts,
     Cookies,
     Device,
     Dialog,
     Dimensions,
+    DocumentPicker,
     Filesystem,
     FileTransfer,
     FileViewer,
     Geolocation,
     GoogleMaps,
     Haptics,
+    Health,
     Http,
+    ImagePicker,
     InAppBrowser,
     Keyboard,
     Linking,
@@ -83,7 +111,11 @@ pub enum NativeCapability {
     LocalNotifications,
     Motion,
     Network,
+    Nfc,
+    Payments,
     Permissions,
+    Phone,
+    PhotoLibrary,
     Platform,
     Preferences,
     PrivacyScreen,
@@ -95,10 +127,16 @@ pub enum NativeCapability {
     StatusBar,
     SystemBars,
     Settings,
+    Shortcuts,
+    Sms,
+    SecureStorage,
     Sync,
     TextZoom,
     Toast,
     Vibration,
+    Video,
+    Wallet,
+    Widgets,
 }
 
 impl NativeCapability {
@@ -110,23 +148,32 @@ impl NativeCapability {
             Self::App => "app",
             Self::AppState => "appState",
             Self::Appearance => "appearance",
+            Self::Audio => "audio",
+            Self::Authentication => "authentication",
             Self::BackgroundRunner => "backgroundRunner",
             Self::BarcodeScanner => "barcodeScanner",
+            Self::Battery => "battery",
+            Self::Biometrics => "biometrics",
             Self::Browser => "browser",
             Self::Bluetooth => "bluetooth",
+            Self::Calendar => "calendar",
             Self::Camera => "camera",
             Self::Clipboard => "clipboard",
+            Self::Contacts => "contacts",
             Self::Cookies => "cookies",
             Self::Device => "device",
             Self::Dialog => "dialog",
             Self::Dimensions => "dimensions",
+            Self::DocumentPicker => "documentPicker",
             Self::Filesystem => "filesystem",
             Self::FileTransfer => "fileTransfer",
             Self::FileViewer => "fileViewer",
             Self::Geolocation => "geolocation",
             Self::GoogleMaps => "googleMaps",
             Self::Haptics => "haptics",
+            Self::Health => "health",
             Self::Http => "http",
+            Self::ImagePicker => "imagePicker",
             Self::InAppBrowser => "inAppBrowser",
             Self::Keyboard => "keyboard",
             Self::Linking => "linking",
@@ -134,7 +181,11 @@ impl NativeCapability {
             Self::LocalNotifications => "localNotifications",
             Self::Motion => "motion",
             Self::Network => "network",
+            Self::Nfc => "nfc",
+            Self::Payments => "payments",
             Self::Permissions => "permissions",
+            Self::Phone => "phone",
+            Self::PhotoLibrary => "photoLibrary",
             Self::Platform => "platform",
             Self::Preferences => "preferences",
             Self::PrivacyScreen => "privacyScreen",
@@ -146,10 +197,16 @@ impl NativeCapability {
             Self::StatusBar => "statusBar",
             Self::SystemBars => "systemBars",
             Self::Settings => "settings",
+            Self::Shortcuts => "shortcuts",
+            Self::Sms => "sms",
+            Self::SecureStorage => "secureStorage",
             Self::Sync => "sync",
             Self::TextZoom => "textZoom",
             Self::Toast => "toast",
             Self::Vibration => "vibration",
+            Self::Video => "video",
+            Self::Wallet => "wallet",
+            Self::Widgets => "widgets",
         }
     }
 }
@@ -235,23 +292,37 @@ mod tests {
             .map(|capability| capability.as_str())
             .collect::<HashSet<_>>();
 
-        assert_eq!(NATIVE_CAPABILITIES.len(), 46);
+        assert_eq!(NATIVE_CAPABILITIES.len(), 65);
         assert_eq!(names.len(), NATIVE_CAPABILITIES.len());
         assert!(names.contains("accessibilityInfo"));
         assert!(names.contains("appState"));
         assert!(names.contains("appearance"));
+        assert!(names.contains("authentication"));
+        assert!(names.contains("battery"));
+        assert!(names.contains("biometrics"));
         assert!(names.contains("bluetooth"));
+        assert!(names.contains("calendar"));
         assert!(names.contains("camera"));
         assert!(names.contains("clipboard"));
+        assert!(names.contains("contacts"));
         assert!(names.contains("dimensions"));
+        assert!(names.contains("documentPicker"));
         assert!(names.contains("fileTransfer"));
+        assert!(names.contains("health"));
+        assert!(names.contains("imagePicker"));
         assert!(names.contains("linking"));
+        assert!(names.contains("nfc"));
+        assert!(names.contains("payments"));
         assert!(names.contains("permissions"));
+        assert!(names.contains("photoLibrary"));
         assert!(names.contains("platform"));
+        assert!(names.contains("secureStorage"));
         assert!(names.contains("settings"));
         assert!(names.contains("sync"));
         assert!(names.contains("toast"));
         assert!(names.contains("vibration"));
+        assert!(names.contains("wallet"));
+        assert!(names.contains("widgets"));
     }
 
     #[test]
