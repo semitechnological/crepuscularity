@@ -1,4 +1,4 @@
-//! **crepuscularity-lite** — embed a V8 guest + Capacitor-shaped Rust bridge inside a GPUI (or other) host.
+//! **crepuscularity-lite** — embed a V8 guest + Rust native-capability bridge inside a GPUI (or other) host.
 //!
 //! Development can run TypeScript / TSX guest entries through the built-in Oxc transpiler. Production
 //! bundling, chunking, and code splitting are still the embedder’s or CLI toolchain’s job; use the

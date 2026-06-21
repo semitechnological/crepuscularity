@@ -1,4 +1,4 @@
-//! Capacitor-shaped **native bridge**: plugins live in Rust; JS calls `Crepus.invoke(plugin, method, payloadJson)`.
+//! Rust **native bridge**: plugins live in Rust; JS calls `Crepus.invoke(plugin, method, payloadJson)`.
 //!
 //! Threading: see `docs/THREADING.md` in the repo root.
 
