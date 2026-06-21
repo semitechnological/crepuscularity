@@ -356,8 +356,15 @@ fn mobile_new_scaffolds_runtime_files() {
     assert!(rust_actions.contains("JSONSerialization.data(withJSONObject:"));
     assert!(rust_actions.contains("let data = Data(result.utf8)"));
     assert!(rust_actions.contains("lastError = payload.error"));
+    assert!(rust_actions.contains("UserDefaults.standard"));
     assert!(!rust_actions.contains(r#""action":"\(action)""#));
     assert!(!rust_actions.contains("result.contains"));
+
+    let android_actions = std::fs::read_to_string(
+        root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusRustActions.kt"),
+    )
+    .expect("read CrepusRustActions.kt");
+    assert!(android_actions.contains("getSharedPreferences(\"crepus_preferences\""));
 
     let project_yml =
         std::fs::read_to_string(root.join("ios/project.yml")).expect("read project.yml");

@@ -88,6 +88,8 @@ public enum CrepusRustActions {
         switch capability {
         case "clipboard":
             return try clipboardValue(method: method, payload: payload)
+        case "preferences":
+            return try preferencesValue(method: method, payload: payload)
         case "browser", "linking":
             return try openUrlValue(capability: capability, method: method, payload: payload)
         case "share":
@@ -112,6 +114,41 @@ public enum CrepusRustActions {
             return ["cleared": true]
         default:
             throw HostActionError("unsupported clipboard method: \(method)")
+        }
+    }
+
+    private static func preferencesValue(method: String, payload: [String: Any]?) throws -> Any {
+        let defaults = UserDefaults.standard
+        switch method {
+        case "get":
+            guard let key = payload?["key"] as? String else {
+                throw HostActionError("preferences.get requires payload.key")
+            }
+            return defaults.object(forKey: key) ?? NSNull()
+        case "set":
+            guard let key = payload?["key"] as? String else {
+                throw HostActionError("preferences.set requires payload.key")
+            }
+            guard let value = payload?["value"] else {
+                throw HostActionError("preferences.set requires payload.value")
+            }
+            defaults.set(value is NSNull ? nil : value, forKey: key)
+            return ["key": key, "value": value]
+        case "remove":
+            guard let key = payload?["key"] as? String else {
+                throw HostActionError("preferences.remove requires payload.key")
+            }
+            let removed = defaults.object(forKey: key) != nil
+            defaults.removeObject(forKey: key)
+            return ["key": key, "removed": removed]
+        case "keys":
+            return defaults.dictionaryRepresentation().keys.sorted()
+        case "clear":
+            let domain = Bundle.main.bundleIdentifier ?? "dev.crepuscularity.nativeshell"
+            defaults.removePersistentDomain(forName: domain)
+            return ["cleared": true]
+        default:
+            throw HostActionError("unsupported preferences method: \(method)")
         }
     }
 
