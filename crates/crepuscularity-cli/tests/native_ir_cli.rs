@@ -268,6 +268,43 @@ fn native_codegen_writes_compose_source() {
     windows,
     ignore = "default desktop crepus.exe does not spawn reliably on Windows CI"
 )]
+fn native_codegen_writes_scaffold_compose_package() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let tpl = tmp.path().join("screen.crepus");
+    let out_dir = tmp
+        .path()
+        .join("android/app/src/main/java/dev/crepuscularity/nativeshell/generated");
+    std::fs::write(&tpl, "span\n  \"Hello\"").expect("write template");
+
+    let out = crepus()
+        .args([
+            "native",
+            "codegen",
+            tpl.to_str().unwrap(),
+            "--platform",
+            "compose",
+            "--out",
+            out_dir.to_str().unwrap(),
+            "--view-name",
+            "GreetingScreen",
+        ])
+        .output()
+        .expect("spawn crepus native codegen");
+    assert!(
+        out.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let generated = std::fs::read_to_string(out_dir.join("GreetingScreen.kt")).unwrap();
+    assert!(generated.starts_with("package dev.crepuscularity.nativeshell\n\n"));
+}
+
+#[test]
+#[cfg_attr(
+    windows,
+    ignore = "default desktop crepus.exe does not spawn reliably on Windows CI"
+)]
 fn mobile_help_lists_core_commands() {
     let out = crepus()
         .args(["mobile", "--help"])
