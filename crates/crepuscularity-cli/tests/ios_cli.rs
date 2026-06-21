@@ -39,6 +39,8 @@ fn ios_new_scaffold_writes_project_yml_and_native_shell() {
     let yml = std::fs::read_to_string(root.join("project.yml")).expect("read project.yml");
     assert!(yml.contains("packages:") && yml.contains("targets:"));
     assert!(yml.contains("path: NativeShell"));
+    assert!(yml.contains("GENERATE_INFOPLIST_FILE: YES"));
+    assert!(yml.contains("INFOPLIST_KEY_UILaunchScreen_Generation: YES"));
 
     let fixture = std::fs::read_to_string(
         root.join("NativeShell")

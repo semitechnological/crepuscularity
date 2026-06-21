@@ -364,6 +364,8 @@ targets:
       - path: App
     settings:
       base:
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
         PRODUCT_BUNDLE_IDENTIFIER: dev.crepuscularity.{bundle_suffix}
     dependencies:
       - package: NativeShell
