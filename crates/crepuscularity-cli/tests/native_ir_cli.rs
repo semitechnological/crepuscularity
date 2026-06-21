@@ -357,6 +357,8 @@ fn mobile_new_scaffolds_runtime_files() {
     assert!(rust_actions.contains("let data = Data(result.utf8)"));
     assert!(rust_actions.contains("lastError = payload.error"));
     assert!(rust_actions.contains("UIImpactFeedbackGenerator"));
+    assert!(rust_actions.contains("UIDevice.current"));
+    assert!(rust_actions.contains("Bundle.main.bundleIdentifier"));
     assert!(rust_actions.contains("UserDefaults.standard"));
     assert!(!rust_actions.contains(r#""action":"\(action)""#));
     assert!(!rust_actions.contains("result.contains"));
@@ -366,6 +368,8 @@ fn mobile_new_scaffolds_runtime_files() {
     )
     .expect("read CrepusRustActions.kt");
     assert!(android_actions.contains("getSharedPreferences(\"crepus_preferences\""));
+    assert!(android_actions.contains("Build.MANUFACTURER"));
+    assert!(android_actions.contains("packageManager.getPackageInfo"));
     assert!(android_actions.contains("VibrationEffect.createOneShot"));
 
     let project_yml =

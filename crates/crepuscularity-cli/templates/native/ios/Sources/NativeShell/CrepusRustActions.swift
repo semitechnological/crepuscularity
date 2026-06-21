@@ -86,8 +86,12 @@ public enum CrepusRustActions {
 
     private static func hostPluginValue(capability: String, method: String, payload: [String: Any]?) throws -> Any {
         switch capability {
+        case "app":
+            return try appValue(method: method)
         case "clipboard":
             return try clipboardValue(method: method, payload: payload)
+        case "device":
+            return try deviceValue(method: method)
         case "haptics":
             return try hapticsValue(method: method, payload: payload)
         case "preferences":
@@ -117,6 +121,36 @@ public enum CrepusRustActions {
         default:
             throw HostActionError("unsupported clipboard method: \(method)")
         }
+    }
+
+    private static func deviceValue(method: String) throws -> Any {
+        guard method == "info" else {
+            throw HostActionError("unsupported device method: \(method)")
+        }
+        let device = UIDevice.current
+        return [
+            "targetOs": "ios",
+            "targetArch": currentArchitecture(),
+            "targetFamily": "apple",
+            "tempDir": NSTemporaryDirectory(),
+            "name": device.name,
+            "model": device.model,
+            "systemName": device.systemName,
+            "systemVersion": device.systemVersion,
+        ]
+    }
+
+    private static func appValue(method: String) throws -> Any {
+        guard method == "info" else {
+            throw HostActionError("unsupported app method: \(method)")
+        }
+        return [
+            "bundleId": Bundle.main.bundleIdentifier as Any,
+            "name": Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as Any,
+            "version": Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as Any,
+            "build": Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as Any,
+            "state": UIApplication.shared.applicationState.rawValue,
+        ]
     }
 
     private static func preferencesValue(method: String, payload: [String: Any]?) throws -> Any {
@@ -299,6 +333,16 @@ public enum CrepusRustActions {
         }
         return "{\"ok\":false,\"error\":\"json encode failure\"}"
     }
+}
+
+private func currentArchitecture() -> String {
+    #if arch(arm64)
+    return "arm64"
+    #elseif arch(x86_64)
+    return "x86_64"
+    #else
+    return "unknown"
+    #endif
 }
 
 private struct HostActionError: LocalizedError {
