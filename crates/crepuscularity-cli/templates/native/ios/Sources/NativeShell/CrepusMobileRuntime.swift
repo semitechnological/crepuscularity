@@ -25,6 +25,10 @@ public final class CrepusMobileRuntime: ObservableObject {
         }
 
         #if DEBUG
+        guard ProcessInfo.processInfo.environment["CREPUS_DEV_SERVER"] == "1" else {
+            return
+        }
+
         while !Task.isCancelled {
             await refreshFromDevServer()
             try? await Task.sleep(nanoseconds: 1_000_000_000)
