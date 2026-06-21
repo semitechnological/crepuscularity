@@ -704,6 +704,25 @@ pub extern "system" fn Java_dev_crepuscularity_nativeshell_CrepusRustActions_dis
     env.new_string(result).unwrap()
 }
 
+#[cfg(target_os = "android")]
+#[no_mangle]
+pub extern "system" fn Java_dev_crepuscularity_nativeshell_CrepusRustActions_initAndroid<'a>(
+    _env: JNIEnv<'a>,
+    _class: JClass<'a>,
+    _context: jni::objects::JObject<'a>,
+) {
+}
+
+#[cfg(target_os = "android")]
+#[no_mangle]
+pub extern "system" fn Java_dev_crepuscularity_nativeshell_CrepusRustActions_shutdownAndroid<
+    'a,
+>(
+    _env: JNIEnv<'a>,
+    _class: JClass<'a>,
+) {
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

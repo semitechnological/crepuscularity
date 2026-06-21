@@ -31,10 +31,13 @@ object CrepusRustActions {
 
     external fun dispatchAction(action: String): Boolean
     external fun dispatchActionJson(action: String): String
+    external fun initAndroid(context: Context)
+    external fun shutdownAndroid()
 
     fun install(activity: ComponentActivity) {
         this.activity = activity
         appContext = activity.applicationContext
+        initAndroid(appContext)
         val filePicker =
             activity.registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
                 val action = pendingPickerAction ?: return@registerForActivityResult
