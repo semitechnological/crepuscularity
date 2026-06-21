@@ -41,11 +41,13 @@ fn swiftui_nodes(nodes: &[ViewNode], indent: usize) -> String {
 fn swiftui_node(node: &ViewNode, indent: usize) -> String {
     let pad = indent_str(indent);
     match node {
-        ViewNode::Text { content, style } => {
+        ViewNode::Text { content, style, .. } => {
             let mut out = format!("{pad}Text(\"{}\")", swift_escape(content));
             swiftui_style(&mut out, style.as_ref(), true, indent);
             out
         }
+        ViewNode::If { then_children, .. } => swiftui_group(then_children, indent),
+        ViewNode::ForEach { item_body, .. } => swiftui_group(item_body, indent),
         ViewNode::Stack {
             axis,
             spacing,
@@ -352,6 +354,12 @@ fn swiftui_children(children: &[ViewNode], indent: usize) -> String {
         .join("\n")
 }
 
+fn swiftui_group(children: &[ViewNode], indent: usize) -> String {
+    let pad = indent_str(indent);
+    let inner = swiftui_children(children, indent + 1);
+    format!("{pad}Group {{\n{inner}\n{pad}}}")
+}
+
 fn swiftui_stack_alignment(axis: StackAxis, align_items: Option<&str>) -> &'static str {
     match axis {
         StackAxis::Column => match align_items {
@@ -575,10 +583,12 @@ fn compose_node(node: &ViewNode, indent: usize) -> String {
 fn compose_node_with_base(node: &ViewNode, indent: usize, base_modifier: Option<String>) -> String {
     let pad = indent_str(indent);
     match node {
-        ViewNode::Text { content, style } => {
+        ViewNode::Text { content, style, .. } => {
             let args = compose_text_args(style.as_ref());
             format!("{pad}Text(\"{}\"{args})", kotlin_escape(content))
         }
+        ViewNode::If { then_children, .. } => compose_children_group(then_children, indent),
+        ViewNode::ForEach { item_body, .. } => compose_children_group(item_body, indent),
         ViewNode::Stack {
             axis,
             spacing,
@@ -836,6 +846,12 @@ fn compose_children(children: &[ViewNode], indent: usize) -> String {
         .map(|child| compose_node(child, indent))
         .collect::<Vec<_>>()
         .join("\n")
+}
+
+fn compose_children_group(children: &[ViewNode], indent: usize) -> String {
+    let pad = indent_str(indent);
+    let inner = compose_children(children, indent + 1);
+    format!("{pad}Column {{\n{inner}\n{pad}}}")
 }
 
 fn compose_text_args(style: Option<&ViewStyle>) -> String {

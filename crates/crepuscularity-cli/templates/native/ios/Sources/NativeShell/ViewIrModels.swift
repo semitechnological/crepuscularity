@@ -100,7 +100,9 @@ public struct PickerOption: Decodable, Sendable, Hashable {
 }
 
 public enum ViewNode: Decodable, Sendable {
-    case text(content: String, style: ViewStyle?)
+    case text(content: String, bind: String?, style: ViewStyle?)
+    case `if`(condition: String, thenChildren: [ViewNode], elseChildren: [ViewNode], style: ViewStyle?)
+    case forEach(bind: String, itemName: String, itemBody: [ViewNode], style: ViewStyle?)
     case stack(
         axis: StackAxis,
         spacing: Float?,
@@ -131,6 +133,11 @@ public enum ViewNode: Decodable, Sendable {
     enum CodingKeys: String, CodingKey {
         case kind
         case content
+        case condition
+        case thenChildren
+        case elseChildren
+        case itemName
+        case itemBody
         case axis
         case spacing
         case alignItems
@@ -164,6 +171,8 @@ public enum ViewNode: Decodable, Sendable {
 
     enum Kind: String, Decodable {
         case text
+        case `if`
+        case forEach
         case stack
         case button
         case toggle
@@ -191,8 +200,21 @@ public enum ViewNode: Decodable, Sendable {
         switch kind {
         case .text:
             let content = try c.decode(String.self, forKey: .content)
+            let bind = try c.decodeIfPresent(String.self, forKey: .bind)
             let style = try c.decodeIfPresent(ViewStyle.self, forKey: .style)
-            self = .text(content: content, style: style)
+            self = .text(content: content, bind: bind, style: style)
+        case .`if`:
+            let condition = try c.decode(String.self, forKey: .condition)
+            let thenChildren = try c.decode([ViewNode].self, forKey: .thenChildren)
+            let elseChildren = try c.decodeIfPresent([ViewNode].self, forKey: .elseChildren) ?? []
+            let style = try c.decodeIfPresent(ViewStyle.self, forKey: .style)
+            self = .if(condition: condition, thenChildren: thenChildren, elseChildren: elseChildren, style: style)
+        case .forEach:
+            let bind = try c.decode(String.self, forKey: .bind)
+            let itemName = try c.decodeIfPresent(String.self, forKey: .itemName) ?? ""
+            let itemBody = try c.decode([ViewNode].self, forKey: .itemBody)
+            let style = try c.decodeIfPresent(ViewStyle.self, forKey: .style)
+            self = .forEach(bind: bind, itemName: itemName, itemBody: itemBody, style: style)
         case .stack:
             let axis = try c.decode(StackAxis.self, forKey: .axis)
             let spacing = try c.decodeIfPresent(Float.self, forKey: .spacing)

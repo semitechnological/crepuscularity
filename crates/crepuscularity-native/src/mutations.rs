@@ -141,14 +141,21 @@ fn diff_node(old: &ViewNode, new: &ViewNode, path: &[usize], out: &mut Vec<IrMut
         (
             ViewNode::Text {
                 content: oc,
+                bind: ob,
                 style: os,
             },
             ViewNode::Text {
                 content: nc,
+                bind: nb,
                 style: ns,
             },
         ) => {
-            if oc != nc {
+            if ob != nb {
+                out.push(IrMutation::ReplaceNode {
+                    path: path.to_vec(),
+                    node: new.clone(),
+                });
+            } else if oc != nc {
                 out.push(IrMutation::UpdateText {
                     path: path.to_vec(),
                     content: nc.clone(),
@@ -429,6 +436,8 @@ fn node_style_mut(node: &mut ViewNode) -> Option<&mut Option<ViewStyle>> {
         | ViewNode::ListItem { style, .. }
         | ViewNode::SlotRotate { style, .. }
         | ViewNode::Input { style, .. }
-        | ViewNode::Picker { style, .. } => Some(style),
+        | ViewNode::Picker { style, .. }
+        | ViewNode::If { style, .. }
+        | ViewNode::ForEach { style, .. } => Some(style),
     }
 }

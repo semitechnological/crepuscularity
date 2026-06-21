@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::fs;
 
-use crepuscularity_core::context::{TemplateContext, TemplateValue};
+use crepuscularity_core::context::TemplateContext;
 use serde_json::json;
 
 use crate::{
@@ -186,34 +186,22 @@ fn round_trip(ir: &ViewIr) {
 
 #[test]
 fn serde_round_trip() {
-    let mut ctx = TemplateContext::new();
-    ctx.set("show", true);
-    let ir = render_template_to_ir(
-        "div flex flex-row\n if {show}\n  \"yes\"\n else\n  \"no\"",
-        &ctx,
-    )
-    .unwrap();
+    let ir =
+        render_template_to_ir("div flex flex-row\n if {show}\n  \"yes\"\n else\n  \"no\"", &TemplateContext::new())
+            .unwrap();
+    let v = serde_json::to_value(&ir).unwrap();
+    assert_eq!(v["root"][0]["children"][0]["kind"], "if");
     round_trip(&ir);
 }
 
 #[test]
 fn for_loop() {
-    let mut ctx = TemplateContext::new();
-    let mut a = TemplateContext::new();
-    a.set("value", "a");
-    let mut b = TemplateContext::new();
-    b.set("value", "b");
-    ctx.set("items", TemplateValue::List(vec![a, b]));
-    let tpl = "div\n for item in {items}\n  span\n    \"{item}\"";
-    let ir = render_template_to_ir(tpl, &ctx).unwrap();
+    let ir = render_template_to_ir("div\n for item in {items}\n  span\n    \"{item}\"", &TemplateContext::new()).unwrap();
     let v = serde_json::to_value(&ir).unwrap();
-    assert_eq!(
-        v["root"][0]["children"][0]["children"]
-            .as_array()
-            .unwrap()
-            .len(),
-        2
-    );
+    assert_eq!(v["root"][0]["children"][0]["kind"], "forEach");
+    assert_eq!(v["root"][0]["children"][0]["bind"], "items");
+    assert_eq!(v["root"][0]["children"][0]["itemName"], "item");
+    assert_eq!(v["root"][0]["children"][0]["itemBody"][0]["bind"], "item");
     round_trip(&ir);
 }
 

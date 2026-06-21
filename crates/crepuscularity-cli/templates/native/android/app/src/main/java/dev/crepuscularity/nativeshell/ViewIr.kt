@@ -53,6 +53,21 @@ data class PickerOption(
 sealed interface ViewNode {
     data class Text(
         val content: String,
+        val bind: String? = null,
+        val style: ViewStyle? = null,
+    ) : ViewNode
+
+    data class If(
+        val condition: String,
+        val thenChildren: List<ViewNode> = emptyList(),
+        val elseChildren: List<ViewNode> = emptyList(),
+        val style: ViewStyle? = null,
+    ) : ViewNode
+
+    data class ForEach(
+        val bind: String,
+        val itemName: String,
+        val itemBody: List<ViewNode> = emptyList(),
         val style: ViewStyle? = null,
     ) : ViewNode
 
@@ -257,6 +272,19 @@ private fun decodeNode(o: JsonObject): ViewNode {
     return when (kind) {
         "text" -> ViewNode.Text(
             content = o["content"]!!.jsonPrimitive.content,
+            bind = o["bind"]?.jsonPrimitive?.content,
+            style = decodeStyle(o["style"]?.jsonObject),
+        )
+        "if" -> ViewNode.If(
+            condition = o["condition"]!!.jsonPrimitive.content,
+            thenChildren = o["thenChildren"]?.jsonArray?.map { decodeNode(it.jsonObject) } ?: emptyList(),
+            elseChildren = o["elseChildren"]?.jsonArray?.map { decodeNode(it.jsonObject) } ?: emptyList(),
+            style = decodeStyle(o["style"]?.jsonObject),
+        )
+        "forEach" -> ViewNode.ForEach(
+            bind = o["bind"]!!.jsonPrimitive.content,
+            itemName = o["itemName"]?.jsonPrimitive?.content ?: "",
+            itemBody = o["itemBody"]?.jsonArray?.map { decodeNode(it.jsonObject) } ?: emptyList(),
             style = decodeStyle(o["style"]?.jsonObject),
         )
         "stack" -> ViewNode.Stack(
