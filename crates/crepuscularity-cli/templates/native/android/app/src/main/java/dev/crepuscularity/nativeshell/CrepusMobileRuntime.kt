@@ -20,7 +20,10 @@ class CrepusMobileRuntime(
 
     fun start() {
         loadFixture()
-        if ((context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0) {
+        if (
+            (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0 &&
+            System.getenv("CREPUS_DEV_SERVER") == "1"
+        ) {
             thread(name = "crepus-mobile-runtime", isDaemon = true) {
                 while (!Thread.currentThread().isInterrupted) {
                     refreshFromDevServer()
