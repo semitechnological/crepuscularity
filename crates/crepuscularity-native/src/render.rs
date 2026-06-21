@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 
 use crepuscularity_core::ast::*;
-use crepuscularity_core::context::{value_to_str, TemplateContext, TemplateValue};
+use crepuscularity_core::context::{value_to_str, TemplateContext};
 use crepuscularity_core::eval::eval_expr;
 use crepuscularity_core::parser::{parse_component_file, parse_template};
 use crepuscularity_core::preprocess::slot_rotate_child_phrases;
@@ -103,6 +103,7 @@ fn render_node(node: &Node, ctx: &TemplateContext) -> Result<ViewNode, CrepusErr
         Node::Element(el) => render_element(el, ctx),
         Node::Text(parts) => Ok(ViewNode::Text {
             content: render_text_inline(parts, ctx)?,
+            bind: text_bind(parts),
             style: None,
         }),
         Node::If(block) => render_if(block, ctx),
@@ -114,14 +115,17 @@ fn render_node(node: &Node, ctx: &TemplateContext) -> Result<ViewNode, CrepusErr
         )),
         Node::Embed(_) => Ok(ViewNode::Text {
             content: String::new(),
+            bind: None,
             style: None,
         }),
         Node::RawText(expr) => Ok(ViewNode::Text {
             content: value_to_str(&eval_expr(expr, ctx)?),
+            bind: None,
             style: None,
         }),
         Node::RawHtml(expr) => Ok(ViewNode::Text {
             content: value_to_str(&eval_expr(expr, ctx)?),
+            bind: None,
             style: None,
         }),
     }
@@ -431,6 +435,7 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<ViewNode, Crepu
             let st = style::extract_text_style(&classes, Some(ctx)).opt();
             return Ok(ViewNode::Text {
                 content: txt,
+                bind: text_bind(parts),
                 style: st,
             });
         }
@@ -625,54 +630,32 @@ fn render_text_inline(parts: &[TextPart], ctx: &TemplateContext) -> Result<Strin
     Ok(result)
 }
 
+fn text_bind(parts: &[TextPart]) -> Option<String> {
+    match parts {
+        [TextPart::Expr(expr)] => Some(expr.trim().to_string()),
+        _ => None,
+    }
+}
+
 fn render_if(block: &IfBlock, ctx: &TemplateContext) -> Result<ViewNode, CrepusError> {
-    let body = if ctx.eval_condition(&block.condition)? {
-        &block.then_children
-    } else if let Some(else_children) = &block.else_children {
-        else_children
-    } else {
-        return Ok(stack_column_raw(vec![]));
-    };
-    let children = render_nodes_list(body, ctx)?;
-    Ok(stack_column_raw(children))
+    Ok(ViewNode::If {
+        condition: block.condition.clone(),
+        then_children: render_nodes_list(&block.then_children, ctx)?,
+        else_children: match &block.else_children {
+            Some(children) => Some(render_nodes_list(children, ctx)?),
+            None => None,
+        },
+        style: None,
+    })
 }
 
 fn render_for(block: &ForBlock, ctx: &TemplateContext) -> Result<ViewNode, CrepusError> {
-    let items = ctx.get_list(&block.iterator);
-    let mut children = Vec::new();
-    let pattern = block.pattern.trim();
-    let has_pattern = !pattern.is_empty();
-    let mut child_ctx = ctx.clone();
-    for item_ctx in items {
-        let item_str = if has_pattern {
-            item_ctx.get_str("value")
-        } else {
-            String::new()
-        };
-        child_ctx.vars.clone_from(&ctx.vars);
-        for (k, v) in item_ctx.vars {
-            child_ctx.vars.insert(k, v);
-        }
-        if has_pattern && !item_str.is_empty() {
-            child_ctx
-                .vars
-                .insert(pattern.to_string(), TemplateValue::Str(item_str));
-        }
-        children.push(render_nodes_list(&block.body, &child_ctx)?);
-    }
-    let flattened: Vec<ViewNode> = children
-        .into_iter()
-        .flat_map(|v| {
-            if v.len() == 1 {
-                v
-            } else if v.is_empty() {
-                vec![]
-            } else {
-                vec![stack_column_raw(v)]
-            }
-        })
-        .collect();
-    Ok(stack_column_raw(flattened))
+    Ok(ViewNode::ForEach {
+        bind: block.iterator.clone(),
+        item_name: block.pattern.trim().to_string(),
+        item_body: render_nodes_list(&block.body, ctx)?,
+        style: None,
+    })
 }
 
 fn render_match(block: &MatchBlock, ctx: &TemplateContext) -> Result<ViewNode, CrepusError> {

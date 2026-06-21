@@ -5,7 +5,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// Bumped when the JSON schema gains incompatible fields; shells should check `version`.
-pub const IR_VERSION: u32 = 3;
+pub const IR_VERSION: u32 = 4;
 
 /// Root document from parsing + lowering (see `crepuscularity_native::render_template_to_ir`).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -305,6 +305,25 @@ pub enum ViewNode {
     #[serde(rename = "text")]
     Text {
         content: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        bind: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        style: Option<ViewStyle>,
+    },
+    #[serde(rename = "if")]
+    If {
+        condition: String,
+        then_children: Vec<ViewNode>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        else_children: Option<Vec<ViewNode>>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        style: Option<ViewStyle>,
+    },
+    #[serde(rename = "forEach")]
+    ForEach {
+        bind: String,
+        item_name: String,
+        item_body: Vec<ViewNode>,
         #[serde(skip_serializing_if = "Option::is_none")]
         style: Option<ViewStyle>,
     },

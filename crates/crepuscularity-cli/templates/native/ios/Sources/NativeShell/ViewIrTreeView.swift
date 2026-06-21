@@ -2,15 +2,17 @@ import SwiftUI
 
 public struct ViewIrRootView: View {
     private let ir: ViewIr
+    private let currentItem: [String: Any]?
 
-    public init(ir: ViewIr) {
+    public init(ir: ViewIr, currentItem: [String: Any]? = nil) {
         self.ir = ir
+        self.currentItem = currentItem
     }
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             ForEach(Array(ir.root.enumerated()), id: \.offset) { _, node in
-                ViewNodeView(node: node)
+                ViewNodeView(node: node, currentItem: currentItem)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -19,17 +21,23 @@ public struct ViewIrRootView: View {
 
 public struct ViewNodeView: View {
     let node: ViewNode
+    let currentItem: [String: Any]?
     @ObservedObject private var actionStore = CrepusActionStore.shared
 
-    public init(node: ViewNode) {
+    public init(node: ViewNode, currentItem: [String: Any]? = nil) {
         self.node = node
+        self.currentItem = currentItem
     }
 
     public var body: some View {
         switch node {
-        case .text(let content, let style):
-            Text(content)
+        case .text(let content, let bind, let style):
+            Text(resolveBind(content: content, bind: bind, currentItem: currentItem))
                 .applyViewStyle(style, isText: true)
+        case .if(let condition, let thenChildren, let elseChildren, _):
+            ViewIfBlock(condition: condition, thenChildren: thenChildren, elseChildren: elseChildren, currentItem: currentItem)
+        case .forEach(let bind, let itemName, let itemBody, _):
+            ViewForEachBlock(bind: bind, itemName: itemName, itemBody: itemBody, currentItem: currentItem)
 
         case .stack(let axis, let spacing, let alignItems, let justifyContent, let style, let children):
             let gap = CGFloat(spacing ?? 8)
@@ -39,13 +47,13 @@ public struct ViewNodeView: View {
                 case .column:
                     VStack(alignment: hAlign, spacing: gap) {
                         ForEach(Array(children.enumerated()), id: \.offset) { _, child in
-                            ViewNodeView(node: child)
+                            ViewNodeView(node: child, currentItem: currentItem)
                         }
                     }
                 case .row:
                     HStack(alignment: rowAlignment(from: alignItems), spacing: gap) {
                         ForEach(Array(children.enumerated()), id: \.offset) { _, child in
-                            ViewNodeView(node: child)
+                            ViewNodeView(node: child, currentItem: currentItem)
                         }
                     }
                 }
@@ -105,7 +113,7 @@ public struct ViewNodeView: View {
                         Text(label)
                     } else {
                         ForEach(Array(children.enumerated()), id: \.offset) { _, child in
-                            ViewNodeView(node: child)
+                            ViewNodeView(node: child, currentItem: currentItem)
                         }
                     }
                 }
@@ -154,13 +162,13 @@ public struct ViewNodeView: View {
                 case .column:
                     VStack(alignment: .leading, spacing: gap) {
                         ForEach(Array(children.enumerated()), id: \.offset) { _, child in
-                            ViewNodeView(node: child)
+                            ViewNodeView(node: child, currentItem: currentItem)
                         }
                     }
                 case .row:
                     HStack(alignment: .top, spacing: gap) {
                         ForEach(Array(children.enumerated()), id: \.offset) { _, child in
-                            ViewNodeView(node: child)
+                            ViewNodeView(node: child, currentItem: currentItem)
                         }
                     }
                 }
@@ -172,7 +180,7 @@ public struct ViewNodeView: View {
                 ForEach(Array(children.enumerated()), id: \.offset) { index, child in
                     HStack(alignment: .top, spacing: 8) {
                         Text(ordered ? "\(index + 1)." : "•")
-                        ViewNodeView(node: child)
+                        ViewNodeView(node: child, currentItem: currentItem)
                     }
                 }
             }
@@ -181,7 +189,7 @@ public struct ViewNodeView: View {
         case .listItem(let style, let children):
             VStack(alignment: .leading, spacing: 8) {
                 ForEach(Array(children.enumerated()), id: \.offset) { _, child in
-                    ViewNodeView(node: child)
+                    ViewNodeView(node: child, currentItem: currentItem)
                 }
             }
             .applyViewStyle(style, isText: false)
@@ -219,6 +227,14 @@ public struct ViewNodeView: View {
         case "stretch": return .center
         default: return .top
         }
+    }
+
+    private func resolveBind(content: String, bind: String?, currentItem: [String: Any]?) -> String {
+        guard let bind else { return content }
+        if let value = lookupValue(currentItem, key: bind) ?? lookupRootValue(result: actionStore.lastResult, key: bind) {
+            return String(describing: value)
+        }
+        return content
     }
 }
 
@@ -614,6 +630,92 @@ public struct FixtureRootView: View {
             }
         }
     }
+}
+
+struct ViewIfBlock: View {
+    let condition: String
+    let thenChildren: [ViewNode]
+    let elseChildren: [ViewNode]
+    let currentItem: [String: Any]?
+    @ObservedObject private var actionStore = CrepusActionStore.shared
+
+    var body: some View {
+        if resolveCondition(condition) {
+            ViewIrRootView(ir: ViewIr(version: 4, root: thenChildren), currentItem: currentItem)
+        } else if !elseChildren.isEmpty {
+            ViewIrRootView(ir: ViewIr(version: 4, root: elseChildren), currentItem: currentItem)
+        }
+    }
+
+    private func resolveCondition(_ condition: String) -> Bool {
+        if let value = lookupValue(currentItem, key: condition) as? Bool {
+            return value
+        }
+        if let value = lookupRootValue(result: actionStore.lastResult, key: condition) as? Bool {
+            return value
+        }
+        return false
+    }
+}
+
+struct ViewForEachBlock: View {
+    let bind: String
+    let itemName: String
+    let itemBody: [ViewNode]
+    let currentItem: [String: Any]?
+    @ObservedObject private var actionStore = CrepusActionStore.shared
+
+    var body: some View {
+        let items = resolveItems()
+        ForEach(Array(items.enumerated()), id: \.offset) { _, item in
+            ViewIrRootView(ir: ViewIr(version: 4, root: itemBody), currentItem: item)
+        }
+    }
+
+    private func resolveItems() -> [[String: Any]] {
+        if let items = lookupValue(currentItem, key: bind) as? [[String: Any]] {
+            return items
+        }
+        if let items = lookupRootValue(result: actionStore.lastResult, key: bind) as? [[String: Any]] {
+            return items
+        }
+        return []
+    }
+}
+
+private func lookupRootValue(result: String, key: String) -> Any? {
+    guard let data = result.data(using: .utf8),
+          let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+    else {
+        return nil
+    }
+    return lookupValue(json, key: key)
+}
+
+private func lookupValue(_ json: [String: Any]?, key: String) -> Any? {
+    guard let json else { return nil }
+    if let value = lookupDirect(json, key: key) {
+        return value
+    }
+    if let nested = json["value"] as? [String: Any] {
+        return lookupDirect(nested, key: key)
+    }
+    return nil
+}
+
+private func lookupDirect(_ json: [String: Any], key: String) -> Any? {
+    if let value = json[key] {
+        return value
+    }
+    guard let dot = key.firstIndex(of: ".") else {
+        return nil
+    }
+    let head = String(key[..<dot])
+    let tail = String(key[key.index(after: dot)...])
+    guard let child = json[head] as? [String: Any] else {
+        return nil
+    }
+    return lookupDirect(child, key: tail)
 }
 
 #if DEBUG

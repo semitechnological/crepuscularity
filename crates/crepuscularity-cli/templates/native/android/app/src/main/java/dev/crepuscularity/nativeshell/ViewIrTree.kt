@@ -50,14 +50,28 @@ import kotlin.math.roundToInt
 @Composable
 fun ViewIrRoot(ir: ViewIr, modifier: Modifier = Modifier) {
     Column(modifier = modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(0.dp)) {
-        ir.root.forEach { node -> ViewNodeView(node) }
+        ir.root.forEach { node -> ViewNodeView(node, null) }
     }
 }
 
 @Composable
-fun ViewNodeView(node: ViewNode) {
+fun ViewNodeView(node: ViewNode, currentItem: Any?) {
     when (node) {
-        is ViewNode.Text -> styledText(node.content, node.style)
+        is ViewNode.Text -> styledText(resolveBind(node.content, node.bind, currentItem), node.style)
+        is ViewNode.If -> {
+            val show = resolveCondition(node.condition, currentItem)
+            if (show) {
+                node.thenChildren.forEach { child -> ViewNodeView(child, currentItem) }
+            } else {
+                node.elseChildren.forEach { child -> ViewNodeView(child, currentItem) }
+            }
+        }
+        is ViewNode.ForEach -> {
+            val items = resolveItems(node.bind, currentItem)
+            items.forEach { item ->
+                node.itemBody.forEach { child -> ViewNodeView(child, item) }
+            }
+        }
         is ViewNode.Stack -> {
             val gap = (node.spacing ?: 8f).dp
             val arr = Arrangement.spacedBy(gap)
@@ -72,7 +86,7 @@ fun ViewNodeView(node: ViewNode) {
                             horizontalArrangement = arr,
                             verticalAlignment = rowAlign,
                         ) {
-                            node.children.forEach { child -> ViewNodeView(child) }
+                            node.children.forEach { child -> ViewNodeView(child, currentItem) }
                         }
                     }
                 else ->
@@ -82,7 +96,7 @@ fun ViewNodeView(node: ViewNode) {
                             verticalArrangement = arr,
                             horizontalAlignment = colAlign,
                         ) {
-                            node.children.forEach { child -> ViewNodeView(child) }
+                            node.children.forEach { child -> ViewNodeView(child, currentItem) }
                         }
                     }
             }
@@ -185,7 +199,7 @@ fun ViewNodeView(node: ViewNode) {
                     Text(node.label)
                 } else {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        node.children.forEach { child -> ViewNodeView(child) }
+                        node.children.forEach { child -> ViewNodeView(child, currentItem) }
                     }
                 }
             }
@@ -215,11 +229,11 @@ fun ViewNodeView(node: ViewNode) {
             when (node.axis) {
                 "row" ->
                     Row(modifier = mod, horizontalArrangement = Arrangement.spacedBy(gap)) {
-                        node.children.forEach { child -> ViewNodeView(child) }
+                        node.children.forEach { child -> ViewNodeView(child, currentItem) }
                     }
                 else ->
                     Column(modifier = mod, verticalArrangement = Arrangement.spacedBy(gap)) {
-                        node.children.forEach { child -> ViewNodeView(child) }
+                        node.children.forEach { child -> ViewNodeView(child, currentItem) }
                     }
             }
         }
@@ -228,13 +242,13 @@ fun ViewNodeView(node: ViewNode) {
                 node.children.forEachIndexed { index, child ->
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Top) {
                         Text(if (node.ordered) "${index + 1}." else "•")
-                        ViewNodeView(child)
+                        ViewNodeView(child, currentItem)
                     }
                 }
             }
         is ViewNode.ListItem ->
             Column(modifier = stackModifier(node.style), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                node.children.forEach { child -> ViewNodeView(child) }
+                node.children.forEach { child -> ViewNodeView(child, currentItem) }
             }
         is ViewNode.SlotRotate ->
             styledText(node.phrases.firstOrNull() ?: "", node.style)
@@ -276,6 +290,63 @@ fun ViewNodeView(node: ViewNode) {
         }
     }
 }
+
+private fun resolveBind(content: String, bind: String?, currentItem: Any?): String {
+    if (bind == null) return content
+    return try {
+        lookupValue(currentItem, bind)?.let(::stringValue)
+            ?: lookupRootValue(bind)?.let(::stringValue)
+            ?: content
+    } catch (_: Exception) {
+        content
+    }
+}
+
+private fun resolveCondition(condition: String, currentItem: Any?): Boolean =
+    when (val value = lookupValue(currentItem, condition) ?: lookupRootValue(condition)) {
+        is Boolean -> value
+        else -> false
+    }
+
+private fun resolveItems(bind: String, currentItem: Any?): List<Any> {
+    val arr = (lookupValue(currentItem, bind) ?: lookupRootValue(bind)) as? org.json.JSONArray ?: return emptyList()
+    return (0 until arr.length()).map { arr.get(it) }
+}
+
+private fun lookupRootValue(key: String): Any? {
+    val result = CrepusActionState.lastResult.value
+    val json = org.json.JSONObject(result)
+    return lookupValue(json, key)
+}
+
+private fun lookupValue(value: Any?, key: String): Any? =
+    when (value) {
+        is org.json.JSONObject -> lookupValue(value, key)
+        else -> null
+    }
+
+private fun lookupValue(json: org.json.JSONObject, key: String): Any? {
+    val direct = lookupDirect(json, key)
+    if (direct != null) return direct
+    val nested = json.optJSONObject("value") ?: return null
+    return lookupDirect(nested, key)
+}
+
+private fun lookupDirect(json: org.json.JSONObject, key: String): Any? {
+    if (json.has(key) && !json.isNull(key)) return json.get(key)
+    val dot = key.indexOf('.')
+    if (dot <= 0) return null
+    val head = key.substring(0, dot)
+    if (!json.has(head) || json.isNull(head)) return null
+    val next = json.get(head)
+    val tail = key.substring(dot + 1)
+    return when (next) {
+        is org.json.JSONObject -> lookupDirect(next, tail)
+        else -> null
+    }
+}
+
+private fun stringValue(value: Any): String = value.toString()
 
 @Composable
 private fun styledText(content: String, style: ViewStyle?) {
