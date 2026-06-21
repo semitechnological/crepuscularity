@@ -39,6 +39,13 @@ pub const OFFICIAL_CAPACITOR_CAPABILITIES: &[NativeCapability] = &[
     NativeCapability::Toast,
 ];
 
+pub fn crepus_native_capabilities() -> impl Iterator<Item = NativeCapability> {
+    OFFICIAL_CAPACITOR_CAPABILITIES
+        .iter()
+        .copied()
+        .chain([NativeCapability::Bluetooth, NativeCapability::Sync])
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum NativeCapability {
@@ -48,6 +55,7 @@ pub enum NativeCapability {
     BackgroundRunner,
     BarcodeScanner,
     Browser,
+    Bluetooth,
     Camera,
     Clipboard,
     Cookies,
@@ -75,6 +83,7 @@ pub enum NativeCapability {
     SplashScreen,
     StatusBar,
     SystemBars,
+    Sync,
     TextZoom,
     Toast,
 }
@@ -88,6 +97,7 @@ impl NativeCapability {
             Self::BackgroundRunner => "backgroundRunner",
             Self::BarcodeScanner => "barcodeScanner",
             Self::Browser => "browser",
+            Self::Bluetooth => "bluetooth",
             Self::Camera => "camera",
             Self::Clipboard => "clipboard",
             Self::Cookies => "cookies",
@@ -115,6 +125,7 @@ impl NativeCapability {
             Self::SplashScreen => "splashScreen",
             Self::StatusBar => "statusBar",
             Self::SystemBars => "systemBars",
+            Self::Sync => "sync",
             Self::TextZoom => "textZoom",
             Self::Toast => "toast",
         }
@@ -208,6 +219,17 @@ mod tests {
         assert!(names.contains("clipboard"));
         assert!(names.contains("fileTransfer"));
         assert!(names.contains("toast"));
+    }
+
+    #[test]
+    fn crepus_native_capability_registry_adds_rust_owned_extensions() {
+        let names = crepus_native_capabilities()
+            .map(|capability| capability.as_str())
+            .collect::<HashSet<_>>();
+
+        assert_eq!(names.len(), 37);
+        assert!(names.contains("bluetooth"));
+        assert!(names.contains("sync"));
     }
 
     #[test]
