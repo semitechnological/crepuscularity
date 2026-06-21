@@ -74,6 +74,7 @@ object CrepusRustActions {
     private fun hostPluginValue(capability: String, method: String, payload: JSONObject?): JSONObject =
         when (capability) {
             "clipboard" -> clipboardValue(method, payload)
+            "preferences" -> preferencesValue(method, payload)
             "browser", "linking" -> openUrlValue(capability, method, payload)
             "share" -> shareValue(method, payload)
             else -> error("unsupported host capability: $capability")
@@ -113,6 +114,44 @@ object CrepusRustActions {
                 JSONObject().put("cleared", true)
             }
             else -> error("unsupported clipboard method: $method")
+        }
+    }
+
+    private fun preferencesValue(method: String, payload: JSONObject?): Any {
+        val prefs = appContext.getSharedPreferences("crepus_preferences", Context.MODE_PRIVATE)
+        return when (method) {
+            "get" -> {
+                val key = payload?.optString("key", null) ?: error("preferences.get requires payload.key")
+                prefs.all[key] ?: JSONObject.NULL
+            }
+            "set" -> {
+                val key = payload?.optString("key", null) ?: error("preferences.set requires payload.key")
+                val value = payload.opt("value") ?: error("preferences.set requires payload.value")
+                val editor = prefs.edit()
+                when (value) {
+                    JSONObject.NULL -> editor.remove(key)
+                    is Boolean -> editor.putBoolean(key, value)
+                    is Int -> editor.putInt(key, value)
+                    is Long -> editor.putLong(key, value)
+                    is Double -> editor.putFloat(key, value.toFloat())
+                    is Float -> editor.putFloat(key, value)
+                    else -> editor.putString(key, value.toString())
+                }
+                editor.apply()
+                JSONObject().put("key", key).put("value", value)
+            }
+            "remove" -> {
+                val key = payload?.optString("key", null) ?: error("preferences.remove requires payload.key")
+                val removed = prefs.contains(key)
+                prefs.edit().remove(key).apply()
+                JSONObject().put("key", key).put("removed", removed)
+            }
+            "keys" -> prefs.all.keys.sorted()
+            "clear" -> {
+                prefs.edit().clear().apply()
+                JSONObject().put("cleared", true)
+            }
+            else -> error("unsupported preferences method: $method")
         }
     }
 
