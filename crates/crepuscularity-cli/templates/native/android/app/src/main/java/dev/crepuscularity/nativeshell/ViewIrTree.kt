@@ -1,11 +1,14 @@
 package dev.crepuscularity.nativeshell
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -16,14 +19,24 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontStyle
@@ -32,6 +45,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlin.math.roundToInt
 
 @Composable
 fun ViewIrRoot(ir: ViewIr, modifier: Modifier = Modifier) {
@@ -77,6 +91,108 @@ fun ViewNodeView(node: ViewNode) {
             Button(onClick = { node.onClick?.let { CrepusActionState.dispatch(it) } }, modifier = stackModifier(node.style)) {
                 Text(node.label)
             }
+        is ViewNode.Toggle -> {
+            var checked by remember { mutableStateOf(node.checked) }
+            Row(
+                modifier = stackModifier(node.style).fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(node.label)
+                Switch(
+                    checked = checked,
+                    onCheckedChange = {
+                        checked = it
+                        node.onChange?.let(CrepusActionState::dispatch)
+                    },
+                )
+            }
+        }
+        is ViewNode.Checkbox -> {
+            var checked by remember { mutableStateOf(node.checked) }
+            Row(
+                modifier =
+                    stackModifier(node.style)
+                        .fillMaxWidth()
+                        .clickable {
+                            checked = !checked
+                            node.onChange?.let(CrepusActionState::dispatch)
+                        },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Checkbox(
+                    checked = checked,
+                    onCheckedChange = {
+                        checked = it
+                        node.onChange?.let(CrepusActionState::dispatch)
+                    },
+                )
+                Text(node.label)
+            }
+        }
+        is ViewNode.Slider -> {
+            var value by remember { mutableFloatStateOf(node.value) }
+            Column(modifier = stackModifier(node.style), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                node.label?.let { Text("$it ${value.roundToInt()}") }
+                androidx.compose.material3.Slider(
+                    value = value,
+                    onValueChange = { value = quantizeSlider(it, node.min, node.step) },
+                    valueRange = node.min..node.max,
+                    steps = sliderSteps(node.min, node.max, node.step),
+                )
+            }
+        }
+        is ViewNode.Progress ->
+            Column(modifier = stackModifier(node.style), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                node.label?.let { Text(it) }
+                LinearProgressIndicator(progress = { progressValue(node.value, 0f, node.max) }, modifier = Modifier.fillMaxWidth())
+            }
+        is ViewNode.Meter ->
+            Column(modifier = stackModifier(node.style), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                node.label?.let { Text(it) }
+                LinearProgressIndicator(progress = { progressValue(node.value, node.min, node.max) }, modifier = Modifier.fillMaxWidth())
+            }
+        is ViewNode.Badge ->
+            Text(
+                text = node.label,
+                modifier =
+                    stackModifier(node.style)
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(badgeColor(node.tone))
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                fontSize = 12.sp,
+                color = Color.White,
+            )
+        is ViewNode.Divider ->
+            when (node.axis) {
+                "row" ->
+                    Box(
+                        modifier = stackModifier(node.style).width(1.dp).height(24.dp).background(Color(0x33000000)),
+                    )
+                else ->
+                    Box(
+                        modifier = stackModifier(node.style).fillMaxWidth().height(1.dp).background(Color(0x33000000)),
+                    )
+            }
+        is ViewNode.Spacer ->
+            Spacer(modifier = stackModifier(node.style).height((node.size ?: 8f).dp))
+        is ViewNode.Dropzone ->
+            Button(
+                onClick = { node.onDrop?.let(CrepusActionState::dispatch) },
+                modifier = stackModifier(node.style).fillMaxWidth(),
+            ) {
+                if (node.children.isEmpty()) {
+                    Text(node.label)
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        node.children.forEach { child -> ViewNodeView(child) }
+                    }
+                }
+            }
+        is ViewNode.FilePicker ->
+            Button(onClick = { node.onPick?.let(CrepusActionState::dispatch) }, modifier = stackModifier(node.style)) {
+                Text(node.label)
+            }
         is ViewNode.Image ->
             Box(
                 modifier =
@@ -107,8 +223,57 @@ fun ViewNodeView(node: ViewNode) {
                     }
             }
         }
+        is ViewNode.ListNode ->
+            Column(modifier = stackModifier(node.style), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                node.children.forEachIndexed { index, child ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Top) {
+                        Text(if (node.ordered) "${index + 1}." else "•")
+                        ViewNodeView(child)
+                    }
+                }
+            }
+        is ViewNode.ListItem ->
+            Column(modifier = stackModifier(node.style), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                node.children.forEach { child -> ViewNodeView(child) }
+            }
         is ViewNode.SlotRotate ->
             styledText(node.phrases.firstOrNull() ?: "", node.style)
+        is ViewNode.Input -> {
+            var text by remember { mutableStateOf("") }
+            OutlinedTextField(
+                value = text,
+                onValueChange = { text = it },
+                modifier = stackModifier(node.style).fillMaxWidth(),
+                placeholder = { Text(node.placeholder) },
+                minLines = if (node.multiline) 4 else 1,
+                maxLines = if (node.multiline) 6 else 1,
+            )
+        }
+        is ViewNode.Picker -> {
+            var selection by remember {
+                mutableStateOf(node.options.firstOrNull()?.value ?: normalizedBindingValue(node.bind))
+            }
+            Row(
+                modifier = stackModifier(node.style).fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                node.options.forEach { option ->
+                    Button(
+                        onClick = { selection = option.value },
+                        modifier =
+                            Modifier.then(
+                                if (selection == option.value) {
+                                    Modifier
+                                } else {
+                                    Modifier.border(1.dp, Color(0x33000000), RoundedCornerShape(999.dp))
+                                },
+                            ),
+                    ) {
+                        Text(option.label)
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -181,8 +346,17 @@ private fun stackModifier(s: ViewStyle?): Modifier {
     }
     val bg = s.backgroundColor?.let { parseColor(it) }
     val r = s.cornerRadius ?: 0f
+    val shape = RoundedCornerShape(r.dp)
+    s.borderWidth?.let { width ->
+        m =
+            m.border(
+                width = width.dp,
+                color = s.borderColor?.let(::parseColor) ?: Color(0x33000000),
+                shape = shape,
+            )
+    }
     if (bg != null && r > 0) {
-        m = m.clip(RoundedCornerShape(r.dp)).background(bg)
+        m = m.clip(shape).background(bg)
     } else if (bg != null) {
         m = m.background(bg)
     }
@@ -228,5 +402,41 @@ private fun parseColor(hex: String): Color {
         6 -> Color(0xFF000000L or v)
         8 -> Color(v)
         else -> Color.Gray
+    }
+}
+
+private fun badgeColor(tone: String?): Color =
+    when (tone) {
+        "success" -> Color(0xFF15803D)
+        "warning" -> Color(0xFFD97706)
+        "danger" -> Color(0xFFB91C1C)
+        else -> Color(0xFF111111)
+    }
+
+private fun progressValue(value: Float, min: Float, max: Float): Float {
+    val span = max - min
+    if (span <= 0f) return 0f
+    return ((value - min) / span).coerceIn(0f, 1f)
+}
+
+private fun sliderSteps(min: Float, max: Float, step: Float?): Int {
+    val size = step ?: return 0
+    if (size <= 0f) return 0
+    val slots = ((max - min) / size).roundToInt()
+    return (slots - 1).coerceAtLeast(0)
+}
+
+private fun quantizeSlider(value: Float, min: Float, step: Float?): Float {
+    val size = step ?: return value
+    if (size <= 0f) return value
+    return (((value - min) / size).roundToInt() * size) + min
+}
+
+private fun normalizedBindingValue(bind: String): String {
+    val trimmed = bind.trim()
+    return if (trimmed.length >= 2 && trimmed.first() == '"' && trimmed.last() == '"') {
+        trimmed.substring(1, trimmed.length - 1)
+    } else {
+        trimmed
     }
 }
