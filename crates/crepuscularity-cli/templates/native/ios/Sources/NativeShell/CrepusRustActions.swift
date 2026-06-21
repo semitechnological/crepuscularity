@@ -57,18 +57,17 @@ public enum CrepusRustActions {
         guard let data = action.data(using: .utf8),
               let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               (root["kind"] as? String) == "plugin",
-              (root["capability"] as? String) == "clipboard",
+              let capability = root["capability"] as? String,
               let method = root["method"] as? String
         else {
             return nil
         }
         let payload = root["payload"] as? [String: Any]
-        let actionName = "clipboard.\(method)"
         do {
-            let value = try clipboardValue(method: method, payload: payload)
-            return successJson(action: actionName, capability: "clipboard", method: method, value: value)
+            let value = try hostPluginValue(capability: capability, method: method, payload: payload)
+            return successJson(action: "\(capability).\(method)", capability: capability, method: method, value: value)
         } catch {
-            return errorJson(action: actionName, error: error.localizedDescription)
+            return errorJson(action: "\(capability).\(method)", error: error.localizedDescription)
         }
     }
 
@@ -82,6 +81,19 @@ public enum CrepusRustActions {
             return pendingJson(action: action)
         default:
             return nil
+        }
+    }
+
+    private static func hostPluginValue(capability: String, method: String, payload: [String: Any]?) throws -> Any {
+        switch capability {
+        case "clipboard":
+            return try clipboardValue(method: method, payload: payload)
+        case "browser", "linking":
+            return try openUrlValue(capability: capability, method: method, payload: payload)
+        case "share":
+            return try shareValue(method: method, payload: payload)
+        default:
+            throw HostActionError("unsupported host capability: \(capability)")
         }
     }
 
@@ -101,6 +113,60 @@ public enum CrepusRustActions {
         default:
             throw HostActionError("unsupported clipboard method: \(method)")
         }
+    }
+
+    private static func openUrlValue(capability: String, method: String, payload: [String: Any]?) throws -> Any {
+        guard method == "open" else {
+            throw HostActionError("unsupported \(capability) method: \(method)")
+        }
+        guard let rawUrl = payload?["url"] as? String, let url = URL(string: rawUrl) else {
+            throw HostActionError("\(capability).open requires payload.url")
+        }
+        Task { @MainActor in
+            UIApplication.shared.open(url)
+        }
+        return ["url": rawUrl, "opened": true]
+    }
+
+    private static func shareValue(method: String, payload: [String: Any]?) throws -> Any {
+        guard method == "share" else {
+            throw HostActionError("unsupported share method: \(method)")
+        }
+        let text = payload?["text"] as? String
+        let rawUrl = payload?["url"] as? String
+        let title = payload?["title"] as? String
+        guard text != nil || rawUrl != nil else {
+            throw HostActionError("share.share requires payload.text or payload.url")
+        }
+        Task { @MainActor in
+            guard let root = topViewController() else {
+                CrepusRustActions.emit(errorJson(action: "share.share", error: "missing root view controller"))
+                return
+            }
+            var items: [Any] = []
+            if let text {
+                items.append(text)
+            }
+            if let rawUrl, let url = URL(string: rawUrl) {
+                items.append(url)
+            }
+            let controller = UIActivityViewController(activityItems: items, applicationActivities: nil)
+            if let title {
+                controller.setValue(title, forKey: "subject")
+            }
+            root.present(controller, animated: true)
+        }
+        var value: [String: Any] = ["shared": true]
+        if let text {
+            value["text"] = text
+        }
+        if let rawUrl {
+            value["url"] = rawUrl
+        }
+        if let title {
+            value["title"] = title
+        }
+        return value
     }
 
     private static func successJson(action: String, capability: String, method: String, value: Any) -> String {

@@ -3,6 +3,7 @@ package dev.crepuscularity.nativeshell
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
@@ -19,6 +20,7 @@ object CrepusRustActions {
     }
 
     private lateinit var appContext: Context
+    private lateinit var activity: ComponentActivity
     private var pendingPickerAction: String? = null
     private var openDocuments: (() -> Unit)? = null
     private var openMedia: (() -> Unit)? = null
@@ -27,6 +29,7 @@ object CrepusRustActions {
     external fun dispatchActionJson(action: String): String
 
     fun install(activity: ComponentActivity) {
+        this.activity = activity
         appContext = activity.applicationContext
         val filePicker =
             activity.registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
@@ -44,18 +47,18 @@ object CrepusRustActions {
         dispatchNamedHostAction(action)?.let { return it }
         val request = runCatching { JSONObject(action) }.getOrNull() ?: return null
         if (request.optString("kind") != "plugin") return null
-        if (request.optString("capability") != "clipboard") return null
+        val capability = request.optString("capability")
         val method = request.optString("method")
-        val actionName = "clipboard.$method"
+        val actionName = "$capability.$method"
         return runCatching {
-            val value = clipboardValue(method, request.optJSONObject("payload"))
+            val value = hostPluginValue(capability, method, request.optJSONObject("payload"))
             JSONObject()
                 .put("ok", true)
                 .put("action", actionName)
                 .put(
                     "value",
                     JSONObject()
-                        .put("capability", "clipboard")
+                        .put("capability", capability)
                         .put("method", method)
                         .put("value", value),
                 ).toString()
@@ -67,6 +70,14 @@ object CrepusRustActions {
                 .toString()
         }
     }
+
+    private fun hostPluginValue(capability: String, method: String, payload: JSONObject?): JSONObject =
+        when (capability) {
+            "clipboard" -> clipboardValue(method, payload)
+            "browser", "linking" -> openUrlValue(capability, method, payload)
+            "share" -> shareValue(method, payload)
+            else -> error("unsupported host capability: $capability")
+        }
 
     private fun dispatchNamedHostAction(action: String): String? =
         when (action) {
@@ -103,6 +114,35 @@ object CrepusRustActions {
             }
             else -> error("unsupported clipboard method: $method")
         }
+    }
+
+    private fun openUrlValue(capability: String, method: String, payload: JSONObject?): JSONObject {
+        if (method != "open") error("unsupported $capability method: $method")
+        val url = payload?.optString("url", null) ?: error("$capability.open requires payload.url")
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        activity.startActivity(intent)
+        return JSONObject().put("url", url).put("opened", true)
+    }
+
+    private fun shareValue(method: String, payload: JSONObject?): JSONObject {
+        if (method != "share") error("unsupported share method: $method")
+        val text = payload?.optString("text", null)
+        val url = payload?.optString("url", null)
+        val title = payload?.optString("title", null)
+        if (text == null && url == null) error("share.share requires payload.text or payload.url")
+        val body = listOfNotNull(text, url).joinToString(separator = "\n").ifBlank {
+            error("share.share requires payload.text or payload.url")
+        }
+        val intent =
+            Intent(Intent.ACTION_SEND)
+                .setType("text/plain")
+                .putExtra(Intent.EXTRA_TEXT, body)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        if (title != null) {
+            intent.putExtra(Intent.EXTRA_SUBJECT, title)
+        }
+        activity.startActivity(Intent.createChooser(intent, title ?: "Share"))
+        return JSONObject().put("shared", true).put("text", text).put("url", url).put("title", title)
     }
 
     private fun emit(result: String) {
