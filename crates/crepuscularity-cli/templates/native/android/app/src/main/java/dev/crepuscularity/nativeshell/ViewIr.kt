@@ -38,9 +38,16 @@ data class ViewStyle(
     val foregroundColor: String? = null,
     val backgroundColor: String? = null,
     val cornerRadius: Float? = null,
+    val borderWidth: Float? = null,
+    val borderColor: String? = null,
     val italic: Boolean? = null,
     val underline: Boolean? = null,
     val strikethrough: Boolean? = null,
+)
+
+data class PickerOption(
+    val value: String,
+    val label: String,
 )
 
 sealed interface ViewNode {
@@ -64,6 +71,79 @@ sealed interface ViewNode {
         val style: ViewStyle? = null,
     ) : ViewNode
 
+    data class Toggle(
+        val label: String,
+        val bind: String? = null,
+        val checked: Boolean,
+        val onChange: String? = null,
+        val style: ViewStyle? = null,
+    ) : ViewNode
+
+    data class Checkbox(
+        val label: String,
+        val bind: String? = null,
+        val checked: Boolean,
+        val onChange: String? = null,
+        val style: ViewStyle? = null,
+    ) : ViewNode
+
+    data class Slider(
+        val label: String? = null,
+        val bind: String? = null,
+        val value: Float,
+        val min: Float,
+        val max: Float,
+        val step: Float? = null,
+        val style: ViewStyle? = null,
+    ) : ViewNode
+
+    data class Progress(
+        val label: String? = null,
+        val value: Float,
+        val max: Float,
+        val style: ViewStyle? = null,
+    ) : ViewNode
+
+    data class Meter(
+        val label: String? = null,
+        val value: Float,
+        val min: Float,
+        val max: Float,
+        val style: ViewStyle? = null,
+    ) : ViewNode
+
+    data class Badge(
+        val label: String,
+        val tone: String? = null,
+        val style: ViewStyle? = null,
+    ) : ViewNode
+
+    data class Divider(
+        val axis: String,
+        val style: ViewStyle? = null,
+    ) : ViewNode
+
+    data class Spacer(
+        val size: Float? = null,
+        val style: ViewStyle? = null,
+    ) : ViewNode
+
+    data class Dropzone(
+        val label: String,
+        val accept: String? = null,
+        val onDrop: String? = null,
+        val style: ViewStyle? = null,
+        val children: List<ViewNode> = emptyList(),
+    ) : ViewNode
+
+    data class FilePicker(
+        val label: String,
+        val accept: List<String> = emptyList(),
+        val multiple: Boolean = false,
+        val onPick: String? = null,
+        val style: ViewStyle? = null,
+    ) : ViewNode
+
     data class Image(
         val src: String,
         val alt: String? = null,
@@ -76,9 +156,33 @@ sealed interface ViewNode {
         val children: List<ViewNode> = emptyList(),
     ) : ViewNode
 
+    data class ListNode(
+        val ordered: Boolean,
+        val style: ViewStyle? = null,
+        val children: List<ViewNode> = emptyList(),
+    ) : ViewNode
+
+    data class ListItem(
+        val style: ViewStyle? = null,
+        val children: List<ViewNode> = emptyList(),
+    ) : ViewNode
+
     data class SlotRotate(
         val phrases: List<String>,
         val intervalMs: Long,
+        val style: ViewStyle? = null,
+    ) : ViewNode
+
+    data class Input(
+        val placeholder: String,
+        val bind: String,
+        val multiline: Boolean = false,
+        val style: ViewStyle? = null,
+    ) : ViewNode
+
+    data class Picker(
+        val bind: String,
+        val options: List<PickerOption>,
         val style: ViewStyle? = null,
     ) : ViewNode
 }
@@ -128,6 +232,8 @@ private fun decodeStyle(o: JsonObject?): ViewStyle? {
         foregroundColor = s("foregroundColor"),
         backgroundColor = s("backgroundColor"),
         cornerRadius = f("cornerRadius"),
+        borderWidth = f("borderWidth"),
+        borderColor = s("borderColor"),
         italic = b("italic"),
         underline = b("underline"),
         strikethrough = b("strikethrough"),
@@ -143,6 +249,7 @@ private fun ViewStyle.isEmpty(): Boolean =
         maxWidth == null && maxHeight == null &&
         fontSize == null && fontWeight == null && textAlign == null &&
         foregroundColor == null && backgroundColor == null && cornerRadius == null &&
+        borderWidth == null && borderColor == null &&
         italic == null && underline == null && strikethrough == null
 
 private fun decodeNode(o: JsonObject): ViewNode {
@@ -165,6 +272,69 @@ private fun decodeNode(o: JsonObject): ViewNode {
             onClick = o["onClick"]?.jsonPrimitive?.content,
             style = decodeStyle(o["style"]?.jsonObject),
         )
+        "toggle" -> ViewNode.Toggle(
+            label = o["label"]!!.jsonPrimitive.content,
+            bind = o["bind"]?.jsonPrimitive?.content,
+            checked = o["checked"]!!.jsonPrimitive.content.toBoolean(),
+            onChange = o["onChange"]?.jsonPrimitive?.content,
+            style = decodeStyle(o["style"]?.jsonObject),
+        )
+        "checkbox" -> ViewNode.Checkbox(
+            label = o["label"]!!.jsonPrimitive.content,
+            bind = o["bind"]?.jsonPrimitive?.content,
+            checked = o["checked"]!!.jsonPrimitive.content.toBoolean(),
+            onChange = o["onChange"]?.jsonPrimitive?.content,
+            style = decodeStyle(o["style"]?.jsonObject),
+        )
+        "slider" -> ViewNode.Slider(
+            label = o["label"]?.jsonPrimitive?.content,
+            bind = o["bind"]?.jsonPrimitive?.content,
+            value = o["value"]!!.jsonPrimitive.content.toFloat(),
+            min = o["min"]!!.jsonPrimitive.content.toFloat(),
+            max = o["max"]!!.jsonPrimitive.content.toFloat(),
+            step = o["step"]?.jsonPrimitive?.content?.toFloatOrNull(),
+            style = decodeStyle(o["style"]?.jsonObject),
+        )
+        "progress" -> ViewNode.Progress(
+            label = o["label"]?.jsonPrimitive?.content,
+            value = o["value"]!!.jsonPrimitive.content.toFloat(),
+            max = o["max"]!!.jsonPrimitive.content.toFloat(),
+            style = decodeStyle(o["style"]?.jsonObject),
+        )
+        "meter" -> ViewNode.Meter(
+            label = o["label"]?.jsonPrimitive?.content,
+            value = o["value"]!!.jsonPrimitive.content.toFloat(),
+            min = o["min"]!!.jsonPrimitive.content.toFloat(),
+            max = o["max"]!!.jsonPrimitive.content.toFloat(),
+            style = decodeStyle(o["style"]?.jsonObject),
+        )
+        "badge" -> ViewNode.Badge(
+            label = o["label"]!!.jsonPrimitive.content,
+            tone = o["tone"]?.jsonPrimitive?.content,
+            style = decodeStyle(o["style"]?.jsonObject),
+        )
+        "divider" -> ViewNode.Divider(
+            axis = o["axis"]!!.jsonPrimitive.content,
+            style = decodeStyle(o["style"]?.jsonObject),
+        )
+        "spacer" -> ViewNode.Spacer(
+            size = o["size"]?.jsonPrimitive?.content?.toFloatOrNull(),
+            style = decodeStyle(o["style"]?.jsonObject),
+        )
+        "dropzone" -> ViewNode.Dropzone(
+            label = o["label"]!!.jsonPrimitive.content,
+            accept = o["accept"]?.jsonPrimitive?.content,
+            onDrop = o["onDrop"]?.jsonPrimitive?.content,
+            style = decodeStyle(o["style"]?.jsonObject),
+            children = o["children"]?.jsonArray?.map { decodeNode(it.jsonObject) } ?: emptyList(),
+        )
+        "filePicker" -> ViewNode.FilePicker(
+            label = o["label"]!!.jsonPrimitive.content,
+            accept = o["accept"]?.jsonArray?.map { it.jsonPrimitive.content } ?: emptyList(),
+            multiple = o["multiple"]?.jsonPrimitive?.content?.toBoolean() ?: false,
+            onPick = o["onPick"]?.jsonPrimitive?.content,
+            style = decodeStyle(o["style"]?.jsonObject),
+        )
         "image" -> ViewNode.Image(
             src = o["src"]!!.jsonPrimitive.content,
             alt = o["alt"]?.jsonPrimitive?.content,
@@ -175,9 +345,35 @@ private fun decodeNode(o: JsonObject): ViewNode {
             style = decodeStyle(o["style"]?.jsonObject),
             children = o["children"]?.jsonArray?.map { decodeNode(it.jsonObject) } ?: emptyList(),
         )
+        "list" -> ViewNode.ListNode(
+            ordered = o["ordered"]!!.jsonPrimitive.content.toBoolean(),
+            style = decodeStyle(o["style"]?.jsonObject),
+            children = o["children"]?.jsonArray?.map { decodeNode(it.jsonObject) } ?: emptyList(),
+        )
+        "listItem" -> ViewNode.ListItem(
+            style = decodeStyle(o["style"]?.jsonObject),
+            children = o["children"]?.jsonArray?.map { decodeNode(it.jsonObject) } ?: emptyList(),
+        )
         "slotRotate" -> ViewNode.SlotRotate(
             phrases = o["phrases"]!!.jsonArray.map { it.jsonPrimitive.content },
             intervalMs = o["intervalMs"]!!.jsonPrimitive.content.toLong(),
+            style = decodeStyle(o["style"]?.jsonObject),
+        )
+        "input" -> ViewNode.Input(
+            placeholder = o["placeholder"]!!.jsonPrimitive.content,
+            bind = o["bind"]!!.jsonPrimitive.content,
+            multiline = o["multiline"]?.jsonPrimitive?.content?.toBoolean() ?: false,
+            style = decodeStyle(o["style"]?.jsonObject),
+        )
+        "picker" -> ViewNode.Picker(
+            bind = o["bind"]!!.jsonPrimitive.content,
+            options = o["options"]!!.jsonArray.map {
+                val option = it.jsonObject
+                PickerOption(
+                    value = option["value"]!!.jsonPrimitive.content,
+                    label = option["label"]!!.jsonPrimitive.content,
+                )
+            },
             style = decodeStyle(o["style"]?.jsonObject),
         )
         else -> error("unknown ViewNode kind: $kind")

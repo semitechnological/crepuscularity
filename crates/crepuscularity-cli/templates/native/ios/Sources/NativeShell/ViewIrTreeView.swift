@@ -62,13 +62,88 @@ public struct ViewNodeView: View {
             }
             .applyViewStyle(style, isText: false)
 
+        case .toggle(let label, _, let checked, let onChange, let style):
+            ToggleNodeView(label: label, checked: checked, onChange: onChange, style: style)
+
+        case .checkbox(let label, _, let checked, let onChange, let style):
+            CheckboxNodeView(label: label, checked: checked, onChange: onChange, style: style)
+
+        case .slider(let label, _, let value, let min, let max, let step, let style):
+            SliderNodeView(label: label, value: value, min: min, max: max, step: step, style: style)
+
+        case .progress(let label, let value, let max, let style):
+            ProgressNodeView(label: label, value: value, min: 0, max: max, style: style)
+
+        case .meter(let label, let value, let min, let max, let style):
+            ProgressNodeView(label: label, value: value, min: min, max: max, style: style)
+
+        case .badge(let label, let tone, let style):
+            Text(label)
+                .font(.caption.weight(.semibold))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(badgeColor(tone))
+                .foregroundStyle(.white)
+                .clipShape(Capsule())
+                .applyViewStyle(style, isText: false)
+
+        case .divider(let axis, let style):
+            DividerNodeView(axis: axis)
+                .applyViewStyle(style, isText: false)
+
+        case .spacer(let size, let style):
+            Color.clear
+                .frame(height: CGFloat(size ?? 8))
+                .applyViewStyle(style, isText: false)
+
+        case .dropzone(let label, _, let onDrop, let style, let children):
+            Button(action: {
+                if let onDrop { actionStore.dispatch(onDrop) }
+            }) {
+                VStack(alignment: .leading, spacing: 8) {
+                    if children.isEmpty {
+                        Text(label)
+                    } else {
+                        ForEach(Array(children.enumerated()), id: \.offset) { _, child in
+                            ViewNodeView(node: child)
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .buttonStyle(.plain)
+            .applyViewStyle(style, isText: false)
+
+        case .filePicker(let label, _, _, let onPick, let style):
+            Button(action: {
+                if let onPick { actionStore.dispatch(onPick) }
+            }) {
+                Label(label, systemImage: "paperclip")
+            }
+            .applyViewStyle(style, isText: false)
+
         case .image(let src, let alt, let style):
-            VStack(alignment: .leading) {
-                Text(alt ?? src)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Text("[image: \(src)]")
-                    .font(.caption2)
+            Group {
+                if let url = URL(string: src) {
+                    AsyncImage(url: url) { phase in
+                        switch phase {
+                        case .success(let image):
+                            image.resizable().scaledToFit()
+                        default:
+                            VStack(alignment: .leading) {
+                                Text(alt ?? src)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                Text("Loading image")
+                                    .font(.caption2)
+                            }
+                        }
+                    }
+                } else {
+                    Text(alt ?? src)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
             .applyViewStyle(style, isText: false)
 
@@ -92,10 +167,40 @@ public struct ViewNodeView: View {
             }
             .applyViewStyle(style, isText: false)
 
+        case .list(let ordered, let style, let children):
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach(Array(children.enumerated()), id: \.offset) { index, child in
+                    HStack(alignment: .top, spacing: 8) {
+                        Text(ordered ? "\(index + 1)." : "•")
+                        ViewNodeView(node: child)
+                    }
+                }
+            }
+            .applyViewStyle(style, isText: false)
+
+        case .listItem(let style, let children):
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach(Array(children.enumerated()), id: \.offset) { _, child in
+                    ViewNodeView(node: child)
+                }
+            }
+            .applyViewStyle(style, isText: false)
+
         case .slotRotate(let phrases, _, let style):
             // Full rotation needs a timer; show first phrase in the shell demo.
             Text(phrases.first ?? "")
                 .applyViewStyle(style, isText: true)
+
+        case .input(let placeholder, let bind, let multiline, let style):
+            InputNodeView(
+                placeholder: placeholder,
+                initialValue: "",
+                multiline: multiline,
+                style: style
+            )
+
+        case .picker(let bind, let options, let style):
+            PickerNodeView(bind: bind, options: options, style: style)
         }
     }
 
@@ -114,6 +219,180 @@ public struct ViewNodeView: View {
         case "stretch": return .center
         default: return .top
         }
+    }
+}
+
+private struct ToggleNodeView: View {
+    let label: String
+    let onChange: String?
+    let style: ViewStyle?
+    @ObservedObject private var actionStore = CrepusActionStore.shared
+    @State private var value: Bool
+
+    init(label: String, checked: Bool, onChange: String?, style: ViewStyle?) {
+        self.label = label
+        self.onChange = onChange
+        self.style = style
+        _value = State(initialValue: checked)
+    }
+
+    var body: some View {
+        Toggle(label, isOn: $value)
+            .onChange(of: value) { _, _ in
+                if let onChange { actionStore.dispatch(onChange) }
+            }
+            .applyViewStyle(style, isText: false)
+    }
+}
+
+private struct CheckboxNodeView: View {
+    let label: String
+    let onChange: String?
+    let style: ViewStyle?
+    @ObservedObject private var actionStore = CrepusActionStore.shared
+    @State private var value: Bool
+
+    init(label: String, checked: Bool, onChange: String?, style: ViewStyle?) {
+        self.label = label
+        self.onChange = onChange
+        self.style = style
+        _value = State(initialValue: checked)
+    }
+
+    var body: some View {
+        Button(action: {
+            value.toggle()
+            if let onChange { actionStore.dispatch(onChange) }
+        }) {
+            HStack(spacing: 8) {
+                Image(systemName: value ? "checkmark.square.fill" : "square")
+                Text(label)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .buttonStyle(.plain)
+        .applyViewStyle(style, isText: false)
+    }
+}
+
+private struct SliderNodeView: View {
+    let label: String?
+    let min: Float
+    let max: Float
+    let step: Float?
+    let style: ViewStyle?
+    @State private var value: Double
+
+    init(label: String?, value: Float, min: Float, max: Float, step: Float?, style: ViewStyle?) {
+        self.label = label
+        self.min = min
+        self.max = max
+        self.step = step
+        self.style = style
+        _value = State(initialValue: Double(value))
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if let label {
+                Text("\(label) \(Int(value.rounded()))")
+            }
+            Slider(
+                value: $value,
+                in: Double(min)...Double(max),
+                step: Double(step ?? 1)
+            )
+        }
+        .applyViewStyle(style, isText: false)
+    }
+}
+
+private struct ProgressNodeView: View {
+    let label: String?
+    let value: Float
+    let min: Float
+    let max: Float
+    let style: ViewStyle?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if let label {
+                Text(label)
+            }
+            ProgressView(value: progressValue)
+        }
+        .applyViewStyle(style, isText: false)
+    }
+
+    private var progressValue: Double {
+        let span = max - min
+        guard span > 0 else { return 0 }
+        return Double((value - min) / span)
+    }
+}
+
+private struct DividerNodeView: View {
+    let axis: StackAxis
+
+    var body: some View {
+        switch axis {
+        case .column:
+            Divider()
+        case .row:
+            Rectangle()
+                .fill(Color.secondary.opacity(0.2))
+                .frame(width: 1, height: 24)
+        }
+    }
+}
+
+private struct InputNodeView: View {
+    let placeholder: String
+    let multiline: Bool
+    let style: ViewStyle?
+    @State private var value: String
+
+    init(placeholder: String, initialValue: String, multiline: Bool, style: ViewStyle?) {
+        self.placeholder = placeholder
+        self.multiline = multiline
+        self.style = style
+        _value = State(initialValue: initialValue)
+    }
+
+    var body: some View {
+        Group {
+            if multiline {
+                TextEditor(text: $value)
+                    .frame(minHeight: 96)
+            } else {
+                TextField(placeholder, text: $value)
+                    .textFieldStyle(.roundedBorder)
+            }
+        }
+        .applyViewStyle(style, isText: false)
+    }
+}
+
+private struct PickerNodeView: View {
+    let options: [PickerOption]
+    let style: ViewStyle?
+    @State private var selection: String
+
+    init(bind: String, options: [PickerOption], style: ViewStyle?) {
+        self.options = options
+        self.style = style
+        let fallback = options.first?.value ?? normalizedBindingValue(bind)
+        _selection = State(initialValue: fallback)
+    }
+
+    var body: some View {
+        Picker("", selection: $selection) {
+            ForEach(options, id: \.value) { option in
+                Text(option.label).tag(option.value)
+            }
+        }
+        .pickerStyle(.segmented)
+        .applyViewStyle(style, isText: false)
     }
 }
 
@@ -175,6 +454,13 @@ private struct ViewStyleModifier: ViewModifier {
             .modifier(ConditionalPadding(pad: pad, enabled: hasPadding))
             .background((style.backgroundColor.flatMap { Color(hex: $0) }) ?? Color.clear)
             .modifier(ConditionalForeground(color: style.foregroundColor.flatMap { Color(hex: $0) }))
+            .overlay(
+                RoundedRectangle(cornerRadius: CGFloat(style.cornerRadius ?? 0))
+                    .stroke(
+                        style.borderColor.flatMap { Color(hex: $0) } ?? Color.secondary.opacity(style.borderWidth == nil ? 0 : 0.3),
+                        lineWidth: CGFloat(style.borderWidth ?? 0)
+                    )
+            )
             .clipShape(RoundedRectangle(cornerRadius: CGFloat(style.cornerRadius ?? 0)))
 
         Group {
@@ -205,6 +491,23 @@ private struct ViewStyleModifier: ViewModifier {
             withFont
         }
     }
+}
+
+private func badgeColor(_ tone: String?) -> Color {
+    switch tone {
+    case "success": return .green
+    case "warning": return .orange
+    case "danger": return .red
+    default: return Color.black.opacity(0.75)
+    }
+}
+
+private func normalizedBindingValue(_ bind: String) -> String {
+    let trimmed = bind.trimmingCharacters(in: .whitespacesAndNewlines)
+    if trimmed.count >= 2, trimmed.hasPrefix("\""), trimmed.hasSuffix("\"") {
+        return String(trimmed.dropFirst().dropLast())
+    }
+    return trimmed
 }
 
 private func frameAxis(width: Float?, min: Float?, max: Float?) -> (min: CGFloat?, ideal: CGFloat?, max: CGFloat?) {
