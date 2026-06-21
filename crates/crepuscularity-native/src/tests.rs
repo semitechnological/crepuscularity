@@ -77,6 +77,35 @@ fn codegen_compose_emits_composable_source() {
 }
 
 #[test]
+fn compose_button_colors_use_material_colors() {
+    let ir = render_template_to_ir(
+        "button @click=\"tap\" bg-[#ffffff] text-[#000000] px-6 py-5\n  \"Tap\"",
+        &TemplateContext::new(),
+    )
+    .unwrap();
+    let source = generate_native_source(&ir, NativeCodegenTarget::Compose, "HelloScreen");
+    assert!(source.contains("import androidx.compose.material3.ButtonDefaults"));
+    assert!(source.contains("import androidx.compose.foundation.layout.PaddingValues"));
+    assert!(source.contains("contentPadding = PaddingValues(horizontal = 24.dp, vertical = 20.dp)"));
+    assert!(source.contains("colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFFFFF), contentColor = Color(0xFF000000))"));
+    assert!(source.contains("elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp, pressedElevation = 0.dp, focusedElevation = 0.dp, hoveredElevation = 0.dp, disabledElevation = 0.dp)"));
+    assert!(!source.contains("modifier = Modifier.padding(horizontal = 24.dp, vertical = 20.dp)"));
+    assert!(!source.contains("Modifier.background(Color(0xFFFFFFFF))"));
+}
+
+#[test]
+fn compose_named_black_and_white_colors() {
+    let ir = render_template_to_ir(
+        "div bg-black\n  span text-white\n    \"Named colors\"",
+        &TemplateContext::new(),
+    )
+    .unwrap();
+    let source = generate_native_source(&ir, NativeCodegenTarget::Compose, "HelloScreen");
+    assert!(source.contains("background(Color(0xFF000000))"));
+    assert!(source.contains("color = Color(0xFFFFFFFF)"));
+}
+
+#[test]
 fn web_style_classes_lower_to_typed_native_codegen() {
     let ir = render_template_to_ir(
         "div flex flex-col w-full h-full px-4 pt-6 mb-2 bg-[#101624] border border-[#334155] rounded-xl opacity-75 shadow-lg translate-x-2 translate-y-1 rotate-6 scale-95 overflow-hidden\n  span text-center text-lg font-semibold italic underline line-through leading-tight line-clamp-2 text-[#f8fafc]\n    \"Literal web-style UI\"",

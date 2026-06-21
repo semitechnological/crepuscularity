@@ -120,6 +120,12 @@ fn parse_size(rest: &str) -> Option<f32> {
 /// Try to resolve a color string: named palette, bare hex, or `#hex`.
 /// Also handles opacity suffix: `red-500/50` → color with alpha.
 fn resolve_color(s: &str) -> Option<String> {
+    match s.trim().to_ascii_lowercase().as_str() {
+        "black" => return Some("#000000".to_string()),
+        "white" => return Some("#ffffff".to_string()),
+        "transparent" | "clear" => return Some("#00000000".to_string()),
+        _ => {}
+    }
     // Named + optional opacity: "red-500/50"
     if let Some((color_part, opacity_part)) = s.split_once('/') {
         if let Some(hex) = lookup_named_color(color_part) {
