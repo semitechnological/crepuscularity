@@ -12,6 +12,14 @@ private func crepusMobileDispatch(_ action: UnsafePointer<CChar>, _ length: UInt
 
 @_silgen_name("crepus_mobile_dispatch_json")
 private func crepusMobileDispatchJson(_ action: UnsafePointer<CChar>, _ length: UInt, _ output: UnsafeMutablePointer<CChar>, _ outputLength: UInt) -> UInt
+@_silgen_name("crepus_mobile_dispatch_and_store_json")
+private func crepusMobileDispatchAndStoreJson(_ action: UnsafePointer<CChar>, _ length: UInt, _ output: UnsafeMutablePointer<CChar>, _ outputLength: UInt) -> UInt
+@_silgen_name("crepus_mobile_start_auto_scan")
+private func crepusMobileStartAutoScan() -> UnsafeMutablePointer<CChar>?
+@_silgen_name("crepus_mobile_last_error")
+private func crepusMobileLastError() -> UnsafeMutablePointer<CChar>?
+@_silgen_name("crepus_mobile_free_string")
+private func crepusMobileFreeString(_ pointer: UnsafeMutablePointer<CChar>?)
 
 public enum CrepusRustActions {
     public static func install() {
@@ -30,11 +38,37 @@ public enum CrepusRustActions {
                 return String(cString: output)
             }
         }
-        CrepusActions.resultSink = { result in
-            Task { @MainActor in
-                CrepusActionStore.shared.record(result)
+        CrepusActions.resultSink = { _ in }
+    }
+
+    public static func dispatchStored(_ action: String) -> String {
+        action.withCString { pointer in
+            let capacity = 4096
+            let output = UnsafeMutablePointer<CChar>.allocate(capacity: capacity)
+            defer { output.deallocate() }
+            let written = crepusMobileDispatchAndStoreJson(pointer, UInt(strlen(pointer)), output, UInt(capacity))
+            if written >= capacity {
+                return oversizedResultJson(action: action)
             }
+            return String(cString: output)
         }
+    }
+
+    public static func startAutoScan() -> String {
+        guard let pointer = crepusMobileStartAutoScan() else {
+            return "{}"
+        }
+        defer { crepusMobileFreeString(pointer) }
+        return String(cString: pointer)
+    }
+
+    public static func lastError() -> String? {
+        guard let pointer = crepusMobileLastError() else {
+            return nil
+        }
+        defer { crepusMobileFreeString(pointer) }
+        let value = String(cString: pointer)
+        return value.isEmpty ? nil : value
     }
 
     private static func oversizedResultJson(action: String) -> String {
@@ -478,11 +512,6 @@ private func setClipboardText(_ text: String) {}
 private func clearClipboard() {}
 #endif
 
-private struct CrepusActionResult: Decodable {
-    let ok: Bool?
-    let error: String?
-}
-
 @MainActor
 public final class CrepusActionStore: ObservableObject {
     public static let shared = CrepusActionStore()
@@ -490,18 +519,16 @@ public final class CrepusActionStore: ObservableObject {
     @Published public private(set) var lastResult: String = "{}"
     @Published public private(set) var lastError: String?
 
+    public func startAutoScan() {
+        record(CrepusRustActions.startAutoScan())
+    }
+
     public func dispatch(_ action: String) {
-        record(CrepusActions.dispatch(action))
+        record(CrepusRustActions.dispatchStored(action))
     }
 
     public func record(_ result: String) {
         lastResult = result
-        let data = Data(result.utf8)
-        if let payload = try? JSONDecoder().decode(CrepusActionResult.self, from: data),
-           payload.ok == false {
-            lastError = payload.error ?? result
-        } else {
-            lastError = nil
-        }
+        lastError = CrepusRustActions.lastError()
     }
 }
