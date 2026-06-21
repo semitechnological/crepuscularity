@@ -259,8 +259,6 @@ fn main() {
 ### Optional web features
 
 - `dom`: wasm-side DOM lookup and mutation helpers such as `crepus.hero.text(...)`.
-- `event-router`: reserved for event-router-related Rust glue. The default shell-side `data-on*` delegation lives in `app.js`, so it does not increase wasm size on its own.
-- `full-web`: convenience feature enabling the optional web-facing feature set.
 
 Keep minimal sites on default features and opt in only when the runtime needs DOM mutations.
 

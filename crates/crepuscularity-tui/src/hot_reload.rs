@@ -59,6 +59,7 @@
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
+use crepuscularity_core::watch::event_touches_relevant_path;
 use notify::{recommended_watcher, Event, EventKind, RecursiveMode, Watcher};
 use ratatui::layout::Rect;
 use ratatui::Frame;
@@ -231,33 +232,4 @@ fn create_file_watcher(
         .map_err(|e| format!("failed to watch {}: {e}", watch_dir.display()))?;
 
     Ok(Box::new(watcher))
-}
-
-/// Pure helper: does this event touch either the canonical target template,
-/// a sibling/descendant `.crepus` (so `include`d components trigger reload),
-/// or a `context.toml` next to the template?
-pub(crate) fn event_touches_relevant_path(event: &Event, target: &Path, watch_root: &Path) -> bool {
-    for path in &event.paths {
-        if path == target {
-            return true;
-        }
-        let canon = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
-        if canon == *target {
-            return true;
-        }
-        let canon_root = watch_root
-            .canonicalize()
-            .unwrap_or_else(|_| watch_root.to_path_buf());
-        if !canon.starts_with(&canon_root) {
-            continue;
-        }
-        match canon.extension().and_then(|e| e.to_str()) {
-            Some("crepus") => return true,
-            Some("toml") if canon.file_name().and_then(|n| n.to_str()) == Some("context.toml") => {
-                return true
-            }
-            _ => continue,
-        }
-    }
-    false
 }

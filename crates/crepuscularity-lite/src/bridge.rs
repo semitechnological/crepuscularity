@@ -183,28 +183,6 @@ impl Bridge {
         }
     }
 
-    /// Run several independent `invoke` calls, optionally in parallel (feature **`parallel`**).
-    ///
-    /// **Thread-safety:** only safe when concurrent access to plugin state is valid. Prefer for
-    /// stateless `core`/`app` calls only until `fs` / `window` / `clipboard` are audited for parallel `invoke`.
-    #[cfg(feature = "parallel")]
-    pub fn invoke_envelope_batch(&self, calls: &[(String, String, Value)]) -> Vec<Value> {
-        use rayon::prelude::*;
-        calls
-            .par_iter()
-            .map(|(plugin_id, method, payload)| self.invoke_envelope(plugin_id, method, payload))
-            .collect()
-    }
-
-    /// Serial fallback when the **`parallel`** feature is disabled.
-    #[cfg(not(feature = "parallel"))]
-    pub fn invoke_envelope_batch(&self, calls: &[(String, String, Value)]) -> Vec<Value> {
-        calls
-            .iter()
-            .map(|(plugin_id, method, payload)| self.invoke_envelope(plugin_id, method, payload))
-            .collect()
-    }
-
     fn invoke_inner(
         &self,
         plugin_id: &str,
@@ -274,20 +252,6 @@ mod tests {
         let v = b.invoke_envelope("core", "nope", &json!({}));
         assert_eq!(v["ok"], false);
         assert_eq!(v["error"]["code"], "unknown_method");
-    }
-
-    #[test]
-    fn invoke_envelope_batch_matches_serial() {
-        let b = Bridge::default_arc();
-        let calls = vec![
-            ("core".to_string(), "echo".to_string(), json!({ "a": 1 })),
-            ("core".to_string(), "ping".to_string(), json!({})),
-        ];
-        let batch = b.invoke_envelope_batch(&calls);
-        assert_eq!(batch.len(), 2);
-        for (i, (pid, method, payload)) in calls.iter().enumerate() {
-            assert_eq!(batch[i], b.invoke_envelope(pid, method, payload));
-        }
     }
 
     #[test]

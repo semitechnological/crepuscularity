@@ -833,7 +833,7 @@ fn hot_template_drop_releases_watcher() {
 // ─── Watcher event filter (pure) ──────────────────────────────────────────────
 
 mod watcher_filter {
-    use crate::hot_reload::event_touches_relevant_path;
+    use crepuscularity_core::watch::event_touches_relevant_path;
     use notify::event::{ModifyKind, RemoveKind};
     use notify::{Event, EventKind};
     use std::fs;
