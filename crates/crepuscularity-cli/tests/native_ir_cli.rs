@@ -356,6 +356,7 @@ fn mobile_new_scaffolds_runtime_files() {
     assert!(rust_actions.contains("JSONSerialization.data(withJSONObject:"));
     assert!(rust_actions.contains("let data = Data(result.utf8)"));
     assert!(rust_actions.contains("lastError = payload.error"));
+    assert!(rust_actions.contains("UIImpactFeedbackGenerator"));
     assert!(rust_actions.contains("UserDefaults.standard"));
     assert!(!rust_actions.contains(r#""action":"\(action)""#));
     assert!(!rust_actions.contains("result.contains"));
@@ -365,6 +366,7 @@ fn mobile_new_scaffolds_runtime_files() {
     )
     .expect("read CrepusRustActions.kt");
     assert!(android_actions.contains("getSharedPreferences(\"crepus_preferences\""));
+    assert!(android_actions.contains("VibrationEffect.createOneShot"));
 
     let project_yml =
         std::fs::read_to_string(root.join("ios/project.yml")).expect("read project.yml");

@@ -5,6 +5,10 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.mutableStateOf
@@ -71,9 +75,10 @@ object CrepusRustActions {
         }
     }
 
-    private fun hostPluginValue(capability: String, method: String, payload: JSONObject?): JSONObject =
+    private fun hostPluginValue(capability: String, method: String, payload: JSONObject?): Any =
         when (capability) {
             "clipboard" -> clipboardValue(method, payload)
+            "haptics" -> hapticsValue(method, payload)
             "preferences" -> preferencesValue(method, payload)
             "browser", "linking" -> openUrlValue(capability, method, payload)
             "share" -> shareValue(method, payload)
@@ -152,6 +157,44 @@ object CrepusRustActions {
                 JSONObject().put("cleared", true)
             }
             else -> error("unsupported preferences method: $method")
+        }
+    }
+
+    private fun hapticsValue(method: String, payload: JSONObject?): JSONObject {
+        val vibrator =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val manager = appContext.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
+                manager.defaultVibrator
+            } else {
+                @Suppress("DEPRECATION")
+                appContext.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+            }
+        val duration =
+            when (method) {
+                "impact" -> when (payload?.optString("style", "medium")) {
+                    "light" -> 10L
+                    "heavy" -> 30L
+                    else -> 20L
+                }
+                "selection" -> 10L
+                "notification" -> when (payload?.optString("type", "success")) {
+                    "warning" -> 25L
+                    "error" -> 35L
+                    else -> 20L
+                }
+                else -> error("unsupported haptics method: $method")
+            }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            vibrator.vibrate(VibrationEffect.createOneShot(duration, VibrationEffect.DEFAULT_AMPLITUDE))
+        } else {
+            @Suppress("DEPRECATION")
+            vibrator.vibrate(duration)
+        }
+        return when (method) {
+            "impact" -> JSONObject().put("triggered", true).put("style", payload?.optString("style", "medium") ?: "medium")
+            "selection" -> JSONObject().put("triggered", true)
+            "notification" -> JSONObject().put("triggered", true).put("type", payload?.optString("type", "success") ?: "success")
+            else -> error("unsupported haptics method: $method")
         }
     }
 
