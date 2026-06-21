@@ -506,8 +506,17 @@ fn codegen_native_source_inner(args: &[String]) -> Result<PathBuf, String> {
     };
     let path = parsed.out_dir.join(format!("{}.{}", parsed.view_name, ext));
     fs::write(&path, source).map_err(|e| format!("write {}: {e}", path.display()))?;
+    if parsed.platform == NativeCodegenTarget::Compose
+        && is_native_shell_android_generated_dir(&parsed.out_dir)
+    {
+        prepend_kotlin_package(&path);
+    }
     ui::success(&format!("generated native source at {}", path.display()));
     Ok(path)
+}
+
+fn is_native_shell_android_generated_dir(path: &Path) -> bool {
+    path.ends_with("android/app/src/main/java/dev/crepuscularity/nativeshell/generated")
 }
 
 fn parse_codegen_args(args: &[String]) -> Result<CodegenArgs, String> {
