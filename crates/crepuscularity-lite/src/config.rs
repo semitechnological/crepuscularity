@@ -33,7 +33,7 @@ pub struct CrepusLiteCapabilities {
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct CrepusLiteConfig {
     /// Optional scripts (relative to the config base dir) concatenated in order **before** [`Self::guest_entry`].
-    /// Used to load a shared library (for example `examples/capacitor/crepus-capacitor-api.js`) ahead of the guest body.
+    /// Used to load a shared library ahead of the guest body.
     #[serde(default)]
     pub guest_prelude: Vec<String>,
     /// Relative path (from config base dir) to a UTF-8 script executed with [`V8Host::eval`](crate::v8_host::V8Host).

@@ -1,13 +1,14 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-pub const OFFICIAL_CAPACITOR_CAPABILITIES: &[NativeCapability] = &[
+pub const NATIVE_CAPABILITIES: &[NativeCapability] = &[
     NativeCapability::ActionSheet,
     NativeCapability::AppLauncher,
     NativeCapability::App,
     NativeCapability::BackgroundRunner,
     NativeCapability::BarcodeScanner,
     NativeCapability::Browser,
+    NativeCapability::Bluetooth,
     NativeCapability::Camera,
     NativeCapability::Clipboard,
     NativeCapability::Cookies,
@@ -35,16 +36,10 @@ pub const OFFICIAL_CAPACITOR_CAPABILITIES: &[NativeCapability] = &[
     NativeCapability::SplashScreen,
     NativeCapability::StatusBar,
     NativeCapability::SystemBars,
+    NativeCapability::Sync,
     NativeCapability::TextZoom,
     NativeCapability::Toast,
 ];
-
-pub fn crepus_native_capabilities() -> impl Iterator<Item = NativeCapability> {
-    OFFICIAL_CAPACITOR_CAPABILITIES
-        .iter()
-        .copied()
-        .chain([NativeCapability::Bluetooth, NativeCapability::Sync])
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -207,29 +202,20 @@ mod tests {
     }
 
     #[test]
-    fn official_capability_registry_tracks_capacitor_surface() {
-        let names = OFFICIAL_CAPACITOR_CAPABILITIES
+    fn native_capability_registry_has_unique_names() {
+        let names = NATIVE_CAPABILITIES
             .iter()
             .map(|capability| capability.as_str())
             .collect::<HashSet<_>>();
 
-        assert_eq!(OFFICIAL_CAPACITOR_CAPABILITIES.len(), 35);
-        assert_eq!(names.len(), OFFICIAL_CAPACITOR_CAPABILITIES.len());
+        assert_eq!(NATIVE_CAPABILITIES.len(), 37);
+        assert_eq!(names.len(), NATIVE_CAPABILITIES.len());
+        assert!(names.contains("bluetooth"));
         assert!(names.contains("camera"));
         assert!(names.contains("clipboard"));
         assert!(names.contains("fileTransfer"));
-        assert!(names.contains("toast"));
-    }
-
-    #[test]
-    fn crepus_native_capability_registry_adds_rust_owned_extensions() {
-        let names = crepus_native_capabilities()
-            .map(|capability| capability.as_str())
-            .collect::<HashSet<_>>();
-
-        assert_eq!(names.len(), 37);
-        assert!(names.contains("bluetooth"));
         assert!(names.contains("sync"));
+        assert!(names.contains("toast"));
     }
 
     #[test]

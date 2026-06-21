@@ -2,7 +2,7 @@
 
 > **Stability:** This project is **unstable** and in active development. APIs, CLI flags, and template semantics may change without a semver-major release until **1.0**. Pin exact dependency versions and expect occasional breakage.
 
-Think React Native turned into a systems UI toolkit: one compact `.crepus` language can drive GPUI desktop apps, Ratatui terminal UIs, Chromium/Firefox extensions, web output, native mobile shells, embedded panels, and LVGL Pro. Crepuscularity also ships hot reload, runtime rendering, and a GPUI desktop shell with an embedded V8 bridge for Capacitor-shaped native plugins.
+Think React Native turned into a systems UI toolkit: one compact `.crepus` language can drive GPUI desktop apps, Ratatui terminal UIs, Chromium/Firefox extensions, web output, native mobile shells, embedded panels, and LVGL Pro. Crepuscularity also ships hot reload, runtime rendering, and a GPUI desktop shell with an embedded V8 bridge for native capabilities.
 
 Write UI in a concise, indentation-based template DSL (`.crepus` files). Templates compile at build time via the `view!` macro or render at runtime with full hot-reload support. The same `.crepus` syntax drives native desktop (GPUI), terminal UIs (Ratatui), browser extensions (MV3), HTML output, and React/JSX — and is the foundation for native mobile backends targeting SwiftUI and Jetpack Compose.
 
@@ -16,7 +16,7 @@ Use [Aurorality](https://github.com/tschk/aurorality) for united SwiftUI macOS +
 - **Polyglot plugin contract** — host languages consume View IR JSON through `crepus native ir` or the optional `crepuscularity-abi` C session API, then create UI from the typed node tree; drop-in reference packages and native workspace files live under [`plugins/`](plugins/README.md)
 - **Terminal UIs without a second UI language** — **`crepuscularity-tui`** maps `.crepus` elements, includes, slots, control flow, and Tailwind-style terminal classes onto Ratatui frames
 - **Embedded panels (in testing)** — **`crepuscularity-embedded`** renders `.crepus` into an RGB565 buffer you flush over SPI (**ILI9341**, **ST7789**) or into an **LTDC** framebuffer on STM32/ESP32; see [`docs/embedded.md`](docs/embedded.md) and [`examples/embedded-dashboard`](examples/embedded-dashboard/README.md)
-- **Desktop shell for embedded guest apps** — **`crepuscularity-lite`** embeds V8 in a GPUI host with a Capacitor-shaped Rust bridge, optional file watching, workers, plugin capabilities, and TypeScript/TSX guest transpilation
+- **Desktop shell for embedded guest apps** — **`crepuscularity-lite`** embeds V8 in a GPUI host with a Rust native-capability bridge, optional file watching, workers, plugin capabilities, and TypeScript/TSX guest transpilation
 - **Compile-time and runtime paths** — `view!` macro for zero-overhead AOT compilation; `parse_template` / `render_nodes` for full runtime flexibility and hot reload
 
 ## Quick Start
