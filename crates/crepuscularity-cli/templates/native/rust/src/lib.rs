@@ -1,5 +1,8 @@
+use std::borrow::Cow;
 use std::ffi::CStr;
+use std::fs;
 use std::os::raw::c_char;
+use std::path::{Component, Path, PathBuf};
 use std::sync::{Mutex, MutexGuard, OnceLock};
 
 #[cfg(target_os = "android")]
@@ -15,9 +18,16 @@ struct MobileActionState {
     last_payload: Option<String>,
 }
 
-static ACTION_STATE: OnceLock<Mutex<MobileActionState>> = OnceLock::new();
+#[derive(Clone, Copy)]
+enum ActionKind {
+    Named(ActionHandler),
+    Plugin,
+}
+
 type ActionHandler =
     fn(&mut MobileActionState, Option<&serde_json::Value>) -> Result<serde_json::Value, String>;
+
+static ACTION_STATE: OnceLock<Mutex<MobileActionState>> = OnceLock::new();
 
 fn action_state() -> &'static Mutex<MobileActionState> {
     ACTION_STATE.get_or_init(|| Mutex::new(MobileActionState::default()))
@@ -30,32 +40,38 @@ fn lock_action_state() -> MutexGuard<'static, MobileActionState> {
 }
 
 pub fn dispatch_action(action: &str) -> bool {
-    action_handler(action).is_some()
+    action_kind(action).is_some()
 }
 
 pub fn dispatch_action_json(action: &str) -> String {
     let request = parse_action_request(action);
-    let action_name = request
-        .get("action")
-        .and_then(|value| value.as_str())
-        .unwrap_or(action);
-    let payload = request.get("payload");
-    let mut state = lock_action_state();
-    let Some(handler) = action_handler(action_name) else {
+    let Some(kind) = action_kind(action) else {
+        let state = lock_action_state();
+        let action_name = legacy_action_name(&request).unwrap_or(action);
         return action_json(false, action_name, None, Some("unknown action"), &state);
     };
-    state.last_action = action_name.to_string();
-    state.last_payload = payload.map(serde_json::Value::to_string);
-    match handler(&mut state, payload) {
-        Ok(value) => action_json(true, action_name, Some(value), None, &state),
-        Err(error) => action_json(false, action_name, None, Some(&error), &state),
+    let mut state = lock_action_state();
+    let action_name = request_action_name(&request);
+    state.last_action = action_name.clone();
+    state.last_payload = request_payload(&request).map(serde_json::Value::to_string);
+    let result = match kind {
+        ActionKind::Named(handler) => handler(&mut state, request_payload(&request)),
+        ActionKind::Plugin => plugin_action(&mut state, &request),
+    };
+    match result {
+        Ok(value) => action_json(true, &action_name, Some(value), None, &state),
+        Err(error) => action_json(false, &action_name, None, Some(&error), &state),
     }
 }
 
-fn action_handler(action: &str) -> Option<ActionHandler> {
-    match action {
-        "sync" => Some(sync_action),
-        "preview" => Some(preview_action),
+fn action_kind(action: &str) -> Option<ActionKind> {
+    let request = parse_action_request(action);
+    if request_kind(&request) == Some("plugin") {
+        return Some(ActionKind::Plugin);
+    }
+    match legacy_action_name(&request).unwrap_or(action) {
+        "sync" => Some(ActionKind::Named(sync_action)),
+        "preview" => Some(ActionKind::Named(preview_action)),
         _ => None,
     }
 }
@@ -82,6 +98,164 @@ fn preview_action(
     }))
 }
 
+fn plugin_action(
+    state: &mut MobileActionState,
+    request: &serde_json::Value,
+) -> Result<serde_json::Value, String> {
+    let capability = request
+        .get("capability")
+        .and_then(|value| value.as_str())
+        .ok_or_else(|| "plugin request missing capability".to_string())?;
+    let method = request
+        .get("method")
+        .and_then(|value| value.as_str())
+        .ok_or_else(|| "plugin request missing method".to_string())?;
+    let payload = request.get("payload");
+    let value = match capability {
+        "preferences" => preferences_backend(method, payload)?,
+        "filesystem" => filesystem_backend(method, payload)?,
+        "device" => device_backend(method)?,
+        "app" => app_backend(state, method)?,
+        other => return Err(format!("unsupported capability: {other}")),
+    };
+    Ok(serde_json::json!({
+        "capability": capability,
+        "method": method,
+        "value": value,
+    }))
+}
+
+fn preferences_backend(
+    method: &str,
+    payload: Option<&serde_json::Value>,
+) -> Result<serde_json::Value, String> {
+    let mut prefs = load_json_map(&preferences_file_path())?;
+    match method {
+        "get" => {
+            let key = payload_string(payload, "key")?;
+            Ok(prefs
+                .get(&key)
+                .cloned()
+                .unwrap_or(serde_json::Value::Null))
+        }
+        "set" => {
+            let key = payload_string(payload, "key")?;
+            let value = payload
+                .and_then(|value| value.get("value"))
+                .cloned()
+                .ok_or_else(|| "preferences.set requires payload.value".to_string())?;
+            prefs.insert(key.clone(), value.clone());
+            save_json_map(&preferences_file_path(), &prefs)?;
+            Ok(serde_json::json!({ "key": key, "value": value }))
+        }
+        "remove" => {
+            let key = payload_string(payload, "key")?;
+            let removed = prefs.remove(&key).is_some();
+            save_json_map(&preferences_file_path(), &prefs)?;
+            Ok(serde_json::json!({ "key": key, "removed": removed }))
+        }
+        "keys" => {
+            let mut keys = prefs.keys().cloned().collect::<Vec<_>>();
+            keys.sort();
+            Ok(serde_json::json!(keys))
+        }
+        "clear" => {
+            prefs.clear();
+            save_json_map(&preferences_file_path(), &prefs)?;
+            Ok(serde_json::json!({ "cleared": true }))
+        }
+        other => Err(format!("unsupported preferences method: {other}")),
+    }
+}
+
+fn filesystem_backend(
+    method: &str,
+    payload: Option<&serde_json::Value>,
+) -> Result<serde_json::Value, String> {
+    match method {
+        "readText" => {
+            let path = scoped_data_path(&payload_string(payload, "path")?)?;
+            let text = fs::read_to_string(&path)
+                .map_err(|error| format!("read {}: {error}", path.display()))?;
+            Ok(serde_json::json!({ "path": path_string(&path), "text": text }))
+        }
+        "writeText" => {
+            let path = scoped_data_path(&payload_string(payload, "path")?)?;
+            let text = payload_string(payload, "text")?;
+            ensure_parent_dir(&path)?;
+            fs::write(&path, text.as_bytes())
+                .map_err(|error| format!("write {}: {error}", path.display()))?;
+            Ok(file_stat_json(&path)?)
+        }
+        "delete" => {
+            let path = scoped_data_path(&payload_string(payload, "path")?)?;
+            let deleted = if path.is_dir() {
+                fs::remove_dir_all(&path).is_ok()
+            } else {
+                fs::remove_file(&path).is_ok()
+            };
+            Ok(serde_json::json!({ "path": path_string(&path), "deleted": deleted }))
+        }
+        "mkdir" => {
+            let path = scoped_data_path(&payload_string(payload, "path")?)?;
+            fs::create_dir_all(&path)
+                .map_err(|error| format!("mkdir {}: {error}", path.display()))?;
+            Ok(file_stat_json(&path)?)
+        }
+        "list" => {
+            let path = scoped_data_path(&payload_string(payload, "path")?)?;
+            let mut entries = fs::read_dir(&path)
+                .map_err(|error| format!("list {}: {error}", path.display()))?
+                .map(|entry| {
+                    let entry = entry.map_err(|error| error.to_string())?;
+                    let entry_path = entry.path();
+                    let metadata = entry
+                        .metadata()
+                        .map_err(|error| format!("stat {}: {error}", entry_path.display()))?;
+                    Ok(serde_json::json!({
+                        "name": entry.file_name().to_string_lossy().to_string(),
+                        "path": path_string(&entry_path),
+                        "isDir": metadata.is_dir(),
+                        "bytes": metadata.len(),
+                    }))
+                })
+                .collect::<Result<Vec<_>, String>>()?;
+            entries.sort_by(|left, right| left["name"].as_str().cmp(&right["name"].as_str()));
+            Ok(serde_json::json!({ "path": path_string(&path), "entries": entries }))
+        }
+        "stat" => {
+            let path = scoped_data_path(&payload_string(payload, "path")?)?;
+            file_stat_json(&path)
+        }
+        other => Err(format!("unsupported filesystem method: {other}")),
+    }
+}
+
+fn device_backend(method: &str) -> Result<serde_json::Value, String> {
+    match method {
+        "info" => Ok(serde_json::json!({
+            "targetOs": std::env::consts::OS,
+            "targetArch": std::env::consts::ARCH,
+            "targetFamily": std::env::consts::FAMILY,
+            "tempDir": path_string(&data_root_dir()),
+        })),
+        other => Err(format!("unsupported device method: {other}")),
+    }
+}
+
+fn app_backend(state: &MobileActionState, method: &str) -> Result<serde_json::Value, String> {
+    match method {
+        "info" => Ok(serde_json::json!({
+            "syncCount": state.sync_count,
+            "previewCount": state.preview_count,
+            "lastAction": state.last_action,
+            "lastPayload": state.last_payload,
+            "dataRoot": path_string(&data_root_dir()),
+        })),
+        other => Err(format!("unsupported app method: {other}")),
+    }
+}
+
 fn payload_message(payload: Option<&serde_json::Value>) -> Option<&str> {
     payload
         .and_then(|value| value.get("message"))
@@ -91,8 +265,133 @@ fn payload_message(payload: Option<&serde_json::Value>) -> Option<&str> {
 fn parse_action_request(input: &str) -> serde_json::Value {
     serde_json::from_str(input)
         .ok()
-        .filter(|value: &serde_json::Value| value.get("action").is_some())
+        .filter(|value: &serde_json::Value| {
+            value.get("action").is_some() || value.get("kind").is_some()
+        })
         .unwrap_or_else(|| serde_json::json!({ "action": input }))
+}
+
+fn legacy_action_name<'a>(request: &'a serde_json::Value) -> Option<&'a str> {
+    request.get("action").and_then(|value| value.as_str())
+}
+
+fn request_kind(request: &serde_json::Value) -> Option<&str> {
+    request.get("kind").and_then(|value| value.as_str())
+}
+
+fn request_action_name(request: &serde_json::Value) -> String {
+    if let Some(action) = legacy_action_name(request) {
+        return action.to_string();
+    }
+    if request_kind(request) == Some("plugin") {
+        let capability = request
+            .get("capability")
+            .and_then(|value| value.as_str())
+            .unwrap_or("plugin");
+        let method = request
+            .get("method")
+            .and_then(|value| value.as_str())
+            .unwrap_or("call");
+        return format!("{capability}.{method}");
+    }
+    request_kind(request).unwrap_or("").to_string()
+}
+
+fn request_payload(request: &serde_json::Value) -> Option<&serde_json::Value> {
+    request.get("payload")
+}
+
+fn payload_string(
+    payload: Option<&serde_json::Value>,
+    key: &str,
+) -> Result<String, String> {
+    payload
+        .and_then(|value| value.get(key))
+        .and_then(|value| value.as_str())
+        .map(str::to_string)
+        .ok_or_else(|| format!("payload.{key} must be a string"))
+}
+
+fn data_root_dir() -> PathBuf {
+    if let Some(path) = std::env::var_os("CREPUS_NATIVE_STATE_DIR") {
+        return PathBuf::from(path);
+    }
+    std::env::temp_dir().join("crepus_mobile_actions")
+}
+
+fn preferences_file_path() -> PathBuf {
+    data_root_dir().join("preferences.json")
+}
+
+fn load_json_map(
+    path: &Path,
+) -> Result<serde_json::Map<String, serde_json::Value>, String> {
+    if !path.exists() {
+        return Ok(serde_json::Map::new());
+    }
+    let text =
+        fs::read_to_string(path).map_err(|error| format!("read {}: {error}", path.display()))?;
+    let value: serde_json::Value = serde_json::from_str(&text)
+        .map_err(|error| format!("parse {}: {error}", path.display()))?;
+    value
+        .as_object()
+        .cloned()
+        .ok_or_else(|| format!("{} is not a JSON object", path.display()))
+}
+
+fn save_json_map(
+    path: &Path,
+    map: &serde_json::Map<String, serde_json::Value>,
+) -> Result<(), String> {
+    ensure_parent_dir(path)?;
+    let json = serde_json::to_vec_pretty(map).map_err(|error| error.to_string())?;
+    fs::write(path, json).map_err(|error| format!("write {}: {error}", path.display()))
+}
+
+fn ensure_parent_dir(path: &Path) -> Result<(), String> {
+    let Some(parent) = path.parent() else {
+        return Ok(());
+    };
+    fs::create_dir_all(parent)
+        .map_err(|error| format!("mkdir {}: {error}", parent.display()))
+}
+
+fn scoped_data_path(raw: &str) -> Result<PathBuf, String> {
+    let relative = sanitize_relative_path(raw)?;
+    Ok(data_root_dir().join(relative))
+}
+
+fn sanitize_relative_path(raw: &str) -> Result<PathBuf, String> {
+    let path = Path::new(raw);
+    if path.is_absolute() {
+        return Err("absolute paths are not allowed".to_string());
+    }
+    let mut clean = PathBuf::new();
+    for component in path.components() {
+        match component {
+            Component::Normal(part) => clean.push(part),
+            Component::CurDir => {}
+            Component::ParentDir => return Err("parent segments are not allowed".to_string()),
+            _ => return Err("unsupported path component".to_string()),
+        }
+    }
+    if clean.as_os_str().is_empty() {
+        return Err("path must not be empty".to_string());
+    }
+    Ok(clean)
+}
+
+fn file_stat_json(path: &Path) -> Result<serde_json::Value, String> {
+    let metadata = fs::metadata(path).map_err(|error| format!("stat {}: {error}", path.display()))?;
+    Ok(serde_json::json!({
+        "path": path_string(path),
+        "isDir": metadata.is_dir(),
+        "bytes": metadata.len(),
+    }))
+}
+
+fn path_string(path: &Path) -> String {
+    path.to_string_lossy().to_string()
 }
 
 fn action_json(
@@ -149,20 +448,20 @@ pub extern "C" fn crepus_mobile_dispatch_json(
     copy_json_to_output(&result, output_ptr, output_len)
 }
 
-fn action_from_ffi(action_ptr: *const c_char, action_len: usize) -> Option<std::borrow::Cow<'static, str>> {
+fn action_from_ffi(action_ptr: *const c_char, action_len: usize) -> Option<Cow<'static, str>> {
     if action_ptr.is_null() {
         return None;
     }
-    Some(if action_len == 0 {
-        // SAFETY: `action_ptr` is checked non-null above and must point to a valid NUL-terminated C string from the platform bridge.
-        unsafe { CStr::from_ptr(action_ptr) }.to_string_lossy()
-    } else {
-        // SAFETY: the platform bridge passes a valid pointer to `action_len` bytes for the duration of this call.
-        let bytes = unsafe { std::slice::from_raw_parts(action_ptr.cast::<u8>(), action_len) };
-        String::from_utf8_lossy(bytes)
-    }
-    .into_owned()
-    .into())
+    Some(
+        if action_len == 0 {
+            unsafe { CStr::from_ptr(action_ptr) }.to_string_lossy()
+        } else {
+            let bytes = unsafe { std::slice::from_raw_parts(action_ptr.cast::<u8>(), action_len) };
+            String::from_utf8_lossy(bytes)
+        }
+        .into_owned()
+        .into(),
+    )
 }
 
 fn copy_json_to_output(result: &str, output_ptr: *mut c_char, output_len: usize) -> usize {
@@ -186,7 +485,16 @@ fn reset_action_state() {
 #[cfg(test)]
 fn test_lock() -> std::sync::MutexGuard<'static, ()> {
     static TEST_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
-    TEST_LOCK.get_or_init(|| Mutex::new(())).lock().unwrap()
+    TEST_LOCK
+        .get_or_init(|| Mutex::new(()))
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
+#[cfg(test)]
+fn reset_test_data_root() {
+    let root = data_root_dir();
+    let _ = fs::remove_dir_all(root);
 }
 
 #[cfg(target_os = "android")]
@@ -258,6 +566,7 @@ mod tests {
         reset_action_state();
         assert!(dispatch_action("sync"));
         assert!(dispatch_action("preview"));
+        assert!(dispatch_action(r#"{"kind":"plugin","capability":"device","method":"info"}"#));
         let state = lock_action_state();
         assert_eq!(state.sync_count, 0);
         assert_eq!(state.preview_count, 0);
@@ -274,6 +583,80 @@ mod tests {
         assert_eq!(result["action"], "sync");
         assert_eq!(result["value"]["message"], "hydrate");
         assert_eq!(result["state"]["lastPayload"], r#"{"message":"hydrate"}"#);
+    }
+
+    #[test]
+    fn preferences_round_trip_persists_values() {
+        let _guard = test_lock();
+        reset_action_state();
+        reset_test_data_root();
+        let set = dispatch_action_json(
+            r#"{"kind":"plugin","capability":"preferences","method":"set","payload":{"key":"theme","value":"light"}}"#,
+        );
+        let get = dispatch_action_json(
+            r#"{"kind":"plugin","capability":"preferences","method":"get","payload":{"key":"theme"}}"#,
+        );
+        let keys =
+            dispatch_action_json(r#"{"kind":"plugin","capability":"preferences","method":"keys"}"#);
+
+        let set: serde_json::Value = serde_json::from_str(&set).expect("json");
+        let get: serde_json::Value = serde_json::from_str(&get).expect("json");
+        let keys: serde_json::Value = serde_json::from_str(&keys).expect("json");
+        assert_eq!(set["ok"], true);
+        assert_eq!(get["value"]["value"], "light");
+        assert_eq!(keys["value"]["value"][0], "theme");
+    }
+
+    #[test]
+    fn filesystem_round_trip_handles_text_files() {
+        let _guard = test_lock();
+        reset_action_state();
+        reset_test_data_root();
+        let write = dispatch_action_json(
+            r#"{"kind":"plugin","capability":"filesystem","method":"writeText","payload":{"path":"notes/hello.txt","text":"hi"}}"#,
+        );
+        let read = dispatch_action_json(
+            r#"{"kind":"plugin","capability":"filesystem","method":"readText","payload":{"path":"notes/hello.txt"}}"#,
+        );
+        let list = dispatch_action_json(
+            r#"{"kind":"plugin","capability":"filesystem","method":"list","payload":{"path":"notes"}}"#,
+        );
+
+        let write: serde_json::Value = serde_json::from_str(&write).expect("json");
+        let read: serde_json::Value = serde_json::from_str(&read).expect("json");
+        let list: serde_json::Value = serde_json::from_str(&list).expect("json");
+        assert_eq!(write["ok"], true);
+        assert_eq!(read["value"]["value"]["text"], "hi");
+        assert_eq!(list["value"]["value"]["entries"][0]["name"], "hello.txt");
+    }
+
+    #[test]
+    fn filesystem_rejects_parent_escape() {
+        let _guard = test_lock();
+        reset_action_state();
+        let result = dispatch_action_json(
+            r#"{"kind":"plugin","capability":"filesystem","method":"readText","payload":{"path":"../secret.txt"}}"#,
+        );
+
+        let result: serde_json::Value = serde_json::from_str(&result).expect("json");
+        assert_eq!(result["ok"], false);
+        assert_eq!(result["error"], "parent segments are not allowed");
+    }
+
+    #[test]
+    fn device_and_app_requests_return_real_values() {
+        let _guard = test_lock();
+        reset_action_state();
+        let device =
+            dispatch_action_json(r#"{"kind":"plugin","capability":"device","method":"info"}"#);
+        let app = dispatch_action_json(r#"{"kind":"plugin","capability":"app","method":"info"}"#);
+
+        let device: serde_json::Value = serde_json::from_str(&device).expect("json");
+        let app: serde_json::Value = serde_json::from_str(&app).expect("json");
+        assert_eq!(device["ok"], true);
+        assert!(device["value"]["value"]["targetOs"].is_string());
+        assert_eq!(app["ok"], true);
+        assert_eq!(app["value"]["value"]["syncCount"], 0);
     }
 
     #[test]
@@ -301,7 +684,8 @@ mod tests {
         reset_action_state();
         let mut output = [0 as c_char; 256];
 
-        let written = crepus_mobile_dispatch_json(std::ptr::null(), 0, output.as_mut_ptr(), output.len());
+        let written =
+            crepus_mobile_dispatch_json(std::ptr::null(), 0, output.as_mut_ptr(), output.len());
 
         assert!(written > 0);
         let result = unsafe { CStr::from_ptr(output.as_ptr()) }.to_string_lossy();
