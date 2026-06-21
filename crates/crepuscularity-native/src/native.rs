@@ -3,8 +3,11 @@ use serde_json::Value;
 
 pub const NATIVE_CAPABILITIES: &[NativeCapability] = &[
     NativeCapability::ActionSheet,
+    NativeCapability::AccessibilityInfo,
     NativeCapability::AppLauncher,
     NativeCapability::App,
+    NativeCapability::AppState,
+    NativeCapability::Appearance,
     NativeCapability::BackgroundRunner,
     NativeCapability::BarcodeScanner,
     NativeCapability::Browser,
@@ -14,6 +17,7 @@ pub const NATIVE_CAPABILITIES: &[NativeCapability] = &[
     NativeCapability::Cookies,
     NativeCapability::Device,
     NativeCapability::Dialog,
+    NativeCapability::Dimensions,
     NativeCapability::Filesystem,
     NativeCapability::FileTransfer,
     NativeCapability::FileViewer,
@@ -23,10 +27,13 @@ pub const NATIVE_CAPABILITIES: &[NativeCapability] = &[
     NativeCapability::Http,
     NativeCapability::InAppBrowser,
     NativeCapability::Keyboard,
+    NativeCapability::Linking,
     NativeCapability::LocalLlm,
     NativeCapability::LocalNotifications,
     NativeCapability::Motion,
     NativeCapability::Network,
+    NativeCapability::Permissions,
+    NativeCapability::Platform,
     NativeCapability::Preferences,
     NativeCapability::PrivacyScreen,
     NativeCapability::PushNotifications,
@@ -36,17 +43,22 @@ pub const NATIVE_CAPABILITIES: &[NativeCapability] = &[
     NativeCapability::SplashScreen,
     NativeCapability::StatusBar,
     NativeCapability::SystemBars,
+    NativeCapability::Settings,
     NativeCapability::Sync,
     NativeCapability::TextZoom,
     NativeCapability::Toast,
+    NativeCapability::Vibration,
 ];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum NativeCapability {
     ActionSheet,
+    AccessibilityInfo,
     AppLauncher,
     App,
+    AppState,
+    Appearance,
     BackgroundRunner,
     BarcodeScanner,
     Browser,
@@ -56,6 +68,7 @@ pub enum NativeCapability {
     Cookies,
     Device,
     Dialog,
+    Dimensions,
     Filesystem,
     FileTransfer,
     FileViewer,
@@ -65,10 +78,13 @@ pub enum NativeCapability {
     Http,
     InAppBrowser,
     Keyboard,
+    Linking,
     LocalLlm,
     LocalNotifications,
     Motion,
     Network,
+    Permissions,
+    Platform,
     Preferences,
     PrivacyScreen,
     PushNotifications,
@@ -78,17 +94,22 @@ pub enum NativeCapability {
     SplashScreen,
     StatusBar,
     SystemBars,
+    Settings,
     Sync,
     TextZoom,
     Toast,
+    Vibration,
 }
 
 impl NativeCapability {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::ActionSheet => "actionSheet",
+            Self::AccessibilityInfo => "accessibilityInfo",
             Self::AppLauncher => "appLauncher",
             Self::App => "app",
+            Self::AppState => "appState",
+            Self::Appearance => "appearance",
             Self::BackgroundRunner => "backgroundRunner",
             Self::BarcodeScanner => "barcodeScanner",
             Self::Browser => "browser",
@@ -98,6 +119,7 @@ impl NativeCapability {
             Self::Cookies => "cookies",
             Self::Device => "device",
             Self::Dialog => "dialog",
+            Self::Dimensions => "dimensions",
             Self::Filesystem => "filesystem",
             Self::FileTransfer => "fileTransfer",
             Self::FileViewer => "fileViewer",
@@ -107,10 +129,13 @@ impl NativeCapability {
             Self::Http => "http",
             Self::InAppBrowser => "inAppBrowser",
             Self::Keyboard => "keyboard",
+            Self::Linking => "linking",
             Self::LocalLlm => "localLlm",
             Self::LocalNotifications => "localNotifications",
             Self::Motion => "motion",
             Self::Network => "network",
+            Self::Permissions => "permissions",
+            Self::Platform => "platform",
             Self::Preferences => "preferences",
             Self::PrivacyScreen => "privacyScreen",
             Self::PushNotifications => "pushNotifications",
@@ -120,9 +145,11 @@ impl NativeCapability {
             Self::SplashScreen => "splashScreen",
             Self::StatusBar => "statusBar",
             Self::SystemBars => "systemBars",
+            Self::Settings => "settings",
             Self::Sync => "sync",
             Self::TextZoom => "textZoom",
             Self::Toast => "toast",
+            Self::Vibration => "vibration",
         }
     }
 }
@@ -208,14 +235,23 @@ mod tests {
             .map(|capability| capability.as_str())
             .collect::<HashSet<_>>();
 
-        assert_eq!(NATIVE_CAPABILITIES.len(), 37);
+        assert_eq!(NATIVE_CAPABILITIES.len(), 46);
         assert_eq!(names.len(), NATIVE_CAPABILITIES.len());
+        assert!(names.contains("accessibilityInfo"));
+        assert!(names.contains("appState"));
+        assert!(names.contains("appearance"));
         assert!(names.contains("bluetooth"));
         assert!(names.contains("camera"));
         assert!(names.contains("clipboard"));
+        assert!(names.contains("dimensions"));
         assert!(names.contains("fileTransfer"));
+        assert!(names.contains("linking"));
+        assert!(names.contains("permissions"));
+        assert!(names.contains("platform"));
+        assert!(names.contains("settings"));
         assert!(names.contains("sync"));
         assert!(names.contains("toast"));
+        assert!(names.contains("vibration"));
     }
 
     #[test]
