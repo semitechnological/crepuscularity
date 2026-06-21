@@ -97,3 +97,13 @@ cargo run -p crepuscularity-native --features schema --bin export-view-ir-schema
 ```
 
 CI does not build these shells yet; verify them locally when you touch the IR schema.
+
+## All components
+
+[`views/all-components.crepus`](views/all-components.crepus) exercises the current native IR controls and can be regenerated with:
+
+```bash
+crepus native sync examples/native-shells/views/all-components.crepus --out examples/native-shells/all-components.fixture.json --pretty
+crepus native codegen examples/native-shells/views/all-components.crepus --platform swiftui --out examples/native-shells/generated/swiftui --view-name AllComponentsView
+crepus native codegen examples/native-shells/views/all-components.crepus --platform compose --out examples/native-shells/generated/compose --view-name AllComponentsView
+```
