@@ -554,7 +554,7 @@ fn generate_compose(ir: &ViewIr, view_name: &str) -> String {
     let actions = collect_actions(&ir.root);
     let known_actions = compose_known_actions(&actions);
     format!(
-        "import androidx.compose.foundation.background\nimport androidx.compose.foundation.border\nimport androidx.compose.foundation.horizontalScroll\nimport androidx.compose.foundation.layout.Arrangement\nimport androidx.compose.foundation.layout.Column\nimport androidx.compose.foundation.layout.PaddingValues\nimport androidx.compose.foundation.layout.Row\nimport androidx.compose.foundation.layout.Spacer\nimport androidx.compose.foundation.layout.fillMaxHeight\nimport androidx.compose.foundation.layout.fillMaxSize\nimport androidx.compose.foundation.layout.fillMaxWidth\nimport androidx.compose.foundation.layout.height\nimport androidx.compose.foundation.layout.offset\nimport androidx.compose.foundation.layout.padding\nimport androidx.compose.foundation.layout.width\nimport androidx.compose.foundation.rememberScrollState\nimport androidx.compose.foundation.shape.RoundedCornerShape\nimport androidx.compose.foundation.verticalScroll\nimport androidx.compose.material3.Button\nimport androidx.compose.material3.ButtonDefaults\nimport androidx.compose.material3.Divider\nimport androidx.compose.material3.LinearProgressIndicator\nimport androidx.compose.material3.Slider\nimport androidx.compose.material3.Switch\nimport androidx.compose.material3.Text\nimport androidx.compose.material3.TextField\nimport androidx.compose.runtime.Composable\nimport androidx.compose.ui.Modifier\nimport androidx.compose.ui.draw.alpha\nimport androidx.compose.ui.draw.clip\nimport androidx.compose.ui.draw.rotate\nimport androidx.compose.ui.draw.scale\nimport androidx.compose.ui.graphics.Color\nimport androidx.compose.ui.text.font.FontStyle\nimport androidx.compose.ui.text.font.FontWeight\nimport androidx.compose.ui.text.style.TextAlign\nimport androidx.compose.ui.text.style.TextDecoration\nimport androidx.compose.ui.unit.dp\nimport androidx.compose.ui.unit.sp\n\nobject CrepusActions {{\n    val knownActions: Set<String> = {known_actions}\n    var dispatch: (String) -> String = {{ \"{{}}\" }}\n    var resultSink: (String) -> Unit = {{}}\n\n    fun perform(action: String) {{\n        if (!knownActions.contains(action)) {{\n            resultSink(\"{{\\\"ok\\\":false,\\\"error\\\":\\\"unknown generated action\\\"}}\")\n            return\n        }}\n        resultSink(dispatch(action))\n    }}\n}}\n\n@Composable\nfun {view_name}(modifier: Modifier = Modifier) {{\n{body}\n}}\n"
+        "import androidx.compose.foundation.background\nimport androidx.compose.foundation.border\nimport androidx.compose.foundation.horizontalScroll\nimport androidx.compose.foundation.layout.Arrangement\nimport androidx.compose.foundation.layout.Column\nimport androidx.compose.foundation.layout.PaddingValues\nimport androidx.compose.foundation.layout.Row\nimport androidx.compose.foundation.layout.Spacer\nimport androidx.compose.foundation.layout.fillMaxHeight\nimport androidx.compose.foundation.layout.fillMaxSize\nimport androidx.compose.foundation.layout.fillMaxWidth\nimport androidx.compose.foundation.layout.height\nimport androidx.compose.foundation.layout.offset\nimport androidx.compose.foundation.layout.padding\nimport androidx.compose.foundation.layout.width\nimport androidx.compose.foundation.rememberScrollState\nimport androidx.compose.foundation.shape.RoundedCornerShape\nimport androidx.compose.foundation.verticalScroll\nimport androidx.compose.material3.Button\nimport androidx.compose.material3.ButtonDefaults\nimport androidx.compose.material3.Divider\nimport androidx.compose.material3.LinearProgressIndicator\nimport androidx.compose.material3.LocalContentColor\nimport androidx.compose.material3.Slider\nimport androidx.compose.material3.Switch\nimport androidx.compose.material3.Text\nimport androidx.compose.material3.TextField\nimport androidx.compose.runtime.Composable\nimport androidx.compose.runtime.CompositionLocalProvider\nimport androidx.compose.ui.Modifier\nimport androidx.compose.ui.draw.alpha\nimport androidx.compose.ui.draw.clip\nimport androidx.compose.ui.draw.rotate\nimport androidx.compose.ui.draw.scale\nimport androidx.compose.ui.graphics.Color\nimport androidx.compose.ui.text.font.FontStyle\nimport androidx.compose.ui.text.font.FontWeight\nimport androidx.compose.ui.text.style.TextAlign\nimport androidx.compose.ui.text.style.TextDecoration\nimport androidx.compose.ui.unit.dp\nimport androidx.compose.ui.unit.sp\n\nobject CrepusActions {{\n    val knownActions: Set<String> = {known_actions}\n    var dispatch: (String) -> String = {{ \"{{}}\" }}\n    var resultSink: (String) -> Unit = {{}}\n\n    fun perform(action: String) {{\n        if (!knownActions.contains(action)) {{\n            resultSink(\"{{\\\"ok\\\":false,\\\"error\\\":\\\"unknown generated action\\\"}}\")\n            return\n        }}\n        resultSink(dispatch(action))\n    }}\n}}\n\n@Composable\nfun {view_name}(modifier: Modifier = Modifier) {{\n{body}\n}}\n"
     )
 }
 
@@ -604,7 +604,8 @@ fn compose_node_with_base(node: &ViewNode, indent: usize, base_modifier: Option<
             ));
             let args = args.join(", ");
             let inner = compose_children(children, indent + 1);
-            format!("{pad}{view}({args}) {{\n{inner}\n{pad}}}")
+            let out = format!("{pad}{view}({args}) {{\n{inner}\n{pad}}}");
+            compose_content_color_wrapper(out, style.as_ref(), indent)
         }
         ViewNode::Button {
             label,
@@ -809,6 +810,24 @@ fn compose_action(on_click: Option<&str>) -> String {
     on_click
         .map(|action| format!("CrepusActions.perform(\"{}\")", kotlin_escape(action)))
         .unwrap_or_default()
+}
+
+fn compose_content_color_wrapper(out: String, style: Option<&ViewStyle>, indent: usize) -> String {
+    let Some(color) = style
+        .and_then(|style| style.foreground_color.as_deref())
+        .map(compose_hex_argb)
+    else {
+        return out;
+    };
+    let pad = indent_str(indent);
+    let inner = out
+        .lines()
+        .map(|line| format!("{}{}", indent_str(1), line))
+        .collect::<Vec<_>>()
+        .join("\n");
+    format!(
+        "{pad}CompositionLocalProvider(LocalContentColor provides Color(0x{color})) {{\n{inner}\n{pad}}}"
+    )
 }
 
 fn compose_children(children: &[ViewNode], indent: usize) -> String {
