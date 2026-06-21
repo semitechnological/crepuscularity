@@ -1415,7 +1415,7 @@ fn run_android(dir: &Path, flavor: &str) {
     cmd.arg("--quiet");
     delegate(cmd, "gradle install");
 
-    let component = format!("{application_id}/.MainActivity");
+    let component = android_main_activity_component(&application_id);
     let mut launch = Command::new("adb");
     launch.args(["shell", "am", "start", "-n", &component]);
     delegate(launch, "adb launch");
@@ -1430,6 +1430,10 @@ fn run_android(dir: &Path, flavor: &str) {
 fn load_android_application_id(android_dir: &Path) -> Option<String> {
     let gradle = fs::read_to_string(android_dir.join("app/build.gradle.kts")).ok()?;
     gradle_kts_value(&gradle, "applicationId")
+}
+
+fn android_main_activity_component(application_id: &str) -> String {
+    format!("{application_id}/dev.crepuscularity.nativeshell.MainActivity")
 }
 
 fn gradle_kts_value(src: &str, key: &str) -> Option<String> {
@@ -1652,6 +1656,14 @@ android {
         assert_eq!(
             gradle_kts_value(src, "applicationId"),
             Some("dev.crepuscularity.nativeshell".to_string())
+        );
+    }
+
+    #[test]
+    fn android_component_uses_generated_shell_package() {
+        assert_eq!(
+            android_main_activity_component("hk.tsc.cupboard"),
+            "hk.tsc.cupboard/dev.crepuscularity.nativeshell.MainActivity"
         );
     }
 

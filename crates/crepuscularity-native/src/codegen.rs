@@ -554,7 +554,7 @@ fn generate_compose(ir: &ViewIr, view_name: &str) -> String {
     let actions = collect_actions(&ir.root);
     let known_actions = compose_known_actions(&actions);
     format!(
-        "import androidx.compose.foundation.background\nimport androidx.compose.foundation.border\nimport androidx.compose.foundation.horizontalScroll\nimport androidx.compose.foundation.layout.Arrangement\nimport androidx.compose.foundation.layout.Column\nimport androidx.compose.foundation.layout.Row\nimport androidx.compose.foundation.layout.Spacer\nimport androidx.compose.foundation.layout.fillMaxHeight\nimport androidx.compose.foundation.layout.fillMaxSize\nimport androidx.compose.foundation.layout.fillMaxWidth\nimport androidx.compose.foundation.layout.height\nimport androidx.compose.foundation.layout.offset\nimport androidx.compose.foundation.layout.padding\nimport androidx.compose.foundation.layout.width\nimport androidx.compose.foundation.rememberScrollState\nimport androidx.compose.foundation.shape.RoundedCornerShape\nimport androidx.compose.foundation.verticalScroll\nimport androidx.compose.material3.Button\nimport androidx.compose.material3.Divider\nimport androidx.compose.material3.LinearProgressIndicator\nimport androidx.compose.material3.Slider\nimport androidx.compose.material3.Switch\nimport androidx.compose.material3.Text\nimport androidx.compose.material3.TextField\nimport androidx.compose.runtime.Composable\nimport androidx.compose.ui.Modifier\nimport androidx.compose.ui.draw.alpha\nimport androidx.compose.ui.draw.clip\nimport androidx.compose.ui.draw.rotate\nimport androidx.compose.ui.draw.scale\nimport androidx.compose.ui.graphics.Color\nimport androidx.compose.ui.text.font.FontStyle\nimport androidx.compose.ui.text.font.FontWeight\nimport androidx.compose.ui.text.style.TextAlign\nimport androidx.compose.ui.text.style.TextDecoration\nimport androidx.compose.ui.unit.dp\nimport androidx.compose.ui.unit.sp\n\nobject CrepusActions {{\n    val knownActions: Set<String> = {known_actions}\n    var dispatch: (String) -> String = {{ \"{{}}\" }}\n    var resultSink: (String) -> Unit = {{}}\n\n    fun perform(action: String) {{\n        if (!knownActions.contains(action)) {{\n            resultSink(\"{{\\\"ok\\\":false,\\\"error\\\":\\\"unknown generated action\\\"}}\")\n            return\n        }}\n        resultSink(dispatch(action))\n    }}\n}}\n\n@Composable\nfun {view_name}(modifier: Modifier = Modifier) {{\n{body}\n}}\n"
+        "import androidx.compose.foundation.background\nimport androidx.compose.foundation.border\nimport androidx.compose.foundation.horizontalScroll\nimport androidx.compose.foundation.layout.Arrangement\nimport androidx.compose.foundation.layout.Column\nimport androidx.compose.foundation.layout.PaddingValues\nimport androidx.compose.foundation.layout.Row\nimport androidx.compose.foundation.layout.Spacer\nimport androidx.compose.foundation.layout.fillMaxHeight\nimport androidx.compose.foundation.layout.fillMaxSize\nimport androidx.compose.foundation.layout.fillMaxWidth\nimport androidx.compose.foundation.layout.height\nimport androidx.compose.foundation.layout.offset\nimport androidx.compose.foundation.layout.padding\nimport androidx.compose.foundation.layout.width\nimport androidx.compose.foundation.rememberScrollState\nimport androidx.compose.foundation.shape.RoundedCornerShape\nimport androidx.compose.foundation.verticalScroll\nimport androidx.compose.material3.Button\nimport androidx.compose.material3.ButtonDefaults\nimport androidx.compose.material3.Divider\nimport androidx.compose.material3.LinearProgressIndicator\nimport androidx.compose.material3.Slider\nimport androidx.compose.material3.Switch\nimport androidx.compose.material3.Text\nimport androidx.compose.material3.TextField\nimport androidx.compose.runtime.Composable\nimport androidx.compose.ui.Modifier\nimport androidx.compose.ui.draw.alpha\nimport androidx.compose.ui.draw.clip\nimport androidx.compose.ui.draw.rotate\nimport androidx.compose.ui.draw.scale\nimport androidx.compose.ui.graphics.Color\nimport androidx.compose.ui.text.font.FontStyle\nimport androidx.compose.ui.text.font.FontWeight\nimport androidx.compose.ui.text.style.TextAlign\nimport androidx.compose.ui.text.style.TextDecoration\nimport androidx.compose.ui.unit.dp\nimport androidx.compose.ui.unit.sp\n\nobject CrepusActions {{\n    val knownActions: Set<String> = {known_actions}\n    var dispatch: (String) -> String = {{ \"{{}}\" }}\n    var resultSink: (String) -> Unit = {{}}\n\n    fun perform(action: String) {{\n        if (!knownActions.contains(action)) {{\n            resultSink(\"{{\\\"ok\\\":false,\\\"error\\\":\\\"unknown generated action\\\"}}\")\n            return\n        }}\n        resultSink(dispatch(action))\n    }}\n}}\n\n@Composable\nfun {view_name}(modifier: Modifier = Modifier) {{\n{body}\n}}\n"
     )
 }
 
@@ -611,7 +611,7 @@ fn compose_node_with_base(node: &ViewNode, indent: usize, base_modifier: Option<
             on_click,
             style,
         } => {
-            let modifier = compose_modifier_param(style.as_ref());
+            let modifier = compose_button_args(style.as_ref());
             let action = compose_action(on_click.as_deref());
             format!(
                 "{pad}Button(onClick = {{ {action} }}{modifier}) {{\n{}Text(\"{}\")\n{pad}}}",
@@ -730,7 +730,7 @@ fn compose_node_with_base(node: &ViewNode, indent: usize, base_modifier: Option<
             style,
             ..
         } => {
-            let modifier = compose_modifier_param(style.as_ref());
+            let modifier = compose_button_args(style.as_ref());
             let action = compose_action(on_pick.as_deref());
             format!(
                 "{pad}Button(onClick = {{ {action} }}{modifier}) {{\n{}Text(\"{}\")\n{pad}}}",
@@ -874,6 +874,79 @@ fn compose_modifier_param(style: Option<&ViewStyle>) -> String {
     compose_modifier(style)
         .map(|modifier| format!(", modifier = {modifier}"))
         .unwrap_or_default()
+}
+
+fn compose_button_args(style: Option<&ViewStyle>) -> String {
+    let mut args = Vec::new();
+    if let Some(style) = style {
+        let mut modifier_style = style.clone();
+        modifier_style.background_color = None;
+        modifier_style.foreground_color = None;
+        modifier_style.padding = None;
+        modifier_style.padding_horizontal = None;
+        modifier_style.padding_vertical = None;
+        modifier_style.padding_top = None;
+        modifier_style.padding_bottom = None;
+        modifier_style.padding_left = None;
+        modifier_style.padding_right = None;
+        if let Some(modifier) = compose_modifier(Some(&modifier_style)) {
+            args.push(format!("modifier = {modifier}"));
+        }
+        if style.background_color.is_some() || style.foreground_color.is_some() {
+            let container = style
+                .background_color
+                .as_deref()
+                .map(compose_hex_argb)
+                .unwrap_or_else(|| "FF6750A4".to_string());
+            let content = style
+                .foreground_color
+                .as_deref()
+                .map(compose_hex_argb)
+                .unwrap_or_else(|| "FFFFFFFF".to_string());
+            args.push(format!(
+                "colors = ButtonDefaults.buttonColors(containerColor = Color(0x{container}), contentColor = Color(0x{content}))"
+            ));
+            args.push(
+                "elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp, pressedElevation = 0.dp, focusedElevation = 0.dp, hoveredElevation = 0.dp, disabledElevation = 0.dp)"
+                    .to_string(),
+            );
+        }
+        if let Some(padding) = compose_button_content_padding(style) {
+            args.push(format!("contentPadding = {padding}"));
+        }
+    }
+    if args.is_empty() {
+        String::new()
+    } else {
+        format!(", {}", args.join(", "))
+    }
+}
+
+fn compose_button_content_padding(style: &ViewStyle) -> Option<String> {
+    if let Some(value) = style.padding {
+        return Some(format!("PaddingValues({value:.0}.dp)"));
+    }
+    if style.padding_horizontal.is_some() || style.padding_vertical.is_some() {
+        return Some(format!(
+            "PaddingValues(horizontal = {:.0}.dp, vertical = {:.0}.dp)",
+            style.padding_horizontal.unwrap_or(0.0),
+            style.padding_vertical.unwrap_or(0.0)
+        ));
+    }
+    if style.padding_top.is_some()
+        || style.padding_bottom.is_some()
+        || style.padding_left.is_some()
+        || style.padding_right.is_some()
+    {
+        return Some(format!(
+            "PaddingValues(start = {:.0}.dp, top = {:.0}.dp, end = {:.0}.dp, bottom = {:.0}.dp)",
+            style.padding_left.unwrap_or(0.0),
+            style.padding_top.unwrap_or(0.0),
+            style.padding_right.unwrap_or(0.0),
+            style.padding_bottom.unwrap_or(0.0)
+        ));
+    }
+    None
 }
 
 fn compose_modifier(style: Option<&ViewStyle>) -> Option<String> {

@@ -9,7 +9,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.NativeShell">
         <activity
-            android:name=".MainActivity"
+            android:name="dev.crepuscularity.nativeshell.MainActivity"
             android:exported="true"
             android:theme="@style/Theme.NativeShell">
             <intent-filter>
