@@ -2,6 +2,7 @@ import Darwin
 import Foundation
 #if canImport(UIKit)
 import UIKit
+import UniformTypeIdentifiers
 #elseif canImport(AppKit)
 import AppKit
 #endif
@@ -50,6 +51,9 @@ public enum CrepusRustActions {
     }
 
     private static func dispatchHostAction(_ action: String) -> String? {
+        if let named = dispatchNamedHostAction(action) {
+            return named
+        }
         guard let data = action.data(using: .utf8),
               let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               (root["kind"] as? String) == "plugin",
@@ -65,6 +69,19 @@ public enum CrepusRustActions {
             return successJson(action: actionName, capability: "clipboard", method: method, value: value)
         } catch {
             return errorJson(action: actionName, error: error.localizedDescription)
+        }
+    }
+
+    private static func dispatchNamedHostAction(_ action: String) -> String? {
+        switch action {
+        case "pick_media":
+            presentFilePicker(action: action, contentTypes: [.image, .movie], allowsMultiple: true)
+            return pendingJson(action: action)
+        case "import_files":
+            presentFilePicker(action: action, contentTypes: [.data], allowsMultiple: true)
+            return pendingJson(action: action)
+        default:
+            return nil
         }
     }
 
@@ -107,6 +124,20 @@ public enum CrepusRustActions {
         ])
     }
 
+    private static func pendingJson(action: String) -> String {
+        stringify([
+            "ok": true,
+            "action": action,
+            "pending": true,
+        ])
+    }
+
+    fileprivate static func emit(_ result: String) {
+        Task { @MainActor in
+            CrepusActions.resultSink(result)
+        }
+    }
+
     private static func stringify(_ payload: [String: Any]) -> String {
         if let data = try? JSONSerialization.data(withJSONObject: payload),
            let json = String(data: data, encoding: .utf8) {
@@ -127,6 +158,91 @@ private struct HostActionError: LocalizedError {
 }
 
 #if canImport(UIKit)
+private final class FilePickerDelegate: NSObject, UIDocumentPickerDelegate {
+    let action: String
+
+    init(action: String) {
+        self.action = action
+    }
+
+    func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+        let files = urls.compactMap { pickedFileJson(url: $0) }
+        CrepusRustActions.emit(filePickerResultJson(action: action, files: files))
+        CrepusHostPicker.shared.clear(delegate: self)
+    }
+
+    func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
+        CrepusRustActions.emit(filePickerResultJson(action: action, files: []))
+        CrepusHostPicker.shared.clear(delegate: self)
+    }
+}
+
+private final class CrepusHostPicker {
+    static let shared = CrepusHostPicker()
+    private var delegates: [FilePickerDelegate] = []
+
+    func retain(delegate: FilePickerDelegate) {
+        delegates.append(delegate)
+    }
+
+    func clear(delegate: FilePickerDelegate) {
+        delegates.removeAll { $0 === delegate }
+    }
+}
+
+private func presentFilePicker(action: String, contentTypes: [UTType], allowsMultiple: Bool) {
+    Task { @MainActor in
+        guard let root = topViewController() else {
+            CrepusRustActions.emit("{\"ok\":false,\"action\":\"\(action)\",\"error\":\"missing root view controller\"}")
+            return
+        }
+        let picker = UIDocumentPickerViewController(forOpeningContentTypes: contentTypes)
+        let delegate = FilePickerDelegate(action: action)
+        picker.delegate = delegate
+        picker.allowsMultipleSelection = allowsMultiple
+        CrepusHostPicker.shared.retain(delegate: delegate)
+        root.present(picker, animated: true)
+    }
+}
+
+private func topViewController() -> UIViewController? {
+    let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+    let root = scenes
+        .flatMap(\.windows)
+        .first(where: \.isKeyWindow)?
+        .rootViewController
+    var current = root
+    while let presented = current?.presentedViewController {
+        current = presented
+    }
+    return current
+}
+
+private func pickedFileJson(url: URL) -> [String: Any]? {
+    guard let data = try? Data(contentsOf: url) else { return nil }
+    let values = try? url.resourceValues(forKeys: [.nameKey, .contentTypeKey, .fileSizeKey])
+    return [
+        "name": values?.name ?? url.lastPathComponent,
+        "mimeType": values?.contentType?.preferredMIMEType ?? "application/octet-stream",
+        "bytes": values?.fileSize ?? data.count,
+        "dataBase64": data.base64EncodedString(),
+    ]
+}
+
+private func filePickerResultJson(action: String, files: [[String: Any]]) -> String {
+    if let data = try? JSONSerialization.data(withJSONObject: [
+        "ok": true,
+        "action": action,
+        "value": [
+            "files": files,
+        ],
+    ]),
+       let json = String(data: data, encoding: .utf8) {
+        return json
+    }
+    return "{\"ok\":false,\"action\":\"\(action)\",\"error\":\"json encode failure\"}"
+}
+
 private func currentClipboardText() -> String? {
     UIPasteboard.general.string
 }
@@ -139,6 +255,10 @@ private func clearClipboard() {
     UIPasteboard.general.items = []
 }
 #elseif canImport(AppKit)
+private func presentFilePicker(action: String, contentTypes: [Any], allowsMultiple: Bool) {
+    CrepusRustActions.emit("{\"ok\":false,\"action\":\"\(action)\",\"error\":\"file picker unavailable on AppKit shell\"}")
+}
+
 private func currentClipboardText() -> String? {
     NSPasteboard.general.string(forType: .string)
 }
