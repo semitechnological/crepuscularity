@@ -77,7 +77,9 @@ object CrepusRustActions {
 
     private fun hostPluginValue(capability: String, method: String, payload: JSONObject?): Any =
         when (capability) {
+            "app" -> appValue(method)
             "clipboard" -> clipboardValue(method, payload)
+            "device" -> deviceValue(method)
             "haptics" -> hapticsValue(method, payload)
             "preferences" -> preferencesValue(method, payload)
             "browser", "linking" -> openUrlValue(capability, method, payload)
@@ -120,6 +122,30 @@ object CrepusRustActions {
             }
             else -> error("unsupported clipboard method: $method")
         }
+    }
+
+    private fun deviceValue(method: String): JSONObject {
+        if (method != "info") error("unsupported device method: $method")
+        return JSONObject()
+            .put("targetOs", "android")
+            .put("targetArch", Build.SUPPORTED_ABIS.firstOrNull() ?: "unknown")
+            .put("targetFamily", "linux")
+            .put("tempDir", appContext.cacheDir.absolutePath)
+            .put("manufacturer", Build.MANUFACTURER)
+            .put("model", Build.MODEL)
+            .put("device", Build.DEVICE)
+            .put("sdkInt", Build.VERSION.SDK_INT)
+            .put("release", Build.VERSION.RELEASE)
+    }
+
+    private fun appValue(method: String): JSONObject {
+        if (method != "info") error("unsupported app method: $method")
+        val packageInfo = appContext.packageManager.getPackageInfo(appContext.packageName, 0)
+        return JSONObject()
+            .put("bundleId", appContext.packageName)
+            .put("name", appContext.applicationInfo.loadLabel(appContext.packageManager).toString())
+            .put("version", packageInfo.versionName ?: JSONObject.NULL)
+            .put("build", packageInfo.longVersionCode)
     }
 
     private fun preferencesValue(method: String, payload: JSONObject?): Any {
