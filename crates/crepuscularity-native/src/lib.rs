@@ -38,7 +38,9 @@ pub use hot_reload::{ast_shape_compatible, plan_hot_reload, HotReloadEnvelope, H
 pub use ir::{PickerOption, StackAxis, ViewIr, ViewNode, ViewStyle, IR_VERSION};
 pub use mutations::{apply_mutations, diff_ir, IrMutation};
 pub use native::{
-    FilePickerRequest, FilePickerResponse, NativeRequest, NativeResponse, PickedFile,
+    crepus_native_capabilities, FilePickerRequest, FilePickerResponse, NativeCapability,
+    NativePluginRequest, NativePluginResponse, NativeRequest, NativeResponse, PickedFile,
+    OFFICIAL_CAPACITOR_CAPABILITIES,
 };
 pub use render::{
     render_component_file_to_ir, render_from_files, render_nodes_to_ir, render_template_to_ir,
