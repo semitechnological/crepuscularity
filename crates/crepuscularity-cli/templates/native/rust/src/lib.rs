@@ -19,6 +19,9 @@ struct MobileActionState {
     preview_count: u64,
     last_action: String,
     last_payload: Option<String>,
+    last_result: String,
+    last_error: Option<String>,
+    auto_scan_started: bool,
 }
 
 #[derive(Clone, Copy)]
@@ -61,10 +64,27 @@ pub fn dispatch_action_json(action: &str) -> String {
         ActionKind::Named(handler) => handler(&mut state, request_payload(&request)),
         ActionKind::Plugin => plugin_action(&mut state, &request),
     };
-    match result {
+    let result = match result {
         Ok(value) => action_json(true, &action_name, Some(value), None, &state),
         Err(error) => action_json(false, &action_name, None, Some(&error), &state),
+    };
+    state.last_error = parse_action_error(&result);
+    state.last_result = result.clone();
+    result
+}
+
+fn parse_action_error(result: &str) -> Option<String> {
+    let payload = serde_json::from_str::<serde_json::Value>(result).ok()?;
+    if payload.get("ok").and_then(|value| value.as_bool()) == Some(false) {
+        return Some(
+            payload
+                .get("error")
+                .and_then(|value| value.as_str())
+                .unwrap_or(result)
+                .to_string(),
+        );
     }
+    None
 }
 
 fn action_kind(action: &str) -> Option<ActionKind> {
@@ -628,6 +648,53 @@ pub extern "C" fn crepus_mobile_dispatch_json(
     copy_json_to_output(&result, output_ptr, output_len)
 }
 
+#[no_mangle]
+pub extern "C" fn crepus_mobile_dispatch_and_store_json(
+    action_ptr: *const c_char,
+    action_len: usize,
+    output_ptr: *mut c_char,
+    output_len: usize,
+) -> usize {
+    crepus_mobile_dispatch_json(action_ptr, action_len, output_ptr, output_len)
+}
+
+#[no_mangle]
+pub extern "C" fn crepus_mobile_start_auto_scan() -> *mut c_char {
+    let mut state = lock_action_state();
+    if !state.auto_scan_started {
+        state.auto_scan_started = true;
+        let result = dispatch_action_json("preview");
+        return alloc_c_string(&result);
+    }
+    alloc_c_string(&state.last_result)
+}
+
+#[no_mangle]
+pub extern "C" fn crepus_mobile_last_error() -> *mut c_char {
+    let state = lock_action_state();
+    alloc_c_string(state.last_error.as_deref().unwrap_or(""))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn crepus_mobile_free_string(ptr: *mut c_char) {
+    if !ptr.is_null() {
+        libc::free(ptr.cast());
+    }
+}
+
+fn alloc_c_string(result: &str) -> *mut c_char {
+    let bytes = result.as_bytes();
+    let ptr = unsafe { libc::malloc(bytes.len() + 1) as *mut c_char };
+    if ptr.is_null() {
+        return ptr;
+    }
+    unsafe {
+        std::ptr::copy_nonoverlapping(bytes.as_ptr(), ptr.cast::<u8>(), bytes.len());
+        *ptr.add(bytes.len()) = 0;
+    }
+    ptr
+}
+
 fn action_from_ffi(action_ptr: *const c_char, action_len: usize) -> Option<Cow<'static, str>> {
     if action_ptr.is_null() {
         return None;
@@ -700,6 +767,62 @@ pub extern "system" fn Java_dev_crepuscularity_nativeshell_CrepusRustActions_dis
     let result = match env.get_string(&action) {
         Ok(action) => dispatch_action_json(action.to_string_lossy().as_ref()),
         Err(_) => "{\"ok\":false,\"action\":\"\",\"error\":\"invalid action string\",\"state\":{\"syncCount\":0,\"previewCount\":0,\"lastAction\":\"\"}}".to_string(),
+    };
+    env.new_string(result).unwrap()
+}
+
+#[cfg(target_os = "android")]
+#[no_mangle]
+pub extern "system" fn Java_dev_crepuscularity_nativeshell_CrepusRustActions_dispatchAndStoreJson<
+    'a,
+>(
+    mut env: JNIEnv<'a>,
+    _class: JClass<'a>,
+    action: JString<'a>,
+) -> JString<'a> {
+    let result = match env.get_string(&action) {
+        Ok(action) => dispatch_action_json(action.to_string_lossy().as_ref()),
+        Err(_) => action_json(
+            false,
+            "",
+            None,
+            Some("invalid action pointer"),
+            &MobileActionState::default(),
+        ),
+    };
+    env.new_string(result).unwrap()
+}
+
+#[cfg(target_os = "android")]
+#[no_mangle]
+pub extern "system" fn Java_dev_crepuscularity_nativeshell_CrepusRustActions_startAutoScan<'a>(
+    env: JNIEnv<'a>,
+    _class: JClass<'a>,
+) -> JString<'a> {
+    let ptr = crepus_mobile_start_auto_scan();
+    let result = if ptr.is_null() {
+        String::new()
+    } else {
+        let result = unsafe { CStr::from_ptr(ptr) }.to_string_lossy().into_owned();
+        unsafe { crepus_mobile_free_string(ptr) };
+        result
+    };
+    env.new_string(result).unwrap()
+}
+
+#[cfg(target_os = "android")]
+#[no_mangle]
+pub extern "system" fn Java_dev_crepuscularity_nativeshell_CrepusRustActions_lastError<'a>(
+    env: JNIEnv<'a>,
+    _class: JClass<'a>,
+) -> JString<'a> {
+    let ptr = crepus_mobile_last_error();
+    let result = if ptr.is_null() {
+        String::new()
+    } else {
+        let result = unsafe { CStr::from_ptr(ptr) }.to_string_lossy().into_owned();
+        unsafe { crepus_mobile_free_string(ptr) };
+        result
     };
     env.new_string(result).unwrap()
 }
@@ -858,6 +981,24 @@ mod tests {
         assert!(device["value"]["value"]["targetOs"].is_string());
         assert_eq!(app["ok"], true);
         assert_eq!(app["value"]["value"]["syncCount"], 0);
+    }
+
+    #[test]
+    fn start_auto_scan_tracks_last_result() {
+        let _guard = test_lock();
+        reset_action_state();
+        let first_ptr = crepus_mobile_start_auto_scan();
+        let first = unsafe { CStr::from_ptr(first_ptr) }.to_string_lossy().into_owned();
+        unsafe { crepus_mobile_free_string(first_ptr) };
+        let second_ptr = crepus_mobile_start_auto_scan();
+        let second = unsafe { CStr::from_ptr(second_ptr) }
+            .to_string_lossy()
+            .into_owned();
+        unsafe { crepus_mobile_free_string(second_ptr) };
+        let first: serde_json::Value = serde_json::from_str(&first).expect("json");
+        let second: serde_json::Value = serde_json::from_str(&second).expect("json");
+        assert_eq!(first["ok"], true);
+        assert_eq!(second["ok"], true);
     }
 
     #[test]

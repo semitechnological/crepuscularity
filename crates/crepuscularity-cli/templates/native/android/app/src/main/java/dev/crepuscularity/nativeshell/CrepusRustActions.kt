@@ -12,10 +12,6 @@ import android.os.VibratorManager
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.mutableStateOf
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.booleanOrNull
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import org.json.JSONObject
 
 object CrepusRustActions {
@@ -31,7 +27,10 @@ object CrepusRustActions {
 
     external fun dispatchAction(action: String): Boolean
     external fun dispatchActionJson(action: String): String
+    external fun dispatchAndStoreJson(action: String): String
     external fun initAndroid(context: Context)
+    external fun lastError(): String
+    external fun startAutoScan(): String
     external fun shutdownAndroid()
 
     fun install(activity: ComponentActivity) {
@@ -46,8 +45,8 @@ object CrepusRustActions {
             }
         openDocuments = { filePicker.launch(arrayOf("*/*")) }
         openMedia = { filePicker.launch(arrayOf("image/*", "video/*")) }
-        CrepusActions.dispatch = { action -> dispatchHostAction(action) ?: dispatchActionJson(action) }
-        CrepusActions.resultSink = { result -> CrepusActionState.record(result) }
+        CrepusActions.dispatch = { action -> dispatchHostAction(action) ?: dispatchAndStoreJson(action) }
+        CrepusActions.resultSink = {}
     }
 
     private fun dispatchHostAction(action: String): String? {
@@ -310,7 +309,10 @@ object CrepusRustActions {
 object CrepusActionState {
     val lastResult = mutableStateOf("{}")
     val lastError = mutableStateOf<String?>(null)
-    private val json = Json { ignoreUnknownKeys = true }
+
+    fun startAutoScan() {
+        record(CrepusRustActions.startAutoScan())
+    }
 
     fun dispatch(action: String) {
         record(CrepusActions.dispatch(action))
@@ -318,12 +320,6 @@ object CrepusActionState {
 
     fun record(result: String) {
         lastResult.value = result
-        lastError.value =
-            runCatching {
-                val payload = json.parseToJsonElement(result).jsonObject
-                result.takeIf { payload["ok"]?.jsonPrimitive?.booleanOrNull == false }
-            }.getOrElse {
-                result.takeIf { it.isNotBlank() }
-            }
+        lastError.value = CrepusRustActions.lastError().ifBlank { null }
     }
 }
