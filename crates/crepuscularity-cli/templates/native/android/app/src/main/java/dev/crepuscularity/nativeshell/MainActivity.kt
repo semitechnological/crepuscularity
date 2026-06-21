@@ -50,4 +50,9 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    override fun onDestroy() {
+        CrepusRustActions.shutdownAndroid()
+        super.onDestroy()
+    }
 }
