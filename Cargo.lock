@@ -1732,7 +1732,7 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity"
-version = "0.4.5"
+version = "0.4.6"
 dependencies = [
  "crepuscularity-core",
  "crepuscularity-lvgl",
@@ -1745,7 +1745,7 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-abi"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "crepuscularity-core",
  "crepuscularity-native",
@@ -1755,7 +1755,7 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-cli"
-version = "0.9.6"
+version = "0.9.7"
 dependencies = [
  "axum",
  "console",
@@ -1799,7 +1799,7 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-dev"
-version = "0.4.6"
+version = "0.4.7"
 dependencies = [
  "crepuscularity-core",
  "crepuscularity-native",
@@ -1908,7 +1908,7 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-native"
-version = "0.5.5"
+version = "0.5.6"
 dependencies = [
  "crepuscularity-core",
  "regex",
