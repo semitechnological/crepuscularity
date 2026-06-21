@@ -13,6 +13,7 @@ toml = { workspace = true }
 sha2 = { workspace = true }
 tracing = { workspace = true }
 thiserror = { workspace = true }
+notify = { workspace = true, optional = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

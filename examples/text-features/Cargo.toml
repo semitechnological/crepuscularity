@@ -11,7 +11,7 @@ path = "src/main.rs"
 
 [features]
 default = []
-# With `.cargo/config.toml` patching gpui → vendor/gpui, enable for full tracking/transform demo.
+# Enable for full tracking/transform demo with a patched gpui checkout.
 vendor-gpui-text = ["crepuscularity-gpui/gpui-text-extras"]
 
 [dependencies]

@@ -28,6 +28,7 @@
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
+use crepuscularity_core::watch::event_touches_relevant_path;
 use notify::{recommended_watcher, Event, EventKind, RecursiveMode, Watcher};
 
 /// Create and start a file-system watcher rooted at the parent directory of
@@ -77,51 +78,11 @@ pub fn create_watcher(
     Ok(Box::new(watcher))
 }
 
-fn is_relevant_kind(kind: &EventKind) -> bool {
+pub(crate) fn is_relevant_kind(kind: &EventKind) -> bool {
     matches!(
         kind,
         EventKind::Modify(_) | EventKind::Create(_) | EventKind::Remove(_)
     )
-}
-
-/// `true` when the event refers to either the canonicalized target template
-/// or to a sibling/descendant `.crepus` / `context.toml` inside `watch_root`.
-///
-/// Pure function — split out for unit testing without spinning up a real
-/// `notify` watcher.
-pub(crate) fn event_touches_relevant_path(event: &Event, target: &Path, watch_root: &Path) -> bool {
-    for path in &event.paths {
-        if path_matches_target(path, target) {
-            return true;
-        }
-        if path_is_relevant_sibling(path, watch_root) {
-            return true;
-        }
-    }
-    false
-}
-
-fn path_matches_target(path: &Path, target: &Path) -> bool {
-    if path == target {
-        return true;
-    }
-    let canon = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
-    canon == *target
-}
-
-fn path_is_relevant_sibling(path: &Path, watch_root: &Path) -> bool {
-    let canon = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
-    let canon_root = watch_root
-        .canonicalize()
-        .unwrap_or_else(|_| watch_root.to_path_buf());
-    if !canon.starts_with(&canon_root) {
-        return false;
-    }
-    match canon.extension().and_then(|e| e.to_str()) {
-        Some("crepus") => true,
-        Some("toml") if canon.file_name().and_then(|n| n.to_str()) == Some("context.toml") => true,
-        _ => false,
-    }
 }
 
 #[cfg(test)]

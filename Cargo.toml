@@ -22,9 +22,8 @@ members = [
     "crates/crepuscularity-tui",
     # GPUI desktop shell with embedded V8 runtime (build V8 on demand):
     #   cargo build -p crepuscularity-lite
-    #   cargo check --workspace --exclude crepuscularity-lite --exclude crepuscularity-lite-macros
+    #   cargo check --workspace --exclude crepuscularity-lite
     "crates/crepuscularity-lite",
-    "crates/crepuscularity-lite-macros",
     "examples/text-features",
     "examples/weather",
     "examples/todo",
@@ -68,9 +67,9 @@ edition = "2021"
 license = "MPL-2.0"
 
 # ── crepuscularity-lite workspace deps ────────────────────────────────────────
-# These are only needed by crepuscularity-lite and crepuscularity-lite-macros.
+# These are only needed by crepuscularity-lite.
 # Build with: cargo build -p crepuscularity-lite [--features cli]
-# Check without V8: cargo check --workspace --exclude crepuscularity-lite --exclude crepuscularity-lite-macros
+# Check without V8: cargo check --workspace --exclude crepuscularity-lite
 
 [workspace.dependencies]
 # One requirement per external crate (loose semver). Run `cargo update` often;
@@ -106,5 +105,4 @@ regex = "1"
 schemars = { version = "0.8", features = ["derive"] }
 thiserror = "2"
 
-# Default build uses crates.io `gpui` 0.2.2 so `cargo publish` matches consumers. For `vendor/gpui`,
-# copy `.cargo/config.toml.example` → `.cargo/config.toml` and enable `gpui-text-extras` where needed.
+# Default build uses crates.io `gpui` 0.2.2 so `cargo publish` matches consumers.

@@ -23,3 +23,34 @@ pub const COOLDOWN_MS: u64 = 200;
 /// enough to feel instant but slow enough to avoid excessive network
 /// requests inside the extension sandbox.
 pub const EXTENSION_POLL_MS: u64 = 1500;
+
+#[cfg(feature = "notify")]
+pub fn event_touches_relevant_path(
+    event: &notify::Event,
+    target: &std::path::Path,
+    watch_root: &std::path::Path,
+) -> bool {
+    for path in &event.paths {
+        if path == target {
+            return true;
+        }
+        let canon = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
+        if canon == *target {
+            return true;
+        }
+        let canon_root = watch_root
+            .canonicalize()
+            .unwrap_or_else(|_| watch_root.to_path_buf());
+        if !canon.starts_with(&canon_root) {
+            continue;
+        }
+        match canon.extension().and_then(|e| e.to_str()) {
+            Some("crepus") => return true,
+            Some("toml") if canon.file_name().and_then(|n| n.to_str()) == Some("context.toml") => {
+                return true
+            }
+            _ => continue,
+        }
+    }
+    false
+}

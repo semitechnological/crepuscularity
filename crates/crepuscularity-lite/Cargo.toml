@@ -8,7 +8,7 @@ repository = "https://github.com/tschk/crepuscularity"
 
 [features]
 default = []
-# Optional Rayon: parallel `guest_prelude` reads and `Bridge::invoke_envelope_batch`.
+# Optional Rayon: parallel `guest_prelude` reads.
 parallel = ["dep:rayon"]
 # CLI helpers (`cl` binary).
 cli = ["dep:clap"]
@@ -17,7 +17,6 @@ bench-tui = ["cli", "dep:crossterm", "dep:ratatui", "parallel"]
 
 [dependencies]
 crepuscularity-core = { path = "../crepuscularity-core", version = "0.4.15" }
-crepuscularity-lite-macros = { path = "../crepuscularity-lite-macros", version = "0.4.7" }
 arboard = "3.6"
 dirs = "6"
 gpui = { workspace = true, features = ["runtime_shaders"] }

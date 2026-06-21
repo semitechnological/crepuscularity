@@ -230,7 +230,6 @@ crates/
   crepuscularity-gpui/      GPUI prelude + view! macro
   crepuscularity-tui/       Ratatui backend + template_refs! handles
   crepuscularity-lite/      GPUI + V8 shell and native plugin bridge
-  crepuscularity-lite-macros/ Compile-time macros for lite plugin bindings
   crepuscularity-native/    View IR JSON for SwiftUI / Compose shells
   crepuscularity-reactive/  WASM signals, memos, effects, hydration lifecycle
   crepuscularity-ssr/       Server-rendering helpers
