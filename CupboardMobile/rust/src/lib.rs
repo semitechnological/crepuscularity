@@ -1,7 +1,7 @@
 use std::ffi::{CStr, CString};
 use std::fs;
 use std::os::raw::c_char;
-use std::path::PathBuf;
+use std::path::{Component, Path, PathBuf};
 use std::sync::{Mutex, MutexGuard, OnceLock};
 
 #[cfg(target_os = "android")]
@@ -147,6 +147,7 @@ fn plugin_action(
     let payload = request.get("payload");
     let value = match capability {
         "preferences" => preferences_backend(method, payload)?,
+        "filesystem" => filesystem_backend(method, payload)?,
         "device" => device_backend(method)?,
         "app" => app_backend(state, method)?,
         other => return Err(format!("unsupported capability: {other}")),
@@ -198,6 +199,69 @@ fn preferences_backend(
             Ok(serde_json::json!({ "cleared": true }))
         }
         other => Err(format!("unsupported preferences method: {other}")),
+    }
+}
+
+fn filesystem_backend(
+    method: &str,
+    payload: Option<&serde_json::Value>,
+) -> Result<serde_json::Value, String> {
+    match method {
+        "readText" => {
+            let path = scoped_data_path(&payload_string(payload, "path")?)?;
+            let text = fs::read_to_string(&path)
+                .map_err(|error| format!("read {}: {error}", path.display()))?;
+            Ok(serde_json::json!({ "path": path_string(&path), "text": text }))
+        }
+        "writeText" => {
+            let path = scoped_data_path(&payload_string(payload, "path")?)?;
+            let text = payload_string(payload, "text")?;
+            ensure_parent_dir(&path)?;
+            fs::write(&path, text.as_bytes())
+                .map_err(|error| format!("write {}: {error}", path.display()))?;
+            Ok(file_stat_json(&path)?)
+        }
+        "delete" => {
+            let path = scoped_data_path(&payload_string(payload, "path")?)?;
+            let deleted = if path.is_dir() {
+                fs::remove_dir_all(&path).is_ok()
+            } else {
+                fs::remove_file(&path).is_ok()
+            };
+            Ok(serde_json::json!({ "path": path_string(&path), "deleted": deleted }))
+        }
+        "mkdir" => {
+            let path = scoped_data_path(&payload_string(payload, "path")?)?;
+            fs::create_dir_all(&path)
+                .map_err(|error| format!("mkdir {}: {error}", path.display()))?;
+            Ok(file_stat_json(&path)?)
+        }
+        "list" => {
+            let path = scoped_data_path(&payload_string(payload, "path")?)?;
+            let mut entries = fs::read_dir(&path)
+                .map_err(|error| format!("list {}: {error}", path.display()))?
+                .map(|entry| {
+                    let entry = entry.map_err(|error| error.to_string())?;
+                    let entry_path = entry.path();
+                    let metadata = entry
+                        .metadata()
+                        .map_err(|error| format!("stat {}: {error}", entry_path.display()))?;
+                    Ok(serde_json::json!({
+                        "name": entry.file_name().to_string_lossy().to_string(),
+                        "path": path_string(&entry_path),
+                        "isDir": metadata.is_dir(),
+                        "bytes": metadata.len(),
+                    }))
+                })
+                .collect::<Result<Vec<_>, String>>()?;
+            entries.sort_by(|left, right| left["name"].as_str().cmp(&right["name"].as_str()));
+            Ok(serde_json::json!({ "path": path_string(&path), "entries": entries }))
+        }
+        "stat" => {
+            let path = scoped_data_path(&payload_string(payload, "path")?)?;
+            file_stat_json(&path)
+        }
+        other => Err(format!("unsupported filesystem method: {other}")),
     }
 }
 
@@ -402,6 +466,48 @@ fn save_json_map(
 
 fn path_string(path: &PathBuf) -> String {
     path.to_string_lossy().to_string()
+}
+
+fn ensure_parent_dir(path: &Path) -> Result<(), String> {
+    let Some(parent) = path.parent() else {
+        return Ok(());
+    };
+    fs::create_dir_all(parent)
+        .map_err(|error| format!("mkdir {}: {error}", parent.display()))
+}
+
+fn scoped_data_path(raw: &str) -> Result<PathBuf, String> {
+    let relative = sanitize_relative_path(raw)?;
+    Ok(data_root_dir().join(relative))
+}
+
+fn sanitize_relative_path(raw: &str) -> Result<PathBuf, String> {
+    let path = Path::new(raw);
+    if path.is_absolute() {
+        return Err("absolute paths are not allowed".to_string());
+    }
+    let mut clean = PathBuf::new();
+    for component in path.components() {
+        match component {
+            Component::Normal(part) => clean.push(part),
+            Component::CurDir => {}
+            Component::ParentDir => return Err("parent segments are not allowed".to_string()),
+            _ => return Err("unsupported path component".to_string()),
+        }
+    }
+    if clean.as_os_str().is_empty() {
+        return Err("path must not be empty".to_string());
+    }
+    Ok(clean)
+}
+
+fn file_stat_json(path: &Path) -> Result<serde_json::Value, String> {
+    let metadata = fs::metadata(path).map_err(|error| format!("stat {}: {error}", path.display()))?;
+    Ok(serde_json::json!({
+        "path": path_string(&path.to_path_buf()),
+        "isDir": metadata.is_dir(),
+        "bytes": metadata.len(),
+    }))
 }
 
 fn store_view_state(raw: &str) -> bool {
@@ -931,6 +1037,42 @@ mod tests {
         assert!(device["value"]["value"]["targetOs"].is_string());
         assert_eq!(app["ok"], true);
         assert_eq!(app["value"]["value"]["syncCount"], 0);
+    }
+
+    #[test]
+    fn filesystem_round_trip_handles_text_files() {
+        let _guard = test_lock();
+        reset_action_state();
+        reset_test_data_root();
+        let write = dispatch_action_json(
+            r#"{"kind":"plugin","capability":"filesystem","method":"writeText","payload":{"path":"notes/hello.txt","text":"hi"}}"#,
+        );
+        let read = dispatch_action_json(
+            r#"{"kind":"plugin","capability":"filesystem","method":"readText","payload":{"path":"notes/hello.txt"}}"#,
+        );
+        let list = dispatch_action_json(
+            r#"{"kind":"plugin","capability":"filesystem","method":"list","payload":{"path":"notes"}}"#,
+        );
+
+        let write: serde_json::Value = serde_json::from_str(&write).expect("json");
+        let read: serde_json::Value = serde_json::from_str(&read).expect("json");
+        let list: serde_json::Value = serde_json::from_str(&list).expect("json");
+        assert_eq!(write["ok"], true);
+        assert_eq!(read["value"]["value"]["text"], "hi");
+        assert_eq!(list["value"]["value"]["entries"][0]["name"], "hello.txt");
+    }
+
+    #[test]
+    fn filesystem_rejects_parent_escape() {
+        let _guard = test_lock();
+        reset_action_state();
+        let result = dispatch_action_json(
+            r#"{"kind":"plugin","capability":"filesystem","method":"readText","payload":{"path":"../secret.txt"}}"#,
+        );
+
+        let result: serde_json::Value = serde_json::from_str(&result).expect("json");
+        assert_eq!(result["ok"], false);
+        assert_eq!(result["error"], "parent segments are not allowed");
     }
 
     #[test]
