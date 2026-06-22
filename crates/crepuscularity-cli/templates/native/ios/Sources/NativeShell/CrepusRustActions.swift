@@ -119,6 +119,9 @@ public enum CrepusRustActions {
         else {
             return nil
         }
+        if capability == "app" || capability == "device" || capability == "preferences" {
+            return nil
+        }
         let payload = root["payload"] as? [String: Any]
         do {
             let value = try hostPluginValue(capability: capability, method: method, payload: payload)
@@ -143,16 +146,10 @@ public enum CrepusRustActions {
 
     private static func hostPluginValue(capability: String, method: String, payload: [String: Any]?) throws -> Any {
         switch capability {
-        case "app":
-            return try appValue(method: method)
         case "clipboard":
             return try clipboardValue(method: method, payload: payload)
-        case "device":
-            return try deviceValue(method: method)
         case "haptics":
             return try hapticsValue(method: method, payload: payload)
-        case "preferences":
-            return try preferencesValue(method: method, payload: payload)
         case "browser", "linking":
             return try openUrlValue(capability: capability, method: method, payload: payload)
         case "share":
@@ -177,71 +174,6 @@ public enum CrepusRustActions {
             return ["cleared": true]
         default:
             throw HostActionError("unsupported clipboard method: \(method)")
-        }
-    }
-
-    private static func deviceValue(method: String) throws -> Any {
-        guard method == "info" else {
-            throw HostActionError("unsupported device method: \(method)")
-        }
-        let device = UIDevice.current
-        return [
-            "targetOs": "ios",
-            "targetArch": currentArchitecture(),
-            "targetFamily": "apple",
-            "tempDir": NSTemporaryDirectory(),
-            "name": device.name,
-            "model": device.model,
-            "systemName": device.systemName,
-            "systemVersion": device.systemVersion,
-        ]
-    }
-
-    private static func appValue(method: String) throws -> Any {
-        guard method == "info" else {
-            throw HostActionError("unsupported app method: \(method)")
-        }
-        return [
-            "bundleId": Bundle.main.bundleIdentifier as Any,
-            "name": Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as Any,
-            "version": Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as Any,
-            "build": Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as Any,
-            "state": UIApplication.shared.applicationState.rawValue,
-        ]
-    }
-
-    private static func preferencesValue(method: String, payload: [String: Any]?) throws -> Any {
-        let defaults = UserDefaults.standard
-        switch method {
-        case "get":
-            guard let key = payload?["key"] as? String else {
-                throw HostActionError("preferences.get requires payload.key")
-            }
-            return defaults.object(forKey: key) ?? NSNull()
-        case "set":
-            guard let key = payload?["key"] as? String else {
-                throw HostActionError("preferences.set requires payload.key")
-            }
-            guard let value = payload?["value"] else {
-                throw HostActionError("preferences.set requires payload.value")
-            }
-            defaults.set(value is NSNull ? nil : value, forKey: key)
-            return ["key": key, "value": value]
-        case "remove":
-            guard let key = payload?["key"] as? String else {
-                throw HostActionError("preferences.remove requires payload.key")
-            }
-            let removed = defaults.object(forKey: key) != nil
-            defaults.removeObject(forKey: key)
-            return ["key": key, "removed": removed]
-        case "keys":
-            return defaults.dictionaryRepresentation().keys.sorted()
-        case "clear":
-            let domain = Bundle.main.bundleIdentifier ?? "dev.crepuscularity.nativeshell"
-            defaults.removePersistentDomain(forName: domain)
-            return ["cleared": true]
-        default:
-            throw HostActionError("unsupported preferences method: \(method)")
         }
     }
 
