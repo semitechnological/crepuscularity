@@ -356,9 +356,10 @@ fn mobile_new_scaffolds_runtime_files() {
     assert!(rust_actions.contains("crepusMobileEvalText"));
     assert!(rust_actions.contains("JSONSerialization.data(withJSONObject:"));
     assert!(rust_actions.contains("UIImpactFeedbackGenerator"));
-    assert!(rust_actions.contains("UIDevice.current"));
-    assert!(rust_actions.contains("Bundle.main.bundleIdentifier"));
-    assert!(rust_actions.contains("UserDefaults.standard"));
+    assert!(rust_actions.contains("crepusMobileLastResult"));
+    assert!(!rust_actions.contains("UIDevice.current"));
+    assert!(!rust_actions.contains("Bundle.main.bundleIdentifier"));
+    assert!(!rust_actions.contains("UserDefaults.standard"));
     assert!(!rust_actions.contains(r#""action":"\(action)""#));
     assert!(!rust_actions.contains("result.contains"));
 
@@ -369,9 +370,10 @@ fn mobile_new_scaffolds_runtime_files() {
     assert!(android_actions.contains("object CrepusStateStore"));
     assert!(android_actions.contains("external fun storeResultJson"));
     assert!(android_actions.contains("external fun evalText"));
-    assert!(android_actions.contains("getSharedPreferences(\"crepus_preferences\""));
-    assert!(android_actions.contains("Build.MANUFACTURER"));
-    assert!(android_actions.contains("packageManager.getPackageInfo"));
+    assert!(android_actions.contains("external fun lastResult"));
+    assert!(!android_actions.contains("getSharedPreferences(\"crepus_preferences\""));
+    assert!(!android_actions.contains("Build.MANUFACTURER"));
+    assert!(!android_actions.contains("packageManager.getPackageInfo"));
     assert!(android_actions.contains("VibrationEffect.createOneShot"));
 
     let project_yml =
