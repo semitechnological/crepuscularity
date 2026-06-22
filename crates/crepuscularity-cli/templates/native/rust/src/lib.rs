@@ -745,46 +745,62 @@ fn store_view_state(raw: &str) -> bool {
     }
 }
 
-fn eval_text(expr: &str, scope_json: Option<&str>) -> String {
-    stringify_value(&resolve_expr(expr, scope_json))
+fn eval_text(expr: &str, scope_name: Option<&str>, scope_json: Option<&str>) -> String {
+    stringify_value(&resolve_expr(expr, scope_name, scope_json))
 }
 
-fn eval_bool(expr: &str, scope_json: Option<&str>) -> bool {
-    truthy_value(&resolve_expr(expr, scope_json))
+fn eval_bool(expr: &str, scope_name: Option<&str>, scope_json: Option<&str>) -> bool {
+    truthy_value(&resolve_expr(expr, scope_name, scope_json))
 }
 
-fn eval_number(expr: &str, scope_json: Option<&str>) -> f64 {
-    number_value(&resolve_expr(expr, scope_json)).unwrap_or(0.0)
+fn eval_number(expr: &str, scope_name: Option<&str>, scope_json: Option<&str>) -> f64 {
+    number_value(&resolve_expr(expr, scope_name, scope_json)).unwrap_or(0.0)
 }
 
-fn eval_items_json(expr: &str, scope_json: Option<&str>) -> String {
-    match resolve_path(expr, scope_json) {
+fn eval_items_json(expr: &str, scope_name: Option<&str>, scope_json: Option<&str>) -> String {
+    match resolve_path(expr, scope_name, scope_json) {
         serde_json::Value::Array(items) => serde_json::Value::Array(items).to_string(),
         _ => "[]".to_string(),
     }
 }
 
-fn resolve_expr(expr: &str, scope_json: Option<&str>) -> serde_json::Value {
+fn resolve_expr(expr: &str, scope_name: Option<&str>, scope_json: Option<&str>) -> serde_json::Value {
     let trimmed = expr.trim();
     if let Some(rest) = trimmed.strip_prefix('!') {
-        return serde_json::Value::Bool(!truthy_value(&resolve_expr(rest, scope_json)));
+        return serde_json::Value::Bool(!truthy_value(&resolve_expr(rest, scope_name, scope_json)));
     }
     for op in [">=", "<=", "==", "!=", ">", "<"] {
         if let Some(index) = trimmed.find(op) {
-            let left = resolve_path(trimmed[..index].trim(), scope_json);
-            let right = resolve_path(trimmed[index + op.len()..].trim(), scope_json);
+            let left = resolve_path(trimmed[..index].trim(), scope_name, scope_json);
+            let right = resolve_path(trimmed[index + op.len()..].trim(), scope_name, scope_json);
             return serde_json::Value::Bool(compare_values(&left, &right, op));
         }
     }
-    resolve_path(trimmed, scope_json)
+    resolve_path(trimmed, scope_name, scope_json)
 }
 
-fn resolve_path(expr: &str, scope_json: Option<&str>) -> serde_json::Value {
+fn resolve_path(expr: &str, scope_name: Option<&str>, scope_json: Option<&str>) -> serde_json::Value {
     if let Some(literal) = literal_value(expr) {
         return literal;
     }
     if let Some(scope) = scope_json.and_then(|value| serde_json::from_str(value).ok()) {
-        return lookup_path(expr, &scope).unwrap_or(serde_json::Value::Null);
+        if let Some(scope_name) = scope_name {
+            if expr == scope_name {
+                return scope;
+            }
+            if let Some(path) = expr
+                .strip_prefix(scope_name)
+                .and_then(|rest| rest.strip_prefix('.'))
+            {
+                return lookup_path(path, &scope).unwrap_or(serde_json::Value::Null);
+            }
+        }
+        return lookup_path(expr, &scope)
+            .or_else(|| {
+                let state = lock_view_state();
+                lookup_path(expr, &state)
+            })
+            .unwrap_or(serde_json::Value::Null);
     }
     let state = lock_view_state();
     lookup_path(expr, &state).unwrap_or(serde_json::Value::Null)
@@ -885,6 +901,8 @@ pub extern "C" fn crepus_mobile_store_result_json(
 pub extern "C" fn crepus_mobile_eval_text(
     expr_ptr: *const c_char,
     expr_len: usize,
+    scope_name_ptr: *const c_char,
+    scope_name_len: usize,
     scope_ptr: *const c_char,
     scope_len: usize,
     output_ptr: *mut c_char,
@@ -892,8 +910,9 @@ pub extern "C" fn crepus_mobile_eval_text(
 ) -> usize {
     let result = action_from_ffi(expr_ptr, expr_len)
         .map(|expr| {
+            let scope_name = action_from_ffi(scope_name_ptr, scope_name_len);
             let scope = action_from_ffi(scope_ptr, scope_len);
-            eval_text(expr.as_ref(), scope.as_deref())
+            eval_text(expr.as_ref(), scope_name.as_deref(), scope.as_deref())
         })
         .unwrap_or_default();
     copy_json_to_output(&result, output_ptr, output_len)
@@ -903,13 +922,16 @@ pub extern "C" fn crepus_mobile_eval_text(
 pub extern "C" fn crepus_mobile_eval_bool(
     expr_ptr: *const c_char,
     expr_len: usize,
+    scope_name_ptr: *const c_char,
+    scope_name_len: usize,
     scope_ptr: *const c_char,
     scope_len: usize,
 ) -> bool {
     action_from_ffi(expr_ptr, expr_len)
         .map(|expr| {
+            let scope_name = action_from_ffi(scope_name_ptr, scope_name_len);
             let scope = action_from_ffi(scope_ptr, scope_len);
-            eval_bool(expr.as_ref(), scope.as_deref())
+            eval_bool(expr.as_ref(), scope_name.as_deref(), scope.as_deref())
         })
         .unwrap_or(false)
 }
@@ -918,13 +940,16 @@ pub extern "C" fn crepus_mobile_eval_bool(
 pub extern "C" fn crepus_mobile_eval_number(
     expr_ptr: *const c_char,
     expr_len: usize,
+    scope_name_ptr: *const c_char,
+    scope_name_len: usize,
     scope_ptr: *const c_char,
     scope_len: usize,
 ) -> f64 {
     action_from_ffi(expr_ptr, expr_len)
         .map(|expr| {
+            let scope_name = action_from_ffi(scope_name_ptr, scope_name_len);
             let scope = action_from_ffi(scope_ptr, scope_len);
-            eval_number(expr.as_ref(), scope.as_deref())
+            eval_number(expr.as_ref(), scope_name.as_deref(), scope.as_deref())
         })
         .unwrap_or(0.0)
 }
@@ -933,6 +958,8 @@ pub extern "C" fn crepus_mobile_eval_number(
 pub extern "C" fn crepus_mobile_eval_items_json(
     expr_ptr: *const c_char,
     expr_len: usize,
+    scope_name_ptr: *const c_char,
+    scope_name_len: usize,
     scope_ptr: *const c_char,
     scope_len: usize,
     output_ptr: *mut c_char,
@@ -940,8 +967,9 @@ pub extern "C" fn crepus_mobile_eval_items_json(
 ) -> usize {
     let result = action_from_ffi(expr_ptr, expr_len)
         .map(|expr| {
+            let scope_name = action_from_ffi(scope_name_ptr, scope_name_len);
             let scope = action_from_ffi(scope_ptr, scope_len);
-            eval_items_json(expr.as_ref(), scope.as_deref())
+            eval_items_json(expr.as_ref(), scope_name.as_deref(), scope.as_deref())
         })
         .unwrap_or_else(|| "[]".to_string());
     copy_json_to_output(&result, output_ptr, output_len)
@@ -1035,18 +1063,24 @@ pub extern "system" fn Java_dev_crepuscularity_nativeshell_CrepusRustActions_eva
     mut env: JNIEnv<'a>,
     _class: JClass<'a>,
     expr: JString<'a>,
+    scope_name: JString<'a>,
     scope: JString<'a>,
 ) -> JString<'a> {
     let expr = env
         .get_string(&expr)
         .map(|value| value.to_string_lossy().into_owned())
         .unwrap_or_default();
+    let scope_name = env
+        .get_string(&scope_name)
+        .ok()
+        .map(|value| value.to_string_lossy().into_owned())
+        .filter(|value| !value.is_empty());
     let scope = env
         .get_string(&scope)
         .ok()
         .map(|value| value.to_string_lossy().into_owned())
         .filter(|value| !value.is_empty());
-    env.new_string(eval_text(&expr, scope.as_deref())).unwrap()
+    env.new_string(eval_text(&expr, scope_name.as_deref(), scope.as_deref())).unwrap()
 }
 
 #[cfg(target_os = "android")]
@@ -1055,18 +1089,24 @@ pub extern "system" fn Java_dev_crepuscularity_nativeshell_CrepusRustActions_eva
     mut env: JNIEnv<'_>,
     _class: JClass<'_>,
     expr: JString<'_>,
+    scope_name: JString<'_>,
     scope: JString<'_>,
 ) -> bool {
     let expr = env
         .get_string(&expr)
         .map(|value| value.to_string_lossy().into_owned())
         .unwrap_or_default();
+    let scope_name = env
+        .get_string(&scope_name)
+        .ok()
+        .map(|value| value.to_string_lossy().into_owned())
+        .filter(|value| !value.is_empty());
     let scope = env
         .get_string(&scope)
         .ok()
         .map(|value| value.to_string_lossy().into_owned())
         .filter(|value| !value.is_empty());
-    eval_bool(&expr, scope.as_deref())
+    eval_bool(&expr, scope_name.as_deref(), scope.as_deref())
 }
 
 #[cfg(target_os = "android")]
@@ -1075,18 +1115,24 @@ pub extern "system" fn Java_dev_crepuscularity_nativeshell_CrepusRustActions_eva
     mut env: JNIEnv<'_>,
     _class: JClass<'_>,
     expr: JString<'_>,
+    scope_name: JString<'_>,
     scope: JString<'_>,
 ) -> f64 {
     let expr = env
         .get_string(&expr)
         .map(|value| value.to_string_lossy().into_owned())
         .unwrap_or_default();
+    let scope_name = env
+        .get_string(&scope_name)
+        .ok()
+        .map(|value| value.to_string_lossy().into_owned())
+        .filter(|value| !value.is_empty());
     let scope = env
         .get_string(&scope)
         .ok()
         .map(|value| value.to_string_lossy().into_owned())
         .filter(|value| !value.is_empty());
-    eval_number(&expr, scope.as_deref())
+    eval_number(&expr, scope_name.as_deref(), scope.as_deref())
 }
 
 #[cfg(target_os = "android")]
@@ -1095,18 +1141,24 @@ pub extern "system" fn Java_dev_crepuscularity_nativeshell_CrepusRustActions_eva
     mut env: JNIEnv<'a>,
     _class: JClass<'a>,
     expr: JString<'a>,
+    scope_name: JString<'a>,
     scope: JString<'a>,
 ) -> JString<'a> {
     let expr = env
         .get_string(&expr)
         .map(|value| value.to_string_lossy().into_owned())
         .unwrap_or_default();
+    let scope_name = env
+        .get_string(&scope_name)
+        .ok()
+        .map(|value| value.to_string_lossy().into_owned())
+        .filter(|value| !value.is_empty());
     let scope = env
         .get_string(&scope)
         .ok()
         .map(|value| value.to_string_lossy().into_owned())
         .filter(|value| !value.is_empty());
-    env.new_string(eval_items_json(&expr, scope.as_deref())).unwrap()
+    env.new_string(eval_items_json(&expr, scope_name.as_deref(), scope.as_deref())).unwrap()
 }
 
 #[cfg(target_os = "android")]
