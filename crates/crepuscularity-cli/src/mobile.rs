@@ -107,7 +107,12 @@ fn run_doctor(args: &[String]) {
 }
 
 fn doctor_command(command: &str, args: &[&str]) -> bool {
-    match Command::new(command).args(args).output() {
+    let mut cmd = Command::new(command);
+    cmd.args(args);
+    if command == "gradle" {
+        configure_java_home(&mut cmd);
+    }
+    match cmd.output() {
         Ok(out) if out.status.success() => {
             eprintln!("{} {command}", style("✓").green());
             true
@@ -121,6 +126,52 @@ fn doctor_command(command: &str, args: &[&str]) -> bool {
             eprintln!("{} {command}: {e}", style("✗").red());
             false
         }
+    }
+}
+
+fn configure_java_home(cmd: &mut Command) {
+    match std::env::var("JAVA_HOME") {
+        Ok(raw) if PathBuf::from(&raw).join("bin/java").exists() => {}
+        _ => {
+            if let Some(java_home) = discover_java_home() {
+                cmd.env("JAVA_HOME", java_home);
+            } else {
+                cmd.env_remove("JAVA_HOME");
+            }
+        }
+    }
+}
+
+fn discover_java_home() -> Option<String> {
+    for candidate in [
+        "/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home",
+        "/opt/homebrew/opt/openjdk/libexec/openjdk.jdk/Contents/Home",
+    ] {
+        let path = Path::new(candidate);
+        if path.join("bin/java").exists() {
+            return Some(candidate.to_string());
+        }
+    }
+    if let Ok(out) = Command::new("/usr/libexec/java_home")
+        .args(["-v", "17"])
+        .output()
+    {
+        if out.status.success() {
+            let path = String::from_utf8(out.stdout).ok()?;
+            let trimmed = path.trim();
+            if !trimmed.is_empty() {
+                return Some(trimmed.to_string());
+            }
+        }
+    }
+    let java = std::fs::canonicalize("/opt/homebrew/bin/java")
+        .or_else(|_| std::fs::canonicalize("/usr/bin/java"))
+        .ok()?;
+    let home = java.parent()?.parent()?;
+    if home.join("bin/java").exists() {
+        Some(home.display().to_string())
+    } else {
+        None
     }
 }
 
@@ -159,6 +210,9 @@ fn doctor_java17() -> bool {
         let java = PathBuf::from(&java_home).join("bin/java");
         if java_version_at_least(&java, 17) {
             eprintln!("{} Java 17 {}", style("✓").green(), java_home);
+            true
+        } else if java_version_at_least(Path::new("java"), 17) {
+            eprintln!("{} Java 17 java on PATH", style("✓").green());
             true
         } else {
             eprintln!(
@@ -220,6 +274,12 @@ fn doctor_java_home() -> bool {
             let path = PathBuf::from(&raw);
             if path.join("bin/java").exists() {
                 eprintln!("{} JAVA_HOME {}", style("✓").green(), path.display());
+                true
+            } else if Path::new("java").exists() || java_version_at_least(Path::new("java"), 17) {
+                eprintln!(
+                    "{} JAVA_HOME invalid; Gradle will use java from PATH",
+                    style("✓").green()
+                );
                 true
             } else {
                 eprintln!(

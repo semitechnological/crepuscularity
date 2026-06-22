@@ -1,15 +1,29 @@
+import Foundation
 import SwiftUI
 
+@MainActor
 public enum CrepusActions {
+    public static let model = CrepusStateStore.shared
     public static var dispatch: (String) -> String = { _ in "{}" }
     public static var resultSink: (String) -> Void = { _ in }
+
+    public static func applyResult(_ json: String) {
+        model.applyResult(json)
+    }
 
     public static func perform(_ action: String) {
         resultSink(dispatch(action))
     }
+
+    public static func performChange(_ action: String?, bind: String, value: Any) {
+        resultSink(CrepusRustActions.dispatchChangeStored(action ?? "", bind: bind, value: value))
+    }
 }
 
+@MainActor
 public struct CrepusGeneratedView: View {
+    @ObservedObject private var model = CrepusActions.model
+
     public init() {}
 
     public var body: some View {

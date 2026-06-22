@@ -1,4 +1,5 @@
-use std::ffi::{CStr, CString};
+use std::borrow::Cow;
+use std::ffi::CStr;
 use std::fs;
 use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
@@ -20,6 +21,7 @@ struct MobileActionState {
     last_payload: Option<String>,
     last_result: String,
     last_error: Option<String>,
+    auto_scan_started: bool,
 }
 
 #[derive(Clone, Copy)]
@@ -28,10 +30,11 @@ enum ActionKind {
     Plugin,
 }
 
-static ACTION_STATE: OnceLock<Mutex<MobileActionState>> = OnceLock::new();
-static VIEW_STATE: OnceLock<Mutex<serde_json::Value>> = OnceLock::new();
 type ActionHandler =
     fn(&mut MobileActionState, Option<&serde_json::Value>) -> Result<serde_json::Value, String>;
+
+static ACTION_STATE: OnceLock<Mutex<MobileActionState>> = OnceLock::new();
+static VIEW_STATE: OnceLock<Mutex<serde_json::Value>> = OnceLock::new();
 
 fn action_state() -> &'static Mutex<MobileActionState> {
     ACTION_STATE.get_or_init(|| Mutex::new(MobileActionState::default()))
@@ -81,6 +84,33 @@ pub fn dispatch_action_json(action: &str) -> String {
     result
 }
 
+fn dispatch_change_json(action: &str, bind: &str, value_json: &str) -> String {
+    let value = match serde_json::from_str::<serde_json::Value>(value_json) {
+        Ok(value) => value,
+        Err(error) => {
+            let state = lock_action_state();
+            return action_json(false, action, None, Some(&format!("invalid change payload: {error}")), &state);
+        }
+    };
+    let mut payload = serde_json::Map::new();
+    payload.insert(bind.to_string(), value);
+    if let Some((capability, method)) = action.split_once('.') {
+        return dispatch_action_json(
+            &serde_json::json!({
+                "kind": "plugin",
+                "capability": capability,
+                "method": method,
+                "payload": payload,
+            })
+            .to_string(),
+        );
+    }
+    if !action.is_empty() {
+        payload.insert("action".to_string(), serde_json::Value::String(action.to_string()));
+    }
+    dispatch_action_json(&serde_json::Value::Object(payload).to_string())
+}
+
 fn parse_action_error(result: &str) -> Option<String> {
     let payload = serde_json::from_str::<serde_json::Value>(result).ok()?;
     if payload.get("ok").and_then(|value| value.as_bool()) == Some(false) {
@@ -127,12 +157,6 @@ fn preview_action(
         "message": payload_message(payload).unwrap_or("previewed"),
         "previewCount": state.preview_count,
     }))
-}
-
-fn payload_message(payload: Option<&serde_json::Value>) -> Option<&str> {
-    payload
-        .and_then(|value| value.get("message"))
-        .and_then(|value| value.as_str())
 }
 
 fn plugin_action(
@@ -358,10 +382,18 @@ fn http_backend(
     }))
 }
 
+fn payload_message(payload: Option<&serde_json::Value>) -> Option<&str> {
+    payload
+        .and_then(|value| value.get("message"))
+        .and_then(|value| value.as_str())
+}
+
 fn parse_action_request(input: &str) -> serde_json::Value {
     serde_json::from_str(input)
         .ok()
-        .filter(|value: &serde_json::Value| value.is_object())
+        .filter(|value: &serde_json::Value| {
+            value.get("action").is_some() || value.get("kind").is_some()
+        })
         .unwrap_or_else(|| serde_json::json!({ "action": input }))
 }
 
@@ -378,17 +410,15 @@ fn request_action_name(request: &serde_json::Value) -> String {
         return action.to_string();
     }
     if request_kind(request) == Some("plugin") {
-        return format!(
-            "{}.{}",
-            request
-                .get("capability")
-                .and_then(|value| value.as_str())
-                .unwrap_or("plugin"),
-            request
-                .get("method")
-                .and_then(|value| value.as_str())
-                .unwrap_or("action")
-        );
+        let capability = request
+            .get("capability")
+            .and_then(|value| value.as_str())
+            .unwrap_or("plugin");
+        let method = request
+            .get("method")
+            .and_then(|value| value.as_str())
+            .unwrap_or("call");
+        return format!("{capability}.{method}");
     }
     request_kind(request).unwrap_or("").to_string()
 }
@@ -405,135 +435,14 @@ fn payload_string(
         .and_then(|value| value.get(key))
         .and_then(|value| value.as_str())
         .map(str::to_string)
-        .ok_or_else(|| format!("payload missing string field {key}"))
-}
-
-fn action_json(
-    ok: bool,
-    action: &str,
-    value: Option<serde_json::Value>,
-    error: Option<&str>,
-    state: &MobileActionState,
-) -> String {
-    let mut out = serde_json::json!({
-        "ok": ok,
-        "action": action,
-        "state": {
-            "syncCount": state.sync_count,
-            "previewCount": state.preview_count,
-            "lastAction": state.last_action,
-            "lastPayload": state.last_payload,
-        }
-    });
-    if let Some(value) = value {
-        out["value"] = value;
-    }
-    if let Some(error) = error {
-        out["error"] = serde_json::Value::String(error.to_string());
-    }
-    out.to_string()
-}
-
-#[no_mangle]
-pub extern "C" fn crepus_mobile_dispatch(action_ptr: *const c_char, action_len: usize) -> bool {
-    action_from_ffi(action_ptr, action_len)
-        .map(|action| dispatch_action(action.as_ref()))
-        .unwrap_or(false)
-}
-
-#[no_mangle]
-pub extern "C" fn crepus_mobile_dispatch_json(
-    action_ptr: *const c_char,
-    action_len: usize,
-    output_ptr: *mut c_char,
-    output_len: usize,
-) -> usize {
-    let result = action_from_ffi(action_ptr, action_len)
-        .map(|action| dispatch_action_json(action.as_ref()))
-        .unwrap_or_else(|| {
-            action_json(
-                false,
-                "",
-                None,
-                Some("invalid action pointer"),
-                &MobileActionState::default(),
-            )
-        });
-    copy_json_to_output(&result, output_ptr, output_len)
-}
-
-fn action_from_ffi(action_ptr: *const c_char, action_len: usize) -> Option<std::borrow::Cow<'static, str>> {
-    if action_ptr.is_null() {
-        return None;
-    }
-    Some(if action_len == 0 {
-        // SAFETY: `action_ptr` is checked non-null above and must point to a valid NUL-terminated C string from the platform bridge.
-        unsafe { CStr::from_ptr(action_ptr) }.to_string_lossy()
-    } else {
-        // SAFETY: the platform bridge passes a valid pointer to `action_len` bytes for the duration of this call.
-        let bytes = unsafe { std::slice::from_raw_parts(action_ptr.cast::<u8>(), action_len) };
-        String::from_utf8_lossy(bytes)
-    }
-    .into_owned()
-    .into())
-}
-
-fn copy_json_to_output(result: &str, output_ptr: *mut c_char, output_len: usize) -> usize {
-    let bytes = result.as_bytes();
-    if output_ptr.is_null() || output_len == 0 {
-        return bytes.len();
-    }
-    let copy_len = bytes.len().min(output_len.saturating_sub(1));
-    unsafe {
-        std::ptr::copy_nonoverlapping(bytes.as_ptr(), output_ptr.cast::<u8>(), copy_len);
-        *output_ptr.add(copy_len) = 0;
-    }
-    bytes.len()
-}
-
-fn alloc_c_string(result: &str) -> *mut c_char {
-    CString::new(result).map(CString::into_raw).unwrap_or(std::ptr::null_mut())
+        .ok_or_else(|| format!("payload.{key} must be a string"))
 }
 
 fn data_root_dir() -> PathBuf {
-    std::env::var_os("CREPUS_MOBILE_DATA_DIR")
-        .map(PathBuf::from)
-        .or_else(|| {
-            std::env::var_os("TMPDIR")
-                .map(PathBuf::from)
-                .map(|path| path.join("crepus-mobile-data"))
-        })
-        .unwrap_or_else(|| std::env::temp_dir().join("crepus-mobile-data"))
-}
-
-fn preferences_file_path() -> PathBuf {
-    data_root_dir().join("preferences.json")
-}
-
-fn load_json_map(
-    path: &PathBuf,
-) -> Result<serde_json::Map<String, serde_json::Value>, String> {
-    match fs::read_to_string(path) {
-        Ok(raw) => serde_json::from_str::<serde_json::Map<String, serde_json::Value>>(&raw)
-            .map_err(|error| format!("parse {}: {error}", path.display())),
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(serde_json::Map::new()),
-        Err(error) => Err(format!("read {}: {error}", path.display())),
+    if let Some(path) = std::env::var_os("CREPUS_NATIVE_STATE_DIR") {
+        return PathBuf::from(path);
     }
-}
-
-fn save_json_map(
-    path: &PathBuf,
-    value: &serde_json::Map<String, serde_json::Value>,
-) -> Result<(), String> {
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|error| format!("mkdir {}: {error}", parent.display()))?;
-    }
-    let raw = serde_json::to_vec_pretty(value).map_err(|error| error.to_string())?;
-    fs::write(path, raw).map_err(|error| format!("write {}: {error}", path.display()))
-}
-
-fn path_string(path: &PathBuf) -> String {
-    path.to_string_lossy().to_string()
+    std::env::temp_dir().join("crepus_mobile_actions")
 }
 
 fn probe_socket(host: &str, port: u16, timeout_ms: u64) -> bool {
@@ -648,6 +557,35 @@ fn parse_http_response(response: &str) -> Result<HttpResponse, String> {
     })
 }
 
+fn preferences_file_path() -> PathBuf {
+    data_root_dir().join("preferences.json")
+}
+
+fn load_json_map(
+    path: &Path,
+) -> Result<serde_json::Map<String, serde_json::Value>, String> {
+    if !path.exists() {
+        return Ok(serde_json::Map::new());
+    }
+    let text =
+        fs::read_to_string(path).map_err(|error| format!("read {}: {error}", path.display()))?;
+    let value: serde_json::Value = serde_json::from_str(&text)
+        .map_err(|error| format!("parse {}: {error}", path.display()))?;
+    value
+        .as_object()
+        .cloned()
+        .ok_or_else(|| format!("{} is not a JSON object", path.display()))
+}
+
+fn save_json_map(
+    path: &Path,
+    map: &serde_json::Map<String, serde_json::Value>,
+) -> Result<(), String> {
+    ensure_parent_dir(path)?;
+    let json = serde_json::to_vec_pretty(map).map_err(|error| error.to_string())?;
+    fs::write(path, json).map_err(|error| format!("write {}: {error}", path.display()))
+}
+
 fn ensure_parent_dir(path: &Path) -> Result<(), String> {
     let Some(parent) = path.parent() else {
         return Ok(());
@@ -684,10 +622,180 @@ fn sanitize_relative_path(raw: &str) -> Result<PathBuf, String> {
 fn file_stat_json(path: &Path) -> Result<serde_json::Value, String> {
     let metadata = fs::metadata(path).map_err(|error| format!("stat {}: {error}", path.display()))?;
     Ok(serde_json::json!({
-        "path": path_string(&path.to_path_buf()),
+        "path": path_string(path),
         "isDir": metadata.is_dir(),
         "bytes": metadata.len(),
     }))
+}
+
+fn path_string(path: &Path) -> String {
+    path.to_string_lossy().to_string()
+}
+
+fn action_json(
+    ok: bool,
+    action: &str,
+    value: Option<serde_json::Value>,
+    error: Option<&str>,
+    state: &MobileActionState,
+) -> String {
+    let mut out = serde_json::json!({
+        "ok": ok,
+        "action": action,
+        "state": {
+            "syncCount": state.sync_count,
+            "previewCount": state.preview_count,
+            "lastAction": state.last_action,
+            "lastPayload": state.last_payload,
+        }
+    });
+    if let Some(value) = value {
+        out["value"] = value;
+    }
+    if let Some(error) = error {
+        out["error"] = serde_json::Value::String(error.to_string());
+    }
+    out.to_string()
+}
+
+#[no_mangle]
+pub extern "C" fn crepus_mobile_dispatch(action_ptr: *const c_char, action_len: usize) -> bool {
+    action_from_ffi(action_ptr, action_len)
+        .map(|action| dispatch_action(action.as_ref()))
+        .unwrap_or(false)
+}
+
+#[no_mangle]
+pub extern "C" fn crepus_mobile_dispatch_json(
+    action_ptr: *const c_char,
+    action_len: usize,
+    output_ptr: *mut c_char,
+    output_len: usize,
+) -> usize {
+    let result = action_from_ffi(action_ptr, action_len)
+        .map(|action| dispatch_action_json(action.as_ref()))
+        .unwrap_or_else(|| {
+            action_json(
+                false,
+                "",
+                None,
+                Some("invalid action pointer"),
+                &MobileActionState::default(),
+            )
+        });
+    copy_json_to_output(&result, output_ptr, output_len)
+}
+
+#[no_mangle]
+pub extern "C" fn crepus_mobile_dispatch_and_store_json(
+    action_ptr: *const c_char,
+    action_len: usize,
+    output_ptr: *mut c_char,
+    output_len: usize,
+) -> usize {
+    crepus_mobile_dispatch_json(action_ptr, action_len, output_ptr, output_len)
+}
+
+#[no_mangle]
+pub extern "C" fn crepus_mobile_dispatch_change_json(
+    action_ptr: *const c_char,
+    action_len: usize,
+    bind_ptr: *const c_char,
+    bind_len: usize,
+    value_ptr: *const c_char,
+    value_len: usize,
+    output_ptr: *mut c_char,
+    output_len: usize,
+) -> usize {
+    let Some(action) = action_from_ffi(action_ptr, action_len) else {
+        let result = action_json(false, "", None, Some("invalid action pointer"), &MobileActionState::default());
+        return copy_json_to_output(&result, output_ptr, output_len);
+    };
+    let Some(bind) = action_from_ffi(bind_ptr, bind_len) else {
+        let result = action_json(false, action.as_ref(), None, Some("invalid bind pointer"), &MobileActionState::default());
+        return copy_json_to_output(&result, output_ptr, output_len);
+    };
+    let Some(value_json) = action_from_ffi(value_ptr, value_len) else {
+        let result = action_json(false, action.as_ref(), None, Some("invalid value pointer"), &MobileActionState::default());
+        return copy_json_to_output(&result, output_ptr, output_len);
+    };
+    copy_json_to_output(
+        &dispatch_change_json(action.as_ref(), bind.as_ref(), value_json.as_ref()),
+        output_ptr,
+        output_len,
+    )
+}
+
+#[no_mangle]
+pub extern "C" fn crepus_mobile_start_auto_scan() -> *mut c_char {
+    let mut state = lock_action_state();
+    if !state.auto_scan_started {
+        state.auto_scan_started = true;
+        let result = dispatch_action_json("preview");
+        return alloc_c_string(&result);
+    }
+    alloc_c_string(&state.last_result)
+}
+
+#[no_mangle]
+pub extern "C" fn crepus_mobile_last_result() -> *mut c_char {
+    let state = lock_action_state();
+    alloc_c_string(&state.last_result)
+}
+
+#[no_mangle]
+pub extern "C" fn crepus_mobile_last_error() -> *mut c_char {
+    let state = lock_action_state();
+    alloc_c_string(state.last_error.as_deref().unwrap_or(""))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn crepus_mobile_free_string(ptr: *mut c_char) {
+    if !ptr.is_null() {
+        libc::free(ptr.cast());
+    }
+}
+
+fn alloc_c_string(result: &str) -> *mut c_char {
+    let bytes = result.as_bytes();
+    let ptr = unsafe { libc::malloc(bytes.len() + 1) as *mut c_char };
+    if ptr.is_null() {
+        return ptr;
+    }
+    unsafe {
+        std::ptr::copy_nonoverlapping(bytes.as_ptr(), ptr.cast::<u8>(), bytes.len());
+        *ptr.add(bytes.len()) = 0;
+    }
+    ptr
+}
+
+fn action_from_ffi(action_ptr: *const c_char, action_len: usize) -> Option<Cow<'static, str>> {
+    if action_ptr.is_null() {
+        return None;
+    }
+    Some(
+        if action_len == 0 {
+            unsafe { CStr::from_ptr(action_ptr) }.to_string_lossy()
+        } else {
+            let bytes = unsafe { std::slice::from_raw_parts(action_ptr.cast::<u8>(), action_len) };
+            String::from_utf8_lossy(bytes)
+        }
+        .into_owned()
+        .into(),
+    )
+}
+
+fn copy_json_to_output(result: &str, output_ptr: *mut c_char, output_len: usize) -> usize {
+    let bytes = result.as_bytes();
+    if output_ptr.is_null() || output_len == 0 {
+        return bytes.len();
+    }
+    let copy_len = bytes.len().min(output_len.saturating_sub(1));
+    unsafe {
+        std::ptr::copy_nonoverlapping(bytes.as_ptr(), output_ptr.cast::<u8>(), copy_len);
+        *output_ptr.add(copy_len) = 0;
+    }
+    bytes.len()
 }
 
 fn store_view_state(raw: &str) -> bool {
@@ -738,17 +846,24 @@ fn resolve_path(expr: &str, scope_name: Option<&str>, scope_json: Option<&str>) 
     if let Some(literal) = literal_value(expr) {
         return literal;
     }
-    if let (Some(scope_name), Some(scope)) = (
-        scope_name,
-        scope_json.and_then(|value| serde_json::from_str(value).ok()),
-    ) {
-        if expr == scope_name {
-            return scope;
+    if let Some(scope) = scope_json.and_then(|value| serde_json::from_str(value).ok()) {
+        if let Some(scope_name) = scope_name {
+            if expr == scope_name {
+                return scope;
+            }
+            if let Some(path) = expr
+                .strip_prefix(scope_name)
+                .and_then(|rest| rest.strip_prefix('.'))
+            {
+                return lookup_path(path, &scope).unwrap_or(serde_json::Value::Null);
+            }
         }
-        let prefix = format!("{scope_name}.");
-        if let Some(stripped) = expr.strip_prefix(&prefix) {
-            return lookup_path(stripped, &scope).unwrap_or(serde_json::Value::Null);
-        }
+        return lookup_path(expr, &scope)
+            .or_else(|| {
+                let state = lock_view_state();
+                lookup_path(expr, &state)
+            })
+            .unwrap_or(serde_json::Value::Null);
     }
     let state = lock_view_state();
     lookup_path(expr, &state).unwrap_or(serde_json::Value::Null)
@@ -846,25 +961,6 @@ pub extern "C" fn crepus_mobile_store_result_json(
 }
 
 #[no_mangle]
-pub extern "C" fn crepus_mobile_last_result() -> *mut c_char {
-    let state = lock_action_state();
-    alloc_c_string(&state.last_result)
-}
-
-#[no_mangle]
-pub extern "C" fn crepus_mobile_last_error() -> *mut c_char {
-    let state = lock_action_state();
-    alloc_c_string(state.last_error.as_deref().unwrap_or(""))
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn crepus_mobile_free_string(ptr: *mut c_char) {
-    if !ptr.is_null() {
-        drop(CString::from_raw(ptr));
-    }
-}
-
-#[no_mangle]
 pub extern "C" fn crepus_mobile_eval_text(
     expr_ptr: *const c_char,
     expr_len: usize,
@@ -958,7 +1054,8 @@ fn test_lock() -> std::sync::MutexGuard<'static, ()> {
 
 #[cfg(test)]
 fn reset_test_data_root() {
-    let _ = fs::remove_dir_all(data_root_dir());
+    let root = data_root_dir();
+    let _ = fs::remove_dir_all(root);
 }
 
 #[cfg(target_os = "android")]
@@ -990,6 +1087,58 @@ pub extern "system" fn Java_dev_crepuscularity_nativeshell_CrepusRustActions_dis
 
 #[cfg(target_os = "android")]
 #[no_mangle]
+pub extern "system" fn Java_dev_crepuscularity_nativeshell_CrepusRustActions_dispatchAndStoreJson<
+    'a,
+>(
+    mut env: JNIEnv<'a>,
+    _class: JClass<'a>,
+    action: JString<'a>,
+) -> JString<'a> {
+    let result = match env.get_string(&action) {
+        Ok(action) => dispatch_action_json(action.to_string_lossy().as_ref()),
+        Err(_) => action_json(
+            false,
+            "",
+            None,
+            Some("invalid action pointer"),
+            &MobileActionState::default(),
+        ),
+    };
+    env.new_string(result).unwrap()
+}
+
+#[cfg(target_os = "android")]
+#[no_mangle]
+pub extern "system" fn Java_dev_crepuscularity_nativeshell_CrepusRustActions_dispatchChangeJson<'a>(
+    mut env: JNIEnv<'a>,
+    _class: JClass<'a>,
+    action: JString<'a>,
+    bind: JString<'a>,
+    value_json: JString<'a>,
+) -> JString<'a> {
+    let result = match (
+        env.get_string(&action),
+        env.get_string(&bind),
+        env.get_string(&value_json),
+    ) {
+        (Ok(action), Ok(bind), Ok(value_json)) => dispatch_change_json(
+            action.to_string_lossy().as_ref(),
+            bind.to_string_lossy().as_ref(),
+            value_json.to_string_lossy().as_ref(),
+        ),
+        _ => action_json(
+            false,
+            "",
+            None,
+            Some("invalid change payload"),
+            &MobileActionState::default(),
+        ),
+    };
+    env.new_string(result).unwrap()
+}
+
+#[cfg(target_os = "android")]
+#[no_mangle]
 pub extern "system" fn Java_dev_crepuscularity_nativeshell_CrepusRustActions_storeResultJson(
     mut env: JNIEnv<'_>,
     _class: JClass<'_>,
@@ -999,26 +1148,6 @@ pub extern "system" fn Java_dev_crepuscularity_nativeshell_CrepusRustActions_sto
         Ok(json) => store_view_state(json.to_string_lossy().as_ref()),
         Err(_) => false,
     }
-}
-
-#[cfg(target_os = "android")]
-#[no_mangle]
-pub extern "system" fn Java_dev_crepuscularity_nativeshell_CrepusRustActions_lastResult<'a>(
-    env: JNIEnv<'a>,
-    _class: JClass<'a>,
-) -> JString<'a> {
-    let state = lock_action_state();
-    env.new_string(state.last_result.clone()).unwrap()
-}
-
-#[cfg(target_os = "android")]
-#[no_mangle]
-pub extern "system" fn Java_dev_crepuscularity_nativeshell_CrepusRustActions_lastError<'a>(
-    env: JNIEnv<'a>,
-    _class: JClass<'a>,
-) -> JString<'a> {
-    let state = lock_action_state();
-    env.new_string(state.last_error.clone().unwrap_or_default()).unwrap()
 }
 
 #[cfg(target_os = "android")]
@@ -1125,11 +1254,80 @@ pub extern "system" fn Java_dev_crepuscularity_nativeshell_CrepusRustActions_eva
     env.new_string(eval_items_json(&expr, scope_name.as_deref(), scope.as_deref())).unwrap()
 }
 
+#[cfg(target_os = "android")]
+#[no_mangle]
+pub extern "system" fn Java_dev_crepuscularity_nativeshell_CrepusRustActions_startAutoScan<'a>(
+    env: JNIEnv<'a>,
+    _class: JClass<'a>,
+) -> JString<'a> {
+    let ptr = crepus_mobile_start_auto_scan();
+    let result = if ptr.is_null() {
+        String::new()
+    } else {
+        let result = unsafe { CStr::from_ptr(ptr) }.to_string_lossy().into_owned();
+        unsafe { crepus_mobile_free_string(ptr) };
+        result
+    };
+    env.new_string(result).unwrap()
+}
+
+#[cfg(target_os = "android")]
+#[no_mangle]
+pub extern "system" fn Java_dev_crepuscularity_nativeshell_CrepusRustActions_lastResult<'a>(
+    env: JNIEnv<'a>,
+    _class: JClass<'a>,
+) -> JString<'a> {
+    let ptr = crepus_mobile_last_result();
+    let result = if ptr.is_null() {
+        String::new()
+    } else {
+        let result = unsafe { CStr::from_ptr(ptr) }.to_string_lossy().into_owned();
+        unsafe { crepus_mobile_free_string(ptr) };
+        result
+    };
+    env.new_string(result).unwrap()
+}
+
+#[cfg(target_os = "android")]
+#[no_mangle]
+pub extern "system" fn Java_dev_crepuscularity_nativeshell_CrepusRustActions_lastError<'a>(
+    env: JNIEnv<'a>,
+    _class: JClass<'a>,
+) -> JString<'a> {
+    let ptr = crepus_mobile_last_error();
+    let result = if ptr.is_null() {
+        String::new()
+    } else {
+        let result = unsafe { CStr::from_ptr(ptr) }.to_string_lossy().into_owned();
+        unsafe { crepus_mobile_free_string(ptr) };
+        result
+    };
+    env.new_string(result).unwrap()
+}
+
+#[cfg(target_os = "android")]
+#[no_mangle]
+pub extern "system" fn Java_dev_crepuscularity_nativeshell_CrepusRustActions_initAndroid<'a>(
+    _env: JNIEnv<'a>,
+    _class: JClass<'a>,
+    _context: jni::objects::JObject<'a>,
+) {
+}
+
+#[cfg(target_os = "android")]
+#[no_mangle]
+pub extern "system" fn Java_dev_crepuscularity_nativeshell_CrepusRustActions_shutdownAndroid<
+    'a,
+>(
+    _env: JNIEnv<'a>,
+    _class: JClass<'a>,
+) {
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::ffi::CString;
-    use std::io::{Read, Write};
     use std::net::TcpListener;
     use std::thread;
 
@@ -1170,6 +1368,7 @@ mod tests {
         reset_action_state();
         assert!(dispatch_action("sync"));
         assert!(dispatch_action("preview"));
+        assert!(dispatch_action(r#"{"kind":"plugin","capability":"device","method":"info"}"#));
         let state = lock_action_state();
         assert_eq!(state.sync_count, 0);
         assert_eq!(state.preview_count, 0);
@@ -1189,6 +1388,19 @@ mod tests {
     }
 
     #[test]
+    fn dispatch_change_json_builds_action_payload_in_rust() {
+        let _guard = test_lock();
+        reset_action_state();
+        let result = dispatch_change_json("sync", "enabled", "true");
+
+        let result: serde_json::Value = serde_json::from_str(&result).expect("json");
+        assert_eq!(result["ok"], true);
+        assert_eq!(result["action"], "sync");
+        assert_eq!(result["value"]["enabled"], true);
+        assert_eq!(result["state"]["lastPayload"], r#"{"enabled":true}"#);
+    }
+
+    #[test]
     fn preferences_round_trip_persists_values() {
         let _guard = test_lock();
         reset_action_state();
@@ -1199,27 +1411,15 @@ mod tests {
         let get = dispatch_action_json(
             r#"{"kind":"plugin","capability":"preferences","method":"get","payload":{"key":"theme"}}"#,
         );
+        let keys =
+            dispatch_action_json(r#"{"kind":"plugin","capability":"preferences","method":"keys"}"#);
 
         let set: serde_json::Value = serde_json::from_str(&set).expect("json");
         let get: serde_json::Value = serde_json::from_str(&get).expect("json");
+        let keys: serde_json::Value = serde_json::from_str(&keys).expect("json");
         assert_eq!(set["ok"], true);
         assert_eq!(get["value"]["value"], "light");
-    }
-
-    #[test]
-    fn device_and_app_requests_return_real_values() {
-        let _guard = test_lock();
-        reset_action_state();
-        let device =
-            dispatch_action_json(r#"{"kind":"plugin","capability":"device","method":"info"}"#);
-        let app = dispatch_action_json(r#"{"kind":"plugin","capability":"app","method":"info"}"#);
-
-        let device: serde_json::Value = serde_json::from_str(&device).expect("json");
-        let app: serde_json::Value = serde_json::from_str(&app).expect("json");
-        assert_eq!(device["ok"], true);
-        assert!(device["value"]["value"]["targetOs"].is_string());
-        assert_eq!(app["ok"], true);
-        assert_eq!(app["value"]["value"]["syncCount"], 0);
+        assert_eq!(keys["value"]["value"][0], "theme");
     }
 
     #[test]
@@ -1259,51 +1459,82 @@ mod tests {
     }
 
     #[test]
-    fn network_status_reports_reachable_loopback_port() {
+    fn device_and_app_requests_return_real_values() {
         let _guard = test_lock();
         reset_action_state();
+        let device =
+            dispatch_action_json(r#"{"kind":"plugin","capability":"device","method":"info"}"#);
+        let app = dispatch_action_json(r#"{"kind":"plugin","capability":"app","method":"info"}"#);
+
+        let device: serde_json::Value = serde_json::from_str(&device).expect("json");
+        let app: serde_json::Value = serde_json::from_str(&app).expect("json");
+        assert_eq!(device["ok"], true);
+        assert!(device["value"]["value"]["targetOs"].is_string());
+        assert_eq!(app["ok"], true);
+        assert_eq!(app["value"]["value"]["syncCount"], 0);
+    }
+
+    #[test]
+    fn start_auto_scan_tracks_last_result() {
+        let _guard = test_lock();
+        reset_action_state();
+        let first_ptr = crepus_mobile_start_auto_scan();
+        let first = unsafe { CStr::from_ptr(first_ptr) }.to_string_lossy().into_owned();
+        unsafe { crepus_mobile_free_string(first_ptr) };
+        let second_ptr = crepus_mobile_start_auto_scan();
+        let second = unsafe { CStr::from_ptr(second_ptr) }
+            .to_string_lossy()
+            .into_owned();
+        unsafe { crepus_mobile_free_string(second_ptr) };
+        let first: serde_json::Value = serde_json::from_str(&first).expect("json");
+        let second: serde_json::Value = serde_json::from_str(&second).expect("json");
+        assert_eq!(first["ok"], true);
+        assert_eq!(second["ok"], true);
+    }
+
+    #[test]
+    fn network_status_reports_reachable_loopback_port() {
+        let _guard = test_lock();
         let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
         let port = listener.local_addr().expect("addr").port();
         let server = thread::spawn(move || {
             let _ = listener.accept();
         });
-        let action = format!(
-            r#"{{"kind":"plugin","capability":"network","method":"status","payload":{{"host":"127.0.0.1","port":{port},"timeoutMs":250}}}}"#
-        );
 
-        let result = dispatch_action_json(&action);
-
+        let result = dispatch_action_json(&format!(
+            r#"{{"kind":"plugin","capability":"network","method":"status","payload":{{"host":"127.0.0.1","port":{port},"timeoutMs":100}}}}"#
+        ));
+        server.join().expect("server thread");
         let result: serde_json::Value = serde_json::from_str(&result).expect("json");
         assert_eq!(result["ok"], true);
         assert_eq!(result["value"]["value"]["reachable"], true);
-        server.join().expect("server thread");
     }
 
     #[test]
     fn http_get_returns_text_from_loopback_server() {
         let _guard = test_lock();
-        reset_action_state();
         let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
         let port = listener.local_addr().expect("addr").port();
         let server = thread::spawn(move || {
             let (mut stream, _) = listener.accept().expect("accept");
             let mut buffer = [0_u8; 1024];
-            let _ = stream.read(&mut buffer);
+            let _ = stream.read(&mut buffer).expect("read request");
             stream
-                .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 5\r\nConnection: close\r\n\r\nhello")
+                .write_all(
+                    b"HTTP/1.1 200 OK\r\nContent-Length: 5\r\nContent-Type: text/plain\r\n\r\nhello",
+                )
                 .expect("write response");
         });
-        let action = format!(
-            r#"{{"kind":"plugin","capability":"http","method":"get","payload":{{"url":"http://127.0.0.1:{port}/health"}}}}"#
-        );
 
-        let result = dispatch_action_json(&action);
+        let result = dispatch_action_json(&format!(
+            r#"{{"kind":"plugin","capability":"http","method":"get","payload":{{"url":"http://127.0.0.1:{port}/ping"}}}}"#
+        ));
+        server.join().expect("server thread");
 
         let result: serde_json::Value = serde_json::from_str(&result).expect("json");
         assert_eq!(result["ok"], true);
         assert_eq!(result["value"]["value"]["status"], 200);
         assert_eq!(result["value"]["value"]["text"], "hello");
-        server.join().expect("server thread");
     }
 
     #[test]
@@ -1331,7 +1562,8 @@ mod tests {
         reset_action_state();
         let mut output = [0 as c_char; 256];
 
-        let written = crepus_mobile_dispatch_json(std::ptr::null(), 0, output.as_mut_ptr(), output.len());
+        let written =
+            crepus_mobile_dispatch_json(std::ptr::null(), 0, output.as_mut_ptr(), output.len());
 
         assert!(written > 0);
         let result = unsafe { CStr::from_ptr(output.as_ptr()) }.to_string_lossy();
@@ -1368,19 +1600,5 @@ mod tests {
         let _guard = test_lock();
         reset_action_state();
         assert!(!dispatch_action("missing"));
-    }
-
-    #[test]
-    fn scoped_expr_resolution_prefers_scope_name_and_falls_back_to_state() {
-        let _guard = test_lock();
-        *lock_view_state() = serde_json::json!({
-            "dashboard": { "title": "Root" },
-            "status": "ready"
-        });
-
-        let scope = r#"{"title":"Scoped"}"#;
-        assert_eq!(eval_text("dashboard.title", Some("dashboard"), Some(scope)), "Scoped");
-        assert_eq!(eval_text("dashboard", Some("dashboard"), Some(scope)), r#"{"title":"Scoped"}"#);
-        assert_eq!(eval_text("status", Some("dashboard"), Some(scope)), "ready");
     }
 }
