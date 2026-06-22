@@ -2,9 +2,11 @@ package dev.crepuscularity.nativeshell
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -18,13 +20,16 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Divider
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
@@ -37,13 +42,23 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonPrimitive
 
 object CrepusActions {
     var dispatch: (String) -> String = { "{}" }
     var resultSink: (String) -> Unit = {}
 
+    fun applyResult(raw: String) {
+        CrepusStateStore.applyResult(raw)
+    }
+
     fun perform(action: String) {
         resultSink(dispatch(action))
+    }
+
+    fun performChange(action: String?, bind: String, value: JsonElement) {
+        resultSink(CrepusRustActions.dispatchChangeJson(action ?: "", bind, value.toString()))
     }
 }
 
@@ -71,10 +86,10 @@ fun CrepusGeneratedView(modifier: Modifier = Modifier) {
             Text("Ship one View IR tree to iOS and Android.", fontSize = 14.0.sp, color = Color(0xFFE5E7EB))
         }
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            Button(onClick = { CrepusActions.perform("sync") }, modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(Color(0xFFFFFFFF)).padding(16.dp)) {
+            Button(onClick = { CrepusActions.perform("sync") }, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFFFFF), contentColor = Color(0xFFFFFFFF)), elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp, pressedElevation = 0.dp, focusedElevation = 0.dp, hoveredElevation = 0.dp, disabledElevation = 0.dp), contentPadding = PaddingValues(16.dp)) {
                 Text("Sync")
             }
-            Button(onClick = { CrepusActions.perform("preview") }, modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(Color(0xFF334155)).padding(16.dp)) {
+            Button(onClick = { CrepusActions.perform("preview") }, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF334155), contentColor = Color(0xFFFFFFFF)), elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp, pressedElevation = 0.dp, focusedElevation = 0.dp, hoveredElevation = 0.dp, disabledElevation = 0.dp), contentPadding = PaddingValues(16.dp)) {
                 Text("Preview")
             }
         }

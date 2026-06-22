@@ -1095,6 +1095,7 @@ fn build_android(dir: &Path, flavor: &str) {
         c.arg(&task);
         c
     };
+    configure_gradle_java(&mut cmd);
     cmd.arg("--quiet"); // don't drown the user in gradle log spam
     delegate(cmd, "gradle build");
 }
@@ -1387,6 +1388,7 @@ fn run_android(dir: &Path, flavor: &str) {
         c.arg(&task);
         c
     };
+    configure_gradle_java(&mut cmd);
     cmd.arg("--quiet");
     delegate(cmd, "gradle install");
 
@@ -1483,6 +1485,52 @@ fn delegate(mut cmd: Command, label: &str) {
         Err(e) => ui::error(&format!(
             "failed to invoke `{label}`: {e}. Is the toolchain installed and on PATH?"
         )),
+    }
+}
+
+fn configure_gradle_java(cmd: &mut Command) {
+    match std::env::var("JAVA_HOME") {
+        Ok(raw) if PathBuf::from(&raw).join("bin/java").exists() => {}
+        _ => {
+            if let Some(java_home) = discover_java_home() {
+                cmd.env("JAVA_HOME", java_home);
+            } else {
+                cmd.env_remove("JAVA_HOME");
+            }
+        }
+    }
+}
+
+fn discover_java_home() -> Option<String> {
+    for candidate in [
+        "/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home",
+        "/opt/homebrew/opt/openjdk/libexec/openjdk.jdk/Contents/Home",
+    ] {
+        let path = Path::new(candidate);
+        if path.join("bin/java").exists() {
+            return Some(candidate.to_string());
+        }
+    }
+    if let Ok(out) = Command::new("/usr/libexec/java_home")
+        .args(["-v", "17"])
+        .output()
+    {
+        if out.status.success() {
+            let path = String::from_utf8(out.stdout).ok()?;
+            let trimmed = path.trim();
+            if !trimmed.is_empty() {
+                return Some(trimmed.to_string());
+            }
+        }
+    }
+    let java = fs::canonicalize("/opt/homebrew/bin/java")
+        .or_else(|_| fs::canonicalize("/usr/bin/java"))
+        .ok()?;
+    let home = java.parent()?.parent()?;
+    if home.join("bin/java").exists() {
+        Some(home.display().to_string())
+    } else {
+        None
     }
 }
 

@@ -738,6 +738,12 @@ pub extern "C" fn crepus_mobile_start_auto_scan() -> *mut c_char {
 }
 
 #[no_mangle]
+pub extern "C" fn crepus_mobile_last_result() -> *mut c_char {
+    let state = lock_action_state();
+    alloc_c_string(&state.last_result)
+}
+
+#[no_mangle]
 pub extern "C" fn crepus_mobile_last_error() -> *mut c_char {
     let state = lock_action_state();
     alloc_c_string(state.last_error.as_deref().unwrap_or(""))

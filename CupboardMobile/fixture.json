@@ -1,5 +1,5 @@
 {
-  "version": 3,
+  "version": 4,
   "root": [
     {
       "kind": "stack",
@@ -7,8 +7,6 @@
       "spacing": 16.0,
       "style": {
         "padding": 24.0,
-        "paddingTop": 112.0,
-        "paddingBottom": 40.0,
         "width": -1.0,
         "height": -1.0,
         "backgroundColor": "#101624",
