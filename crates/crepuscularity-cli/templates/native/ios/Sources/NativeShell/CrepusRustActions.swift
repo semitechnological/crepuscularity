@@ -15,6 +15,8 @@ private func crepusMobileDispatch(_ action: UnsafePointer<CChar>, _ length: UInt
 private func crepusMobileDispatchJson(_ action: UnsafePointer<CChar>, _ length: UInt, _ output: UnsafeMutablePointer<CChar>, _ outputLength: UInt) -> UInt
 @_silgen_name("crepus_mobile_dispatch_and_store_json")
 private func crepusMobileDispatchAndStoreJson(_ action: UnsafePointer<CChar>, _ length: UInt, _ output: UnsafeMutablePointer<CChar>, _ outputLength: UInt) -> UInt
+@_silgen_name("crepus_mobile_dispatch_change_json")
+private func crepusMobileDispatchChangeJson(_ action: UnsafePointer<CChar>, _ actionLength: UInt, _ bind: UnsafePointer<CChar>, _ bindLength: UInt, _ value: UnsafePointer<CChar>, _ valueLength: UInt, _ output: UnsafeMutablePointer<CChar>, _ outputLength: UInt) -> UInt
 @_silgen_name("crepus_mobile_start_auto_scan")
 private func crepusMobileStartAutoScan() -> UnsafeMutablePointer<CChar>?
 @_silgen_name("crepus_mobile_last_result")
@@ -69,6 +71,35 @@ public enum CrepusRustActions {
         }
     }
 
+    public static func dispatchChangeStored(_ action: String, bind: String, value: Any) -> String {
+        guard let valueJson = encodeJsonValue(value) else {
+            return "{\"ok\":false,\"error\":\"json encode failure\"}"
+        }
+        return action.withCString { actionPointer in
+            bind.withCString { bindPointer in
+                valueJson.withCString { valuePointer in
+                    let capacity = 4096
+                    let output = UnsafeMutablePointer<CChar>.allocate(capacity: capacity)
+                    defer { output.deallocate() }
+                    let written = crepusMobileDispatchChangeJson(
+                        actionPointer,
+                        UInt(strlen(actionPointer)),
+                        bindPointer,
+                        UInt(strlen(bindPointer)),
+                        valuePointer,
+                        UInt(strlen(valuePointer)),
+                        output,
+                        UInt(capacity)
+                    )
+                    if written >= capacity {
+                        return oversizedResultJson(action: action)
+                    }
+                    return String(cString: output)
+                }
+            }
+        }
+    }
+
     public static func startAutoScan() -> String {
         guard let pointer = crepusMobileStartAutoScan() else {
             return "{}"
@@ -105,6 +136,30 @@ public enum CrepusRustActions {
             return json
         }
         return "{\"ok\":false,\"error\":\"action result too large\"}"
+    }
+
+    private static func encodeJsonValue(_ value: Any) -> String? {
+        switch value {
+        case let text as String:
+            guard let data = try? JSONSerialization.data(withJSONObject: [text]),
+                  let json = String(data: data, encoding: .utf8)
+            else {
+                return nil
+            }
+            return String(json.dropFirst().dropLast())
+        case let number as NSNumber:
+            return number.stringValue
+        case is NSNull:
+            return "null"
+        default:
+            guard JSONSerialization.isValidJSONObject(value),
+                  let data = try? JSONSerialization.data(withJSONObject: value),
+                  let json = String(data: data, encoding: .utf8)
+            else {
+                return nil
+            }
+            return json
+        }
     }
 
     private static func dispatchHostAction(_ action: String) -> String? {

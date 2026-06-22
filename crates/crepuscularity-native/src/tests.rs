@@ -117,6 +117,9 @@ fn codegen_preserves_control_change_bindings() {
     assert!(swift
         .contains("public static func performChange(_ action: String?, bind: String, value: Any)"));
     assert!(swift.contains(
+        "resultSink(CrepusRustActions.dispatchChangeStored(action ?? \"\", bind: bind, value: value))"
+    ));
+    assert!(swift.contains(
         "CrepusActions.performChange(\"sync_enabled\", bind: \"enabled\", value: newValue)"
     ));
     assert!(swift.contains(
@@ -131,6 +134,9 @@ fn codegen_preserves_control_change_bindings() {
     assert!(
         compose.contains("fun performChange(action: String?, bind: String, value: JsonElement)")
     );
+    assert!(compose.contains(
+        "resultSink(CrepusRustActions.dispatchChangeJson(action ?: \"\", bind, value.toString()))"
+    ));
     assert!(compose
         .contains("CrepusActions.performChange(\"sync_enabled\", \"enabled\", JsonPrimitive(it))"));
     assert!(compose.contains(

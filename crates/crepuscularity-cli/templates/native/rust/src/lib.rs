@@ -84,6 +84,33 @@ pub fn dispatch_action_json(action: &str) -> String {
     result
 }
 
+fn dispatch_change_json(action: &str, bind: &str, value_json: &str) -> String {
+    let value = match serde_json::from_str::<serde_json::Value>(value_json) {
+        Ok(value) => value,
+        Err(error) => {
+            let state = lock_action_state();
+            return action_json(false, action, None, Some(&format!("invalid change payload: {error}")), &state);
+        }
+    };
+    let mut payload = serde_json::Map::new();
+    payload.insert(bind.to_string(), value);
+    if let Some((capability, method)) = action.split_once('.') {
+        return dispatch_action_json(
+            &serde_json::json!({
+                "kind": "plugin",
+                "capability": capability,
+                "method": method,
+                "payload": payload,
+            })
+            .to_string(),
+        );
+    }
+    if !action.is_empty() {
+        payload.insert("action".to_string(), serde_json::Value::String(action.to_string()));
+    }
+    dispatch_action_json(&serde_json::Value::Object(payload).to_string())
+}
+
 fn parse_action_error(result: &str) -> Option<String> {
     let payload = serde_json::from_str::<serde_json::Value>(result).ok()?;
     if payload.get("ok").and_then(|value| value.as_bool()) == Some(false) {
@@ -670,6 +697,36 @@ pub extern "C" fn crepus_mobile_dispatch_and_store_json(
 }
 
 #[no_mangle]
+pub extern "C" fn crepus_mobile_dispatch_change_json(
+    action_ptr: *const c_char,
+    action_len: usize,
+    bind_ptr: *const c_char,
+    bind_len: usize,
+    value_ptr: *const c_char,
+    value_len: usize,
+    output_ptr: *mut c_char,
+    output_len: usize,
+) -> usize {
+    let Some(action) = action_from_ffi(action_ptr, action_len) else {
+        let result = action_json(false, "", None, Some("invalid action pointer"), &MobileActionState::default());
+        return copy_json_to_output(&result, output_ptr, output_len);
+    };
+    let Some(bind) = action_from_ffi(bind_ptr, bind_len) else {
+        let result = action_json(false, action.as_ref(), None, Some("invalid bind pointer"), &MobileActionState::default());
+        return copy_json_to_output(&result, output_ptr, output_len);
+    };
+    let Some(value_json) = action_from_ffi(value_ptr, value_len) else {
+        let result = action_json(false, action.as_ref(), None, Some("invalid value pointer"), &MobileActionState::default());
+        return copy_json_to_output(&result, output_ptr, output_len);
+    };
+    copy_json_to_output(
+        &dispatch_change_json(action.as_ref(), bind.as_ref(), value_json.as_ref()),
+        output_ptr,
+        output_len,
+    )
+}
+
+#[no_mangle]
 pub extern "C" fn crepus_mobile_start_auto_scan() -> *mut c_char {
     let mut state = lock_action_state();
     if !state.auto_scan_started {
@@ -1046,6 +1103,36 @@ pub extern "system" fn Java_dev_crepuscularity_nativeshell_CrepusRustActions_dis
 
 #[cfg(target_os = "android")]
 #[no_mangle]
+pub extern "system" fn Java_dev_crepuscularity_nativeshell_CrepusRustActions_dispatchChangeJson<'a>(
+    mut env: JNIEnv<'a>,
+    _class: JClass<'a>,
+    action: JString<'a>,
+    bind: JString<'a>,
+    value_json: JString<'a>,
+) -> JString<'a> {
+    let result = match (
+        env.get_string(&action),
+        env.get_string(&bind),
+        env.get_string(&value_json),
+    ) {
+        (Ok(action), Ok(bind), Ok(value_json)) => dispatch_change_json(
+            action.to_string_lossy().as_ref(),
+            bind.to_string_lossy().as_ref(),
+            value_json.to_string_lossy().as_ref(),
+        ),
+        _ => action_json(
+            false,
+            "",
+            None,
+            Some("invalid change payload"),
+            &MobileActionState::default(),
+        ),
+    };
+    env.new_string(result).unwrap()
+}
+
+#[cfg(target_os = "android")]
+#[no_mangle]
 pub extern "system" fn Java_dev_crepuscularity_nativeshell_CrepusRustActions_storeResultJson(
     mut env: JNIEnv<'_>,
     _class: JClass<'_>,
@@ -1292,6 +1379,19 @@ mod tests {
         assert_eq!(result["action"], "sync");
         assert_eq!(result["value"]["message"], "hydrate");
         assert_eq!(result["state"]["lastPayload"], r#"{"message":"hydrate"}"#);
+    }
+
+    #[test]
+    fn dispatch_change_json_builds_action_payload_in_rust() {
+        let _guard = test_lock();
+        reset_action_state();
+        let result = dispatch_change_json("sync", "enabled", "true");
+
+        let result: serde_json::Value = serde_json::from_str(&result).expect("json");
+        assert_eq!(result["ok"], true);
+        assert_eq!(result["action"], "sync");
+        assert_eq!(result["value"]["enabled"], true);
+        assert_eq!(result["state"]["lastPayload"], r#"{"enabled":true}"#);
     }
 
     #[test]
