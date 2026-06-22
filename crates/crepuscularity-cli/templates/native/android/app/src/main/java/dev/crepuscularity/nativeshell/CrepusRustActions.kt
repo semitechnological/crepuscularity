@@ -68,6 +68,7 @@ object CrepusRustActions {
     external fun dispatchAction(action: String): Boolean
     external fun dispatchActionJson(action: String): String
     external fun dispatchAndStoreJson(action: String): String
+    external fun lastResult(): String
     external fun storeResultJson(json: String): Boolean
     external fun evalText(expr: String, scopeName: String?, scopeJson: String?): String
     external fun evalBool(expr: String, scopeName: String?, scopeJson: String?): Boolean
@@ -364,7 +365,7 @@ object CrepusActionState {
     }
 
     fun record(result: String) {
-        lastResult.value = result
+        lastResult.value = CrepusRustActions.lastResult()
         lastError.value = CrepusRustActions.lastError().ifBlank { null }
     }
 }
