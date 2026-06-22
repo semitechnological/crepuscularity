@@ -7,6 +7,12 @@ private func crepusMobileDispatch(_ action: UnsafePointer<CChar>, _ length: UInt
 
 @_silgen_name("crepus_mobile_dispatch_json")
 private func crepusMobileDispatchJson(_ action: UnsafePointer<CChar>, _ length: UInt, _ output: UnsafeMutablePointer<CChar>, _ outputLength: UInt) -> UInt
+@_silgen_name("crepus_mobile_last_result")
+private func crepusMobileLastResult() -> UnsafeMutablePointer<CChar>?
+@_silgen_name("crepus_mobile_last_error")
+private func crepusMobileLastError() -> UnsafeMutablePointer<CChar>?
+@_silgen_name("crepus_mobile_free_string")
+private func crepusMobileFreeString(_ pointer: UnsafeMutablePointer<CChar>?)
 @_silgen_name("crepus_mobile_store_result_json")
 private func crepusMobileStoreResultJson(_ json: UnsafePointer<CChar>, _ length: UInt) -> Bool
 @_silgen_name("crepus_mobile_eval_text")
@@ -168,11 +174,6 @@ public final class CrepusStateStore: ObservableObject {
     }
 }
 
-private struct CrepusActionResult: Decodable {
-    let ok: Bool?
-    let error: String?
-}
-
 @MainActor
 public final class CrepusActionStore: ObservableObject {
     public static let shared = CrepusActionStore()
@@ -185,13 +186,24 @@ public final class CrepusActionStore: ObservableObject {
     }
 
     public func record(_ result: String) {
-        lastResult = result
-        let data = Data(result.utf8)
-        if let payload = try? JSONDecoder().decode(CrepusActionResult.self, from: data),
-           payload.ok == false {
-            lastError = payload.error ?? result
-        } else {
-            lastError = nil
+        lastResult = resultString()
+        lastError = errorString()
+    }
+
+    private func resultString() -> String {
+        guard let pointer = crepusMobileLastResult() else {
+            return "{}"
         }
+        defer { crepusMobileFreeString(pointer) }
+        return String(cString: pointer)
+    }
+
+    private func errorString() -> String? {
+        guard let pointer = crepusMobileLastError() else {
+            return nil
+        }
+        defer { crepusMobileFreeString(pointer) }
+        let value = String(cString: pointer)
+        return value.isEmpty ? nil : value
     }
 }

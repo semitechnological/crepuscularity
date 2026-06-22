@@ -1,4 +1,4 @@
-use std::ffi::CStr;
+use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 use std::sync::{Mutex, MutexGuard, OnceLock};
 
@@ -13,6 +13,8 @@ struct MobileActionState {
     preview_count: u64,
     last_action: String,
     last_payload: Option<String>,
+    last_result: String,
+    last_error: Option<String>,
 }
 
 static ACTION_STATE: OnceLock<Mutex<MobileActionState>> = OnceLock::new();
@@ -57,10 +59,27 @@ pub fn dispatch_action_json(action: &str) -> String {
     };
     state.last_action = action_name.to_string();
     state.last_payload = payload.map(serde_json::Value::to_string);
-    match handler(&mut state, payload) {
+    let result = match handler(&mut state, payload) {
         Ok(value) => action_json(true, action_name, Some(value), None, &state),
         Err(error) => action_json(false, action_name, None, Some(&error), &state),
+    };
+    state.last_error = parse_action_error(&result);
+    state.last_result = result.clone();
+    result
+}
+
+fn parse_action_error(result: &str) -> Option<String> {
+    let payload = serde_json::from_str::<serde_json::Value>(result).ok()?;
+    if payload.get("ok").and_then(|value| value.as_bool()) == Some(false) {
+        return Some(
+            payload
+                .get("error")
+                .and_then(|value| value.as_str())
+                .unwrap_or(result)
+                .to_string(),
+        );
     }
+    None
 }
 
 fn action_handler(action: &str) -> Option<ActionHandler> {
@@ -187,6 +206,10 @@ fn copy_json_to_output(result: &str, output_ptr: *mut c_char, output_len: usize)
         *output_ptr.add(copy_len) = 0;
     }
     bytes.len()
+}
+
+fn alloc_c_string(result: &str) -> *mut c_char {
+    CString::new(result).map(CString::into_raw).unwrap_or(std::ptr::null_mut())
 }
 
 fn store_view_state(raw: &str) -> bool {
@@ -345,6 +368,25 @@ pub extern "C" fn crepus_mobile_store_result_json(
 }
 
 #[no_mangle]
+pub extern "C" fn crepus_mobile_last_result() -> *mut c_char {
+    let state = lock_action_state();
+    alloc_c_string(&state.last_result)
+}
+
+#[no_mangle]
+pub extern "C" fn crepus_mobile_last_error() -> *mut c_char {
+    let state = lock_action_state();
+    alloc_c_string(state.last_error.as_deref().unwrap_or(""))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn crepus_mobile_free_string(ptr: *mut c_char) {
+    if !ptr.is_null() {
+        drop(CString::from_raw(ptr));
+    }
+}
+
+#[no_mangle]
 pub extern "C" fn crepus_mobile_eval_text(
     expr_ptr: *const c_char,
     expr_len: usize,
@@ -471,6 +513,26 @@ pub extern "system" fn Java_dev_crepuscularity_nativeshell_CrepusRustActions_sto
         Ok(json) => store_view_state(json.to_string_lossy().as_ref()),
         Err(_) => false,
     }
+}
+
+#[cfg(target_os = "android")]
+#[no_mangle]
+pub extern "system" fn Java_dev_crepuscularity_nativeshell_CrepusRustActions_lastResult<'a>(
+    env: JNIEnv<'a>,
+    _class: JClass<'a>,
+) -> JString<'a> {
+    let state = lock_action_state();
+    env.new_string(state.last_result.clone()).unwrap()
+}
+
+#[cfg(target_os = "android")]
+#[no_mangle]
+pub extern "system" fn Java_dev_crepuscularity_nativeshell_CrepusRustActions_lastError<'a>(
+    env: JNIEnv<'a>,
+    _class: JClass<'a>,
+) -> JString<'a> {
+    let state = lock_action_state();
+    env.new_string(state.last_error.clone().unwrap_or_default()).unwrap()
 }
 
 #[cfg(target_os = "android")]

@@ -6,10 +6,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 
 object CrepusStateStore {
     private val json = Json { ignoreUnknownKeys = true }
@@ -51,6 +48,8 @@ object CrepusRustActions {
 
     external fun dispatchAction(action: String): Boolean
     external fun dispatchActionJson(action: String): String
+    external fun lastResult(): String
+    external fun lastError(): String
     external fun storeResultJson(json: String): Boolean
     external fun evalText(expr: String, scopeName: String?, scopeJson: String?): String
     external fun evalBool(expr: String, scopeName: String?, scopeJson: String?): Boolean
@@ -66,20 +65,13 @@ object CrepusRustActions {
 object CrepusActionState {
     val lastResult = mutableStateOf("{}")
     val lastError = mutableStateOf<String?>(null)
-    private val json = Json { ignoreUnknownKeys = true }
 
     fun dispatch(action: String) {
         record(CrepusActions.dispatch(action))
     }
 
     fun record(result: String) {
-        lastResult.value = result
-        lastError.value =
-            runCatching {
-                val payload = json.parseToJsonElement(result).jsonObject
-                result.takeIf { payload["ok"]?.jsonPrimitive?.booleanOrNull == false }
-            }.getOrElse {
-                result.takeIf { it.isNotBlank() }
-            }
+        lastResult.value = CrepusRustActions.lastResult()
+        lastError.value = CrepusRustActions.lastError().ifBlank { null }
     }
 }
