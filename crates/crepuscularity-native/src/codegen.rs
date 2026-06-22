@@ -48,7 +48,10 @@ fn swiftui_node(
     let pad = indent_str(indent);
     match node {
         ViewNode::Text {
-            content, bind, style, ..
+            content,
+            bind,
+            style,
+            ..
         } => {
             let text = bind
                 .as_deref()
@@ -140,8 +143,7 @@ fn swiftui_node(
                     )
                 })
                 .unwrap_or_else(|| format!(".constant({})", swift_bool(*checked)));
-            let mut out =
-                format!("{pad}Toggle(\"{}\", isOn: {binding})", swift_escape(label));
+            let mut out = format!("{pad}Toggle(\"{}\", isOn: {binding})", swift_escape(label));
             swiftui_style(&mut out, style.as_ref(), false, indent);
             out
         }
@@ -163,8 +165,7 @@ fn swiftui_node(
                     )
                 })
                 .unwrap_or_else(|| format!(".constant({})", swift_bool(*checked)));
-            let mut out =
-                format!("{pad}Toggle(\"{}\", isOn: {binding})", swift_escape(label));
+            let mut out = format!("{pad}Toggle(\"{}\", isOn: {binding})", swift_escape(label));
             swiftui_style(&mut out, style.as_ref(), false, indent);
             out
         }
@@ -369,7 +370,8 @@ fn swiftui_node(
             out
         }
         ViewNode::Input {
-            placeholder, bind,
+            placeholder,
+            bind,
             multiline,
             on_change,
             style,
@@ -730,7 +732,13 @@ fn compose_nodes(
     scope_var: Option<&str>,
 ) -> String {
     if nodes.len() == 1 {
-        compose_node_with_base(&nodes[0], indent, Some("modifier".to_string()), scope_name, scope_var)
+        compose_node_with_base(
+            &nodes[0],
+            indent,
+            Some("modifier".to_string()),
+            scope_name,
+            scope_var,
+        )
     } else {
         let pad = indent_str(indent);
         let inner = compose_children(nodes, indent + 1, scope_name, scope_var);
@@ -757,7 +765,10 @@ fn compose_node_with_base(
     let pad = indent_str(indent);
     match node {
         ViewNode::Text {
-            content, bind, style, ..
+            content,
+            bind,
+            style,
+            ..
         } => {
             let args = compose_text_args(style.as_ref());
             let text = bind
@@ -892,7 +903,9 @@ fn compose_node_with_base(
                 .unwrap_or_else(|| format!("{value:.3}f"));
             let on_value_change = bind
                 .as_deref()
-                .map(|bind| compose_change(on_change.as_deref(), bind, "JsonPrimitive(it.toDouble())"))
+                .map(|bind| {
+                    compose_change(on_change.as_deref(), bind, "JsonPrimitive(it.toDouble())")
+                })
                 .unwrap_or_default();
             format!(
                 "{pad}Column{modifier} {{\n{label}{}Slider(value = {slider_value}, onValueChange = {{ {on_value_change} }}, valueRange = {min:.3}f..{max:.3}f)\n{pad}}}",

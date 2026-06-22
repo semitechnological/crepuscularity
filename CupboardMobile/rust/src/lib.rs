@@ -1,8 +1,11 @@
 use std::ffi::{CStr, CString};
 use std::fs;
+use std::io::{Read, Write};
+use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
 use std::os::raw::c_char;
 use std::path::{Component, Path, PathBuf};
 use std::sync::{Mutex, MutexGuard, OnceLock};
+use std::time::Duration;
 
 #[cfg(target_os = "android")]
 use jni::objects::{JClass, JString};
@@ -150,6 +153,8 @@ fn plugin_action(
         "filesystem" => filesystem_backend(method, payload)?,
         "device" => device_backend(method)?,
         "app" => app_backend(state, method)?,
+        "network" => network_backend(method, payload)?,
+        "http" => http_backend(method, payload)?,
         other => return Err(format!("unsupported capability: {other}")),
     };
     Ok(serde_json::json!({
@@ -288,6 +293,69 @@ fn app_backend(state: &MobileActionState, method: &str) -> Result<serde_json::Va
         })),
         other => Err(format!("unsupported app method: {other}")),
     }
+}
+
+fn network_backend(
+    method: &str,
+    payload: Option<&serde_json::Value>,
+) -> Result<serde_json::Value, String> {
+    match method {
+        "status" => {
+            let host = payload
+                .and_then(|value| value.get("host"))
+                .and_then(|value| value.as_str())
+                .unwrap_or("1.1.1.1");
+            let port = payload
+                .and_then(|value| value.get("port"))
+                .and_then(|value| value.as_u64())
+                .unwrap_or(53) as u16;
+            let timeout_ms = payload
+                .and_then(|value| value.get("timeoutMs"))
+                .and_then(|value| value.as_u64())
+                .unwrap_or(1000);
+            let reachable = probe_socket(host, port, timeout_ms);
+            Ok(serde_json::json!({
+                "host": host,
+                "port": port,
+                "reachable": reachable,
+            }))
+        }
+        other => Err(format!("unsupported network method: {other}")),
+    }
+}
+
+fn http_backend(
+    method: &str,
+    payload: Option<&serde_json::Value>,
+) -> Result<serde_json::Value, String> {
+    let payload = payload.ok_or_else(|| "http request requires payload".to_string())?;
+    let url = payload_string(Some(payload), "url")?;
+    let verb = match method {
+        "get" => "GET",
+        "post" => "POST",
+        "put" => "PUT",
+        "delete" => "DELETE",
+        "request" => payload
+            .get("verb")
+            .and_then(|value| value.as_str())
+            .unwrap_or("GET"),
+        other => return Err(format!("unsupported http method: {other}")),
+    };
+    let parsed = parse_http_url(&url)?;
+    let body = payload
+        .get("body")
+        .map(|body| match body {
+            serde_json::Value::String(text) => Ok(text.clone()),
+            other => serde_json::to_string(&other).map_err(|error| error.to_string()),
+        })
+        .transpose()?
+        .unwrap_or_default();
+    let response = send_http_request(verb, &parsed, payload.get("headers"), &body)?;
+    Ok(serde_json::json!({
+        "status": response.status,
+        "ok": (200..=299).contains(&response.status),
+        "text": response.body,
+    }))
 }
 
 fn parse_action_request(input: &str) -> serde_json::Value {
@@ -466,6 +534,118 @@ fn save_json_map(
 
 fn path_string(path: &PathBuf) -> String {
     path.to_string_lossy().to_string()
+}
+
+fn probe_socket(host: &str, port: u16, timeout_ms: u64) -> bool {
+    resolve_socket_addrs(host, port)
+        .into_iter()
+        .any(|address| TcpStream::connect_timeout(&address, Duration::from_millis(timeout_ms)).is_ok())
+}
+
+fn resolve_socket_addrs(host: &str, port: u16) -> Vec<SocketAddr> {
+    (host, port)
+        .to_socket_addrs()
+        .map(|addresses| addresses.collect())
+        .unwrap_or_default()
+}
+
+struct ParsedHttpUrl {
+    host: String,
+    port: u16,
+    path: String,
+}
+
+struct HttpResponse {
+    status: u16,
+    body: String,
+}
+
+fn parse_http_url(url: &str) -> Result<ParsedHttpUrl, String> {
+    let rest = url
+        .strip_prefix("http://")
+        .ok_or_else(|| "only http:// URLs are supported".to_string())?;
+    let (authority, path) = match rest.split_once('/') {
+        Some((authority, path)) => (authority, format!("/{}", path)),
+        None => (rest, "/".to_string()),
+    };
+    let (host, port) = match authority.rsplit_once(':') {
+        Some((host, port)) if !host.contains(']') => {
+            let port = port
+                .parse::<u16>()
+                .map_err(|_| format!("invalid port in URL: {url}"))?;
+            (host.to_string(), port)
+        }
+        _ => (authority.to_string(), 80),
+    };
+    if host.is_empty() {
+        return Err("URL host must not be empty".to_string());
+    }
+    Ok(ParsedHttpUrl { host, port, path })
+}
+
+fn send_http_request(
+    verb: &str,
+    url: &ParsedHttpUrl,
+    headers: Option<&serde_json::Value>,
+    body: &str,
+) -> Result<HttpResponse, String> {
+    let address = resolve_socket_addrs(&url.host, url.port)
+        .into_iter()
+        .next()
+        .ok_or_else(|| format!("failed to resolve {}:{}", url.host, url.port))?;
+    let mut stream = TcpStream::connect_timeout(&address, Duration::from_secs(2))
+        .map_err(|error| format!("connect {}: {error}", address))?;
+    stream
+        .set_read_timeout(Some(Duration::from_secs(2)))
+        .map_err(|error| error.to_string())?;
+    stream
+        .set_write_timeout(Some(Duration::from_secs(2)))
+        .map_err(|error| error.to_string())?;
+
+    let mut request = format!(
+        "{verb} {} HTTP/1.1\r\nHost: {}:{}\r\nConnection: close\r\n",
+        url.path, url.host, url.port
+    );
+    if let Some(headers) = headers.and_then(|value| value.as_object()) {
+        for (key, value) in headers {
+            let Some(value) = value.as_str() else {
+                return Err(format!("header {key} must be a string"));
+            };
+            request.push_str(&format!("{key}: {value}\r\n"));
+        }
+    }
+    if !body.is_empty() {
+        request.push_str(&format!("Content-Length: {}\r\n", body.len()));
+    }
+    request.push_str("\r\n");
+    request.push_str(body);
+
+    stream
+        .write_all(request.as_bytes())
+        .map_err(|error| format!("write request: {error}"))?;
+    let mut response = String::new();
+    stream
+        .read_to_string(&mut response)
+        .map_err(|error| format!("read response: {error}"))?;
+    parse_http_response(&response)
+}
+
+fn parse_http_response(response: &str) -> Result<HttpResponse, String> {
+    let (head, body) = response
+        .split_once("\r\n\r\n")
+        .ok_or_else(|| "invalid HTTP response".to_string())?;
+    let mut lines = head.lines();
+    let status_line = lines.next().ok_or_else(|| "missing status line".to_string())?;
+    let status = status_line
+        .split_whitespace()
+        .nth(1)
+        .ok_or_else(|| "missing status code".to_string())?
+        .parse::<u16>()
+        .map_err(|_| "invalid status code".to_string())?;
+    Ok(HttpResponse {
+        status,
+        body: body.to_string(),
+    })
 }
 
 fn ensure_parent_dir(path: &Path) -> Result<(), String> {
@@ -949,6 +1129,9 @@ pub extern "system" fn Java_dev_crepuscularity_nativeshell_CrepusRustActions_eva
 mod tests {
     use super::*;
     use std::ffi::CString;
+    use std::io::{Read, Write};
+    use std::net::TcpListener;
+    use std::thread;
 
     #[test]
     fn dispatch_action_json_mutates_state() {
@@ -1073,6 +1256,54 @@ mod tests {
         let result: serde_json::Value = serde_json::from_str(&result).expect("json");
         assert_eq!(result["ok"], false);
         assert_eq!(result["error"], "parent segments are not allowed");
+    }
+
+    #[test]
+    fn network_status_reports_reachable_loopback_port() {
+        let _guard = test_lock();
+        reset_action_state();
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+        let port = listener.local_addr().expect("addr").port();
+        let server = thread::spawn(move || {
+            let _ = listener.accept();
+        });
+        let action = format!(
+            r#"{{"kind":"plugin","capability":"network","method":"status","payload":{{"host":"127.0.0.1","port":{port},"timeoutMs":250}}}}"#
+        );
+
+        let result = dispatch_action_json(&action);
+
+        let result: serde_json::Value = serde_json::from_str(&result).expect("json");
+        assert_eq!(result["ok"], true);
+        assert_eq!(result["value"]["value"]["reachable"], true);
+        server.join().expect("server thread");
+    }
+
+    #[test]
+    fn http_get_returns_text_from_loopback_server() {
+        let _guard = test_lock();
+        reset_action_state();
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+        let port = listener.local_addr().expect("addr").port();
+        let server = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().expect("accept");
+            let mut buffer = [0_u8; 1024];
+            let _ = stream.read(&mut buffer);
+            stream
+                .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 5\r\nConnection: close\r\n\r\nhello")
+                .expect("write response");
+        });
+        let action = format!(
+            r#"{{"kind":"plugin","capability":"http","method":"get","payload":{{"url":"http://127.0.0.1:{port}/health"}}}}"#
+        );
+
+        let result = dispatch_action_json(&action);
+
+        let result: serde_json::Value = serde_json::from_str(&result).expect("json");
+        assert_eq!(result["ok"], true);
+        assert_eq!(result["value"]["value"]["status"], 200);
+        assert_eq!(result["value"]["value"]["text"], "hello");
+        server.join().expect("server thread");
     }
 
     #[test]
