@@ -33,7 +33,7 @@ fn native_ir_renders_file_with_context() {
         String::from_utf8_lossy(&out.stderr)
     );
     let value: serde_json::Value = serde_json::from_slice(&out.stdout).expect("IR JSON");
-    assert_eq!(value["version"], 3);
+    assert_eq!(value["version"], 4);
     assert_eq!(value["root"][0]["children"][0]["content"], "Hello Ada");
 }
 
@@ -413,9 +413,9 @@ fn mobile_new_scaffolds_android_runtime_audit_fixes() {
     assert!(android_actions.contains("CrepusRustActions.evalItemsJson"));
     assert!(!android_actions.contains("contains(\"\\\"ok\\\":false\")"));
 
-    let android_generated = std::fs::read_to_string(
-        root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/generated/CrepusGeneratedView.kt"),
-    )
+    let android_generated = std::fs::read_to_string(root.join(
+        "android/app/src/main/java/dev/crepuscularity/nativeshell/generated/CrepusGeneratedView.kt",
+    ))
     .expect("read generated view");
     assert!(android_generated.contains("object CrepusActions"));
     assert!(android_generated.contains("fun perform(action: String)"));

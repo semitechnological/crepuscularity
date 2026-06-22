@@ -90,14 +90,18 @@ fn codegen_preserves_dynamic_state_bindings() {
     assert!(swift.contains("public static let model = CrepusStateStore.shared"));
     assert!(swift.contains("if CrepusActions.model.bool(\"count > 1\")"));
     assert!(swift.contains("CrepusActions.model.items(\"hubs\")"));
-    assert!(swift.contains("CrepusActions.model.text(\"hub.name\", scopeName: \"hub\", scope: hub)"));
+    assert!(
+        swift.contains("CrepusActions.model.text(\"hub.name\", scopeName: \"hub\", scope: hub)")
+    );
     assert!(swift.contains("CrepusActions.model.text(\"pairing_code\")"));
 
     let compose = generate_native_source(&ir, NativeCodegenTarget::Compose, "DynamicView");
     assert!(compose.contains("CrepusStateStore.applyResult(raw)"));
     assert!(compose.contains("if (CrepusStateStore.bool(\"count > 1\"))"));
     assert!(compose.contains("CrepusStateStore.items(\"hubs\").forEachIndexed"));
-    assert!(compose.contains("CrepusStateStore.text(\"hub.name\", scopeName = \"hub\", scope = hub)"));
+    assert!(
+        compose.contains("CrepusStateStore.text(\"hub.name\", scopeName = \"hub\", scope = hub)")
+    );
     assert!(compose.contains("CrepusStateStore.text(\"pairing_code\")"));
 }
 
@@ -110,18 +114,33 @@ fn codegen_preserves_control_change_bindings() {
     .unwrap();
 
     let swift = generate_native_source(&ir, NativeCodegenTarget::SwiftUi, "ControlsView");
-    assert!(swift.contains("public static func performChange(_ action: String?, bind: String, value: Any)"));
-    assert!(swift.contains("CrepusActions.performChange(\"sync_enabled\", bind: \"enabled\", value: newValue)"));
-    assert!(swift.contains("CrepusActions.performChange(\"sync_volume\", bind: \"volume\", value: newValue)"));
-    assert!(swift.contains("CrepusActions.performChange(\"sync_name\", bind: \"name\", value: newValue)"));
-    assert!(swift.contains("CrepusActions.performChange(\"sync_mode\", bind: \"mode\", value: newValue)"));
+    assert!(swift
+        .contains("public static func performChange(_ action: String?, bind: String, value: Any)"));
+    assert!(swift.contains(
+        "CrepusActions.performChange(\"sync_enabled\", bind: \"enabled\", value: newValue)"
+    ));
+    assert!(swift.contains(
+        "CrepusActions.performChange(\"sync_volume\", bind: \"volume\", value: newValue)"
+    ));
+    assert!(swift
+        .contains("CrepusActions.performChange(\"sync_name\", bind: \"name\", value: newValue)"));
+    assert!(swift
+        .contains("CrepusActions.performChange(\"sync_mode\", bind: \"mode\", value: newValue)"));
 
     let compose = generate_native_source(&ir, NativeCodegenTarget::Compose, "ControlsView");
-    assert!(compose.contains("fun performChange(action: String?, bind: String, value: JsonElement)"));
-    assert!(compose.contains("CrepusActions.performChange(\"sync_enabled\", \"enabled\", JsonPrimitive(it))"));
-    assert!(compose.contains("CrepusActions.performChange(\"sync_volume\", \"volume\", JsonPrimitive(it.toDouble()))"));
-    assert!(compose.contains("CrepusActions.performChange(\"sync_name\", \"name\", JsonPrimitive(it))"));
-    assert!(compose.contains("CrepusActions.performChange(\"sync_mode\", \"mode\", JsonPrimitive(\"auto\"))"));
+    assert!(
+        compose.contains("fun performChange(action: String?, bind: String, value: JsonElement)")
+    );
+    assert!(compose
+        .contains("CrepusActions.performChange(\"sync_enabled\", \"enabled\", JsonPrimitive(it))"));
+    assert!(compose.contains(
+        "CrepusActions.performChange(\"sync_volume\", \"volume\", JsonPrimitive(it.toDouble()))"
+    ));
+    assert!(
+        compose.contains("CrepusActions.performChange(\"sync_name\", \"name\", JsonPrimitive(it))")
+    );
+    assert!(compose
+        .contains("CrepusActions.performChange(\"sync_mode\", \"mode\", JsonPrimitive(\"auto\"))"));
 }
 
 #[test]
