@@ -382,6 +382,8 @@ pub enum ViewNode {
         #[serde(skip_serializing_if = "Option::is_none")]
         step: Option<f32>,
         #[serde(skip_serializing_if = "Option::is_none")]
+        on_change: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
         style: Option<ViewStyle>,
     },
     #[serde(rename = "progress")]
@@ -493,6 +495,8 @@ pub enum ViewNode {
         #[serde(default)]
         multiline: bool,
         #[serde(skip_serializing_if = "Option::is_none")]
+        on_change: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
         style: Option<ViewStyle>,
     },
     /// Segmented / picker control bound to a context string field.
@@ -501,6 +505,8 @@ pub enum ViewNode {
         /// Context field holding the selected option value.
         bind: String,
         options: Vec<PickerOption>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        on_change: Option<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
         style: Option<ViewStyle>,
     },

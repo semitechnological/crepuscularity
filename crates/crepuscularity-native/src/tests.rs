@@ -102,6 +102,29 @@ fn codegen_preserves_dynamic_state_bindings() {
 }
 
 #[test]
+fn codegen_preserves_control_change_bindings() {
+    let ir = render_template_to_ir(
+        "div\n toggle bind=enabled @change=\"sync_enabled\"\n  \"Enabled\"\n slider bind=volume @change=\"sync_volume\" min=0 max=100\n input bind=name @change=\"sync_name\" placeholder=\"Name\"\n picker bind=mode @change=\"sync_mode\"\n  option value=\"auto\"\n    \"Auto\"\n  option value=\"manual\"\n    \"Manual\"",
+        &TemplateContext::new(),
+    )
+    .unwrap();
+
+    let swift = generate_native_source(&ir, NativeCodegenTarget::SwiftUi, "ControlsView");
+    assert!(swift.contains("public static func performChange(_ action: String?, bind: String, value: Any)"));
+    assert!(swift.contains("CrepusActions.performChange(\"sync_enabled\", bind: \"enabled\", value: newValue)"));
+    assert!(swift.contains("CrepusActions.performChange(\"sync_volume\", bind: \"volume\", value: newValue)"));
+    assert!(swift.contains("CrepusActions.performChange(\"sync_name\", bind: \"name\", value: newValue)"));
+    assert!(swift.contains("CrepusActions.performChange(\"sync_mode\", bind: \"mode\", value: newValue)"));
+
+    let compose = generate_native_source(&ir, NativeCodegenTarget::Compose, "ControlsView");
+    assert!(compose.contains("fun performChange(action: String?, bind: String, value: JsonElement)"));
+    assert!(compose.contains("CrepusActions.performChange(\"sync_enabled\", \"enabled\", JsonPrimitive(it))"));
+    assert!(compose.contains("CrepusActions.performChange(\"sync_volume\", \"volume\", JsonPrimitive(it.toDouble()))"));
+    assert!(compose.contains("CrepusActions.performChange(\"sync_name\", \"name\", JsonPrimitive(it))"));
+    assert!(compose.contains("CrepusActions.performChange(\"sync_mode\", \"mode\", JsonPrimitive(\"auto\"))"));
+}
+
+#[test]
 fn compose_button_colors_use_material_colors() {
     let ir = render_template_to_ir(
         "button @click=\"tap\" bg-[#ffffff] text-[#000000] px-6 py-5\n  \"Tap\"",
