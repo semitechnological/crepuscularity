@@ -10,13 +10,13 @@ private func crepusMobileDispatchJson(_ action: UnsafePointer<CChar>, _ length: 
 @_silgen_name("crepus_mobile_store_result_json")
 private func crepusMobileStoreResultJson(_ json: UnsafePointer<CChar>, _ length: UInt) -> Bool
 @_silgen_name("crepus_mobile_eval_text")
-private func crepusMobileEvalText(_ expr: UnsafePointer<CChar>, _ exprLength: UInt, _ scope: UnsafePointer<CChar>?, _ scopeLength: UInt, _ output: UnsafeMutablePointer<CChar>, _ outputLength: UInt) -> UInt
+private func crepusMobileEvalText(_ expr: UnsafePointer<CChar>, _ exprLength: UInt, _ scopeName: UnsafePointer<CChar>?, _ scopeNameLength: UInt, _ scope: UnsafePointer<CChar>?, _ scopeLength: UInt, _ output: UnsafeMutablePointer<CChar>, _ outputLength: UInt) -> UInt
 @_silgen_name("crepus_mobile_eval_bool")
-private func crepusMobileEvalBool(_ expr: UnsafePointer<CChar>, _ exprLength: UInt, _ scope: UnsafePointer<CChar>?, _ scopeLength: UInt) -> Bool
+private func crepusMobileEvalBool(_ expr: UnsafePointer<CChar>, _ exprLength: UInt, _ scopeName: UnsafePointer<CChar>?, _ scopeNameLength: UInt, _ scope: UnsafePointer<CChar>?, _ scopeLength: UInt) -> Bool
 @_silgen_name("crepus_mobile_eval_number")
-private func crepusMobileEvalNumber(_ expr: UnsafePointer<CChar>, _ exprLength: UInt, _ scope: UnsafePointer<CChar>?, _ scopeLength: UInt) -> Double
+private func crepusMobileEvalNumber(_ expr: UnsafePointer<CChar>, _ exprLength: UInt, _ scopeName: UnsafePointer<CChar>?, _ scopeNameLength: UInt, _ scope: UnsafePointer<CChar>?, _ scopeLength: UInt) -> Double
 @_silgen_name("crepus_mobile_eval_items_json")
-private func crepusMobileEvalItemsJson(_ expr: UnsafePointer<CChar>, _ exprLength: UInt, _ scope: UnsafePointer<CChar>?, _ scopeLength: UInt, _ output: UnsafeMutablePointer<CChar>, _ outputLength: UInt) -> UInt
+private func crepusMobileEvalItemsJson(_ expr: UnsafePointer<CChar>, _ exprLength: UInt, _ scopeName: UnsafePointer<CChar>?, _ scopeNameLength: UInt, _ scope: UnsafePointer<CChar>?, _ scopeLength: UInt, _ output: UnsafeMutablePointer<CChar>, _ outputLength: UInt) -> UInt
 
 public enum CrepusRustActions {
     public static func install() {
@@ -69,35 +69,31 @@ public final class CrepusStateStore: ObservableObject {
     }
 
     public func text(_ expr: String, scopeName: String? = nil, scope: Any? = nil) -> String {
-        let (normalized, scopeJson) = normalize(expr: expr, scopeName: scopeName, scope: scope)
         _ = revision
-        return readString(expr: normalized, scopeJson: scopeJson, reader: crepusMobileEvalText)
+        return readString(expr: expr, scopeName: scopeName, scopeJson: scopeJson(scope), reader: crepusMobileEvalText)
     }
 
     public func bool(_ expr: String, scopeName: String? = nil, scope: Any? = nil) -> Bool {
-        let (normalized, scopeJson) = normalize(expr: expr, scopeName: scopeName, scope: scope)
         _ = revision
-        return normalized.withCString { exprPointer in
-            callOptionalScope(scopeJson) { scopePointer, scopeLength in
-                crepusMobileEvalBool(exprPointer, UInt(strlen(exprPointer)), scopePointer, scopeLength)
+        return expr.withCString { exprPointer in
+            callOptionalArgs(scopeName, scopeJson(scope)) { scopeNamePointer, scopeNameLength, scopePointer, scopeLength in
+                crepusMobileEvalBool(exprPointer, UInt(strlen(exprPointer)), scopeNamePointer, scopeNameLength, scopePointer, scopeLength)
             }
         }
     }
 
     public func number(_ expr: String, scopeName: String? = nil, scope: Any? = nil) -> Double {
-        let (normalized, scopeJson) = normalize(expr: expr, scopeName: scopeName, scope: scope)
         _ = revision
-        return normalized.withCString { exprPointer in
-            callOptionalScope(scopeJson) { scopePointer, scopeLength in
-                crepusMobileEvalNumber(exprPointer, UInt(strlen(exprPointer)), scopePointer, scopeLength)
+        return expr.withCString { exprPointer in
+            callOptionalArgs(scopeName, scopeJson(scope)) { scopeNamePointer, scopeNameLength, scopePointer, scopeLength in
+                crepusMobileEvalNumber(exprPointer, UInt(strlen(exprPointer)), scopeNamePointer, scopeNameLength, scopePointer, scopeLength)
             }
         }
     }
 
     public func items(_ expr: String, scopeName: String? = nil, scope: Any? = nil) -> [Any] {
-        let (normalized, scopeJson) = normalize(expr: expr, scopeName: scopeName, scope: scope)
         _ = revision
-        let json = readString(expr: normalized, scopeJson: scopeJson, reader: crepusMobileEvalItemsJson)
+        let json = readString(expr: expr, scopeName: scopeName, scopeJson: scopeJson(scope), reader: crepusMobileEvalItemsJson)
         guard let data = json.data(using: .utf8),
               let array = try? JSONSerialization.jsonObject(with: data) as? [Any]
         else {
@@ -106,21 +102,10 @@ public final class CrepusStateStore: ObservableObject {
         return array
     }
 
-    private func normalize(expr: String, scopeName: String?, scope: Any?) -> (String, String?) {
-        guard let scopeName, let scope, let scopeJson = scopeJson(scope) else {
-            return (expr, nil)
+    private func scopeJson(_ scope: Any?) -> String? {
+        guard let scope else {
+            return nil
         }
-        if expr == scopeName {
-            return ("", scopeJson)
-        }
-        let prefix = "\(scopeName)."
-        if expr.hasPrefix(prefix) {
-            return (String(expr.dropFirst(prefix.count)), scopeJson)
-        }
-        return (expr, nil)
-    }
-
-    private func scopeJson(_ scope: Any) -> String? {
         switch scope {
         case let text as String:
             return "\"\(text.replacingOccurrences(of: "\"", with: "\\\""))\""
@@ -141,15 +126,16 @@ public final class CrepusStateStore: ObservableObject {
 
     private func readString(
         expr: String,
+        scopeName: String?,
         scopeJson: String?,
-        reader: (UnsafePointer<CChar>, UInt, UnsafePointer<CChar>?, UInt, UnsafeMutablePointer<CChar>, UInt) -> UInt
+        reader: (UnsafePointer<CChar>, UInt, UnsafePointer<CChar>?, UInt, UnsafePointer<CChar>?, UInt, UnsafeMutablePointer<CChar>, UInt) -> UInt
     ) -> String {
         expr.withCString { exprPointer in
             let capacity = 4096
             let output = UnsafeMutablePointer<CChar>.allocate(capacity: capacity)
             defer { output.deallocate() }
-            let written = callOptionalScope(scopeJson) { scopePointer, scopeLength in
-                reader(exprPointer, UInt(strlen(exprPointer)), scopePointer, scopeLength, output, UInt(capacity))
+            let written = callOptionalArgs(scopeName, scopeJson) { scopeNamePointer, scopeNameLength, scopePointer, scopeLength in
+                reader(exprPointer, UInt(strlen(exprPointer)), scopeNamePointer, scopeNameLength, scopePointer, scopeLength, output, UInt(capacity))
             }
             if written >= capacity {
                 return ""
@@ -158,13 +144,27 @@ public final class CrepusStateStore: ObservableObject {
         }
     }
 
-    private func callOptionalScope<T>(_ scopeJson: String?, body: (UnsafePointer<CChar>?, UInt) -> T) -> T {
-        guard let scopeJson else {
-            return body(nil, 0)
+    private func callOptionalArgs<T>(
+        _ scopeName: String?,
+        _ scopeJson: String?,
+        body: (UnsafePointer<CChar>?, UInt, UnsafePointer<CChar>?, UInt) -> T
+    ) -> T {
+        if let scopeName {
+            return scopeName.withCString { scopeNamePointer in
+                if let scopeJson {
+                    return scopeJson.withCString { scopePointer in
+                        body(scopeNamePointer, UInt(strlen(scopeNamePointer)), scopePointer, UInt(strlen(scopePointer)))
+                    }
+                }
+                return body(scopeNamePointer, UInt(strlen(scopeNamePointer)), nil, 0)
+            }
         }
-        return scopeJson.withCString { pointer in
-            body(pointer, UInt(strlen(pointer)))
+        if let scopeJson {
+            return scopeJson.withCString { scopePointer in
+                body(nil, 0, scopePointer, UInt(strlen(scopePointer)))
+            }
         }
+        return body(nil, 0, nil, 0)
     }
 }
 
