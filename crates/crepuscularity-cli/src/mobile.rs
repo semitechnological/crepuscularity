@@ -1064,9 +1064,13 @@ mod tests {
 
     #[test]
     fn ir_response_returns_latest_ir() {
+        let expected = test_state()
+            .last_ir_json
+            .read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
         let response = mobile_dev_response("/ir", &test_state());
-        assert!(response.contains("\"version\":3"));
-        assert!(response.contains("\"content\":\"Hi\""));
+        assert!(response.contains(&expected));
     }
 
     #[test]
