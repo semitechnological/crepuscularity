@@ -46,7 +46,7 @@ object CrepusRustActions {
         openDocuments = { filePicker.launch(arrayOf("*/*")) }
         openMedia = { filePicker.launch(arrayOf("image/*", "video/*")) }
         CrepusActions.dispatch = { action -> dispatchHostAction(action) ?: dispatchAndStoreJson(action) }
-        CrepusActions.resultSink = {}
+        CrepusActions.resultSink = { result -> CrepusActions.applyResult(result) }
     }
 
     private fun dispatchHostAction(action: String): String? {

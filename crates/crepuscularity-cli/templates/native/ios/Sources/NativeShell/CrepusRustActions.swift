@@ -38,7 +38,9 @@ public enum CrepusRustActions {
                 return String(cString: output)
             }
         }
-        CrepusActions.resultSink = { _ in }
+        CrepusActions.resultSink = { result in
+            CrepusActions.applyResult(result)
+        }
     }
 
     public static func dispatchStored(_ action: String) -> String {
