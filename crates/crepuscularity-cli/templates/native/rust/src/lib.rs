@@ -1180,6 +1180,23 @@ pub extern "system" fn Java_dev_crepuscularity_nativeshell_CrepusRustActions_sta
 
 #[cfg(target_os = "android")]
 #[no_mangle]
+pub extern "system" fn Java_dev_crepuscularity_nativeshell_CrepusRustActions_lastResult<'a>(
+    env: JNIEnv<'a>,
+    _class: JClass<'a>,
+) -> JString<'a> {
+    let ptr = crepus_mobile_last_result();
+    let result = if ptr.is_null() {
+        String::new()
+    } else {
+        let result = unsafe { CStr::from_ptr(ptr) }.to_string_lossy().into_owned();
+        unsafe { crepus_mobile_free_string(ptr) };
+        result
+    };
+    env.new_string(result).unwrap()
+}
+
+#[cfg(target_os = "android")]
+#[no_mangle]
 pub extern "system" fn Java_dev_crepuscularity_nativeshell_CrepusRustActions_lastError<'a>(
     env: JNIEnv<'a>,
     _class: JClass<'a>,

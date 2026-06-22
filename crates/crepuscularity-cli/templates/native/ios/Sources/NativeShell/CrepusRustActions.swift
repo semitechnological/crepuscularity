@@ -17,6 +17,8 @@ private func crepusMobileDispatchJson(_ action: UnsafePointer<CChar>, _ length: 
 private func crepusMobileDispatchAndStoreJson(_ action: UnsafePointer<CChar>, _ length: UInt, _ output: UnsafeMutablePointer<CChar>, _ outputLength: UInt) -> UInt
 @_silgen_name("crepus_mobile_start_auto_scan")
 private func crepusMobileStartAutoScan() -> UnsafeMutablePointer<CChar>?
+@_silgen_name("crepus_mobile_last_result")
+private func crepusMobileLastResult() -> UnsafeMutablePointer<CChar>?
 @_silgen_name("crepus_mobile_last_error")
 private func crepusMobileLastError() -> UnsafeMutablePointer<CChar>?
 @_silgen_name("crepus_mobile_free_string")
@@ -82,6 +84,14 @@ public enum CrepusRustActions {
         defer { crepusMobileFreeString(pointer) }
         let value = String(cString: pointer)
         return value.isEmpty ? nil : value
+    }
+
+    public static func lastResult() -> String {
+        guard let pointer = crepusMobileLastResult() else {
+            return "{}"
+        }
+        defer { crepusMobileFreeString(pointer) }
+        return String(cString: pointer)
     }
 
     private static func oversizedResultJson(action: String) -> String {
@@ -652,7 +662,7 @@ public final class CrepusActionStore: ObservableObject {
     }
 
     public func record(_ result: String) {
-        lastResult = result
+        lastResult = CrepusRustActions.lastResult()
         lastError = CrepusRustActions.lastError()
     }
 }
