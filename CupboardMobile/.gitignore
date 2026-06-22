@@ -1,0 +1,12 @@
+# Build outputs and IDE caches kept out of source control.
+ios/.build/
+ios/build/
+ios/*.xcodeproj/
+ios/*.xcworkspace/
+ios/xcuserdata/
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+.idea/
+*.iml
