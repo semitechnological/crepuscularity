@@ -16,6 +16,7 @@ struct MobileActionState {
 }
 
 static ACTION_STATE: OnceLock<Mutex<MobileActionState>> = OnceLock::new();
+static VIEW_STATE: OnceLock<Mutex<serde_json::Value>> = OnceLock::new();
 type ActionHandler =
     fn(&mut MobileActionState, Option<&serde_json::Value>) -> Result<serde_json::Value, String>;
 
@@ -23,8 +24,18 @@ fn action_state() -> &'static Mutex<MobileActionState> {
     ACTION_STATE.get_or_init(|| Mutex::new(MobileActionState::default()))
 }
 
+fn view_state() -> &'static Mutex<serde_json::Value> {
+    VIEW_STATE.get_or_init(|| Mutex::new(serde_json::json!({})))
+}
+
 fn lock_action_state() -> MutexGuard<'static, MobileActionState> {
     action_state()
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
+fn lock_view_state() -> MutexGuard<'static, serde_json::Value> {
+    view_state()
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner)
 }
@@ -178,6 +189,218 @@ fn copy_json_to_output(result: &str, output_ptr: *mut c_char, output_len: usize)
     bytes.len()
 }
 
+fn store_view_state(raw: &str) -> bool {
+    match serde_json::from_str::<serde_json::Value>(raw) {
+        Ok(value) => {
+            *lock_view_state() = value;
+            true
+        }
+        Err(_) => false,
+    }
+}
+
+fn eval_text(expr: &str, scope_json: Option<&str>) -> String {
+    stringify_value(&resolve_expr(expr, scope_json))
+}
+
+fn eval_bool(expr: &str, scope_json: Option<&str>) -> bool {
+    truthy_value(&resolve_expr(expr, scope_json))
+}
+
+fn eval_number(expr: &str, scope_json: Option<&str>) -> f64 {
+    number_value(&resolve_expr(expr, scope_json)).unwrap_or(0.0)
+}
+
+fn eval_items_json(expr: &str, scope_json: Option<&str>) -> String {
+    match resolve_path(expr, scope_json) {
+        serde_json::Value::Array(items) => serde_json::Value::Array(items).to_string(),
+        _ => "[]".to_string(),
+    }
+}
+
+fn resolve_expr(expr: &str, scope_json: Option<&str>) -> serde_json::Value {
+    let trimmed = expr.trim();
+    if let Some(rest) = trimmed.strip_prefix('!') {
+        return serde_json::Value::Bool(!truthy_value(&resolve_expr(rest, scope_json)));
+    }
+    for op in [">=", "<=", "==", "!=", ">", "<"] {
+        if let Some(index) = trimmed.find(op) {
+            let left = resolve_path(trimmed[..index].trim(), scope_json);
+            let right = resolve_path(trimmed[index + op.len()..].trim(), scope_json);
+            return serde_json::Value::Bool(compare_values(&left, &right, op));
+        }
+    }
+    resolve_path(trimmed, scope_json)
+}
+
+fn resolve_path(expr: &str, scope_json: Option<&str>) -> serde_json::Value {
+    if let Some(literal) = literal_value(expr) {
+        return literal;
+    }
+    if let Some(scope) = scope_json.and_then(|value| serde_json::from_str(value).ok()) {
+        return lookup_path(expr, &scope).unwrap_or(serde_json::Value::Null);
+    }
+    let state = lock_view_state();
+    lookup_path(expr, &state).unwrap_or(serde_json::Value::Null)
+}
+
+fn lookup_path(path: &str, root: &serde_json::Value) -> Option<serde_json::Value> {
+    if path.is_empty() {
+        return Some(root.clone());
+    }
+    let mut current = root;
+    for segment in path.split('.') {
+        match current {
+            serde_json::Value::Object(map) => current = map.get(segment)?,
+            serde_json::Value::Array(items) => current = items.get(segment.parse::<usize>().ok()?)?,
+            _ => return None,
+        }
+    }
+    Some(current.clone())
+}
+
+fn literal_value(expr: &str) -> Option<serde_json::Value> {
+    match expr {
+        "true" => Some(serde_json::Value::Bool(true)),
+        "false" => Some(serde_json::Value::Bool(false)),
+        "null" => Some(serde_json::Value::Null),
+        _ if expr.starts_with('"') && expr.ends_with('"') && expr.len() >= 2 => Some(
+            serde_json::Value::String(expr[1..expr.len() - 1].to_string()),
+        ),
+        _ => expr
+            .parse::<i64>()
+            .map(|value| serde_json::json!(value))
+            .or_else(|_| expr.parse::<f64>().map(|value| serde_json::json!(value)))
+            .ok(),
+    }
+}
+
+fn compare_values(left: &serde_json::Value, right: &serde_json::Value, op: &str) -> bool {
+    if let (Some(left), Some(right)) = (number_value(left), number_value(right)) {
+        return match op {
+            ">=" => left >= right,
+            "<=" => left <= right,
+            ">" => left > right,
+            "<" => left < right,
+            "==" => left == right,
+            "!=" => left != right,
+            _ => false,
+        };
+    }
+    let left = stringify_value(left);
+    let right = stringify_value(right);
+    match op {
+        "==" => left == right,
+        "!=" => left != right,
+        _ => false,
+    }
+}
+
+fn number_value(value: &serde_json::Value) -> Option<f64> {
+    match value {
+        serde_json::Value::Number(number) => number.as_f64(),
+        serde_json::Value::String(text) => text.parse::<f64>().ok(),
+        _ => None,
+    }
+}
+
+fn truthy_value(value: &serde_json::Value) -> bool {
+    match value {
+        serde_json::Value::Null => false,
+        serde_json::Value::Bool(value) => *value,
+        serde_json::Value::Number(number) => number.as_f64().unwrap_or_default() != 0.0,
+        serde_json::Value::String(text) => !text.is_empty(),
+        serde_json::Value::Array(items) => !items.is_empty(),
+        serde_json::Value::Object(map) => !map.is_empty(),
+    }
+}
+
+fn stringify_value(value: &serde_json::Value) -> String {
+    match value {
+        serde_json::Value::Null => String::new(),
+        serde_json::Value::Bool(value) => value.to_string(),
+        serde_json::Value::String(text) => text.clone(),
+        serde_json::Value::Number(number) => number.to_string(),
+        _ => value.to_string(),
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn crepus_mobile_store_result_json(
+    json_ptr: *const c_char,
+    json_len: usize,
+) -> bool {
+    action_from_ffi(json_ptr, json_len)
+        .map(|json| store_view_state(json.as_ref()))
+        .unwrap_or(false)
+}
+
+#[no_mangle]
+pub extern "C" fn crepus_mobile_eval_text(
+    expr_ptr: *const c_char,
+    expr_len: usize,
+    scope_ptr: *const c_char,
+    scope_len: usize,
+    output_ptr: *mut c_char,
+    output_len: usize,
+) -> usize {
+    let result = action_from_ffi(expr_ptr, expr_len)
+        .map(|expr| {
+            let scope = action_from_ffi(scope_ptr, scope_len);
+            eval_text(expr.as_ref(), scope.as_deref())
+        })
+        .unwrap_or_default();
+    copy_json_to_output(&result, output_ptr, output_len)
+}
+
+#[no_mangle]
+pub extern "C" fn crepus_mobile_eval_bool(
+    expr_ptr: *const c_char,
+    expr_len: usize,
+    scope_ptr: *const c_char,
+    scope_len: usize,
+) -> bool {
+    action_from_ffi(expr_ptr, expr_len)
+        .map(|expr| {
+            let scope = action_from_ffi(scope_ptr, scope_len);
+            eval_bool(expr.as_ref(), scope.as_deref())
+        })
+        .unwrap_or(false)
+}
+
+#[no_mangle]
+pub extern "C" fn crepus_mobile_eval_number(
+    expr_ptr: *const c_char,
+    expr_len: usize,
+    scope_ptr: *const c_char,
+    scope_len: usize,
+) -> f64 {
+    action_from_ffi(expr_ptr, expr_len)
+        .map(|expr| {
+            let scope = action_from_ffi(scope_ptr, scope_len);
+            eval_number(expr.as_ref(), scope.as_deref())
+        })
+        .unwrap_or(0.0)
+}
+
+#[no_mangle]
+pub extern "C" fn crepus_mobile_eval_items_json(
+    expr_ptr: *const c_char,
+    expr_len: usize,
+    scope_ptr: *const c_char,
+    scope_len: usize,
+    output_ptr: *mut c_char,
+    output_len: usize,
+) -> usize {
+    let result = action_from_ffi(expr_ptr, expr_len)
+        .map(|expr| {
+            let scope = action_from_ffi(scope_ptr, scope_len);
+            eval_items_json(expr.as_ref(), scope.as_deref())
+        })
+        .unwrap_or_else(|| "[]".to_string());
+    copy_json_to_output(&result, output_ptr, output_len)
+}
+
 #[cfg(test)]
 fn reset_action_state() {
     *lock_action_state() = MobileActionState::default();
@@ -214,6 +437,99 @@ pub extern "system" fn Java_dev_crepuscularity_nativeshell_CrepusRustActions_dis
         Err(_) => "{\"ok\":false,\"action\":\"\",\"error\":\"invalid action string\",\"state\":{\"syncCount\":0,\"previewCount\":0,\"lastAction\":\"\"}}".to_string(),
     };
     env.new_string(result).unwrap()
+}
+
+#[cfg(target_os = "android")]
+#[no_mangle]
+pub extern "system" fn Java_dev_crepuscularity_nativeshell_CrepusRustActions_storeResultJson(
+    mut env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    json: JString<'_>,
+) -> bool {
+    match env.get_string(&json) {
+        Ok(json) => store_view_state(json.to_string_lossy().as_ref()),
+        Err(_) => false,
+    }
+}
+
+#[cfg(target_os = "android")]
+#[no_mangle]
+pub extern "system" fn Java_dev_crepuscularity_nativeshell_CrepusRustActions_evalText<'a>(
+    mut env: JNIEnv<'a>,
+    _class: JClass<'a>,
+    expr: JString<'a>,
+    scope: JString<'a>,
+) -> JString<'a> {
+    let expr = env
+        .get_string(&expr)
+        .map(|value| value.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let scope = env
+        .get_string(&scope)
+        .ok()
+        .map(|value| value.to_string_lossy().into_owned())
+        .filter(|value| !value.is_empty());
+    env.new_string(eval_text(&expr, scope.as_deref())).unwrap()
+}
+
+#[cfg(target_os = "android")]
+#[no_mangle]
+pub extern "system" fn Java_dev_crepuscularity_nativeshell_CrepusRustActions_evalBool(
+    mut env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    expr: JString<'_>,
+    scope: JString<'_>,
+) -> bool {
+    let expr = env
+        .get_string(&expr)
+        .map(|value| value.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let scope = env
+        .get_string(&scope)
+        .ok()
+        .map(|value| value.to_string_lossy().into_owned())
+        .filter(|value| !value.is_empty());
+    eval_bool(&expr, scope.as_deref())
+}
+
+#[cfg(target_os = "android")]
+#[no_mangle]
+pub extern "system" fn Java_dev_crepuscularity_nativeshell_CrepusRustActions_evalNumber(
+    mut env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    expr: JString<'_>,
+    scope: JString<'_>,
+) -> f64 {
+    let expr = env
+        .get_string(&expr)
+        .map(|value| value.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let scope = env
+        .get_string(&scope)
+        .ok()
+        .map(|value| value.to_string_lossy().into_owned())
+        .filter(|value| !value.is_empty());
+    eval_number(&expr, scope.as_deref())
+}
+
+#[cfg(target_os = "android")]
+#[no_mangle]
+pub extern "system" fn Java_dev_crepuscularity_nativeshell_CrepusRustActions_evalItemsJson<'a>(
+    mut env: JNIEnv<'a>,
+    _class: JClass<'a>,
+    expr: JString<'a>,
+    scope: JString<'a>,
+) -> JString<'a> {
+    let expr = env
+        .get_string(&expr)
+        .map(|value| value.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let scope = env
+        .get_string(&scope)
+        .ok()
+        .map(|value| value.to_string_lossy().into_owned())
+        .filter(|value| !value.is_empty());
+    env.new_string(eval_items_json(&expr, scope.as_deref())).unwrap()
 }
 
 #[cfg(test)]

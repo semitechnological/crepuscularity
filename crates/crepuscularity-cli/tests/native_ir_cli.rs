@@ -339,23 +339,22 @@ fn mobile_new_scaffolds_runtime_files() {
     let root = tmp.path().join("phone");
     assert!(root.join("crepus.toml").is_file());
     assert!(root.join("views/main.crepus").is_file());
-    assert!(root
-        .join("ios/Sources/NativeShell/CrepusMobileRuntime.swift")
-        .is_file());
+    assert!(root.join("fixture.json").is_file());
     assert!(root.join("ios/project.yml").is_file());
     assert!(root.join("ios/crepus.toml").is_file());
+    assert!(root.join("ios/Package.swift").is_file());
     assert!(root.join("ios/App/CrepusMobileApp.swift").is_file());
     assert!(root.join("ios/App/ContentView.swift").is_file());
-    assert!(root
-        .join("android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusMobileRuntime.kt")
-        .is_file());
+    assert!(root.join("rust/Cargo.toml").is_file());
+    assert!(root.join("rust/src/lib.rs").is_file());
 
     let rust_actions =
         std::fs::read_to_string(root.join("ios/Sources/NativeShell/CrepusRustActions.swift"))
             .expect("read CrepusRustActions.swift");
+    assert!(rust_actions.contains("public final class CrepusStateStore: ObservableObject"));
+    assert!(rust_actions.contains("crepusMobileStoreResultJson"));
+    assert!(rust_actions.contains("crepusMobileEvalText"));
     assert!(rust_actions.contains("JSONSerialization.data(withJSONObject:"));
-    assert!(rust_actions.contains("let data = Data(result.utf8)"));
-    assert!(rust_actions.contains("lastError = payload.error"));
     assert!(rust_actions.contains("UIImpactFeedbackGenerator"));
     assert!(rust_actions.contains("UIDevice.current"));
     assert!(rust_actions.contains("Bundle.main.bundleIdentifier"));
@@ -367,6 +366,9 @@ fn mobile_new_scaffolds_runtime_files() {
         root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusRustActions.kt"),
     )
     .expect("read CrepusRustActions.kt");
+    assert!(android_actions.contains("object CrepusStateStore"));
+    assert!(android_actions.contains("external fun storeResultJson"));
+    assert!(android_actions.contains("external fun evalText"));
     assert!(android_actions.contains("getSharedPreferences(\"crepus_preferences\""));
     assert!(android_actions.contains("Build.MANUFACTURER"));
     assert!(android_actions.contains("packageManager.getPackageInfo"));
@@ -404,17 +406,17 @@ fn mobile_new_scaffolds_android_runtime_audit_fixes() {
         root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusRustActions.kt"),
     )
     .expect("read CrepusRustActions.kt");
-    assert!(android_actions.contains("parseToJsonElement(result).jsonObject"));
-    assert!(android_actions.contains("jsonPrimitive?.booleanOrNull == false"));
+    assert!(android_actions.contains("mutableLongStateOf(0L)"));
+    assert!(android_actions.contains("CrepusRustActions.storeResultJson(raw)"));
+    assert!(android_actions.contains("CrepusRustActions.evalItemsJson"));
     assert!(!android_actions.contains("contains(\"\\\"ok\\\":false\")"));
 
-    let android_tree = std::fs::read_to_string(
-        root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/ViewIrTree.kt"),
+    let android_generated = std::fs::read_to_string(
+        root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/generated/CrepusGeneratedView.kt"),
     )
-    .expect("read ViewIrTree.kt");
-    assert!(android_tree.contains("Button(onClick = { node.onClick?.let { CrepusActionState.dispatch(it) } }, modifier = stackModifier(node.style))"));
-    assert!(android_tree.contains("contentDescription = node.alt ?: node.src"));
-    assert!(android_tree.contains("Unsupported remote image"));
+    .expect("read generated view");
+    assert!(android_generated.contains("object CrepusActions"));
+    assert!(android_generated.contains("fun perform(action: String)"));
 
     let android_gradle = std::fs::read_to_string(root.join("android/app/build.gradle.kts"))
         .expect("read build.gradle.kts");

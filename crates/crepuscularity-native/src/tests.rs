@@ -87,18 +87,18 @@ fn codegen_preserves_dynamic_state_bindings() {
     )
     .unwrap();
     let swift = generate_native_source(&ir, NativeCodegenTarget::SwiftUi, "DynamicView");
-    assert!(swift.contains("public final class CrepusModel: ObservableObject"));
+    assert!(swift.contains("public static let model = CrepusStateStore.shared"));
     assert!(swift.contains("if CrepusActions.model.bool(\"count > 1\")"));
     assert!(swift.contains("CrepusActions.model.items(\"hubs\")"));
     assert!(swift.contains("CrepusActions.model.text(\"hub.name\", scopeName: \"hub\", scope: hub)"));
     assert!(swift.contains("CrepusActions.model.text(\"pairing_code\")"));
 
     let compose = generate_native_source(&ir, NativeCodegenTarget::Compose, "DynamicView");
-    assert!(compose.contains("object CrepusState"));
-    assert!(compose.contains("if (CrepusState.bool(\"count > 1\"))"));
-    assert!(compose.contains("CrepusState.items(\"hubs\").forEachIndexed"));
-    assert!(compose.contains("CrepusState.text(\"hub.name\", scopeName = \"hub\", scope = hub)"));
-    assert!(compose.contains("CrepusState.text(\"pairing_code\")"));
+    assert!(compose.contains("CrepusStateStore.applyResult(raw)"));
+    assert!(compose.contains("if (CrepusStateStore.bool(\"count > 1\"))"));
+    assert!(compose.contains("CrepusStateStore.items(\"hubs\").forEachIndexed"));
+    assert!(compose.contains("CrepusStateStore.text(\"hub.name\", scopeName = \"hub\", scope = hub)"));
+    assert!(compose.contains("CrepusStateStore.text(\"pairing_code\")"));
 }
 
 #[test]
