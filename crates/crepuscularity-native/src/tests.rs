@@ -80,6 +80,28 @@ fn codegen_compose_emits_composable_source() {
 }
 
 #[test]
+fn codegen_preserves_dynamic_state_bindings() {
+    let ir = render_template_to_ir(
+        "div\n if {count > 1}\n  span\n    \"Many\"\n else\n  span\n    \"One\"\n for hub in {hubs}\n  span\n    \"{hub.name}\"\n span\n  \"{pairing_code}\"",
+        &TemplateContext::new(),
+    )
+    .unwrap();
+    let swift = generate_native_source(&ir, NativeCodegenTarget::SwiftUi, "DynamicView");
+    assert!(swift.contains("public final class CrepusModel: ObservableObject"));
+    assert!(swift.contains("if CrepusActions.model.bool(\"count > 1\")"));
+    assert!(swift.contains("CrepusActions.model.items(\"hubs\")"));
+    assert!(swift.contains("CrepusActions.model.text(\"hub.name\", scopeName: \"hub\", scope: hub)"));
+    assert!(swift.contains("CrepusActions.model.text(\"pairing_code\")"));
+
+    let compose = generate_native_source(&ir, NativeCodegenTarget::Compose, "DynamicView");
+    assert!(compose.contains("object CrepusState"));
+    assert!(compose.contains("if (CrepusState.bool(\"count > 1\"))"));
+    assert!(compose.contains("CrepusState.items(\"hubs\").forEachIndexed"));
+    assert!(compose.contains("CrepusState.text(\"hub.name\", scopeName = \"hub\", scope = hub)"));
+    assert!(compose.contains("CrepusState.text(\"pairing_code\")"));
+}
+
+#[test]
 fn compose_button_colors_use_material_colors() {
     let ir = render_template_to_ir(
         "button @click=\"tap\" bg-[#ffffff] text-[#000000] px-6 py-5\n  \"Tap\"",

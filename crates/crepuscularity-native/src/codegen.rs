@@ -14,36 +14,80 @@ pub fn generate_native_source(ir: &ViewIr, target: NativeCodegenTarget, view_nam
 }
 
 fn generate_swiftui(ir: &ViewIr, view_name: &str) -> String {
-    let body = swiftui_nodes(&ir.root, 2);
+    let body = swiftui_nodes(&ir.root, 2, None, None);
     format!(
-        "import SwiftUI\n\npublic enum CrepusActions {{\n    public static var dispatch: (String) -> String = {{ _ in \"{{}}\" }}\n    public static var resultSink: (String) -> Void = {{ _ in }}\n\n    public static func perform(_ action: String) {{\n        resultSink(dispatch(action))\n    }}\n}}\n\npublic struct {view_name}: View {{\n    public init() {{}}\n\n    public var body: some View {{\n{body}\n    }}\n}}\n"
+        "import Foundation\nimport SwiftUI\n\npublic final class CrepusModel: ObservableObject {{\n    @Published private var state: [String: Any] = [:]\n\n    public init() {{}}\n\n    public func applyResult(_ json: String) {{\n        guard let data = json.data(using: .utf8),\n              let decoded = try? JSONSerialization.jsonObject(with: data) as? [String: Any]\n        else {{\n            return\n        }}\n        if Thread.isMainThread {{\n            state = decoded\n        }} else {{\n            DispatchQueue.main.async {{\n                self.state = decoded\n            }}\n        }}\n    }}\n\n    public func text(_ expr: String, scopeName: String? = nil, scope: Any? = nil) -> String {{\n        stringify(resolveExpr(expr, scopeName: scopeName, scope: scope))\n    }}\n\n    public func bool(_ expr: String, scopeName: String? = nil, scope: Any? = nil) -> Bool {{\n        truthy(resolveExpr(expr, scopeName: scopeName, scope: scope))\n    }}\n\n    public func number(_ expr: String, scopeName: String? = nil, scope: Any? = nil) -> Double {{\n        numberValue(resolveExpr(expr, scopeName: scopeName, scope: scope)) ?? 0\n    }}\n\n    public func items(_ expr: String, scopeName: String? = nil, scope: Any? = nil) -> [Any] {{\n        resolvePath(expr, scopeName: scopeName, scope: scope) as? [Any] ?? []\n    }}\n\n    private func resolveExpr(_ expr: String, scopeName: String?, scope: Any?) -> Any? {{\n        let trimmed = expr.trimmingCharacters(in: .whitespacesAndNewlines)\n        if trimmed.hasPrefix(\"!\") {{\n            return !truthy(resolveExpr(String(trimmed.dropFirst()), scopeName: scopeName, scope: scope))\n        }}\n        for op in [\">=\", \"<=\", \"==\", \"!=\", \">\", \"<\"] {{\n            if let range = trimmed.range(of: op) {{\n                let left = resolvePath(String(trimmed[..<range.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines), scopeName: scopeName, scope: scope)\n                let right = resolvePath(String(trimmed[range.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines), scopeName: scopeName, scope: scope)\n                return compare(left: left, right: right, op: op)\n            }}\n        }}\n        return resolvePath(trimmed, scopeName: scopeName, scope: scope)\n    }}\n\n    private func resolvePath(_ expr: String, scopeName: String?, scope: Any?) -> Any? {{\n        if let literal = literal(expr) {{\n            return literal\n        }}\n        if let scopeName, let scope {{\n            if expr == scopeName {{\n                return scope\n            }}\n            let prefix = \"\\(scopeName).\"\n            if expr.hasPrefix(prefix) {{\n                return lookup(String(expr.dropFirst(prefix.count)), in: scope)\n            }}\n        }}\n        return lookup(expr, in: state)\n    }}\n\n    private func lookup(_ path: String, in root: Any?) -> Any? {{\n        if path.isEmpty {{\n            return root\n        }}\n        var current = root\n        for segment in path.split(separator: \".\").map(String.init) {{\n            if let dict = current as? [String: Any] {{\n                current = dict[segment]\n            }} else if let array = current as? [Any], let index = Int(segment), array.indices.contains(index) {{\n                current = array[index]\n            }} else {{\n                return nil\n            }}\n        }}\n        return current\n    }}\n\n    private func literal(_ expr: String) -> Any? {{\n        if expr == \"true\" {{ return true }}\n        if expr == \"false\" {{ return false }}\n        if expr == \"null\" {{ return nil }}\n        if expr.hasPrefix(\"\\\"\") && expr.hasSuffix(\"\\\"\") && expr.count >= 2 {{\n            return String(expr.dropFirst().dropLast())\n        }}\n        if let int = Int(expr) {{ return int }}\n        if let double = Double(expr) {{ return double }}\n        return nil\n    }}\n\n    private func compare(left: Any?, right: Any?, op: String) -> Bool {{\n        if let leftNumber = numberValue(left), let rightNumber = numberValue(right) {{\n            switch op {{\n            case \">=\": return leftNumber >= rightNumber\n            case \"<=\": return leftNumber <= rightNumber\n            case \">\": return leftNumber > rightNumber\n            case \"<\": return leftNumber < rightNumber\n            case \"==\": return leftNumber == rightNumber\n            case \"!=\": return leftNumber != rightNumber\n            default: return false\n            }}\n        }}\n        let leftText = stringify(left)\n        let rightText = stringify(right)\n        switch op {{\n        case \"==\": return leftText == rightText\n        case \"!=\": return leftText != rightText\n        default: return false\n        }}\n    }}\n\n    private func numberValue(_ value: Any?) -> Double? {{\n        switch value {{\n        case let number as NSNumber:\n            return number.doubleValue\n        case let text as String:\n            return Double(text)\n        default:\n            return nil\n        }}\n    }}\n\n    private func truthy(_ value: Any?) -> Bool {{\n        switch value {{\n        case let bool as Bool:\n            return bool\n        case let number as NSNumber:\n            return number.doubleValue != 0\n        case let text as String:\n            return !text.isEmpty\n        case let array as [Any]:\n            return !array.isEmpty\n        case let dict as [String: Any]:\n            return !dict.isEmpty\n        case nil:\n            return false\n        default:\n            return true\n        }}\n    }}\n\n    private func stringify(_ value: Any?) -> String {{\n        switch value {{\n        case let text as String:\n            return text\n        case let bool as Bool:\n            return bool ? \"true\" : \"false\"\n        case let number as NSNumber:\n            let double = number.doubleValue\n            if floor(double) == double {{\n                return String(Int(double))\n            }}\n            return String(double)\n        case nil:\n            return \"\"\n        default:\n            return String(describing: value!)\n        }}\n    }}\n}}\n\npublic enum CrepusActions {{\n    public static let model = CrepusModel()\n    public static var dispatch: (String) -> String = {{ _ in \"{{}}\" }}\n    public static var resultSink: (String) -> Void = {{ _ in }}\n\n    public static func applyResult(_ json: String) {{\n        model.applyResult(json)\n    }}\n\n    public static func perform(_ action: String) {{\n        resultSink(dispatch(action))\n    }}\n}}\n\npublic struct {view_name}: View {{\n    @ObservedObject private var model = CrepusActions.model\n\n    public init() {{}}\n\n    public var body: some View {{\n{body}\n    }}\n}}\n"
     )
 }
 
-fn swiftui_nodes(nodes: &[ViewNode], indent: usize) -> String {
+fn swiftui_nodes(
+    nodes: &[ViewNode],
+    indent: usize,
+    scope_name: Option<&str>,
+    scope_var: Option<&str>,
+) -> String {
     if nodes.len() == 1 {
-        swiftui_node(&nodes[0], indent)
+        swiftui_node(&nodes[0], indent, scope_name, scope_var)
     } else {
         let pad = indent_str(indent);
         let inner = nodes
             .iter()
-            .map(|node| swiftui_node(node, indent + 1))
+            .map(|node| swiftui_node(node, indent + 1, scope_name, scope_var))
             .collect::<Vec<_>>()
             .join("\n");
         format!("{pad}Group {{\n{inner}\n{pad}}}")
     }
 }
 
-fn swiftui_node(node: &ViewNode, indent: usize) -> String {
+fn swiftui_node(
+    node: &ViewNode,
+    indent: usize,
+    scope_name: Option<&str>,
+    scope_var: Option<&str>,
+) -> String {
     let pad = indent_str(indent);
     match node {
-        ViewNode::Text { content, style, .. } => {
-            let mut out = format!("{pad}Text(\"{}\")", swift_escape(content));
+        ViewNode::Text {
+            content, bind, style, ..
+        } => {
+            let text = bind
+                .as_deref()
+                .map(|bind| swift_model_text(bind, scope_name, scope_var))
+                .unwrap_or_else(|| format!("\"{}\"", swift_escape(content)));
+            let mut out = format!("{pad}Text({text})");
             swiftui_style(&mut out, style.as_ref(), true, indent);
             out
         }
-        ViewNode::If { then_children, .. } => swiftui_group(then_children, indent),
-        ViewNode::ForEach { item_body, .. } => swiftui_group(item_body, indent),
+        ViewNode::If {
+            condition,
+            then_children,
+            else_children,
+            ..
+        } => {
+            let then_inner = swiftui_children(then_children, indent + 1, scope_name, scope_var);
+            let condition = swift_model_bool(condition, scope_name, scope_var);
+            if let Some(else_children) = else_children {
+                let else_inner = swiftui_children(else_children, indent + 1, scope_name, scope_var);
+                format!(
+                    "{pad}if {condition} {{\n{then_inner}\n{pad}}} else {{\n{else_inner}\n{pad}}}"
+                )
+            } else {
+                format!("{pad}if {condition} {{\n{then_inner}\n{pad}}}")
+            }
+        }
+        ViewNode::ForEach {
+            bind,
+            item_name,
+            item_body,
+            ..
+        } => {
+            let item_var = swift_identifier(item_name);
+            let items = swift_model_items(bind, scope_name, scope_var);
+            let inner = swiftui_children(item_body, indent + 1, Some(item_name), Some(&item_var));
+            format!(
+                "{pad}ForEach(Array({items}.enumerated()), id: \\.offset) {{ _, {item_var} in\n{inner}\n{pad}}}"
+            )
+        }
         ViewNode::Stack {
             axis,
             spacing,
@@ -58,7 +102,7 @@ fn swiftui_node(node: &ViewNode, indent: usize) -> String {
             };
             let align = swiftui_stack_alignment(*axis, align_items.as_deref());
             let gap = spacing.unwrap_or(8.0);
-            let inner = swiftui_children(children, indent + 1);
+            let inner = swiftui_children(children, indent + 1, scope_name, scope_var);
             let mut out =
                 format!("{pad}{view}(alignment: {align}, spacing: {gap:.1}) {{\n{inner}\n{pad}}}");
             swiftui_style(&mut out, style.as_ref(), false, indent);
@@ -80,34 +124,53 @@ fn swiftui_node(node: &ViewNode, indent: usize) -> String {
         }
         ViewNode::Toggle {
             label,
+            bind,
             checked,
+            on_change,
             style,
             ..
         } => {
-            let mut out = format!(
-                "{pad}Toggle(\"{}\", isOn: .constant({}))",
-                swift_escape(label),
-                swift_bool(*checked)
-            );
+            let binding = bind
+                .as_deref()
+                .map(|bind| {
+                    format!(
+                        "Binding(get: {{ {} }}, set: {{ _ in {} }})",
+                        swift_model_bool(bind, scope_name, scope_var),
+                        swiftui_action(on_change.as_deref())
+                    )
+                })
+                .unwrap_or_else(|| format!(".constant({})", swift_bool(*checked)));
+            let mut out =
+                format!("{pad}Toggle(\"{}\", isOn: {binding})", swift_escape(label));
             swiftui_style(&mut out, style.as_ref(), false, indent);
             out
         }
         ViewNode::Checkbox {
             label,
+            bind,
             checked,
+            on_change,
             style,
             ..
         } => {
-            let mut out = format!(
-                "{pad}Toggle(\"{}\", isOn: .constant({}))",
-                swift_escape(label),
-                swift_bool(*checked)
-            );
+            let binding = bind
+                .as_deref()
+                .map(|bind| {
+                    format!(
+                        "Binding(get: {{ {} }}, set: {{ _ in {} }})",
+                        swift_model_bool(bind, scope_name, scope_var),
+                        swiftui_action(on_change.as_deref())
+                    )
+                })
+                .unwrap_or_else(|| format!(".constant({})", swift_bool(*checked)));
+            let mut out =
+                format!("{pad}Toggle(\"{}\", isOn: {binding})", swift_escape(label));
             swiftui_style(&mut out, style.as_ref(), false, indent);
             out
         }
         ViewNode::Slider {
             label,
+            bind,
             value,
             min,
             max,
@@ -116,8 +179,17 @@ fn swiftui_node(node: &ViewNode, indent: usize) -> String {
             ..
         } => {
             let step_arg = step.map(|v| format!(", step: {v:.1}")).unwrap_or_default();
+            let slider_value = bind
+                .as_deref()
+                .map(|bind| {
+                    format!(
+                        "Binding(get: {{ {} }}, set: {{ _ in }})",
+                        swift_model_number(bind, scope_name, scope_var)
+                    )
+                })
+                .unwrap_or_else(|| format!(".constant({value:.3})"));
             let control =
-                format!("Slider(value: .constant({value:.3}), in: {min:.3}...{max:.3}{step_arg})");
+                format!("Slider(value: {slider_value}, in: {min:.3}...{max:.3}{step_arg})");
             let mut out = if let Some(label) = label {
                 format!(
                     "{pad}VStack(alignment: .leading, spacing: 8.0) {{\n{}Text(\"{}\")\n{}{control}\n{pad}}}",
@@ -193,7 +265,7 @@ fn swiftui_node(node: &ViewNode, indent: usize) -> String {
                     swift_escape(label)
                 )
             } else {
-                swiftui_children(children, indent + 1)
+                swiftui_children(children, indent + 1, scope_name, scope_var)
             };
             let mut out =
                 format!("{pad}VStack(alignment: .leading, spacing: 8.0) {{\n{inner}\n{pad}}}");
@@ -242,6 +314,8 @@ fn swiftui_node(node: &ViewNode, indent: usize) -> String {
                     children: children.clone(),
                 },
                 indent + 1,
+                scope_name,
+                scope_var,
             );
             let mut out = format!("{pad}ScrollView({scroll_axis}) {{\n{inner}\n{pad}}}");
             swiftui_style(&mut out, style.as_ref(), false, indent);
@@ -266,7 +340,7 @@ fn swiftui_node(node: &ViewNode, indent: usize) -> String {
                         indent_str(indent + 1),
                         indent_str(indent + 2),
                         swift_escape(&prefix),
-                        swiftui_node(child, indent + 2),
+                        swiftui_node(child, indent + 2, scope_name, scope_var),
                         indent_str(indent + 1)
                     )
                 })
@@ -278,7 +352,7 @@ fn swiftui_node(node: &ViewNode, indent: usize) -> String {
             out
         }
         ViewNode::ListItem { style, children } => {
-            let inner = swiftui_children(children, indent + 1);
+            let inner = swiftui_children(children, indent + 1, scope_name, scope_var);
             let mut out =
                 format!("{pad}VStack(alignment: .leading, spacing: 4.0) {{\n{inner}\n{pad}}}");
             swiftui_style(&mut out, style.as_ref(), false, indent);
@@ -293,26 +367,33 @@ fn swiftui_node(node: &ViewNode, indent: usize) -> String {
             out
         }
         ViewNode::Input {
-            placeholder,
+            placeholder, bind,
             multiline,
             style,
             ..
         } => {
             let mut out = if *multiline {
                 format!(
-                    "{pad}TextEditor(text: .constant(\"{}\"))",
-                    swift_escape(placeholder)
+                    "{pad}TextEditor(text: Binding(get: {{ {} }}, set: {{ _ in }}))",
+                    swift_model_text(bind, scope_name, scope_var)
                 )
             } else {
                 format!(
-                    "{pad}TextField(\"{}\", text: .constant(\"\"))",
+                    "{pad}TextField(\"{}\", text: Binding(get: {{ {} }}, set: {{ _ in }}))",
                     swift_escape(placeholder)
+                    ,
+                    swift_model_text(bind, scope_name, scope_var)
                 )
             };
             swiftui_style(&mut out, style.as_ref(), false, indent);
             out
         }
-        ViewNode::Picker { options, style, .. } => {
+        ViewNode::Picker {
+            bind,
+            options,
+            style,
+            ..
+        } => {
             let first = options.first().map(|o| o.value.as_str()).unwrap_or("");
             let rows = options
                 .iter()
@@ -327,10 +408,13 @@ fn swiftui_node(node: &ViewNode, indent: usize) -> String {
                 .collect::<Vec<_>>()
                 .join("\n");
             let mut out = format!(
-                "{pad}Picker(\"\", selection: .constant(\"{}\")) {{\n{rows}\n{pad}}}",
-                swift_escape(first)
+                "{pad}Picker(\"\", selection: Binding(get: {{ {} }}, set: {{ _ in }})) {{\n{rows}\n{pad}}}",
+                swift_model_text(bind, scope_name, scope_var)
             );
             swiftui_style(&mut out, style.as_ref(), false, indent);
+            if first.is_empty() {
+                out = out.replace("Binding(get: {  }, set: { _ in })", ".constant(\"\")");
+            }
             out
         }
     }
@@ -342,18 +426,78 @@ fn swiftui_action(on_click: Option<&str>) -> String {
         .unwrap_or_default()
 }
 
-fn swiftui_children(children: &[ViewNode], indent: usize) -> String {
+fn swiftui_children(
+    children: &[ViewNode],
+    indent: usize,
+    scope_name: Option<&str>,
+    scope_var: Option<&str>,
+) -> String {
     children
         .iter()
-        .map(|child| swiftui_node(child, indent))
+        .map(|child| swiftui_node(child, indent, scope_name, scope_var))
         .collect::<Vec<_>>()
         .join("\n")
 }
 
-fn swiftui_group(children: &[ViewNode], indent: usize) -> String {
-    let pad = indent_str(indent);
-    let inner = swiftui_children(children, indent + 1);
-    format!("{pad}Group {{\n{inner}\n{pad}}}")
+fn swift_identifier(name: &str) -> String {
+    let mut out = String::new();
+    for (idx, ch) in name.chars().enumerate() {
+        if (idx == 0 && (ch.is_ascii_alphabetic() || ch == '_'))
+            || (idx > 0 && (ch.is_ascii_alphanumeric() || ch == '_'))
+        {
+            out.push(ch);
+        } else {
+            out.push('_');
+        }
+    }
+    if out.is_empty() {
+        "item".to_string()
+    } else {
+        out
+    }
+}
+
+fn swift_scope_args(scope_name: Option<&str>, scope_var: Option<&str>) -> String {
+    match (scope_name, scope_var) {
+        (Some(scope_name), Some(scope_var)) => format!(
+            ", scopeName: \"{}\", scope: {}",
+            swift_escape(scope_name),
+            scope_var
+        ),
+        _ => String::new(),
+    }
+}
+
+fn swift_model_text(expr: &str, scope_name: Option<&str>, scope_var: Option<&str>) -> String {
+    format!(
+        "CrepusActions.model.text(\"{}\"{})",
+        swift_escape(expr),
+        swift_scope_args(scope_name, scope_var)
+    )
+}
+
+fn swift_model_bool(expr: &str, scope_name: Option<&str>, scope_var: Option<&str>) -> String {
+    format!(
+        "CrepusActions.model.bool(\"{}\"{})",
+        swift_escape(expr),
+        swift_scope_args(scope_name, scope_var)
+    )
+}
+
+fn swift_model_number(expr: &str, scope_name: Option<&str>, scope_var: Option<&str>) -> String {
+    format!(
+        "CrepusActions.model.number(\"{}\"{})",
+        swift_escape(expr),
+        swift_scope_args(scope_name, scope_var)
+    )
+}
+
+fn swift_model_items(expr: &str, scope_name: Option<&str>, scope_var: Option<&str>) -> String {
+    format!(
+        "CrepusActions.model.items(\"{}\"{})",
+        swift_escape(expr),
+        swift_scope_args(scope_name, scope_var)
+    )
 }
 
 fn swiftui_stack_alignment(axis: StackAxis, align_items: Option<&str>) -> &'static str {
@@ -554,35 +698,81 @@ fn swiftui_font_weight(weight: u16) -> &'static str {
 }
 
 fn generate_compose(ir: &ViewIr, view_name: &str) -> String {
-    let body = compose_nodes(&ir.root, 1);
+    let body = compose_nodes(&ir.root, 1, None, None);
     format!(
-        "import androidx.compose.foundation.background\nimport androidx.compose.foundation.border\nimport androidx.compose.foundation.horizontalScroll\nimport androidx.compose.foundation.layout.Arrangement\nimport androidx.compose.foundation.layout.Column\nimport androidx.compose.foundation.layout.PaddingValues\nimport androidx.compose.foundation.layout.Row\nimport androidx.compose.foundation.layout.Spacer\nimport androidx.compose.foundation.layout.fillMaxHeight\nimport androidx.compose.foundation.layout.fillMaxSize\nimport androidx.compose.foundation.layout.fillMaxWidth\nimport androidx.compose.foundation.layout.height\nimport androidx.compose.foundation.layout.offset\nimport androidx.compose.foundation.layout.padding\nimport androidx.compose.foundation.layout.width\nimport androidx.compose.foundation.rememberScrollState\nimport androidx.compose.foundation.shape.RoundedCornerShape\nimport androidx.compose.foundation.verticalScroll\nimport androidx.compose.material3.Button\nimport androidx.compose.material3.ButtonDefaults\nimport androidx.compose.material3.Divider\nimport androidx.compose.material3.LinearProgressIndicator\nimport androidx.compose.material3.LocalContentColor\nimport androidx.compose.material3.Slider\nimport androidx.compose.material3.Switch\nimport androidx.compose.material3.Text\nimport androidx.compose.material3.TextField\nimport androidx.compose.runtime.Composable\nimport androidx.compose.runtime.CompositionLocalProvider\nimport androidx.compose.ui.Modifier\nimport androidx.compose.ui.draw.alpha\nimport androidx.compose.ui.draw.clip\nimport androidx.compose.ui.draw.rotate\nimport androidx.compose.ui.draw.scale\nimport androidx.compose.ui.graphics.Color\nimport androidx.compose.ui.text.font.FontStyle\nimport androidx.compose.ui.text.font.FontWeight\nimport androidx.compose.ui.text.style.TextAlign\nimport androidx.compose.ui.text.style.TextDecoration\nimport androidx.compose.ui.unit.dp\nimport androidx.compose.ui.unit.sp\n\nobject CrepusActions {{\n    var dispatch: (String) -> String = {{ \"{{}}\" }}\n    var resultSink: (String) -> Unit = {{}}\n\n    fun perform(action: String) {{\n        resultSink(dispatch(action))\n    }}\n}}\n\n@Composable\nfun {view_name}(modifier: Modifier = Modifier) {{\n{body}\n}}\n"
+        "import androidx.compose.foundation.background\nimport androidx.compose.foundation.border\nimport androidx.compose.foundation.horizontalScroll\nimport androidx.compose.foundation.layout.Arrangement\nimport androidx.compose.foundation.layout.Column\nimport androidx.compose.foundation.layout.PaddingValues\nimport androidx.compose.foundation.layout.Row\nimport androidx.compose.foundation.layout.Spacer\nimport androidx.compose.foundation.layout.fillMaxHeight\nimport androidx.compose.foundation.layout.fillMaxSize\nimport androidx.compose.foundation.layout.fillMaxWidth\nimport androidx.compose.foundation.layout.height\nimport androidx.compose.foundation.layout.offset\nimport androidx.compose.foundation.layout.padding\nimport androidx.compose.foundation.layout.width\nimport androidx.compose.foundation.rememberScrollState\nimport androidx.compose.foundation.shape.RoundedCornerShape\nimport androidx.compose.foundation.verticalScroll\nimport androidx.compose.material3.Button\nimport androidx.compose.material3.ButtonDefaults\nimport androidx.compose.material3.Divider\nimport androidx.compose.material3.LinearProgressIndicator\nimport androidx.compose.material3.LocalContentColor\nimport androidx.compose.material3.Slider\nimport androidx.compose.material3.Switch\nimport androidx.compose.material3.Text\nimport androidx.compose.material3.TextField\nimport androidx.compose.runtime.Composable\nimport androidx.compose.runtime.CompositionLocalProvider\nimport androidx.compose.runtime.getValue\nimport androidx.compose.runtime.mutableStateOf\nimport androidx.compose.runtime.setValue\nimport androidx.compose.ui.Modifier\nimport androidx.compose.ui.draw.alpha\nimport androidx.compose.ui.draw.clip\nimport androidx.compose.ui.draw.rotate\nimport androidx.compose.ui.draw.scale\nimport androidx.compose.ui.graphics.Color\nimport androidx.compose.ui.text.font.FontStyle\nimport androidx.compose.ui.text.font.FontWeight\nimport androidx.compose.ui.text.style.TextAlign\nimport androidx.compose.ui.text.style.TextDecoration\nimport androidx.compose.ui.unit.dp\nimport androidx.compose.ui.unit.sp\nimport kotlinx.serialization.json.Json\nimport kotlinx.serialization.json.JsonArray\nimport kotlinx.serialization.json.JsonElement\nimport kotlinx.serialization.json.JsonNull\nimport kotlinx.serialization.json.JsonObject\nimport kotlinx.serialization.json.JsonPrimitive\nimport kotlinx.serialization.json.booleanOrNull\nimport kotlinx.serialization.json.doubleOrNull\nimport kotlinx.serialization.json.jsonArray\nimport kotlinx.serialization.json.jsonObject\nimport kotlinx.serialization.json.jsonPrimitive\n\nobject CrepusState {{\n    private val parser = Json {{ ignoreUnknownKeys = true }}\n    var state: JsonObject by mutableStateOf(JsonObject(emptyMap()))\n\n    fun applyResult(raw: String) {{\n        runCatching {{ parser.parseToJsonElement(raw).jsonObject }}.getOrNull()?.let {{ state = it }}\n    }}\n\n    fun text(expr: String, scopeName: String? = null, scope: JsonElement? = null): String = stringify(resolveExpr(expr, scopeName, scope))\n    fun bool(expr: String, scopeName: String? = null, scope: JsonElement? = null): Boolean = truthy(resolveExpr(expr, scopeName, scope))\n    fun number(expr: String, scopeName: String? = null, scope: JsonElement? = null): Float = (numberValue(resolveExpr(expr, scopeName, scope)) ?: 0.0).toFloat()\n    fun items(expr: String, scopeName: String? = null, scope: JsonElement? = null): List<JsonElement> = resolvePath(expr, scopeName, scope)?.let {{ if (it is JsonArray) it else null }}?.toList() ?: emptyList()\n\n    private fun resolveExpr(expr: String, scopeName: String?, scope: JsonElement?): JsonElement? {{\n        val trimmed = expr.trim()\n        if (trimmed.startsWith(\"!\")) {{\n            return JsonPrimitive(!truthy(resolveExpr(trimmed.drop(1), scopeName, scope)))\n        }}\n        for (op in listOf(\">=\", \"<=\", \"==\", \"!=\", \">\", \"<\")) {{\n            val index = trimmed.indexOf(op)\n            if (index > 0) {{\n                val left = resolvePath(trimmed.substring(0, index).trim(), scopeName, scope)\n                val right = resolvePath(trimmed.substring(index + op.length).trim(), scopeName, scope)\n                return JsonPrimitive(compare(left, right, op))\n            }}\n        }}\n        return resolvePath(trimmed, scopeName, scope)\n    }}\n\n    private fun resolvePath(expr: String, scopeName: String?, scope: JsonElement?): JsonElement? {{\n        literal(expr)?.let {{ return it }}\n        if (scopeName != null && scope != null) {{\n            if (expr == scopeName) return scope\n            val prefix = \"$scopeName.\"\n            if (expr.startsWith(prefix)) return lookup(expr.removePrefix(prefix), scope)\n        }}\n        return lookup(expr, state)\n    }}\n\n    private fun lookup(path: String, root: JsonElement?): JsonElement? {{\n        if (path.isEmpty()) return root\n        var current = root ?: return null\n        for (segment in path.split('.')) {{\n            current = when (current) {{\n                is JsonObject -> current[segment] ?: return null\n                is JsonArray -> current.getOrNull(segment.toIntOrNull() ?: return null) ?: return null\n                else -> return null\n            }}\n        }}\n        return current\n    }}\n\n    private fun literal(expr: String): JsonElement? = when {{\n        expr == \"true\" -> JsonPrimitive(true)\n        expr == \"false\" -> JsonPrimitive(false)\n        expr == \"null\" -> JsonNull\n        expr.startsWith(\"\\\"\") && expr.endsWith(\"\\\"\") && expr.length >= 2 -> JsonPrimitive(expr.substring(1, expr.length - 1))\n        expr.toLongOrNull() != null -> JsonPrimitive(expr.toLong())\n        expr.toDoubleOrNull() != null -> JsonPrimitive(expr.toDouble())\n        else -> null\n    }}\n\n    private fun compare(left: JsonElement?, right: JsonElement?, op: String): Boolean {{\n        val leftNumber = numberValue(left)\n        val rightNumber = numberValue(right)\n        if (leftNumber != null && rightNumber != null) {{\n            return when (op) {{\n                \">=\" -> leftNumber >= rightNumber\n                \"<=\" -> leftNumber <= rightNumber\n                \">\" -> leftNumber > rightNumber\n                \"<\" -> leftNumber < rightNumber\n                \"==\" -> leftNumber == rightNumber\n                \"!=\" -> leftNumber != rightNumber\n                else -> false\n            }}\n        }}\n        val leftText = stringify(left)\n        val rightText = stringify(right)\n        return when (op) {{\n            \"==\" -> leftText == rightText\n            \"!=\" -> leftText != rightText\n            else -> false\n        }}\n    }}\n\n    private fun numberValue(value: JsonElement?): Double? = when (value) {{\n        is JsonPrimitive -> value.doubleOrNull ?: value.content.toDoubleOrNull()\n        else -> null\n    }}\n\n    private fun truthy(value: JsonElement?): Boolean = when (value) {{\n        null, JsonNull -> false\n        is JsonPrimitive -> value.booleanOrNull ?: value.doubleOrNull?.let {{ it != 0.0 }} ?: value.content.isNotEmpty()\n        is JsonArray -> value.isNotEmpty()\n        is JsonObject -> value.isNotEmpty()\n    }}\n\n    private fun stringify(value: JsonElement?): String = when (value) {{\n        null, JsonNull -> \"\"\n        is JsonPrimitive -> value.content\n        else -> value.toString()\n    }}\n}}\n\nobject CrepusActions {{\n    var dispatch: (String) -> String = {{ \"{{}}\" }}\n    var resultSink: (String) -> Unit = {{}}\n\n    fun applyResult(raw: String) {{\n        CrepusState.applyResult(raw)\n    }}\n\n    fun perform(action: String) {{\n        resultSink(dispatch(action))\n    }}\n}}\n\n@Composable\nfun {view_name}(modifier: Modifier = Modifier) {{\n{body}\n}}\n"
     )
 }
 
-fn compose_nodes(nodes: &[ViewNode], indent: usize) -> String {
+fn compose_nodes(
+    nodes: &[ViewNode],
+    indent: usize,
+    scope_name: Option<&str>,
+    scope_var: Option<&str>,
+) -> String {
     if nodes.len() == 1 {
-        compose_node_with_base(&nodes[0], indent, Some("modifier".to_string()))
+        compose_node_with_base(&nodes[0], indent, Some("modifier".to_string()), scope_name, scope_var)
     } else {
         let pad = indent_str(indent);
-        let inner = compose_children(nodes, indent + 1);
+        let inner = compose_children(nodes, indent + 1, scope_name, scope_var);
         format!("{pad}Column {{\n{inner}\n{pad}}}")
     }
 }
 
-fn compose_node(node: &ViewNode, indent: usize) -> String {
-    compose_node_with_base(node, indent, None)
+fn compose_node(
+    node: &ViewNode,
+    indent: usize,
+    scope_name: Option<&str>,
+    scope_var: Option<&str>,
+) -> String {
+    compose_node_with_base(node, indent, None, scope_name, scope_var)
 }
 
-fn compose_node_with_base(node: &ViewNode, indent: usize, base_modifier: Option<String>) -> String {
+fn compose_node_with_base(
+    node: &ViewNode,
+    indent: usize,
+    base_modifier: Option<String>,
+    scope_name: Option<&str>,
+    scope_var: Option<&str>,
+) -> String {
     let pad = indent_str(indent);
     match node {
-        ViewNode::Text { content, style, .. } => {
+        ViewNode::Text {
+            content, bind, style, ..
+        } => {
             let args = compose_text_args(style.as_ref());
-            format!("{pad}Text(\"{}\"{args})", kotlin_escape(content))
+            let text = bind
+                .as_deref()
+                .map(|bind| compose_model_text(bind, scope_name, scope_var))
+                .unwrap_or_else(|| format!("\"{}\"", kotlin_escape(content)));
+            format!("{pad}Text({text}{args})")
         }
-        ViewNode::If { then_children, .. } => compose_children_group(then_children, indent),
-        ViewNode::ForEach { item_body, .. } => compose_children_group(item_body, indent),
+        ViewNode::If {
+            condition,
+            then_children,
+            else_children,
+            ..
+        } => {
+            let condition = compose_model_bool(condition, scope_name, scope_var);
+            let then_inner = compose_children(then_children, indent + 1, scope_name, scope_var);
+            if let Some(else_children) = else_children {
+                let else_inner = compose_children(else_children, indent + 1, scope_name, scope_var);
+                format!("{pad}if ({condition}) {{\n{then_inner}\n{pad}}} else {{\n{else_inner}\n{pad}}}")
+            } else {
+                format!("{pad}if ({condition}) {{\n{then_inner}\n{pad}}}")
+            }
+        }
+        ViewNode::ForEach {
+            bind,
+            item_name,
+            item_body,
+            ..
+        } => {
+            let item_var = kotlin_identifier(item_name);
+            let items = compose_model_items(bind, scope_name, scope_var);
+            let inner = compose_children(item_body, indent + 1, Some(item_name), Some(&item_var));
+            format!("{pad}{items}.forEachIndexed {{ _, {item_var} ->\n{inner}\n{pad}}}")
+        }
         ViewNode::Stack {
             axis,
             spacing,
@@ -607,7 +797,7 @@ fn compose_node_with_base(node: &ViewNode, indent: usize, base_modifier: Option<
                 spacing.unwrap_or(8.0)
             ));
             let args = args.join(", ");
-            let inner = compose_children(children, indent + 1);
+            let inner = compose_children(children, indent + 1, scope_name, scope_var);
             let out = format!("{pad}{view}({args}) {{\n{inner}\n{pad}}}");
             compose_content_color_wrapper(out, style.as_ref(), indent)
         }
@@ -626,27 +816,36 @@ fn compose_node_with_base(node: &ViewNode, indent: usize, base_modifier: Option<
         }
         ViewNode::Toggle {
             label,
+            bind,
             checked,
+            on_change,
             style,
             ..
         }
         | ViewNode::Checkbox {
             label,
+            bind,
             checked,
+            on_change,
             style,
             ..
         } => {
             let modifier = compose_modifier_call_args(style.as_ref());
+            let checked_value = bind
+                .as_deref()
+                .map(|bind| compose_model_bool(bind, scope_name, scope_var))
+                .unwrap_or_else(|| kotlin_bool(*checked).to_string());
+            let on_change = compose_action(on_change.as_deref());
             format!(
-                "{pad}Row{modifier} {{\n{}Text(\"{}\")\n{}Switch(checked = {}, onCheckedChange = {{}})\n{pad}}}",
+                "{pad}Row{modifier} {{\n{}Text(\"{}\")\n{}Switch(checked = {checked_value}, onCheckedChange = {{ {on_change} }})\n{pad}}}",
                 indent_str(indent + 1),
                 kotlin_escape(label),
-                indent_str(indent + 1),
-                kotlin_bool(*checked)
+                indent_str(indent + 1)
             )
         }
         ViewNode::Slider {
             label,
+            bind,
             value,
             min,
             max,
@@ -664,8 +863,12 @@ fn compose_node_with_base(node: &ViewNode, indent: usize, base_modifier: Option<
                     )
                 })
                 .unwrap_or_default();
+            let slider_value = bind
+                .as_deref()
+                .map(|bind| compose_model_number(bind, scope_name, scope_var))
+                .unwrap_or_else(|| format!("{value:.3}f"));
             format!(
-                "{pad}Column{modifier} {{\n{label}{}Slider(value = {value:.3}f, onValueChange = {{}}, valueRange = {min:.3}f..{max:.3}f)\n{pad}}}",
+                "{pad}Column{modifier} {{\n{label}{}Slider(value = {slider_value}, onValueChange = {{}}, valueRange = {min:.3}f..{max:.3}f)\n{pad}}}",
                 indent_str(indent + 1)
             )
         }
@@ -725,7 +928,7 @@ fn compose_node_with_base(node: &ViewNode, indent: usize, base_modifier: Option<
                     kotlin_escape(label)
                 )
             } else {
-                compose_children(children, indent + 1)
+                compose_children(children, indent + 1, scope_name, scope_var)
             };
             format!("{pad}Column{modifier} {{\n{inner}\n{pad}}}")
         }
@@ -766,14 +969,14 @@ fn compose_node_with_base(node: &ViewNode, indent: usize, base_modifier: Option<
                 StackAxis::Row => "Row",
                 StackAxis::Column => "Column",
             };
-            let inner = compose_children(children, indent + 1);
+            let inner = compose_children(children, indent + 1, scope_name, scope_var);
             format!(
                 "{pad}{view}(modifier = {}) {{\n{inner}\n{pad}}}",
                 modifier.unwrap_or_else(|| "Modifier".to_string())
             )
         }
         ViewNode::List { children, .. } | ViewNode::ListItem { children, .. } => {
-            let inner = compose_children(children, indent + 1);
+            let inner = compose_children(children, indent + 1, scope_name, scope_var);
             format!("{pad}Column {{\n{inner}\n{pad}}}")
         }
         ViewNode::SlotRotate { phrases, style, .. } => {
@@ -784,22 +987,29 @@ fn compose_node_with_base(node: &ViewNode, indent: usize, base_modifier: Option<
             )
         }
         ViewNode::Input {
-            placeholder, style, ..
+            placeholder,
+            bind,
+            style,
+            ..
         } => {
             let modifier = compose_modifier_param(style.as_ref());
             format!(
-                "{pad}TextField(value = \"\", onValueChange = {{}}, placeholder = {{ Text(\"{}\") }}{modifier})",
-                kotlin_escape(placeholder)
+                "{pad}TextField(value = {}, onValueChange = {{}}, placeholder = {{ Text(\"{}\") }}{modifier})",
+                compose_model_text(bind, scope_name, scope_var),
+                kotlin_escape(placeholder),
             )
         }
-        ViewNode::Picker { options, style, .. } => {
+        ViewNode::Picker { bind, options, style, .. } => {
             let modifier = compose_modifier_call_args(style.as_ref());
+            let current = compose_model_text(bind, scope_name, scope_var);
             let inner = options
                 .iter()
                 .map(|option| {
                     format!(
-                        "{}Text(\"{}\")",
+                        "{}Text(if ({current} == \"{}\") \"{}\" else \"{}\")",
                         indent_str(indent + 1),
+                        kotlin_escape(&option.value),
+                        kotlin_escape(&option.label),
                         kotlin_escape(&option.label)
                     )
                 })
@@ -834,18 +1044,78 @@ fn compose_content_color_wrapper(out: String, style: Option<&ViewStyle>, indent:
     )
 }
 
-fn compose_children(children: &[ViewNode], indent: usize) -> String {
+fn compose_children(
+    children: &[ViewNode],
+    indent: usize,
+    scope_name: Option<&str>,
+    scope_var: Option<&str>,
+) -> String {
     children
         .iter()
-        .map(|child| compose_node(child, indent))
+        .map(|child| compose_node(child, indent, scope_name, scope_var))
         .collect::<Vec<_>>()
         .join("\n")
 }
 
-fn compose_children_group(children: &[ViewNode], indent: usize) -> String {
-    let pad = indent_str(indent);
-    let inner = compose_children(children, indent + 1);
-    format!("{pad}Column {{\n{inner}\n{pad}}}")
+fn kotlin_identifier(name: &str) -> String {
+    let mut out = String::new();
+    for (idx, ch) in name.chars().enumerate() {
+        if (idx == 0 && (ch.is_ascii_alphabetic() || ch == '_'))
+            || (idx > 0 && (ch.is_ascii_alphanumeric() || ch == '_'))
+        {
+            out.push(ch);
+        } else {
+            out.push('_');
+        }
+    }
+    if out.is_empty() {
+        "item".to_string()
+    } else {
+        out
+    }
+}
+
+fn kotlin_scope_args(scope_name: Option<&str>, scope_var: Option<&str>) -> String {
+    match (scope_name, scope_var) {
+        (Some(scope_name), Some(scope_var)) => format!(
+            ", scopeName = \"{}\", scope = {}",
+            kotlin_escape(scope_name),
+            scope_var
+        ),
+        _ => String::new(),
+    }
+}
+
+fn compose_model_text(expr: &str, scope_name: Option<&str>, scope_var: Option<&str>) -> String {
+    format!(
+        "CrepusState.text(\"{}\"{})",
+        kotlin_escape(expr),
+        kotlin_scope_args(scope_name, scope_var)
+    )
+}
+
+fn compose_model_bool(expr: &str, scope_name: Option<&str>, scope_var: Option<&str>) -> String {
+    format!(
+        "CrepusState.bool(\"{}\"{})",
+        kotlin_escape(expr),
+        kotlin_scope_args(scope_name, scope_var)
+    )
+}
+
+fn compose_model_number(expr: &str, scope_name: Option<&str>, scope_var: Option<&str>) -> String {
+    format!(
+        "CrepusState.number(\"{}\"{})",
+        kotlin_escape(expr),
+        kotlin_scope_args(scope_name, scope_var)
+    )
+}
+
+fn compose_model_items(expr: &str, scope_name: Option<&str>, scope_var: Option<&str>) -> String {
+    format!(
+        "CrepusState.items(\"{}\"{})",
+        kotlin_escape(expr),
+        kotlin_scope_args(scope_name, scope_var)
+    )
 }
 
 fn compose_text_args(style: Option<&ViewStyle>) -> String {
