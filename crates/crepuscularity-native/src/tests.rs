@@ -47,7 +47,9 @@ fn codegen_swiftui_emits_standalone_view_source() {
     assert!(source.contains("import SwiftUI"));
     assert!(source.contains("public enum CrepusActions"));
     assert!(source.contains("public static var dispatch: (String) -> String"));
-    assert!(source.contains("public static let knownActions: Set<String> = []"));
+    assert!(source.contains("public static func perform(_ action: String)"));
+    assert!(source.contains("resultSink(dispatch(action))"));
+    assert!(!source.contains("knownActions"));
     assert!(source.contains("public struct HelloScreen: View"));
     assert!(source.contains("VStack(alignment: .leading, spacing: 16.0)"));
     assert!(source.contains("Text(\"Hello Ada\")"));
@@ -71,8 +73,9 @@ fn codegen_compose_emits_composable_source() {
     );
     assert!(source.contains("object CrepusActions"));
     assert!(source.contains("var dispatch: (String) -> String"));
-    assert!(source.contains("val knownActions: Set<String> = setOf(\"tap\")"));
-    assert!(source.contains("if (!knownActions.contains(action))"));
+    assert!(source.contains("fun perform(action: String)"));
+    assert!(source.contains("resultSink(dispatch(action))"));
+    assert!(!source.contains("knownActions"));
     assert!(source.contains("Button(onClick = { CrepusActions.perform(\"tap\") })"));
 }
 
@@ -186,9 +189,11 @@ fn round_trip(ir: &ViewIr) {
 
 #[test]
 fn serde_round_trip() {
-    let ir =
-        render_template_to_ir("div flex flex-row\n if {show}\n  \"yes\"\n else\n  \"no\"", &TemplateContext::new())
-            .unwrap();
+    let ir = render_template_to_ir(
+        "div flex flex-row\n if {show}\n  \"yes\"\n else\n  \"no\"",
+        &TemplateContext::new(),
+    )
+    .unwrap();
     let v = serde_json::to_value(&ir).unwrap();
     assert_eq!(v["root"][0]["children"][0]["kind"], "if");
     round_trip(&ir);
@@ -196,7 +201,11 @@ fn serde_round_trip() {
 
 #[test]
 fn for_loop() {
-    let ir = render_template_to_ir("div\n for item in {items}\n  span\n    \"{item}\"", &TemplateContext::new()).unwrap();
+    let ir = render_template_to_ir(
+        "div\n for item in {items}\n  span\n    \"{item}\"",
+        &TemplateContext::new(),
+    )
+    .unwrap();
     let v = serde_json::to_value(&ir).unwrap();
     assert_eq!(v["root"][0]["children"][0]["kind"], "forEach");
     assert_eq!(v["root"][0]["children"][0]["bind"], "items");

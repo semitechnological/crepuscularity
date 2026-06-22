@@ -1,5 +1,3 @@
-use std::collections::BTreeSet;
-
 use crate::ir::{StackAxis, ViewIr, ViewNode, ViewStyle};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -17,10 +15,8 @@ pub fn generate_native_source(ir: &ViewIr, target: NativeCodegenTarget, view_nam
 
 fn generate_swiftui(ir: &ViewIr, view_name: &str) -> String {
     let body = swiftui_nodes(&ir.root, 2);
-    let actions = collect_actions(&ir.root);
-    let known_actions = swift_known_actions(&actions);
     format!(
-        "import SwiftUI\n\npublic enum CrepusActions {{\n    public static let knownActions: Set<String> = {known_actions}\n    public static var dispatch: (String) -> String = {{ _ in \"{{}}\" }}\n    public static var resultSink: (String) -> Void = {{ _ in }}\n\n    public static func perform(_ action: String) {{\n        guard knownActions.contains(action) else {{\n            resultSink(\"{{\\\"ok\\\":false,\\\"error\\\":\\\"unknown generated action\\\"}}\")\n            return\n        }}\n        resultSink(dispatch(action))\n    }}\n}}\n\npublic struct {view_name}: View {{\n    public init() {{}}\n\n    public var body: some View {{\n{body}\n    }}\n}}\n"
+        "import SwiftUI\n\npublic enum CrepusActions {{\n    public static var dispatch: (String) -> String = {{ _ in \"{{}}\" }}\n    public static var resultSink: (String) -> Void = {{ _ in }}\n\n    public static func perform(_ action: String) {{\n        resultSink(dispatch(action))\n    }}\n}}\n\npublic struct {view_name}: View {{\n    public init() {{}}\n\n    public var body: some View {{\n{body}\n    }}\n}}\n"
     )
 }
 
@@ -559,10 +555,8 @@ fn swiftui_font_weight(weight: u16) -> &'static str {
 
 fn generate_compose(ir: &ViewIr, view_name: &str) -> String {
     let body = compose_nodes(&ir.root, 1);
-    let actions = collect_actions(&ir.root);
-    let known_actions = compose_known_actions(&actions);
     format!(
-        "import androidx.compose.foundation.background\nimport androidx.compose.foundation.border\nimport androidx.compose.foundation.horizontalScroll\nimport androidx.compose.foundation.layout.Arrangement\nimport androidx.compose.foundation.layout.Column\nimport androidx.compose.foundation.layout.PaddingValues\nimport androidx.compose.foundation.layout.Row\nimport androidx.compose.foundation.layout.Spacer\nimport androidx.compose.foundation.layout.fillMaxHeight\nimport androidx.compose.foundation.layout.fillMaxSize\nimport androidx.compose.foundation.layout.fillMaxWidth\nimport androidx.compose.foundation.layout.height\nimport androidx.compose.foundation.layout.offset\nimport androidx.compose.foundation.layout.padding\nimport androidx.compose.foundation.layout.width\nimport androidx.compose.foundation.rememberScrollState\nimport androidx.compose.foundation.shape.RoundedCornerShape\nimport androidx.compose.foundation.verticalScroll\nimport androidx.compose.material3.Button\nimport androidx.compose.material3.ButtonDefaults\nimport androidx.compose.material3.Divider\nimport androidx.compose.material3.LinearProgressIndicator\nimport androidx.compose.material3.LocalContentColor\nimport androidx.compose.material3.Slider\nimport androidx.compose.material3.Switch\nimport androidx.compose.material3.Text\nimport androidx.compose.material3.TextField\nimport androidx.compose.runtime.Composable\nimport androidx.compose.runtime.CompositionLocalProvider\nimport androidx.compose.ui.Modifier\nimport androidx.compose.ui.draw.alpha\nimport androidx.compose.ui.draw.clip\nimport androidx.compose.ui.draw.rotate\nimport androidx.compose.ui.draw.scale\nimport androidx.compose.ui.graphics.Color\nimport androidx.compose.ui.text.font.FontStyle\nimport androidx.compose.ui.text.font.FontWeight\nimport androidx.compose.ui.text.style.TextAlign\nimport androidx.compose.ui.text.style.TextDecoration\nimport androidx.compose.ui.unit.dp\nimport androidx.compose.ui.unit.sp\n\nobject CrepusActions {{\n    val knownActions: Set<String> = {known_actions}\n    var dispatch: (String) -> String = {{ \"{{}}\" }}\n    var resultSink: (String) -> Unit = {{}}\n\n    fun perform(action: String) {{\n        if (!knownActions.contains(action)) {{\n            resultSink(\"{{\\\"ok\\\":false,\\\"error\\\":\\\"unknown generated action\\\"}}\")\n            return\n        }}\n        resultSink(dispatch(action))\n    }}\n}}\n\n@Composable\nfun {view_name}(modifier: Modifier = Modifier) {{\n{body}\n}}\n"
+        "import androidx.compose.foundation.background\nimport androidx.compose.foundation.border\nimport androidx.compose.foundation.horizontalScroll\nimport androidx.compose.foundation.layout.Arrangement\nimport androidx.compose.foundation.layout.Column\nimport androidx.compose.foundation.layout.PaddingValues\nimport androidx.compose.foundation.layout.Row\nimport androidx.compose.foundation.layout.Spacer\nimport androidx.compose.foundation.layout.fillMaxHeight\nimport androidx.compose.foundation.layout.fillMaxSize\nimport androidx.compose.foundation.layout.fillMaxWidth\nimport androidx.compose.foundation.layout.height\nimport androidx.compose.foundation.layout.offset\nimport androidx.compose.foundation.layout.padding\nimport androidx.compose.foundation.layout.width\nimport androidx.compose.foundation.rememberScrollState\nimport androidx.compose.foundation.shape.RoundedCornerShape\nimport androidx.compose.foundation.verticalScroll\nimport androidx.compose.material3.Button\nimport androidx.compose.material3.ButtonDefaults\nimport androidx.compose.material3.Divider\nimport androidx.compose.material3.LinearProgressIndicator\nimport androidx.compose.material3.LocalContentColor\nimport androidx.compose.material3.Slider\nimport androidx.compose.material3.Switch\nimport androidx.compose.material3.Text\nimport androidx.compose.material3.TextField\nimport androidx.compose.runtime.Composable\nimport androidx.compose.runtime.CompositionLocalProvider\nimport androidx.compose.ui.Modifier\nimport androidx.compose.ui.draw.alpha\nimport androidx.compose.ui.draw.clip\nimport androidx.compose.ui.draw.rotate\nimport androidx.compose.ui.draw.scale\nimport androidx.compose.ui.graphics.Color\nimport androidx.compose.ui.text.font.FontStyle\nimport androidx.compose.ui.text.font.FontWeight\nimport androidx.compose.ui.text.style.TextAlign\nimport androidx.compose.ui.text.style.TextDecoration\nimport androidx.compose.ui.unit.dp\nimport androidx.compose.ui.unit.sp\n\nobject CrepusActions {{\n    var dispatch: (String) -> String = {{ \"{{}}\" }}\n    var resultSink: (String) -> Unit = {{}}\n\n    fun perform(action: String) {{\n        resultSink(dispatch(action))\n    }}\n}}\n\n@Composable\nfun {view_name}(modifier: Modifier = Modifier) {{\n{body}\n}}\n"
     )
 }
 
@@ -1206,99 +1200,6 @@ fn kotlin_bool(value: bool) -> &'static str {
         "true"
     } else {
         "false"
-    }
-}
-
-fn collect_actions(nodes: &[ViewNode]) -> BTreeSet<String> {
-    let mut actions = BTreeSet::new();
-    for node in nodes {
-        collect_node_actions(node, &mut actions);
-    }
-    actions
-}
-
-fn collect_node_actions(node: &ViewNode, actions: &mut BTreeSet<String>) {
-    match node {
-        ViewNode::Button {
-            on_click: Some(action),
-            ..
-        } => {
-            actions.insert(action.clone());
-        }
-        ViewNode::Toggle {
-            on_change: Some(action),
-            ..
-        }
-        | ViewNode::Checkbox {
-            on_change: Some(action),
-            ..
-        } => {
-            actions.insert(action.clone());
-        }
-        ViewNode::Dropzone {
-            on_drop: Some(action),
-            children,
-            ..
-        } => {
-            actions.insert(action.clone());
-            for child in children {
-                collect_node_actions(child, actions);
-            }
-        }
-        ViewNode::Dropzone {
-            on_drop: None,
-            children,
-            ..
-        } => {
-            for child in children {
-                collect_node_actions(child, actions);
-            }
-        }
-        ViewNode::FilePicker {
-            on_pick: Some(action),
-            ..
-        } => {
-            actions.insert(action.clone());
-        }
-        ViewNode::Stack { children, .. }
-        | ViewNode::Scroll { children, .. }
-        | ViewNode::List { children, .. }
-        | ViewNode::ListItem { children, .. } => {
-            for child in children {
-                collect_node_actions(child, actions);
-            }
-        }
-        _ => {}
-    }
-}
-
-fn swift_known_actions(actions: &BTreeSet<String>) -> String {
-    if actions.is_empty() {
-        "[]".to_string()
-    } else {
-        format!(
-            "[{}]",
-            actions
-                .iter()
-                .map(|action| format!("\"{}\"", swift_escape(action)))
-                .collect::<Vec<_>>()
-                .join(", ")
-        )
-    }
-}
-
-fn compose_known_actions(actions: &BTreeSet<String>) -> String {
-    if actions.is_empty() {
-        "emptySet()".to_string()
-    } else {
-        format!(
-            "setOf({})",
-            actions
-                .iter()
-                .map(|action| format!("\"{}\"", kotlin_escape(action)))
-                .collect::<Vec<_>>()
-                .join(", ")
-        )
     }
 }
 
