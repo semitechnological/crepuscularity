@@ -10,8 +10,7 @@ let package = Package(
     targets: [
         .target(
             name: "NativeShell",
-            path: "Sources/NativeShell",
-            resources: [.copy("fixture.json")]
+            path: "Sources/NativeShell"
         ),
     ]
 )

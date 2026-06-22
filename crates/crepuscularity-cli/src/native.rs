@@ -770,30 +770,14 @@ const TEMPLATE_FILES: &[(&str, &str)] = &[
         include_str!("../templates/native/ios/App/ContentView.swift"),
     ),
     (
-        "ios/Sources/NativeShell/ViewIrModels.swift",
-        include_str!("../templates/native/ios/Sources/NativeShell/ViewIrModels.swift"),
-    ),
-    (
-        "ios/Sources/NativeShell/CrepusMobileRuntime.swift",
-        include_str!("../templates/native/ios/Sources/NativeShell/CrepusMobileRuntime.swift"),
-    ),
-    (
         "ios/Sources/NativeShell/CrepusRustActions.swift",
         include_str!("../templates/native/ios/Sources/NativeShell/CrepusRustActions.swift"),
-    ),
-    (
-        "ios/Sources/NativeShell/ViewIrTreeView.swift",
-        include_str!("../templates/native/ios/Sources/NativeShell/ViewIrTreeView.swift"),
     ),
     (
         "ios/Sources/NativeShell/Generated/CrepusGeneratedView.swift",
         include_str!(
             "../templates/native/ios/Sources/NativeShell/Generated/CrepusGeneratedView.swift"
         ),
-    ),
-    (
-        "ios/Sources/NativeShell/fixture.json",
-        include_str!("../templates/native/ios/Sources/NativeShell/fixture.json"),
     ),
     (
         "android/build.gradle.kts",
@@ -830,27 +814,9 @@ const TEMPLATE_FILES: &[(&str, &str)] = &[
         ),
     ),
     (
-        "android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusMobileRuntime.kt",
-        include_str!(
-            "../templates/native/android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusMobileRuntime.kt"
-        ),
-    ),
-    (
         "android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusRustActions.kt",
         include_str!(
             "../templates/native/android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusRustActions.kt"
-        ),
-    ),
-    (
-        "android/app/src/main/java/dev/crepuscularity/nativeshell/ViewIr.kt",
-        include_str!(
-            "../templates/native/android/app/src/main/java/dev/crepuscularity/nativeshell/ViewIr.kt"
-        ),
-    ),
-    (
-        "android/app/src/main/java/dev/crepuscularity/nativeshell/ViewIrTree.kt",
-        include_str!(
-            "../templates/native/android/app/src/main/java/dev/crepuscularity/nativeshell/ViewIrTree.kt"
         ),
     ),
     (
