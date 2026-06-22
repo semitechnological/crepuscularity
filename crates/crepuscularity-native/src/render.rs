@@ -225,6 +225,7 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<ViewNode, Crepu
             min: binding_f32(el, "min", ctx).unwrap_or(0.0),
             max: binding_f32(el, "max", ctx).unwrap_or(100.0),
             step: binding_f32(el, "step", ctx),
+            on_change: event_handler(el, "change"),
             style: hints.style.opt(),
         });
     }
@@ -326,12 +327,7 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<ViewNode, Crepu
     }
 
     if tag == "input" || tag == "textfield" || tag == "textinput" || tag == "textarea" {
-        let bind = el
-            .bindings
-            .iter()
-            .find(|b| b.prop == "bind")
-            .map(|b| b.value.clone())
-            .unwrap_or_default();
+        let bind = binding_raw(el, "bind").unwrap_or_default();
         let placeholder = el
             .bindings
             .iter()
@@ -347,17 +343,13 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<ViewNode, Crepu
             placeholder,
             bind,
             multiline,
+            on_change: event_handler(el, "change"),
             style: hints.style.opt(),
         });
     }
 
     if tag == "picker" || tag == "select" {
-        let bind = el
-            .bindings
-            .iter()
-            .find(|b| b.prop == "bind")
-            .map(|b| b.value.clone())
-            .unwrap_or_default();
+        let bind = binding_raw(el, "bind").unwrap_or_default();
         let mut options = Vec::new();
         for child in &el.children {
             if let Node::Element(inner) = child {
@@ -382,6 +374,7 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<ViewNode, Crepu
         return Ok(ViewNode::Picker {
             bind,
             options,
+            on_change: event_handler(el, "change"),
             style: hints.style.opt(),
         });
     }
