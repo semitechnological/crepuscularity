@@ -249,6 +249,12 @@ fn print_matrix_stdout(rows: &[MatrixRow], plain: bool, sort: SortBy) {
 }
 
 fn run_compare_sh(repo: &Path, mode: &str) -> io::Result<String> {
+    if mode != "disk" && mode != "memory" {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            format!("Invalid mode: {}", mode),
+        ));
+    }
     let script = repo.join("examples/benchmark/compare.sh");
     if !script.is_file() {
         return Ok(format!("missing {}", script.display()));
