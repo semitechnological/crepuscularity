@@ -28,3 +28,5 @@ js-sys = { workspace = true, optional = true }
 serde-wasm-bindgen = { version = "0.6", optional = true }
 wasm-bindgen = { workspace = true, optional = true }
 wasm-bindgen-futures = { version = "0.4", optional = true }
+[dev-dependencies]
+tempfile = { workspace = true }
