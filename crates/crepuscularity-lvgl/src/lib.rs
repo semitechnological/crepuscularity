@@ -1,4 +1,5 @@
 use std::path::Path;
+use std::sync::Arc;
 
 use crepuscularity_core::ast::*;
 use crepuscularity_core::context::{value_to_str, TemplateContext, TemplateValue};
@@ -138,7 +139,7 @@ fn render_nodes_list(nodes: &[Node], ctx: &TemplateContext) -> Result<Vec<XmlNod
                 out.extend(render_nodes_list(body, &ctx)?);
             }
             Node::For(block) => {
-                for item_ctx in ctx.get_list(&block.iterator) {
+                for item_ctx in ctx.get_list_ref(&block.iterator) {
                     let mut loop_ctx = ctx.clone();
                     for (key, value) in &item_ctx.vars {
                         loop_ctx.vars.insert(key.clone(), value.clone());
@@ -284,7 +285,7 @@ fn expand_include(
         child_ctx.vars.insert(key.clone(), eval_expr(expr, ctx)?);
     }
     if !inc.slot.is_empty() {
-        child_ctx.slot = Some((inc.slot.clone(), Box::new(ctx.clone())));
+        child_ctx.slot = Some((inc.slot.clone(), Arc::new(ctx.clone())));
     }
 
     Ok((nodes, lvgl_context(&child_ctx)))
@@ -318,7 +319,7 @@ fn expand_named_component(
         child_ctx.vars.insert(key.clone(), eval_expr(expr, ctx)?);
     }
     if !inc.slot.is_empty() {
-        child_ctx.slot = Some((inc.slot.clone(), Box::new(ctx.clone())));
+        child_ctx.slot = Some((inc.slot.clone(), Arc::new(ctx.clone())));
     }
 
     Ok((comp.nodes.clone(), lvgl_context(&child_ctx)))

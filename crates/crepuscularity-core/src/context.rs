@@ -11,7 +11,7 @@ pub struct TemplateContext {
     pub base_dir: Option<PathBuf>,
     /// Slot content passed from a parent `include` directive.
     /// `(nodes, parent_ctx)` — the nodes are rendered with the parent's context.
-    pub slot: Option<(Vec<crate::ast::Node>, Box<TemplateContext>)>,
+    pub slot: Option<(Vec<crate::ast::Node>, Arc<TemplateContext>)>,
     /// In-memory virtual file system for WASM / no-filesystem environments.
     /// Keys are paths (e.g. `"views/ui.crepus"`). Checked before real filesystem.
     pub virtual_files: Arc<HashMap<String, String>>,
@@ -58,6 +58,14 @@ impl TemplateContext {
         match self.vars.get(key) {
             Some(TemplateValue::List(items)) => items.clone(),
             _ => Vec::new(),
+        }
+    }
+
+    /// Like `get_list` but returns a reference — avoids cloning the entire list.
+    pub fn get_list_ref(&self, key: &str) -> &[TemplateContext] {
+        match self.vars.get(key) {
+            Some(TemplateValue::List(items)) => items.as_slice(),
+            _ => &[],
         }
     }
 

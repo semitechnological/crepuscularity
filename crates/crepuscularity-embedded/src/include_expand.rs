@@ -1,6 +1,7 @@
 //! Expand `include` directives into parsed child nodes + context.
 
 use std::path::Path;
+use std::sync::Arc;
 
 use crepuscularity_core::ast::{IncludeNode, Node};
 use crepuscularity_core::context::TemplateContext;
@@ -38,7 +39,7 @@ pub(crate) fn expand_include(
         child_ctx.vars.insert(key.clone(), eval_expr(expr, ctx)?);
     }
     if !inc.slot.is_empty() {
-        child_ctx.slot = Some((inc.slot.clone(), Box::new(ctx.clone())));
+        child_ctx.slot = Some((inc.slot.clone(), Arc::new(ctx.clone())));
     }
 
     Ok((nodes, child_ctx))
@@ -72,7 +73,7 @@ fn expand_named_component(
         child_ctx.vars.insert(key.clone(), eval_expr(expr, ctx)?);
     }
     if !inc.slot.is_empty() {
-        child_ctx.slot = Some((inc.slot.clone(), Box::new(ctx.clone())));
+        child_ctx.slot = Some((inc.slot.clone(), Arc::new(ctx.clone())));
     }
 
     Ok((comp.nodes.clone(), child_ctx))

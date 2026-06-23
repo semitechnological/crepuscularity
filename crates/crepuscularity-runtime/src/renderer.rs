@@ -4,6 +4,7 @@
 /// - Dynamic theme colors via context expressions in class values
 /// - GPUI animations via `animate:property={duration easing}` attributes
 /// - All standard Tailwind-like classes mapped to GPUI methods
+use std::sync::Arc;
 use std::time::Duration;
 
 use gpui::{
@@ -274,7 +275,7 @@ fn render_if(block: &IfBlock, ctx: &TemplateContext) -> AnyElement {
 }
 
 fn render_for(block: &ForBlock, ctx: &TemplateContext) -> AnyElement {
-    let items = ctx.get_list(&block.iterator);
+    let items = ctx.get_list_ref(&block.iterator);
 
     let mut d = div();
     let mut child_ctx = ctx.clone();
@@ -287,8 +288,8 @@ fn render_for(block: &ForBlock, ctx: &TemplateContext) -> AnyElement {
             String::new()
         };
         child_ctx.vars.clone_from(&ctx.vars);
-        for (k, v) in item_ctx.vars {
-            child_ctx.vars.insert(k, v);
+        for (k, v) in &item_ctx.vars {
+            child_ctx.vars.insert(k.clone(), v.clone());
         }
         if has_pattern && !item_str.is_empty() {
             child_ctx
@@ -362,7 +363,7 @@ fn render_include(inc: &IncludeNode, ctx: &TemplateContext) -> AnyElement {
     }
 
     if !inc.slot.is_empty() {
-        child_ctx.slot = Some((inc.slot.clone(), Box::new(ctx.clone())));
+        child_ctx.slot = Some((inc.slot.clone(), Arc::new(ctx.clone())));
     }
 
     render_nodes(nodes.as_ref(), &child_ctx)
@@ -441,7 +442,7 @@ fn render_named_component(
     }
 
     if !inc.slot.is_empty() {
-        child_ctx.slot = Some((inc.slot.clone(), Box::new(ctx.clone())));
+        child_ctx.slot = Some((inc.slot.clone(), Arc::new(ctx.clone())));
     }
 
     render_nodes(&comp.nodes, &child_ctx)

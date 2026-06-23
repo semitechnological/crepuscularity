@@ -18,6 +18,7 @@ use ratatui::style::{Color, Style};
 use ratatui::text::{Line, Span, Text};
 use ratatui::widgets::{Block, BorderType, Borders, Padding, Paragraph, Wrap};
 use ratatui::Frame;
+use std::sync::Arc;
 
 use crepuscularity_core::ast::*;
 use crepuscularity_core::context::{value_to_str, TemplateContext, TemplateValue};
@@ -606,7 +607,7 @@ fn build_for(
     parent_dir: Direction,
     inherited: Style,
 ) -> Vec<WidgetChild> {
-    let items = ctx.get_list(&block.iterator);
+    let items = ctx.get_list_ref(&block.iterator);
     let mut out = Vec::new();
     let mut child_ctx = ctx.clone();
     let pattern = block.pattern.trim();
@@ -620,8 +621,8 @@ fn build_for(
         // Restore child_ctx
         child_ctx.vars.clone_from(&ctx.vars);
         // Merge all fields from the item context into the child context.
-        for (k, v) in item_ctx.vars {
-            child_ctx.vars.insert(k, v);
+        for (k, v) in &item_ctx.vars {
+            child_ctx.vars.insert(k.clone(), v.clone());
         }
         // Bind the loop pattern variable to the item's "value" field if present.
         if has_pattern && !item_str.is_empty() {
@@ -674,7 +675,7 @@ fn prepare_include_context(
         child_ctx.vars.insert(key.clone(), eval_value(expr, ctx));
     }
     if !inc.slot.is_empty() {
-        child_ctx.slot = Some((inc.slot.clone(), Box::new(ctx.clone())));
+        child_ctx.slot = Some((inc.slot.clone(), Arc::new(ctx.clone())));
     }
     child_ctx
 }
