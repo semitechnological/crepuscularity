@@ -1043,8 +1043,14 @@ fn exec_tracked(
 
     cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
     let mut child = cmd.spawn().map_err(|e| e.to_string())?;
-    let stdout_pipe = child.stdout.take().unwrap();
-    let stderr_pipe = child.stderr.take().unwrap();
+    let stdout_pipe = child
+        .stdout
+        .take()
+        .ok_or_else(|| "Failed to capture stdout".to_string())?;
+    let stderr_pipe = child
+        .stderr
+        .take()
+        .ok_or_else(|| "Failed to capture stderr".to_string())?;
     let t_out = thread::spawn(move || {
         let mut s = String::new();
         let _ = std::io::BufReader::new(stdout_pipe).read_to_string(&mut s);
