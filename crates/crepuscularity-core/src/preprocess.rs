@@ -98,7 +98,17 @@ pub fn strip_indent_decorators(raw: &str) -> IndentDecorators {
     }
 
     let (end, inline_css) = strip_trailing_inline_css(&lines, i, end);
-    let body = lines[i..end].join("\n");
+    let body = {
+        let slice = &lines[i..end];
+        let mut s = String::with_capacity(slice.iter().map(|l| l.len() + 1).sum());
+        for (idx, line) in slice.iter().enumerate() {
+            if idx > 0 {
+                s.push('\n');
+            }
+            s.push_str(line);
+        }
+        s
+    };
     IndentDecorators {
         body,
         google_fonts,
@@ -380,11 +390,22 @@ fn parse_class_alias_line(line: &str) -> Option<(String, String)> {
 }
 
 /// Expand `.shortcut` tokens in `classes` using `aliases` (one level).
+/// Returns owned strings; in the common no-alias case the input is moved
+/// into the result without re-allocation.
 pub fn expand_class_token(token: &str, aliases: &HashMap<String, String>) -> Vec<String> {
     if let Some(exp) = aliases.get(token) {
         return exp.split_whitespace().map(|s| s.to_string()).collect();
     }
     vec![token.to_string()]
+}
+
+/// Like `expand_class_token` but takes ownership of `token` to avoid
+/// re-allocating in the common no-alias case.
+pub fn expand_class_token_owned(token: String, aliases: &HashMap<String, String>) -> Vec<String> {
+    if let Some(exp) = aliases.get(token.as_str()) {
+        return exp.split_whitespace().map(|s| s.to_string()).collect();
+    }
+    vec![token]
 }
 
 /// Recursively expand class shortcuts on every element.
@@ -397,12 +418,12 @@ pub fn expand_class_aliases_in_nodes(nodes: &mut [Node], aliases: &HashMap<Strin
             Node::Element(el) => {
                 let mut out = Vec::new();
                 for c in std::mem::take(&mut el.classes) {
-                    out.extend(expand_class_token(&c, aliases));
+                    out.extend(expand_class_token_owned(c, aliases));
                 }
                 el.classes = out;
                 let mut out_cc: Vec<ConditionalClass> = Vec::new();
                 for cc in std::mem::take(&mut el.conditional_classes) {
-                    for c in expand_class_token(&cc.class, aliases) {
+                    for c in expand_class_token_owned(cc.class, aliases) {
                         out_cc.push(ConditionalClass {
                             class: c,
                             condition: cc.condition.clone(),
