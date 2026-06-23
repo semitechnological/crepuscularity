@@ -737,3 +737,31 @@ fn render_named_component_ssr(
 
     render_nodes_ssr(&comp.nodes, &child_ctx, counter, bind, false)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crepuscularity_core::context::TemplateContext;
+    use crepuscularity_core::context::TemplateValue;
+
+    #[test]
+    fn test_serialize_ctx_for_ssr_empty() {
+        let ctx = TemplateContext::new();
+        let result = serialize_ctx_for_ssr(&ctx).unwrap();
+        assert_eq!(result, serde_json::Value::Object(serde_json::Map::new()));
+    }
+
+    #[test]
+    fn test_serialize_ctx_for_ssr_with_vars() {
+        let mut ctx = TemplateContext::new();
+        ctx.vars.insert("str".to_string(), TemplateValue::Str("hello".to_string()));
+        ctx.vars.insert("num".to_string(), TemplateValue::Float(42.0));
+        ctx.vars.insert("bool".to_string(), TemplateValue::Bool(true));
+
+        let result = serialize_ctx_for_ssr(&ctx).unwrap();
+        let obj = result.as_object().unwrap();
+        assert_eq!(obj.get("str").unwrap().as_str().unwrap(), "hello");
+        assert_eq!(obj.get("num").unwrap().as_f64().unwrap(), 42.0);
+        assert_eq!(obj.get("bool").unwrap().as_bool().unwrap(), true);
+    }
+}
