@@ -70,11 +70,18 @@ use console::style;
 use std::time::Instant;
 
 fn main() {
+    let mut filter = tracing_subscriber::EnvFilter::from_default_env();
+    match "crepuscularity=info".parse() {
+        Ok(dir) => {
+            filter = filter.add_directive(dir);
+        }
+        Err(e) => {
+            eprintln!("Warning: Failed to parse default tracing directive: {}", e);
+        }
+    }
+
     tracing_subscriber::fmt()
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::from_default_env()
-                .add_directive("crepuscularity=info".parse().unwrap()),
-        )
+        .with_env_filter(filter)
         .with_target(false)
         .init();
 

@@ -111,7 +111,7 @@ impl DevHud {
 }
 
 fn snapshot(shared: &Arc<Mutex<HudState>>, frame: usize) -> (String, String, u32) {
-    let state = shared.lock().unwrap();
+    let state = shared.lock().unwrap_or_else(|e| e.into_inner());
     let spinner = SPINNER[frame % SPINNER.len()];
     let (text, color) = match &state.status {
         DevStatus::Starting => (format!("{spinner} starting…"), 0x888888u32),

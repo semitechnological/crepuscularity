@@ -3,7 +3,7 @@
 //! Currently uses a single-chunk approach (full render before flush); the channel-based
 //! structure allows per-section streaming in a future iteration.
 use axum::body::Body;
-use axum::response::Response;
+use axum::response::{IntoResponse, Response};
 use crepuscularity_core::TemplateContext;
 use crepuscularity_web::{render_ssr_document, SsrDocument};
 use http::StatusCode;
@@ -39,7 +39,7 @@ pub async fn stream_ssr_response(
         .status(StatusCode::OK)
         .header("content-type", "text/html; charset=utf-8")
         .body(body)
-        .unwrap()
+        .unwrap_or_else(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error").into_response())
 }
 
 /// Convenience wrapper that accepts a `&'static str` template and renders with an empty context.

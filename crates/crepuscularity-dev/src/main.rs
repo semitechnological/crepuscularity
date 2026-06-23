@@ -262,11 +262,12 @@ fn launch_viewer(
         let path = template_path.clone();
         let ctx = ctx.clone();
 
-        cx.open_window(window_options, move |_window, cx| {
+        if let Err(e) = cx.open_window(window_options, move |_window, cx| {
             let state = cx.new(|cx| HotReloadState::new(path.clone(), ctx.clone(), cx));
             cx.new(|_| HotReloadView::new(state))
-        })
-        .unwrap();
+        }) {
+            eprintln!("Failed to open window: {e:?}");
+        }
     });
 }
 
