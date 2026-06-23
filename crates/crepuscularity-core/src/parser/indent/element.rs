@@ -241,8 +241,8 @@ pub fn parse_when_attribute_suffix(src: &str) -> Option<(String, String)> {
 
 fn tokenize_line(line: &str) -> Vec<String> {
     let line = normalize_fullwidth_braces(line);
-    let mut tokens = Vec::new();
-    let mut current = String::new();
+    let mut tokens = Vec::with_capacity(8);
+    let mut current = String::with_capacity(line.len());
     let mut bracket_depth: usize = 0;
     let mut brace_depth: usize = 0;
     let mut in_string = false;
@@ -367,5 +367,16 @@ pub(crate) fn parse_text_template(line: &str) -> Vec<TextPart> {
 }
 
 fn normalize_fullwidth_braces(s: &str) -> String {
-    s.replace('\u{FF5B}', "{").replace('\u{FF5D}', "}")
+    if !s.contains('\u{FF5B}') && !s.contains('\u{FF5D}') {
+        return s.to_string();
+    }
+    let mut out = String::with_capacity(s.len());
+    for ch in s.chars() {
+        match ch {
+            '\u{FF5B}' => out.push('{'),
+            '\u{FF5D}' => out.push('}'),
+            _ => out.push(ch),
+        }
+    }
+    out
 }

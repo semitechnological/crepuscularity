@@ -32,6 +32,9 @@ pub use crepuscularity_core::preprocess::google_fonts_head_markup;
 pub use crepuscularity_core::CrepusError;
 pub use crepuscularity_macros::crepus_refs;
 
+/// Maximum include nesting depth to prevent infinite recursion / stack overflow.
+const MAX_INCLUDE_DEPTH: usize = 64;
+
 #[cfg(feature = "ssr")]
 mod ssr;
 
@@ -191,13 +194,14 @@ pub fn render_component_file_to_html(
 /// Use this when a caller owns parsing or analysis separately from rendering. `$: let` declarations
 /// are applied in source order via an optional context overlay, so sibling nodes after a declaration can see it.
 pub fn render_nodes_to_html(nodes: &[Node], ctx: &TemplateContext) -> Result<String, CrepusError> {
-    render_nodes_with_ctx(nodes, None, ctx)
+    render_nodes_with_ctx(nodes, None, ctx, 0)
 }
 
 fn render_nodes_with_ctx(
     nodes: &[Node],
     mut overlay: Option<TemplateContext>,
     base: &TemplateContext,
+    depth: usize,
 ) -> Result<String, CrepusError> {
     let _span = tracing::debug_span!("render_html", node_count = nodes.len()).entered();
     let mut html = String::new();
@@ -214,21 +218,21 @@ fn render_nodes_with_ctx(
             continue;
         }
         let cur = overlay.as_ref().unwrap_or(base);
-        html.push_str(&render_node(node, cur)?);
+        html.push_str(&render_node(node, cur, depth)?);
     }
 
     Ok(html)
 }
 
-fn render_node(node: &Node, ctx: &TemplateContext) -> Result<String, CrepusError> {
+fn render_node(node: &Node, ctx: &TemplateContext, depth: usize) -> Result<String, CrepusError> {
     match node {
-        Node::Element(el) => render_element(el, ctx),
+        Node::Element(el) => render_element(el, ctx, depth),
         Node::Text(parts) => Ok(escape_html(&render_text(parts, ctx)?)),
-        Node::If(block) => render_if(block, ctx),
-        Node::For(block) => render_for(block, ctx),
-        Node::Match(block) => render_match(block, ctx),
+        Node::If(block) => render_if(block, ctx, depth),
+        Node::For(block) => render_for(block, ctx, depth),
+        Node::Match(block) => render_match(block, ctx, depth),
         Node::LetDecl(_) => Ok(String::new()),
-        Node::Include(inc) => render_include(inc, ctx),
+        Node::Include(inc) => render_include(inc, ctx, depth),
         Node::Embed(embed) => render_embed(embed, ctx),
         Node::RawText(expr) => Ok(escape_html(&value_to_str(&eval_expr(expr, ctx)?))),
         Node::RawHtml(expr) => {
@@ -289,12 +293,12 @@ fn template_value_to_json(value: &TemplateValue) -> serde_json::Value {
     }
 }
 
-fn render_element(el: &Element, ctx: &TemplateContext) -> Result<String, CrepusError> {
+fn render_element(el: &Element, ctx: &TemplateContext, depth: usize) -> Result<String, CrepusError> {
     if el.tag == "slot" {
         return if let Some((slot_nodes, slot_ctx)) = &ctx.slot {
-            render_nodes_to_html(slot_nodes, slot_ctx)
+            render_nodes_with_ctx(slot_nodes, None, slot_ctx, depth)
         } else {
-            render_nodes_to_html(&el.children, ctx)
+            render_nodes_with_ctx(&el.children, None, ctx, depth)
         };
     }
 
@@ -426,7 +430,7 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<String, CrepusE
     out.push('>');
 
     for child in &el.children {
-        out.push_str(&render_node(child, ctx)?);
+        out.push_str(&render_node(child, ctx, depth)?);
     }
 
     out.push_str("</");
@@ -451,17 +455,17 @@ pub(crate) fn render_text(
     Ok(result)
 }
 
-fn render_if(block: &IfBlock, ctx: &TemplateContext) -> Result<String, CrepusError> {
+fn render_if(block: &IfBlock, ctx: &TemplateContext, depth: usize) -> Result<String, CrepusError> {
     if ctx.eval_condition(&block.condition)? {
-        render_nodes_to_html(&block.then_children, ctx)
+        render_nodes_with_ctx(&block.then_children, None, ctx, depth)
     } else if let Some(else_children) = &block.else_children {
-        render_nodes_to_html(else_children, ctx)
+        render_nodes_with_ctx(else_children, None, ctx, depth)
     } else {
         Ok(String::new())
     }
 }
 
-fn render_for(block: &ForBlock, ctx: &TemplateContext) -> Result<String, CrepusError> {
+fn render_for(block: &ForBlock, ctx: &TemplateContext, depth: usize) -> Result<String, CrepusError> {
     let items = ctx.get_list_ref(&block.iterator);
     let mut out = String::new();
     let pattern = block.pattern.trim();
@@ -485,29 +489,29 @@ fn render_for(block: &ForBlock, ctx: &TemplateContext) -> Result<String, CrepusE
                     .insert(pattern.to_string(), TemplateValue::Scope(item_ctx.clone()));
             }
         }
-        out.push_str(&render_nodes_to_html(&block.body, &child_ctx)?);
+        out.push_str(&render_nodes_with_ctx(&block.body, None, &child_ctx, depth)?);
     }
 
     Ok(out)
 }
 
-fn render_match(block: &MatchBlock, ctx: &TemplateContext) -> Result<String, CrepusError> {
+fn render_match(block: &MatchBlock, ctx: &TemplateContext, depth: usize) -> Result<String, CrepusError> {
     let val = eval_expr(&block.expr, ctx)?;
     let value = value_to_str(&val);
 
     for arm in &block.arms {
         let pattern = arm.pattern.trim();
         if pattern == "_" {
-            return render_nodes_to_html(&arm.body, ctx);
+            return render_nodes_with_ctx(&arm.body, None, ctx, depth);
         }
         if pattern.starts_with('"') && pattern.ends_with('"') {
             let lit = &pattern[1..pattern.len() - 1];
             if value == lit {
-                return render_nodes_to_html(&arm.body, ctx);
+                return render_nodes_with_ctx(&arm.body, None, ctx, depth);
             }
         }
         if value == pattern {
-            return render_nodes_to_html(&arm.body, ctx);
+            return render_nodes_with_ctx(&arm.body, None, ctx, depth);
         }
     }
 
@@ -529,9 +533,16 @@ pub(crate) fn read_file(ctx: &TemplateContext, path: &Path) -> Result<String, Cr
     }
 }
 
-fn render_include(inc: &IncludeNode, ctx: &TemplateContext) -> Result<String, CrepusError> {
+fn render_include(inc: &IncludeNode, ctx: &TemplateContext, depth: usize) -> Result<String, CrepusError> {
+    if depth >= MAX_INCLUDE_DEPTH {
+        return Err(CrepusError::render(format!(
+            "maximum include depth ({MAX_INCLUDE_DEPTH}) exceeded; possible circular include involving '{}'",
+            inc.path
+        )));
+    }
+
     if let Some((file_part, comp_name)) = inc.path.split_once('#') {
-        return render_named_component(inc, ctx, file_part, comp_name);
+        return render_named_component(inc, ctx, file_part, comp_name, depth);
     }
 
     let file_path = resolve_include_path(ctx.base_dir.as_deref(), &inc.path)?;
@@ -549,7 +560,7 @@ fn render_include(inc: &IncludeNode, ctx: &TemplateContext) -> Result<String, Cr
         child_ctx.slot = Some((inc.slot.clone(), Arc::new(ctx.clone())));
     }
 
-    render_nodes_to_html(&nodes, &child_ctx)
+    render_nodes_with_ctx(&nodes, None, &child_ctx, depth + 1)
 }
 
 fn render_named_component(
@@ -557,7 +568,14 @@ fn render_named_component(
     ctx: &TemplateContext,
     file_part: &str,
     comp_name: &str,
+    depth: usize,
 ) -> Result<String, CrepusError> {
+    if depth >= MAX_INCLUDE_DEPTH {
+        return Err(CrepusError::render(format!(
+            "maximum include depth ({MAX_INCLUDE_DEPTH}) exceeded; possible circular include involving '{file_part}#{comp_name}'"
+        )));
+    }
+
     let file_path = resolve_include_path(ctx.base_dir.as_deref(), file_part)?;
     let content = read_file(ctx, &file_path)?;
     let comp_file = parse_component_file(&content)
@@ -584,7 +602,7 @@ fn render_named_component(
         child_ctx.slot = Some((inc.slot.clone(), Arc::new(ctx.clone())));
     }
 
-    render_nodes_to_html(&comp.nodes, &child_ctx)
+    render_nodes_with_ctx(&comp.nodes, None, &child_ctx, depth + 1)
 }
 
 // ── Hydration ─────────────────────────────────────────────────────────────────
@@ -688,7 +706,7 @@ fn render_nodes_with_hydration_impl(
             )?);
             is_first = false;
         } else {
-            html.push_str(&render_node(node, &ctx)?);
+            html.push_str(&render_node(node, &ctx, 0)?);
             is_first = false;
         }
     }
@@ -814,6 +832,7 @@ pub(crate) fn escape_html(input: &str) -> String {
             '<' => out.push_str("&lt;"),
             '>' => out.push_str("&gt;"),
             '"' => out.push_str("&quot;"),
+            '\'' => out.push_str("&#39;"),
             c => out.push(c),
         }
     }

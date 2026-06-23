@@ -11,6 +11,9 @@ use crepuscularity_core::parser::{parse_component_file, parse_template};
 use crepuscularity_core::virtual_files::lookup_virtual_file;
 use crepuscularity_core::CrepusError;
 
+/// Maximum include nesting depth to prevent infinite recursion / stack overflow.
+const MAX_INCLUDE_DEPTH: usize = 64;
+
 pub(crate) fn read_file(ctx: &TemplateContext, path: &Path) -> Result<String, CrepusError> {
     if let Some(content) = lookup_virtual_file(ctx, path) {
         return Ok(content);
@@ -23,6 +26,24 @@ pub(crate) fn expand_include(
     inc: &IncludeNode,
     ctx: &TemplateContext,
 ) -> Result<(Vec<Node>, TemplateContext), CrepusError> {
+    expand_include_with_depth(inc, ctx, 0)
+}
+
+/// Depth-aware version of [`expand_include`]. Callers that recurse on the returned
+/// nodes should pass `depth + 1` so that circular includes are detected before
+/// stack overflow.
+pub(crate) fn expand_include_with_depth(
+    inc: &IncludeNode,
+    ctx: &TemplateContext,
+    depth: usize,
+) -> Result<(Vec<Node>, TemplateContext), CrepusError> {
+    if depth >= MAX_INCLUDE_DEPTH {
+        return Err(CrepusError::render(format!(
+            "maximum include depth ({MAX_INCLUDE_DEPTH}) exceeded; possible circular include involving '{}'",
+            inc.path
+        )));
+    }
+
     if let Some((file_part, comp_name)) = inc.path.split_once('#') {
         return expand_named_component(inc, ctx, file_part, comp_name);
     }

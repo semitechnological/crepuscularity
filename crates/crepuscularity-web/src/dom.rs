@@ -56,7 +56,11 @@ impl ElementRef {
     }
 
     pub fn html(&self, html: &str) -> Result<(), JsValue> {
-        self.get()?.set_inner_html(html);
+        // Sanitize with ammonia before setting innerHTML to prevent XSS.
+        // The SSR path already uses ammonia::clean; this mirrors that protection
+        // for the WASM DOM API.
+        let sanitized = ammonia::clean(html);
+        self.get()?.set_inner_html(&sanitized);
         Ok(())
     }
 

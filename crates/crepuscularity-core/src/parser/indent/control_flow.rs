@@ -5,12 +5,36 @@ use crate::ast::*;
 use super::attrs::merge_attr_only_children;
 use super::element::{parse_element_line, parse_text_template};
 use super::include::{try_parse_embed, try_parse_include};
+use super::super::RawParseError;
+
+/// Maximum nesting depth for recursive `parse_nodes` calls.
+/// Prevents stack overflow on pathologically deep input.
+const MAX_DEPTH: usize = 256;
 
 pub(crate) fn parse_nodes(
     lines: &[(usize, String)],
     start: usize,
     expected_indent: usize,
 ) -> (Vec<Node>, usize) {
+    match parse_nodes_with_depth(lines, start, expected_indent, 0) {
+        Ok(result) => result,
+        Err(_) => (vec![], start),
+    }
+}
+
+fn parse_nodes_with_depth(
+    lines: &[(usize, String)],
+    start: usize,
+    expected_indent: usize,
+    depth: usize,
+) -> Result<(Vec<Node>, usize), RawParseError> {
+    if depth >= MAX_DEPTH {
+        return Err(RawParseError {
+            message: format!("maximum nesting depth ({MAX_DEPTH}) exceeded"),
+            byte_offset: None,
+        });
+    }
+
     let mut nodes = Vec::new();
     let mut i = start;
 
@@ -46,7 +70,7 @@ pub(crate) fn parse_nodes(
             i += 1;
             let (slot, next_i) = if i < lines.len() && lines[i].0 > expected_indent {
                 let child_indent = lines[i].0;
-                parse_nodes(lines, i, child_indent)
+                parse_nodes_with_depth(lines, i, child_indent, depth + 1)?
             } else {
                 (vec![], i)
             };
@@ -66,7 +90,7 @@ pub(crate) fn parse_nodes(
         // match block
         if let Some(expr) = try_parse_match(line) {
             i += 1;
-            let (arms, next_i) = parse_match_arms(lines, i, expected_indent);
+            let (arms, next_i) = parse_match_arms_with_depth(lines, i, expected_indent, depth + 1)?;
             i = next_i;
             nodes.push(Node::Match(MatchBlock { expr, arms }));
             continue;
@@ -74,7 +98,7 @@ pub(crate) fn parse_nodes(
 
         // if block
         if try_parse_if(line).is_some() {
-            let (node, next_i) = parse_if_node(lines, i, expected_indent);
+            let (node, next_i) = parse_if_node_with_depth(lines, i, expected_indent, depth + 1)?;
             i = next_i;
             nodes.push(node);
             continue;
@@ -85,7 +109,7 @@ pub(crate) fn parse_nodes(
         // Children: lines with strictly greater indent
         let (children, next_i) = if i < lines.len() && lines[i].0 > expected_indent {
             let child_indent = lines[i].0;
-            parse_nodes(lines, i, child_indent)
+            parse_nodes_with_depth(lines, i, child_indent, depth + 1)?
         } else {
             (vec![], i)
         };
@@ -112,17 +136,29 @@ pub(crate) fn parse_nodes(
         }
     }
 
-    (nodes, i)
+    Ok((nodes, i))
 }
 
-fn parse_if_node(lines: &[(usize, String)], i: usize, expected_indent: usize) -> (Node, usize) {
+fn parse_if_node_with_depth(
+    lines: &[(usize, String)],
+    i: usize,
+    expected_indent: usize,
+    depth: usize,
+) -> Result<(Node, usize), RawParseError> {
+    if depth >= MAX_DEPTH {
+        return Err(RawParseError {
+            message: format!("maximum nesting depth ({MAX_DEPTH}) exceeded"),
+            byte_offset: None,
+        });
+    }
+
     let line = &lines[i].1;
     let condition = try_parse_if(line).unwrap_or_default();
     let mut i = i + 1;
 
     let (then_children, next_i) = if i < lines.len() && lines[i].0 > expected_indent {
         let child_indent = lines[i].0;
-        parse_nodes(lines, i, child_indent)
+        parse_nodes_with_depth(lines, i, child_indent, depth + 1)?
     } else {
         (vec![], i)
     };
@@ -134,7 +170,7 @@ fn parse_if_node(lines: &[(usize, String)], i: usize, expected_indent: usize) ->
             i += 1;
             if i < lines.len() && lines[i].0 > expected_indent {
                 let else_indent = lines[i].0;
-                let (else_nodes, next_i) = parse_nodes(lines, i, else_indent);
+                let (else_nodes, next_i) = parse_nodes_with_depth(lines, i, else_indent, depth + 1)?;
                 i = next_i;
                 Some(else_nodes)
             } else {
@@ -147,7 +183,7 @@ fn parse_if_node(lines: &[(usize, String)], i: usize, expected_indent: usize) ->
                 .to_string();
             let mut patched = lines.to_vec();
             patched[i].1 = rewritten;
-            let (else_if_node, next_i) = parse_if_node(&patched, i, expected_indent);
+            let (else_if_node, next_i) = parse_if_node_with_depth(&patched, i, expected_indent, depth + 1)?;
             i = next_i;
             Some(vec![else_if_node])
         } else {
@@ -157,21 +193,29 @@ fn parse_if_node(lines: &[(usize, String)], i: usize, expected_indent: usize) ->
         None
     };
 
-    (
+    Ok((
         Node::If(IfBlock {
             condition,
             then_children,
             else_children,
         }),
         i,
-    )
+    ))
 }
 
-fn parse_match_arms(
+fn parse_match_arms_with_depth(
     lines: &[(usize, String)],
     start: usize,
     expected_indent: usize,
-) -> (Vec<MatchArm>, usize) {
+    depth: usize,
+) -> Result<(Vec<MatchArm>, usize), RawParseError> {
+    if depth >= MAX_DEPTH {
+        return Err(RawParseError {
+            message: format!("maximum nesting depth ({MAX_DEPTH}) exceeded"),
+            byte_offset: None,
+        });
+    }
+
     let mut arms = Vec::new();
     let mut i = start;
 
@@ -189,7 +233,7 @@ fn parse_match_arms(
             i += 1;
             let (body, next_i) = if i < lines.len() && lines[i].0 > expected_indent {
                 let body_indent = lines[i].0;
-                parse_nodes(lines, i, body_indent)
+                parse_nodes_with_depth(lines, i, body_indent, depth + 1)?
             } else {
                 (vec![], i)
             };
@@ -200,7 +244,7 @@ fn parse_match_arms(
         }
     }
 
-    (arms, i)
+    Ok((arms, i))
 }
 
 fn try_parse_if(line: &str) -> Option<String> {
