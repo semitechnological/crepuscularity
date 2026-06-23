@@ -8,4 +8,4 @@ publish = false
 [dependencies]
 
 [build-dependencies]
-crepuscularity = { path = "../../crates/crepuscularity" }
+crepuscularity = { path = "../../crates/crepuscularity", version = "0.4.6" }

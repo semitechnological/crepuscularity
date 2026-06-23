@@ -3,6 +3,7 @@ name = "quicknote_runtime"
 version = "0.2.0"
 edition = "2021"
 description = "Quicknote browser extension example for crepuscularity"
+license = "MPL-2.0"
 
 [lib]
 crate-type = ["cdylib", "rlib"]

@@ -2,7 +2,7 @@
 name = "tree-sitter-crepus"
 description = "Crepus grammar for tree-sitter"
 version = "0.0.1"
-license = "MIT"
+license = "MPL-2.0"
 readme = "README.md"
 keywords = ["incremental", "parsing", "tree-sitter", "crepus"]
 categories = ["parsing", "text-editors"]
