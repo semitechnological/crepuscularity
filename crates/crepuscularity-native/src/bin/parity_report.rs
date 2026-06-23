@@ -8,7 +8,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 
-use regex::Regex;
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize)]
@@ -239,22 +239,39 @@ fn extract_fn_body_brace<'a>(src: &'a str, fn_name: &str) -> Option<&'a str> {
     None
 }
 
+/// Extract all double-quoted string contents from `s`.
+fn extract_quoted_strings(s: &str) -> Vec<&str> {
+    let mut out = Vec::new();
+    let bytes = s.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'"' {
+            let start = i + 1;
+            i = start;
+            while i < bytes.len() && bytes[i] != b'"' {
+                i += 1;
+            }
+            if i < bytes.len() {
+                out.push(&s[start..i]);
+            }
+        }
+        i += 1;
+    }
+    out
+}
+
 /// Quoted tokens in `matches!(…)` helpers (no `=>` arms).
 fn extract_quoted_tailwind_tokens(body: &str) -> BTreeSet<String> {
-    let re = Regex::new(r#""([^"]+)""#).expect("regex");
     let mut out = BTreeSet::new();
-    for cap in re.captures_iter(body) {
-        if let Some(s) = cap.get(1).map(|m| m.as_str()) {
-            if is_class_literal(s) {
-                out.insert(s.to_string());
-            }
+    for s in extract_quoted_strings(body) {
+        if is_class_literal(s) {
+            out.insert(s.to_string());
         }
     }
     out
 }
 
 fn extract_match_arm_classes_from_body(body: &str) -> BTreeSet<String> {
-    let re = Regex::new(r#""([^"]+)""#).expect("regex");
     let lines: Vec<&str> = body.lines().collect();
     let mut out = BTreeSet::new();
     let mut i = 0usize;
@@ -279,11 +296,9 @@ fn extract_match_arm_classes_from_body(body: &str) -> BTreeSet<String> {
             }
             if found_arrow {
                 let left = chunk.split_once("=>").map(|(l, _)| l).unwrap_or("");
-                for cap in re.captures_iter(left) {
-                    if let Some(s) = cap.get(1).map(|m| m.as_str()) {
-                        if is_class_literal(s) {
-                            out.insert(s.to_string());
-                        }
+                for s in extract_quoted_strings(left) {
+                    if is_class_literal(s) {
+                        out.insert(s.to_string());
                     }
                 }
             } else {

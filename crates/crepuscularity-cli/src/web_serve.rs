@@ -44,8 +44,7 @@ use crepuscularity_web::render_from_files;
 use axum::extract::State;
 
 use crate::crepus_toml::WebTargetMeta;
-use crate::web::{
-    ensure_web_dev_artifacts, load_site_head, merge_site_head_meta, merged_site_google_fonts,
+use crate::web::{    ensure_web_dev_artifacts, load_site_head, merge_site_head_meta, merged_site_google_fonts,
     merged_site_inline_css, render_index_html,
 };
 use crate::web_docs_hook::{docs_src_path, run_docs_hook, DocsHookTheme};
@@ -172,21 +171,31 @@ const RELOAD_SCRIPT: &str = "<script>
 
 // ── Startup validation ───────────────────────────────────────────────────────
 
+/// Recursively collect `.crepus` file paths under `dir`, relative to `base`.
+fn walk_crepus_files(base: &Path, dir: &Path, out: &mut Vec<PathBuf>) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            walk_crepus_files(base, &path, out);
+        } else if path.extension().and_then(|x| x.to_str()) == Some("crepus") {
+            out.push(path);
+        }
+    }
+}
+
 /// Walk `site_dir` and parse every `.crepus` file, printing pass/fail per file.
 fn validate_templates(site_dir: &std::path::Path) {
     use crepuscularity_core::parser::parse_template;
     let mut found = false;
-    for entry in walkdir::WalkDir::new(site_dir)
-        .into_iter()
-        .flatten()
-        .filter(|e| {
-            !e.file_type().is_dir()
-                && e.path().extension().and_then(|x| x.to_str()) == Some("crepus")
-        })
-    {
+    let mut files = Vec::new();
+    walk_crepus_files(site_dir, site_dir, &mut files);
+    for path in &files {
         found = true;
-        let rel = entry.path().strip_prefix(site_dir).unwrap_or(entry.path());
-        match std::fs::read_to_string(entry.path()).map(|s| parse_template(&s)) {
+        let rel = path.strip_prefix(site_dir).unwrap_or(path);
+        match std::fs::read_to_string(path).map(|s| parse_template(&s)) {
             Ok(Ok(_)) => eprintln!("  {} {}", console::style("✓").green(), rel.display()),
             Ok(Err(e)) => eprintln!("  {} {} — {}", console::style("✗").red(), rel.display(), e),
             Err(e) => eprintln!(
@@ -1250,21 +1259,15 @@ async fn sse_handler(
 
 fn load_vfm(site_dir: &Path) -> Arc<RwLock<HashMap<String, String>>> {
     let mut files = HashMap::new();
-    for entry in walkdir::WalkDir::new(site_dir)
-        .into_iter()
-        .flatten()
-        .filter(|e| {
-            !e.file_type().is_dir()
-                && e.path().extension().and_then(|x| x.to_str()) == Some("crepus")
-        })
-    {
-        let rel = entry
-            .path()
+    let mut paths = Vec::new();
+    walk_crepus_files(site_dir, site_dir, &mut paths);
+    for path in &paths {
+        let rel = path
             .strip_prefix(site_dir)
-            .unwrap_or(entry.path())
+            .unwrap_or(path)
             .to_string_lossy()
             .to_string();
-        if let Ok(content) = std::fs::read_to_string(entry.path()) {
+        if let Ok(content) = std::fs::read_to_string(path) {
             files.insert(rel, content);
         }
     }
@@ -1304,21 +1307,15 @@ fn watch_crepus_files(
         {
             let mut files = vfm.write().unwrap_or_else(|e| e.into_inner());
             files.clear();
-            for entry in walkdir::WalkDir::new(site_dir)
-                .into_iter()
-                .flatten()
-                .filter(|e| {
-                    !e.file_type().is_dir()
-                        && e.path().extension().and_then(|x| x.to_str()) == Some("crepus")
-                })
-            {
-                let rel = entry
-                    .path()
+            let mut paths = Vec::new();
+            walk_crepus_files(site_dir, site_dir, &mut paths);
+            for path in &paths {
+                let rel = path
                     .strip_prefix(site_dir)
-                    .unwrap_or(entry.path())
+                    .unwrap_or(path)
                     .to_string_lossy()
                     .to_string();
-                if let Ok(content) = std::fs::read_to_string(entry.path()) {
+                if let Ok(content) = std::fs::read_to_string(path) {
                     files.insert(rel, content);
                 }
             }
