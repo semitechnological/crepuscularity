@@ -32,3 +32,7 @@ plugins/**/target/
 plugins/.build/
 plugins/**/bin/
 plugins/**/obj/
+# Native template build artifacts (SwiftPM/Gradle)
+crates/crepuscularity-cli/templates/native/ios/.build/
+crates/crepuscularity-cli/templates/native/android/**/build/
+crates/crepuscularity-cli/templates/native/android/.gradle/
