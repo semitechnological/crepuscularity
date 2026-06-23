@@ -91,10 +91,12 @@ impl Render for {pascal}View {{
 fn main() {{
     Application::new().run(|cx: &mut App| {{
         use gpui::prelude::*;
-        cx.open_window(WindowOptions::default(), |_win, cx| {{
+        match cx.open_window(WindowOptions::default(), |_win, cx| {{
             cx.new({pascal}View::new)
-        }})
-        .unwrap();
+        }}) {{
+            Ok(_) => {{}},
+            Err(e) => eprintln!("failed to open window: {{e:?}}"),
+        }}
     }});
 }}
 "##,
