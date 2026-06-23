@@ -593,12 +593,13 @@ fn main() {
     let result = match cli.cmd {
         Cmd::Build { example } => {
             let target = example.as_deref().unwrap_or(".");
-            let dir = resolve_target_dir(target);
-            if let Err(e) = &dir {
-                eprintln!("cl: {e}");
-                std::process::exit(1);
-            }
-            let dir = dir.unwrap();
+            let dir = match resolve_target_dir(target) {
+                Ok(d) => d,
+                Err(e) => {
+                    eprintln!("cl: {e}");
+                    std::process::exit(1);
+                }
+            };
             if let Err(e) = detect_project_type(&dir) {
                 eprintln!("cl: {e}");
                 std::process::exit(1);
@@ -607,12 +608,13 @@ fn main() {
         }
         Cmd::Dev { example } => {
             let target = example.as_deref().unwrap_or(".");
-            let dir = resolve_target_dir(target);
-            if let Err(e) = &dir {
-                eprintln!("cl: {e}");
-                std::process::exit(1);
-            }
-            let dir = dir.unwrap();
+            let dir = match resolve_target_dir(target) {
+                Ok(d) => d,
+                Err(e) => {
+                    eprintln!("cl: {e}");
+                    std::process::exit(1);
+                }
+            };
             if let Err(e) = detect_project_type(&dir) {
                 eprintln!("cl: {e}");
                 std::process::exit(1);
@@ -621,12 +623,13 @@ fn main() {
         }
         Cmd::Serve { example, verbose } => {
             let target = example.as_deref().unwrap_or(".");
-            let dir = resolve_target_dir(target);
-            if let Err(e) = &dir {
-                eprintln!("cl: {e}");
-                std::process::exit(1);
-            }
-            let dir = dir.unwrap();
+            let dir = match resolve_target_dir(target) {
+                Ok(d) => d,
+                Err(e) => {
+                    eprintln!("cl: {e}");
+                    std::process::exit(1);
+                }
+            };
             match detect_project_type(&dir) {
                 Ok(ProjectType::Full) => {
                     eprintln!("cl: you are working in a full crepuscularity project; use 'crepus dev' or 'cre web dev' instead");
