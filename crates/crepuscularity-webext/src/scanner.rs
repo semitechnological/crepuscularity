@@ -177,4 +177,33 @@ div
             .iter()
             .any(|u| u.capability == Capability::Notifications));
     }
+
+    #[test]
+    fn test_scan_directory_for_capabilities() {
+        let dir = tempfile::tempdir().unwrap();
+
+        // Create a root .crepus file
+        let root_file = dir.path().join("root.crepus");
+        std::fs::write(&root_file, "div on-click={browser.storage.local.get('key')}").unwrap();
+
+        // Create a non-crepus file (should be ignored)
+        let non_crepus_file = dir.path().join("ignored.txt");
+        std::fs::write(&non_crepus_file, "browser.tabs").unwrap();
+
+        // Create a subdirectory with a .crepus file
+        let sub_dir = dir.path().join("components");
+        std::fs::create_dir(&sub_dir).unwrap();
+        let sub_file = sub_dir.join("comp.crepus");
+        std::fs::write(&sub_file, "div on-click={browser.notifications.create()}").unwrap();
+
+        // Scan the directory
+        let capabilities = scan_directory_for_capabilities(dir.path()).unwrap();
+
+        // Check that the correct capabilities were found
+        assert!(capabilities.has(&Capability::Storage));
+        assert!(capabilities.has(&Capability::Notifications));
+
+        // Check that capabilities from ignored file are NOT found
+        assert!(!capabilities.has(&Capability::Tabs));
+    }
 }
