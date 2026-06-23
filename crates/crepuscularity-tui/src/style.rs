@@ -492,3 +492,57 @@ fn split_color_shade(s: &str) -> (&str, Option<u16>) {
     }
     (s, None)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_color() {
+        // ANSI indexed
+        assert_eq!(parse_color("ansi-196"), Some(Color::Indexed(196)));
+        assert_eq!(parse_color("ansi-0"), Some(Color::Indexed(0)));
+        assert_eq!(parse_color("ansi-255"), Some(Color::Indexed(255)));
+        assert_eq!(parse_color("ansi-256"), None);
+
+        // Hex colours
+        assert_eq!(parse_color("#ff0000"), Some(Color::Rgb(255, 0, 0)));
+        assert_eq!(parse_color("#00ff00"), Some(Color::Rgb(0, 255, 0)));
+        assert_eq!(parse_color("#0000ff"), Some(Color::Rgb(0, 0, 255)));
+        assert_eq!(parse_color("#123"), None); // Too short
+        assert_eq!(parse_color("#ff0000ff"), None); // Too long
+        assert_eq!(parse_color("#zx0000"), None); // Invalid hex
+
+        // Arbitrary-value brackets
+        assert_eq!(parse_color("[#ff0000]"), Some(Color::Rgb(255, 0, 0)));
+        assert_eq!(parse_color("[ansi-12]"), Some(Color::Indexed(12)));
+        assert_eq!(parse_color("[red-500]"), Some(Color::Red));
+
+        // Named colours
+        assert_eq!(parse_color("white"), Some(Color::White));
+        assert_eq!(parse_color("black"), Some(Color::Black));
+
+        // Named colours with shades
+        assert_eq!(parse_color("red-500"), Some(Color::Red));
+        assert_eq!(parse_color("red-400"), Some(Color::LightRed));
+        assert_eq!(parse_color("green-500"), Some(Color::Green));
+        assert_eq!(parse_color("lime-300"), Some(Color::LightGreen));
+        assert_eq!(parse_color("blue-600"), Some(Color::Blue));
+        assert_eq!(parse_color("sky-200"), Some(Color::LightCyan));
+        assert_eq!(parse_color("yellow"), Some(Color::Yellow));
+        assert_eq!(parse_color("amber-300"), Some(Color::LightYellow));
+        assert_eq!(parse_color("orange-500"), Some(Color::LightYellow));
+        assert_eq!(parse_color("purple-800"), Some(Color::Magenta));
+        assert_eq!(parse_color("fuchsia-100"), Some(Color::LightMagenta));
+
+        // Grays
+        assert_eq!(parse_color("gray-500"), Some(Color::DarkGray));
+        assert_eq!(parse_color("zinc-400"), Some(Color::Gray));
+        assert_eq!(parse_color("slate-900"), Some(Color::DarkGray));
+        assert_eq!(parse_color("neutral"), Some(Color::DarkGray)); // default 500
+
+        // Invalid
+        assert_eq!(parse_color("unknown"), None);
+        assert_eq!(parse_color("red-xx"), None);
+    }
+}
