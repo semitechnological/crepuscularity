@@ -111,9 +111,8 @@ pub(crate) fn parse_element_line(line: &str, children: Vec<Node>) -> Element {
             if !rest.is_empty() {
                 id = Some(rest.to_string());
             }
-        } else if token.contains('=') {
+        } else if let Some(eq_pos) = token.find('=') {
             // HTML attribute: class="foo bar", type="button", data-action="x", key={expr}
-            let eq_pos = token.find('=').unwrap();
             let key = &token[..eq_pos];
             let valid_key = !key.is_empty()
                 && key
