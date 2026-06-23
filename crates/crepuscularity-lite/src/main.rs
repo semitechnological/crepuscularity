@@ -539,9 +539,13 @@ fn main() {
             ..Default::default()
         };
 
-        let handle = cx
-            .open_window(opts, |_w, cx| cx.new(LiteRoot::new))
-            .unwrap();
+        let handle = match cx.open_window(opts, |_w, cx| cx.new(LiteRoot::new)) {
+            Ok(handle) => handle,
+            Err(e) => {
+                eprintln!("\x1b[31mfailed to open window:\x1b[0m {e}");
+                return;
+            }
+        };
 
         let wh = handle;
         cx.spawn(async move |async_cx| {
