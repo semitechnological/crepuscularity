@@ -29,6 +29,8 @@ pub mod plugins;
 pub mod config;
 pub mod guest_watch;
 
+#[cfg(all(feature = "v8", feature = "oxc"))]
+pub mod bench_eval;
 #[cfg(feature = "oxc")]
 pub mod guest_compiler;
 #[cfg(feature = "v8")]
@@ -37,8 +39,6 @@ pub mod v8_host;
 pub mod v8_thread;
 #[cfg(feature = "v8")]
 pub mod worker;
-#[cfg(all(feature = "v8", feature = "oxc"))]
-pub mod bench_eval;
 
 #[cfg(all(feature = "v8", feature = "oxc"))]
 pub use bench_eval::{
