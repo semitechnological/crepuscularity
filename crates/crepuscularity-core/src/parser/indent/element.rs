@@ -33,7 +33,7 @@ pub(crate) fn parse_element_line(line: &str, children: Vec<Node>) -> Element {
     }
 
     let mut id = None;
-    let mut classes = Vec::new();
+    let mut classes = Vec::with_capacity(4);
     let mut conditional_classes = Vec::new();
     let mut event_handlers = Vec::new();
     let mut bindings = Vec::new();
@@ -277,8 +277,7 @@ fn tokenize_line(line: &str) -> Vec<String> {
             }
             ' ' | '\t' if bracket_depth == 0 && brace_depth == 0 && !in_string => {
                 if !current.is_empty() {
-                    tokens.push(current.clone());
-                    current.clear();
+                    tokens.push(std::mem::take(&mut current));
                 }
             }
             _ => current.push(ch),
