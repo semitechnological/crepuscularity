@@ -593,50 +593,29 @@ fn main() {
     let result = match cli.cmd {
         Cmd::Build { example } => {
             let target = example.as_deref().unwrap_or(".");
-            let dir = resolve_target_dir(target);
-            if let Err(e) = &dir {
-                eprintln!("cl: {e}");
-                std::process::exit(1);
-            }
-            let dir = dir.unwrap();
-            if let Err(e) = detect_project_type(&dir) {
-                eprintln!("cl: {e}");
-                std::process::exit(1);
-            }
-            run_bun_build(&dir, true, false)
+            resolve_target_dir(target).and_then(|dir| {
+                detect_project_type(&dir)?;
+                run_bun_build(&dir, true, false)
+            })
         }
         Cmd::Dev { example } => {
             let target = example.as_deref().unwrap_or(".");
-            let dir = resolve_target_dir(target);
-            if let Err(e) = &dir {
-                eprintln!("cl: {e}");
-                std::process::exit(1);
-            }
-            let dir = dir.unwrap();
-            if let Err(e) = detect_project_type(&dir) {
-                eprintln!("cl: {e}");
-                std::process::exit(1);
-            }
-            run_dev_loop(target, false)
+            resolve_target_dir(target).and_then(|dir| {
+                detect_project_type(&dir)?;
+                run_dev_loop(target, false)
+            })
         }
         Cmd::Serve { example, verbose } => {
             let target = example.as_deref().unwrap_or(".");
-            let dir = resolve_target_dir(target);
-            if let Err(e) = &dir {
-                eprintln!("cl: {e}");
-                std::process::exit(1);
-            }
-            let dir = dir.unwrap();
-            match detect_project_type(&dir) {
-                Ok(ProjectType::Full) => {
-                    eprintln!("cl: you are working in a full crepuscularity project; use 'crepus dev' or 'cre web dev' instead");
-                    std::process::exit(1);
-                }
+            resolve_target_dir(target).and_then(|dir| match detect_project_type(&dir) {
+                Ok(ProjectType::Full) => Err(
+                    "you are working in a full crepuscularity project; use 'crepus dev' or 'cre web dev' instead".to_string()
+                ),
                 Ok(ProjectType::Lite) => {
                     resolve_config_path(&dir).and_then(|config| run_gui_once(&config, verbose))
                 }
                 Err(e) => Err(e),
-            }
+            })
         }
         Cmd::New { name } => scaffold_new(&name),
         Cmd::Init { path } => init_project(&path),
