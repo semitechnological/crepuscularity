@@ -347,7 +347,9 @@ pub fn run(args: &[String]) {
     }
 
     for suite_id in suite_keys {
-        let targets = by_suite.get(&suite_id).unwrap();
+        let Some(targets) = by_suite.get(&suite_id) else {
+            continue;
+        };
         if !json_out {
             eprintln!();
             eprintln!(
@@ -490,7 +492,10 @@ pub fn run(args: &[String]) {
             summary,
             suites: json_suites,
         };
-        println!("{}", serde_json::to_string_pretty(&report).unwrap());
+        match serde_json::to_string_pretty(&report) {
+            Ok(json) => println!("{json}"),
+            Err(e) => ui::error(&format!("failed to serialize JSON report: {e}")),
+        }
     } else {
         let outcomes = benchmark_outcomes_from_suites(&json_suites);
         #[cfg(feature = "tui")]
@@ -1043,8 +1048,14 @@ fn exec_tracked(
 
     cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
     let mut child = cmd.spawn().map_err(|e| e.to_string())?;
-    let stdout_pipe = child.stdout.take().unwrap();
-    let stderr_pipe = child.stderr.take().unwrap();
+    let stdout_pipe = child
+        .stdout
+        .take()
+        .ok_or_else(|| "Failed to capture stdout".to_string())?;
+    let stderr_pipe = child
+        .stderr
+        .take()
+        .ok_or_else(|| "Failed to capture stderr".to_string())?;
     let t_out = thread::spawn(move || {
         let mut s = String::new();
         let _ = std::io::BufReader::new(stdout_pipe).read_to_string(&mut s);
@@ -1085,31 +1096,45 @@ fn run_shell(
     }
     #[cfg(not(unix))]
     {
+        static COUNTER: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+        let id = COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let pid = std::process::id();
+        let bat_name = format!("crepus_bench_{pid}_{id}.bat");
+        let bat_path = workdir.join(&bat_name);
+
+        if let Err(e) = std::fs::write(&bat_path, script) {
+            return (false, format!("failed to write batch file: {e}"), None);
+        }
+
         let mut cmd = Command::new("cmd");
-        cmd.args(["/C", script]).current_dir(workdir).envs(envs);
+        cmd.arg("/C").arg(bat_path.as_os_str()).current_dir(workdir).envs(envs);
         let _measure_memory = measure_memory; // RSS sampling not implemented on Windows
-        if inherit_io {
+
+        let res = if inherit_io {
             let st = cmd.status();
-            return match st {
+            match st {
                 Ok(s) if s.success() => (true, String::new(), None),
                 Ok(s) => (false, format!("`cmd /C` exited with {s}"), None),
                 Err(e) => (false, e.to_string(), None),
-            };
-        }
-        let o = cmd.output();
-        match o {
-            Ok(out) => {
-                let mut err = String::from_utf8_lossy(&out.stderr).to_string();
-                if !out.stdout.is_empty() {
-                    if !err.is_empty() {
-                        err.push('\n');
-                    }
-                    err.push_str(&String::from_utf8_lossy(&out.stdout));
-                }
-                (out.status.success(), err, None)
             }
-            Err(e) => (false, e.to_string(), None),
-        }
+        } else {
+            match cmd.output() {
+                Ok(out) => {
+                    let mut err = String::from_utf8_lossy(&out.stderr).to_string();
+                    if !out.stdout.is_empty() {
+                        if !err.is_empty() {
+                            err.push('\n');
+                        }
+                        err.push_str(&String::from_utf8_lossy(&out.stdout));
+                    }
+                    (out.status.success(), err, None)
+                }
+                Err(e) => (false, e.to_string(), None),
+            }
+        };
+
+        let _ = std::fs::remove_file(&bat_path);
+        res
     }
 }
 
