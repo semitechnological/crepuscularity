@@ -9,6 +9,9 @@ use crepuscularity_core::parser::{parse_component_file, parse_template};
 use crepuscularity_core::virtual_files::lookup_virtual_file;
 pub use crepuscularity_core::CrepusError;
 
+/// Maximum include nesting depth to prevent infinite recursion / stack overflow.
+const MAX_INCLUDE_DEPTH: usize = 64;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LvglOptions {
     pub name: String,
@@ -90,7 +93,7 @@ pub fn render_nodes_to_lvgl_xml(
     push_xml_attr(&mut out, &options.name);
     out.push_str("\">\n  <view>\n");
     let ctx = lvgl_context(ctx);
-    for node in render_nodes_list(nodes, &ctx)? {
+    for node in render_nodes_list(nodes, &ctx, 0)? {
         write_node(&mut out, &node, 4);
     }
     out.push_str("  </view>\n</");
@@ -119,7 +122,7 @@ struct XmlNode {
     children: Vec<XmlNode>,
 }
 
-fn render_nodes_list(nodes: &[Node], ctx: &TemplateContext) -> Result<Vec<XmlNode>, CrepusError> {
+fn render_nodes_list(nodes: &[Node], ctx: &TemplateContext, depth: usize) -> Result<Vec<XmlNode>, CrepusError> {
     let mut ctx = ctx.clone();
     let mut out = Vec::new();
     for node in nodes {
@@ -136,7 +139,7 @@ fn render_nodes_list(nodes: &[Node], ctx: &TemplateContext) -> Result<Vec<XmlNod
                 } else {
                     block.else_children.as_deref().unwrap_or(&[])
                 };
-                out.extend(render_nodes_list(body, &ctx)?);
+                out.extend(render_nodes_list(body, &ctx, depth)?);
             }
             Node::For(block) => {
                 for item_ctx in ctx.get_list_ref(&block.iterator) {
@@ -153,18 +156,24 @@ fn render_nodes_list(nodes: &[Node], ctx: &TemplateContext) -> Result<Vec<XmlNod
                                 .insert(pattern.to_string(), TemplateValue::Str(item_value));
                         }
                     }
-                    out.extend(render_nodes_list(&block.body, &loop_ctx)?);
+                    out.extend(render_nodes_list(&block.body, &loop_ctx, depth)?);
                 }
             }
-            Node::Match(block) => out.extend(render_match(block, &ctx)?),
-            Node::Element(el) => out.push(render_element(el, &ctx)?),
+            Node::Match(block) => out.extend(render_match(block, &ctx, depth)?),
+            Node::Element(el) => out.push(render_element(el, &ctx, depth)?),
             Node::Text(parts) => out.push(label_node(render_text_inline(parts, &ctx)?)),
             Node::RawText(expr) | Node::RawHtml(expr) => {
                 out.push(label_node(value_to_str(&eval_expr(expr, &ctx)?)));
             }
             Node::Include(inc) => {
-                let (inner, inner_ctx) = expand_include(inc, &ctx)?;
-                out.extend(render_nodes_list(&inner, &inner_ctx)?);
+                if depth >= MAX_INCLUDE_DEPTH {
+                    return Err(CrepusError::render(format!(
+                        "maximum include depth ({MAX_INCLUDE_DEPTH}) exceeded; possible circular include involving '{}'",
+                        inc.path
+                    )));
+                }
+                let (inner, inner_ctx) = expand_include(inc, &ctx, depth)?;
+                out.extend(render_nodes_list(&inner, &inner_ctx, depth + 1)?);
             }
             Node::Embed(_) => {}
         }
@@ -172,7 +181,7 @@ fn render_nodes_list(nodes: &[Node], ctx: &TemplateContext) -> Result<Vec<XmlNod
     Ok(out)
 }
 
-fn render_match(block: &MatchBlock, ctx: &TemplateContext) -> Result<Vec<XmlNode>, CrepusError> {
+fn render_match(block: &MatchBlock, ctx: &TemplateContext, depth: usize) -> Result<Vec<XmlNode>, CrepusError> {
     let value = value_to_str(&eval_expr(&block.expr, ctx)?);
     for arm in &block.arms {
         let pattern = arm.pattern.trim();
@@ -182,18 +191,18 @@ fn render_match(block: &MatchBlock, ctx: &TemplateContext) -> Result<Vec<XmlNode
                 && value == pattern[1..pattern.len() - 1])
             || value == pattern
         {
-            return render_nodes_list(&arm.body, ctx);
+            return render_nodes_list(&arm.body, ctx, depth);
         }
     }
     Ok(Vec::new())
 }
 
-fn render_element(el: &Element, ctx: &TemplateContext) -> Result<XmlNode, CrepusError> {
+fn render_element(el: &Element, ctx: &TemplateContext, depth: usize) -> Result<XmlNode, CrepusError> {
     if el.tag == "slot" {
         let children = if let Some((nodes, slot_ctx)) = &ctx.slot {
-            render_nodes_list(nodes, slot_ctx)?
+            render_nodes_list(nodes, slot_ctx, depth)?
         } else {
-            render_nodes_list(&el.children, ctx)?
+            render_nodes_list(&el.children, ctx, depth)?
         };
         return Ok(XmlNode {
             tag: "lv_obj".into(),
@@ -209,7 +218,7 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<XmlNode, Crepus
         }
     }
 
-    let mut children = render_nodes_list(&el.children, ctx)?;
+    let mut children = render_nodes_list(&el.children, ctx, depth)?;
     let text = take_text_child(&mut children);
     let mut attrs = Vec::new();
     if let Some(id) = &el.id {
@@ -268,9 +277,17 @@ fn read_file(ctx: &TemplateContext, path: &Path) -> Result<String, CrepusError> 
 fn expand_include(
     inc: &IncludeNode,
     ctx: &TemplateContext,
+    depth: usize,
 ) -> Result<(Vec<Node>, TemplateContext), CrepusError> {
+    if depth >= MAX_INCLUDE_DEPTH {
+        return Err(CrepusError::render(format!(
+            "maximum include depth ({MAX_INCLUDE_DEPTH}) exceeded; possible circular include involving '{}'",
+            inc.path
+        )));
+    }
+
     if let Some((file_part, comp_name)) = inc.path.split_once('#') {
-        return expand_named_component(inc, ctx, file_part, comp_name);
+        return expand_named_component(inc, ctx, file_part, comp_name, depth);
     }
 
     let file_path = resolve_include_path(ctx.base_dir.as_deref(), &inc.path)?;
@@ -296,7 +313,14 @@ fn expand_named_component(
     ctx: &TemplateContext,
     file_part: &str,
     comp_name: &str,
+    depth: usize,
 ) -> Result<(Vec<Node>, TemplateContext), CrepusError> {
+    if depth >= MAX_INCLUDE_DEPTH {
+        return Err(CrepusError::render(format!(
+            "maximum include depth ({MAX_INCLUDE_DEPTH}) exceeded; possible circular include involving '{file_part}#{comp_name}'"
+        )));
+    }
+
     let file_path = resolve_include_path(ctx.base_dir.as_deref(), file_part)?;
     let content = read_file(ctx, &file_path)?;
     let comp_file = parse_component_file(&content)
