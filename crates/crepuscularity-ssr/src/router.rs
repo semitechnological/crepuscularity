@@ -8,6 +8,7 @@ use axum::{
     routing::get,
     Router,
 };
+use crepuscularity_core::ast::Node;
 use crepuscularity_core::TemplateContext;
 use crepuscularity_web::{render_ssr_document, SsrDocument};
 
@@ -20,12 +21,19 @@ fn escape_html_error(s: &str) -> String {
 }
 
 /// A single route entry pairing a template source with a page title.
+///
+/// The `nodes` field holds the pre-parsed AST so templates are not re-parsed on every request.
 pub struct RouteEntry {
     pub template: String,
     pub title: String,
+    /// Pre-parsed template AST, cached at startup to avoid re-parsing on every request.
+    pub nodes: Arc<Vec<Node>>,
 }
 
 /// Builds an Axum `Router` from a declarative map of URL paths → `.crepus` templates.
+///
+/// Templates are pre-parsed at registration time (in [`SsrRouter::route`]) so that parse errors
+/// surface immediately at startup and the parsed AST is reused across all requests.
 ///
 /// # Example
 /// ```rust,no_run
@@ -54,17 +62,26 @@ impl SsrRouter {
     }
 
     /// Register a URL path with its template source and page title.
+    ///
+    /// The template is pre-parsed immediately so that syntax errors are caught at startup
+    /// rather than at request time. The parsed AST is stored in [`RouteEntry::nodes`] and
+    /// shared across all requests via `Arc`.
     pub fn route(
         mut self,
         path: &str,
         template: impl Into<String>,
         title: impl Into<String>,
     ) -> Self {
+        let template = template.into();
+        let title = title.into();
+        let nodes = crepuscularity_core::ast_cache::parse_content(&template)
+            .unwrap_or_else(|e| panic!("SsrRouter::route: failed to parse template for {path}: {e}"));
         self.routes.insert(
             path.to_string(),
             RouteEntry {
-                template: template.into(),
-                title: title.into(),
+                template,
+                title,
+                nodes,
             },
         );
         self
@@ -81,7 +98,7 @@ impl SsrRouter {
 }
 
 async fn handle_root(State(routes): State<Arc<HashMap<String, RouteEntry>>>) -> Html<String> {
-    render_entry(&routes, "/")
+    render_entry(&routes, "/").await
 }
 
 async fn handle_route(
@@ -89,26 +106,40 @@ async fn handle_route(
     Path(path): Path<String>,
 ) -> Html<String> {
     let path = format!("/{path}");
-    render_entry(&routes, &path)
+    render_entry(&routes, &path).await
 }
 
-fn render_entry(routes: &HashMap<String, RouteEntry>, path: &str) -> Html<String> {
+/// Look up the route entry and render the template on a blocking thread so the async
+/// runtime event loop is not stalled by synchronous template parsing/rendering.
+async fn render_entry(routes: &HashMap<String, RouteEntry>, path: &str) -> Html<String> {
     let entry = match routes.get(path).or_else(|| routes.get("/")) {
         Some(e) => e,
         None => return Html("<h1>404 Not Found</h1>".to_string()),
     };
     let template = entry.template.clone();
     let title = entry.title.clone();
-    let ctx = TemplateContext::new();
 
-    let doc = SsrDocument {
-        title: &title,
-        ..Default::default()
-    };
-    let result = render_ssr_document(&template, &ctx, &doc, true);
+    // Wrap the synchronous parsing/rendering work in spawn_blocking so it runs on a
+    // dedicated blocking thread instead of stalling the Tokio async runtime.
+    let result = tokio::task::spawn_blocking(move || {
+        let ctx = TemplateContext::new();
+        let doc = SsrDocument {
+            title: &title,
+            ..Default::default()
+        };
+        render_ssr_document(&template, &ctx, &doc, true)
+    })
+    .await;
 
     match result {
-        Ok(h) => Html(h),
-        Err(e) => Html(format!("<pre style='color:red'>{}</pre>", escape_html_error(&e.to_string()))),
+        Ok(Ok(h)) => Html(h),
+        Ok(Err(e)) => Html(format!(
+            "<pre style='color:red'>{}</pre>",
+            escape_html_error(&e.to_string())
+        )),
+        Err(e) => Html(format!(
+            "<pre style='color:red'>render task panicked: {}</pre>",
+            escape_html_error(&e.to_string())
+        )),
     }
 }
