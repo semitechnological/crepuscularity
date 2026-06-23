@@ -16,34 +16,45 @@
 //!
 //! For a full demo, run the package binary (see `src/main.rs`).
 
-pub mod bench_eval;
 pub mod bench_plugin;
 pub mod bridge;
 pub mod clipboard;
 pub mod download_plugin;
 mod fs_paths;
-pub mod guest_compiler;
 pub mod host;
 pub mod host_queue;
 pub mod integration;
 pub mod plugins;
-pub mod v8_host;
 
 pub mod config;
 pub mod guest_watch;
-pub mod v8_thread;
-pub mod worker;
 
+#[cfg(feature = "oxc")]
+pub mod guest_compiler;
+#[cfg(feature = "v8")]
+pub mod v8_host;
+#[cfg(feature = "v8")]
+pub mod v8_thread;
+#[cfg(feature = "v8")]
+pub mod worker;
+#[cfg(all(feature = "v8", feature = "oxc"))]
+pub mod bench_eval;
+
+#[cfg(all(feature = "v8", feature = "oxc"))]
 pub use bench_eval::{
     bench_matrix_shared_for_configs, eval_guest_from_config_file, BenchMatrixShared,
 };
 pub use bench_plugin::BenchPlugin;
 pub use bridge::{Bridge, BridgeError, Capability, NativePlugin};
 pub use download_plugin::DownloadPlugin;
+#[cfg(feature = "oxc")]
 pub use guest_compiler::prepare_guest_source;
 pub use host::{HostEventRecord, HostNode, HostRoute, HostSnapshot, HostState, HostStyle};
 pub use host_queue::{DeferredWindowDecorations, HostCommandQueue, HostDeferred};
 pub use plugins::{AppPlugin, ClipboardPlugin, CorePlugin, FsPlugin, HostPlugin, WindowPlugin};
+#[cfg(feature = "v8")]
 pub use v8_host::V8Host;
+#[cfg(feature = "v8")]
 pub use v8_thread::{V8ThreadHandle, V8ThreadRequest, V8ThreadRuntime};
+#[cfg(feature = "v8")]
 pub use worker::{WorkerHandle, WorkerRuntime};

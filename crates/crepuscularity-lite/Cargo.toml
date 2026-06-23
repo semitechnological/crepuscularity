@@ -13,7 +13,11 @@ parallel = ["dep:rayon"]
 # CLI helpers (`cl` binary).
 cli = ["dep:clap"]
 # Terminal benchmark UI + parallel headless V8 matrix (`crepus-bench` binary).
-bench-tui = ["cli", "dep:crossterm", "dep:ratatui", "parallel"]
+bench-tui = ["cli", "dep:crossterm", "dep:ratatui", "parallel", "v8", "oxc"]
+# V8 JavaScript runtime (rusty_v8) — embedded JS evaluation via `v8_host`.
+v8 = ["dep:v8", "dep:icu_calendar", "dep:icu_calendar_data", "dep:icu_locale", "dep:icu_locale_data"]
+# Oxc TypeScript / TSX / JSX transpiler — transforms `.ts`/`.tsx` guest sources.
+oxc = ["dep:oxc_allocator", "dep:oxc_codegen", "dep:oxc_parser", "dep:oxc_semantic", "dep:oxc_span", "dep:oxc_transformer"]
 
 [dependencies]
 crepuscularity-core = { path = "../crepuscularity-core", version = "0.4.15" }
@@ -26,23 +30,28 @@ reqwest = { version = "0.12", default-features = false, features = ["blocking", 
 serde = { workspace = true }
 serde_json.workspace = true
 toml = { workspace = true }
-oxc_allocator = "0.127"
-oxc_codegen = "0.127"
-oxc_parser = "0.127"
-oxc_semantic = "0.127"
-oxc_span = "0.127"
-oxc_transformer = "0.127"
+oxc_allocator = { version = "0.128", optional = true }
+oxc_codegen = { version = "0.128", optional = true }
+oxc_parser = { version = "0.128", optional = true }
+oxc_semantic = { version = "0.128", optional = true }
+oxc_span = { version = "0.128", optional = true }
+oxc_transformer = { version = "0.128", optional = true }
 # V8 149+ requires ICU 2.2.x; pins below unify the transitive ICU tree.
-v8 = "149"
-icu_calendar = "=2.2.1"
-icu_calendar_data = "=2.2.0"
-icu_locale = "=2.2.0"
-icu_locale_data = "=2.2.0"
+v8 = { version = "149", optional = true }
+icu_calendar = { version = "=2.2.1", optional = true }
+icu_calendar_data = { version = "=2.2.0", optional = true }
+icu_locale = { version = "=2.2.0", optional = true }
+icu_locale_data = { version = "=2.2.0", optional = true }
 clap = { version = "4.5", optional = true, features = ["derive"] }
 crossterm = { version = "0.28", optional = true }
 ratatui = { version = "0.30", optional = true }
 rayon = { version = "1", optional = true }
 which = "8.0.3"
+
+[[bin]]
+name = "crepuscularity-lite"
+path = "src/main.rs"
+required-features = ["v8", "oxc"]
 
 [[bin]]
 name = "crepus-bench"
