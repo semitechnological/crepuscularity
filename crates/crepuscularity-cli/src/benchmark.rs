@@ -347,7 +347,9 @@ pub fn run(args: &[String]) {
     }
 
     for suite_id in suite_keys {
-        let targets = by_suite.get(&suite_id).unwrap();
+        let Some(targets) = by_suite.get(&suite_id) else {
+            continue;
+        };
         if !json_out {
             eprintln!();
             eprintln!(
