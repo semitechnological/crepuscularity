@@ -1,6 +1,6 @@
 [package]
 name = "crepuscularity-webext"
-version = "0.2.10"
+version = "0.2.11"
 edition = "2021"
 description = "Browser extension (MV3) support for Crepuscularity — UNSTABLE; in active development."
 license = "MPL-2.0"

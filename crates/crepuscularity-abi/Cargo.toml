@@ -1,6 +1,6 @@
 [package]
 name = "crepuscularity-abi"
-version = "0.1.6"
+version = "0.1.7"
 edition = "2021"
 license = "MPL-2.0"
 description = "Plain C ABI for Crepuscularity View IR sessions."
