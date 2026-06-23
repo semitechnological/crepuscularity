@@ -71,7 +71,7 @@ pgo_use() {
   echo "==> Step 3: PGO-optimised build (profile=pgo)"
   SDKROOT="$(xcrun --show-sdk-path 2>/dev/null || echo '')"
   export SDKROOT
-  RUSTFLAGS="-Cprofile-use=$PGO_DIR/merged.profdata -Cprofile-use=$PGO_DIR" \
+  RUSTFLAGS="-Cprofile-use=$PGO_DIR/merged.profdata" \
     cargo build --profile pgo -p crepuscularity-cli
   echo "  → PGO binary: $CREPUS_BIN"
   echo ""
