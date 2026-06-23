@@ -11,7 +11,7 @@ class CrepuscularityAbiTests(unittest.TestCase):
             session.set_context({"count": "1"})
             session.on_event(events.append)
             first = session.render_ir()
-            self.assertEqual(first["version"], 3)
+            self.assertEqual(first["version"], 4)
             self.assertIn("Count 1", str(first))
             result = session.dispatch_event({"handler": "bind:count:2"})
             self.assertEqual(result["handler"], "bind:count:2")
