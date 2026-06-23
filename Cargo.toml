@@ -34,8 +34,10 @@ members = [
 ]
 
 [profile.release]
-lto = "thin"
+lto = "fat"
 codegen-units = 1
+panic = "abort"
+strip = "symbols"
 
 # ABI / cdylib embedders: `cargo build -p crepuscularity-abi --profile abi`
 [profile.abi]
@@ -101,7 +103,7 @@ tokio-stream = { version = "0.1", features = ["net"] }
 wasm-bindgen = "0.2"
 web-sys = "0.3"
 regex = "1"
-schemars = { version = "0.8", features = ["derive"] }
+schemars = { version = "1", features = ["derive"] }
 thiserror = "2"
 
 # Default build uses crates.io `gpui` 0.2.2 so `cargo publish` matches consumers.
