@@ -44,7 +44,8 @@ use crepuscularity_web::render_from_files;
 use axum::extract::State;
 
 use crate::crepus_toml::WebTargetMeta;
-use crate::web::{    ensure_web_dev_artifacts, load_site_head, merge_site_head_meta, merged_site_google_fonts,
+use crate::web::{
+    ensure_web_dev_artifacts, load_site_head, merge_site_head_meta, merged_site_google_fonts,
     merged_site_inline_css, render_index_html,
 };
 use crate::web_docs_hook::{docs_src_path, run_docs_hook, DocsHookTheme};

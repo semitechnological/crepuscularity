@@ -1085,31 +1085,46 @@ fn run_shell(
     }
     #[cfg(not(unix))]
     {
+        static COUNTER: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+        let id = COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let pid = std::process::id();
+        let bat_name = format!("crepus_bench_{pid}_{id}.bat");
+        let bat_path = workdir.join(&bat_name);
+
+        if let Err(e) = std::fs::write(&bat_path, script) {
+            return (false, format!("failed to write batch file: {e}"), None);
+        }
+
         let mut cmd = Command::new("cmd");
-        cmd.args(["/C", script]).current_dir(workdir).envs(envs);
+        cmd.arg("/C").arg(bat_path.as_os_str()).current_dir(workdir).envs(envs);
         let _measure_memory = measure_memory; // RSS sampling not implemented on Windows
-        if inherit_io {
+
+        let res = if inherit_io {
             let st = cmd.status();
-            return match st {
+            match st {
                 Ok(s) if s.success() => (true, String::new(), None),
                 Ok(s) => (false, format!("`cmd /C` exited with {s}"), None),
                 Err(e) => (false, e.to_string(), None),
-            };
-        }
-        let o = cmd.output();
-        match o {
-            Ok(out) => {
-                let mut err = String::from_utf8_lossy(&out.stderr).to_string();
-                if !out.stdout.is_empty() {
-                    if !err.is_empty() {
-                        err.push('\n');
-                    }
-                    err.push_str(&String::from_utf8_lossy(&out.stdout));
-                }
-                (out.status.success(), err, None)
             }
-            Err(e) => (false, e.to_string(), None),
-        }
+        } else {
+            let o = cmd.output();
+            match o {
+                Ok(out) => {
+                    let mut err = String::from_utf8_lossy(&out.stderr).to_string();
+                    if !out.stdout.is_empty() {
+                        if !err.is_empty() {
+                            err.push('\n');
+                        }
+                        err.push_str(&String::from_utf8_lossy(&out.stdout));
+                    }
+                    (out.status.success(), err, None)
+                }
+                Err(e) => (false, e.to_string(), None),
+            }
+        };
+
+        let _ = std::fs::remove_file(bat_path);
+        res
     }
 }
 
