@@ -549,7 +549,10 @@ mod tests {
             .to_string();
 
         let mut completed = false;
-        for _ in 0..60 {
+        let start = std::time::Instant::now();
+        let mut sleep_time = Duration::from_millis(1);
+
+        while start.elapsed() < Duration::from_secs(6) {
             let snapshot = plugin.invoke("list", &json!({})).expect("list");
             let tasks = snapshot
                 .get("tasks")
@@ -568,7 +571,8 @@ mod tests {
                     break;
                 }
             }
-            thread::sleep(Duration::from_millis(100));
+            thread::sleep(sleep_time);
+            sleep_time = std::cmp::min(sleep_time * 2, Duration::from_millis(100));
         }
 
         assert!(completed, "download never completed");

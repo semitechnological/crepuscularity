@@ -1747,7 +1747,7 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity"
-version = "0.4.6"
+version = "0.4.7"
 dependencies = [
  "crepuscularity-core",
  "crepuscularity-lvgl",
@@ -1760,7 +1760,7 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-abi"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "crepuscularity-core",
  "crepuscularity-native",
@@ -1770,7 +1770,7 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-cli"
-version = "0.9.7"
+version = "0.9.8"
 dependencies = [
  "axum",
  "console",
@@ -1801,7 +1801,7 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-core"
-version = "0.4.16"
+version = "0.4.17"
 dependencies = [
  "notify",
  "sha2 0.11.0",
@@ -1813,7 +1813,7 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-dev"
-version = "0.4.7"
+version = "0.4.8"
 dependencies = [
  "crepuscularity-core",
  "crepuscularity-native",
@@ -1826,7 +1826,7 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-embedded"
-version = "0.1.15"
+version = "0.1.16"
 dependencies = [
  "crepuscularity-core",
  "crepuscularity-embedded-macros",
@@ -1847,7 +1847,7 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-embedded-macros"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "crepuscularity-core",
  "proc-macro2",
@@ -1857,7 +1857,7 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-gpui"
-version = "0.4.6"
+version = "0.4.7"
 dependencies = [
  "crepuscularity-core",
  "crepuscularity-runtime",
@@ -1873,7 +1873,7 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-lite"
-version = "0.4.8"
+version = "0.4.9"
 dependencies = [
  "arboard",
  "clap",
@@ -1905,7 +1905,7 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-lsp"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "crepuscularity-core",
  "tokio",
@@ -1914,7 +1914,7 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-lvgl"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "crepuscularity-core",
  "tempfile",
@@ -1922,7 +1922,7 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-native"
-version = "0.5.6"
+version = "0.5.7"
 dependencies = [
  "crepuscularity-core",
  "schemars",
@@ -1934,7 +1934,7 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-reactive"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "base64 0.22.1",
  "crepuscularity-core",
@@ -1946,7 +1946,7 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-runtime"
-version = "0.4.11"
+version = "0.4.12"
 dependencies = [
  "crepuscularity-core",
  "gpui",
@@ -1959,7 +1959,7 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-ssr"
-version = "0.2.3"
+version = "0.2.4"
 dependencies = [
  "axum",
  "crepuscularity-core",
@@ -1974,7 +1974,7 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-tui"
-version = "0.4.11"
+version = "0.4.12"
 dependencies = [
  "crepuscularity-core",
  "crepuscularity_macros",
@@ -1986,7 +1986,7 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-web"
-version = "0.4.8"
+version = "0.4.9"
 dependencies = [
  "ammonia",
  "base64 0.22.1",
@@ -2004,7 +2004,7 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-webext"
-version = "0.2.10"
+version = "0.2.11"
 dependencies = [
  "crepuscularity-core",
  "crepuscularity-web",
@@ -2020,7 +2020,7 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity_macros"
-version = "0.5.4"
+version = "0.5.5"
 dependencies = [
  "crepuscularity-core",
  "proc-macro2",
