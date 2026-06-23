@@ -11,6 +11,14 @@ use axum::{
 use crepuscularity_core::TemplateContext;
 use crepuscularity_web::{render_ssr_document, SsrDocument};
 
+/// Escape HTML special characters in error messages before injecting into HTML.
+fn escape_html_error(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+}
+
 /// A single route entry pairing a template source with a page title.
 pub struct RouteEntry {
     pub template: String,
@@ -101,6 +109,6 @@ fn render_entry(routes: &HashMap<String, RouteEntry>, path: &str) -> Html<String
 
     match result {
         Ok(h) => Html(h),
-        Err(e) => Html(format!("<pre style='color:red'>{e}</pre>")),
+        Err(e) => Html(format!("<pre style='color:red'>{}</pre>", escape_html_error(&e.to_string()))),
     }
 }

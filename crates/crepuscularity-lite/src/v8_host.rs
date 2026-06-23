@@ -59,11 +59,14 @@ impl V8Host {
             let global = scope.get_current_context().global(scope);
             let crepus = v8::Object::new(scope);
 
-            let version_key = V8String::new(scope, "version").unwrap();
-            let version_val = V8String::new(scope, env!("CARGO_PKG_VERSION")).unwrap();
+            let version_key = V8String::new(scope, "version")
+                .ok_or_else(|| "failed to create version key".to_string())?;
+            let version_val = V8String::new(scope, env!("CARGO_PKG_VERSION"))
+                .ok_or_else(|| "failed to create version value".to_string())?;
             let _ = crepus.set(scope, version_key.into(), version_val.into());
 
-            let echo_key = V8String::new(scope, "nativeEcho").unwrap();
+            let echo_key = V8String::new(scope, "nativeEcho")
+                .ok_or_else(|| "failed to create echo key".to_string())?;
             let echo_fn = v8::Function::new(
                 scope,
                 |scope: &mut v8::PinScope<'_, '_>,
@@ -72,21 +75,25 @@ impl V8Host {
                     let a0 = args.get(0);
                     let iso: &v8::Isolate = scope.deref();
                     let msg = if a0.is_string() {
-                        a0.to_string(scope).unwrap().to_rust_string_lossy(iso)
+                        a0.to_string(scope)
+                            .map(|s| s.to_rust_string_lossy(iso))
+                            .unwrap_or_else(|| "<string conversion failed>".into())
                     } else if a0.is_undefined() {
                         "undefined".into()
                     } else {
                         "<non-string>".into()
                     };
                     let reply = format!("[Crepus.nativeEcho ← Rust] {msg}");
-                    let s = V8String::new(scope, &reply).unwrap();
-                    rv.set(s.into());
+                    if let Some(s) = V8String::new(scope, &reply) {
+                        rv.set(s.into());
+                    }
                 },
             )
-            .unwrap();
+            .ok_or_else(|| "failed to create echo function".to_string())?;
             let _ = crepus.set(scope, echo_key.into(), echo_fn.into());
 
-            let invoke_key = V8String::new(scope, "invoke").unwrap();
+            let invoke_key = V8String::new(scope, "invoke")
+                .ok_or_else(|| "failed to create invoke key".to_string())?;
             let invoke_fn = v8::Function::new(
                 scope,
                 |scope: &mut v8::PinScope<'_, '_>,
@@ -105,14 +112,16 @@ impl V8Host {
                         })
                         .to_string()
                     };
-                    let s = V8String::new(scope, &reply).unwrap();
-                    rv.set(s.into());
+                    if let Some(s) = V8String::new(scope, &reply) {
+                        rv.set(s.into());
+                    }
                 },
             )
-            .unwrap();
+            .ok_or_else(|| "failed to create invoke function".to_string())?;
             let _ = crepus.set(scope, invoke_key.into(), invoke_fn.into());
 
-            let crepus_key = V8String::new(scope, "Crepus").unwrap();
+            let crepus_key = V8String::new(scope, "Crepus")
+                .ok_or_else(|| "failed to create Crepus key".to_string())?;
             let _ = global.set(scope, crepus_key.into(), crepus.into());
 
             let ctx_for_global = scope.get_current_context();
@@ -175,12 +184,51 @@ fn dispatch_invoke(
         });
         return envelope.to_string();
     }
-    let plugin_id = plugin.to_string(scope).unwrap().to_rust_string_lossy(iso);
-    let method_name = method.to_string(scope).unwrap().to_rust_string_lossy(iso);
-    let payload_str = payload_raw
-        .to_string(scope)
-        .unwrap()
-        .to_rust_string_lossy(iso);
+    let plugin_id = match plugin.to_string(scope) {
+        Some(s) => s.to_rust_string_lossy(iso),
+        None => {
+            return json!({
+                "ok": false,
+                "error": BridgeError::new("string_conversion", "failed to convert plugin id to string"),
+            })
+            .to_string();
+        }
+    };
+    let method_name = match method.to_string(scope) {
+        Some(s) => s.to_rust_string_lossy(iso),
+        None => {
+            return json!({
+                "ok": false,
+                "error": BridgeError::new("string_conversion", "failed to convert method name to string"),
+            })
+            .to_string();
+        }
+    };
+    let payload_str = match payload_raw.to_string(scope) {
+        Some(s) => s.to_rust_string_lossy(iso),
+        None => {
+            return json!({
+                "ok": false,
+                "error": BridgeError::new("string_conversion", "failed to convert payload to string"),
+            })
+            .to_string();
+        }
+    };
+
+    /// Maximum accepted V8 invoke payload size (1 MB).
+    const MAX_V8_PAYLOAD_SIZE: usize = 1024 * 1024;
+
+    if payload_str.len() > MAX_V8_PAYLOAD_SIZE {
+        return json!({
+            "ok": false,
+            "error": BridgeError::with_details(
+                "payload_too_large",
+                "payload exceeds 1 MB limit",
+                json!({ "size": payload_str.len() }),
+            ),
+        })
+        .to_string();
+    }
 
     let payload: Value = match serde_json::from_str(&payload_str) {
         Ok(v) => v,
