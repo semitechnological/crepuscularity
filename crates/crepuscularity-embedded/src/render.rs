@@ -159,7 +159,7 @@ fn render_node(node: &Node, ctx: &TemplateContext) -> Result<EmbeddedNode, Crepu
         }
         Node::For(block) => {
             let mut children = Vec::new();
-            let items = ctx.get_list(&block.iterator);
+            let items = ctx.get_list_ref(&block.iterator);
             let pattern = block.pattern.trim();
             let has_pattern = !pattern.is_empty();
             let mut loop_ctx = ctx.clone();
@@ -170,8 +170,8 @@ fn render_node(node: &Node, ctx: &TemplateContext) -> Result<EmbeddedNode, Crepu
                     String::new()
                 };
                 loop_ctx.vars.clone_from(&ctx.vars);
-                for (k, v) in item_ctx.vars {
-                    loop_ctx.vars.insert(k, v);
+                for (k, v) in &item_ctx.vars {
+                    loop_ctx.vars.insert(k.clone(), v.clone());
                 }
                 if has_pattern && !s.is_empty() {
                     loop_ctx

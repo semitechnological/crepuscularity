@@ -4,6 +4,7 @@
 //! templates, and [`render_bundle`] for the `crepus web build` JSON bundle format.
 
 use std::path::Path;
+use std::sync::Arc;
 
 use crepuscularity_core::ast::*;
 use crepuscularity_core::context::{value_to_str, TemplateContext, TemplateValue};
@@ -314,13 +315,10 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<String, CrepusE
         }
         let words_json = slot_rotate_words_json_attr(&phrases);
 
-        let mut class_names = vec!["crepus-slot".to_string()];
-        class_names.extend(el.classes.clone());
-        for cc in &el.conditional_classes {
-            if ctx.eval_condition(&cc.condition)? {
-                class_names.push(cc.class.clone());
-            }
-        }
+        // Build class list with the "crepus-slot" prefix prepended.
+        let mut class_names: Vec<String> = Vec::with_capacity(el.classes.len() + 1);
+        class_names.push("crepus-slot".to_string());
+        class_names.extend(el.classes.iter().cloned());
 
         let mut out = String::new();
         out.push_str("<span");
@@ -329,9 +327,11 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<String, CrepusE
             out.push_str(&escape_html(id));
             out.push('"');
         }
-        out.push_str(" class=\"");
-        out.push_str(&escape_html(&ctx.interpolate(&class_names.join(" "))?));
-        out.push('"');
+        if let Some(class_attr) = build_class_attr(&class_names, &el.conditional_classes, ctx)? {
+            out.push_str(" class=\"");
+            out.push_str(&class_attr);
+            out.push('"');
+        }
         out.push_str(" data-slot-words=\"");
         out.push_str(&escape_html(&words_json));
         out.push('"');
@@ -377,13 +377,6 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<String, CrepusE
         return Ok(out);
     }
 
-    let mut class_names = el.classes.clone();
-    for cc in &el.conditional_classes {
-        if ctx.eval_condition(&cc.condition)? {
-            class_names.push(cc.class.clone());
-        }
-    }
-
     let mut out = String::new();
     out.push('<');
     out.push_str(&el.tag);
@@ -394,9 +387,9 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<String, CrepusE
         out.push('"');
     }
 
-    if !class_names.is_empty() {
+    if let Some(class_attr) = build_class_attr(&el.classes, &el.conditional_classes, ctx)? {
         out.push_str(" class=\"");
-        out.push_str(&escape_html(&ctx.interpolate(&class_names.join(" "))?));
+        out.push_str(&class_attr);
         out.push('"');
     }
 
@@ -469,25 +462,29 @@ fn render_if(block: &IfBlock, ctx: &TemplateContext) -> Result<String, CrepusErr
 }
 
 fn render_for(block: &ForBlock, ctx: &TemplateContext) -> Result<String, CrepusError> {
-    let items = ctx.get_list(&block.iterator);
+    let items = ctx.get_list_ref(&block.iterator);
     let mut out = String::new();
     let pattern = block.pattern.trim();
+    let has_pattern = !pattern.is_empty();
+    let mut child_ctx = ctx.clone();
 
     for item_ctx in items {
-        let mut vars: Vec<(String, TemplateValue)> = item_ctx
-            .vars
-            .iter()
-            .map(|(k, v)| (k.clone(), v.clone()))
-            .collect();
-        if !pattern.is_empty() {
+        child_ctx.vars.clone_from(&ctx.vars);
+        for (k, v) in &item_ctx.vars {
+            child_ctx.vars.insert(k.clone(), v.clone());
+        }
+        if has_pattern {
             let item_str = item_ctx.get_str("value");
             if !item_str.is_empty() {
-                vars.push((pattern.to_string(), TemplateValue::Str(item_str)));
+                child_ctx
+                    .vars
+                    .insert(pattern.to_string(), TemplateValue::Str(item_str));
             } else {
-                vars.push((pattern.to_string(), TemplateValue::Scope(item_ctx.clone())));
+                child_ctx
+                    .vars
+                    .insert(pattern.to_string(), TemplateValue::Scope(item_ctx.clone()));
             }
         }
-        let child_ctx = ctx.child_with_vars(vars);
         out.push_str(&render_nodes_to_html(&block.body, &child_ctx)?);
     }
 
@@ -549,7 +546,7 @@ fn render_include(inc: &IncludeNode, ctx: &TemplateContext) -> Result<String, Cr
         child_ctx.vars.insert(key.clone(), eval_expr(expr, ctx)?);
     }
     if !inc.slot.is_empty() {
-        child_ctx.slot = Some((inc.slot.clone(), Box::new(ctx.clone())));
+        child_ctx.slot = Some((inc.slot.clone(), Arc::new(ctx.clone())));
     }
 
     render_nodes_to_html(&nodes, &child_ctx)
@@ -584,7 +581,7 @@ fn render_named_component(
         child_ctx.vars.insert(key.clone(), eval_expr(expr, ctx)?);
     }
     if !inc.slot.is_empty() {
-        child_ctx.slot = Some((inc.slot.clone(), Box::new(ctx.clone())));
+        child_ctx.slot = Some((inc.slot.clone(), Arc::new(ctx.clone())));
     }
 
     render_nodes_to_html(&comp.nodes, &child_ctx)
@@ -810,16 +807,51 @@ fn serialize_ctx_to_value(ctx: &TemplateContext) -> serde_json::Value {
 }
 
 pub(crate) fn escape_html(input: &str) -> String {
-    input
-        .replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
+    let mut out = String::with_capacity(input.len());
+    for ch in input.chars() {
+        match ch {
+            '&' => out.push_str("&amp;"),
+            '<' => out.push_str("&lt;"),
+            '>' => out.push_str("&gt;"),
+            '"' => out.push_str("&quot;"),
+            c => out.push(c),
+        }
+    }
+    out
 }
 
 pub(crate) fn escape_html_attr(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
+    escape_html(s)
+}
+
+/// Build the `class="..."` attribute value: join classes with spaces, interpolate,
+/// and escape — in a single pass, avoiding the intermediate Vec + join + escape.
+pub(crate) fn build_class_attr(
+    base_classes: &[String],
+    conditional: &[ConditionalClass],
+    ctx: &TemplateContext,
+) -> Result<Option<String>, CrepusError> {
+    // First pass: interpolate each class and collect into one space-joined string.
+    let mut joined = String::new();
+    let mut first = true;
+    for class in base_classes {
+        if !first {
+            joined.push(' ');
+        }
+        joined.push_str(&ctx.interpolate(class)?);
+        first = false;
+    }
+    for cc in conditional {
+        if ctx.eval_condition(&cc.condition)? {
+            if !first {
+                joined.push(' ');
+            }
+            joined.push_str(&ctx.interpolate(&cc.class)?);
+            first = false;
+        }
+    }
+    if first {
+        return Ok(None);
+    }
+    Ok(Some(escape_html(&joined)))
 }

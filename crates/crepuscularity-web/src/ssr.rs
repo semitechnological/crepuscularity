@@ -17,6 +17,7 @@
 
 use std::cell::Cell;
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use base64::Engine;
 use serde_json::{json, Value};
@@ -350,24 +351,28 @@ fn render_node_ssr(
                     "iterator": block.iterator,
                 }),
             );
-            let items = ctx.get_list(&block.iterator);
+            let items = ctx.get_list_ref(&block.iterator);
             let mut inner = String::new();
             let pattern = block.pattern.trim();
+            let has_pattern = !pattern.is_empty();
+            let mut child_ctx = ctx.clone();
             for item_ctx in items {
-                let mut vars: Vec<(String, TemplateValue)> = item_ctx
-                    .vars
-                    .iter()
-                    .map(|(k, v)| (k.clone(), v.clone()))
-                    .collect();
-                if !pattern.is_empty() {
+                child_ctx.vars.clone_from(&ctx.vars);
+                for (k, v) in &item_ctx.vars {
+                    child_ctx.vars.insert(k.clone(), v.clone());
+                }
+                if has_pattern {
                     let item_str = item_ctx.get_str("value");
                     if !item_str.is_empty() {
-                        vars.push((pattern.to_string(), TemplateValue::Str(item_str)));
+                        child_ctx
+                            .vars
+                            .insert(pattern.to_string(), TemplateValue::Str(item_str));
                     } else {
-                        vars.push((pattern.to_string(), TemplateValue::Scope(item_ctx.clone())));
+                        child_ctx
+                            .vars
+                            .insert(pattern.to_string(), TemplateValue::Scope(item_ctx.clone()));
                     }
                 }
-                let child_ctx = ctx.child_with_vars(vars);
                 inner.push_str(&render_nodes_ssr(
                     &block.body,
                     &child_ctx,
@@ -508,13 +513,9 @@ fn render_element_ssr(
             }),
         );
 
-        let mut class_names = vec!["crepus-slot".to_string()];
-        class_names.extend(el.classes.clone());
-        for cc in &el.conditional_classes {
-            if ctx.eval_condition(&cc.condition)? {
-                class_names.push(cc.class.clone());
-            }
-        }
+        let mut class_names: Vec<String> = Vec::with_capacity(el.classes.len() + 1);
+        class_names.push("crepus-slot".to_string());
+        class_names.extend(el.classes.iter().cloned());
 
         let inject_root = *root_element_pending;
         *root_element_pending = false;
@@ -526,11 +527,13 @@ fn render_element_ssr(
         }
         out.push_str(&format!(r#" data-crepus-id="c{id}""#));
         out.push_str(" data-crepus-kind=\"slot-rotate\"");
-        out.push_str(" class=\"");
-        out.push_str(&crate::escape_html(
-            &ctx.interpolate(&class_names.join(" "))?,
-        ));
-        out.push('"');
+        if let Some(class_attr) =
+            crate::build_class_attr(&class_names, &el.conditional_classes, ctx)?
+        {
+            out.push_str(" class=\"");
+            out.push_str(&class_attr);
+            out.push('"');
+        }
         out.push_str(" data-slot-words=\"");
         out.push_str(&crate::escape_html(&words_json));
         out.push('"');
@@ -595,13 +598,6 @@ fn render_element_ssr(
         .as_ref()
         .map(|d| alloc_binding(counter, bind, d.clone()));
 
-    let mut class_names = el.classes.clone();
-    for cc in &el.conditional_classes {
-        if ctx.eval_condition(&cc.condition)? {
-            class_names.push(cc.class.clone());
-        }
-    }
-
     let mut out = String::new();
     out.push('<');
     out.push_str(&el.tag);
@@ -614,11 +610,9 @@ fn render_element_ssr(
         ));
     }
 
-    if !class_names.is_empty() {
+    if let Some(class_attr) = crate::build_class_attr(&el.classes, &el.conditional_classes, ctx)? {
         out.push_str(" class=\"");
-        out.push_str(&crate::escape_html(
-            &ctx.interpolate(&class_names.join(" "))?,
-        ));
+        out.push_str(&class_attr);
         out.push('"');
     }
 
@@ -698,7 +692,7 @@ fn render_include_ssr(
             child_ctx.vars.insert(key.clone(), eval_expr(expr, ctx)?);
         }
         if !inc.slot.is_empty() {
-            child_ctx.slot = Some((inc.slot.clone(), Box::new(ctx.clone())));
+            child_ctx.slot = Some((inc.slot.clone(), Arc::new(ctx.clone())));
         }
         render_nodes_ssr(&nodes, &child_ctx, counter, bind, false)?
     };
@@ -738,7 +732,7 @@ fn render_named_component_ssr(
         child_ctx.vars.insert(key.clone(), eval_expr(expr, ctx)?);
     }
     if !inc.slot.is_empty() {
-        child_ctx.slot = Some((inc.slot.clone(), Box::new(ctx.clone())));
+        child_ctx.slot = Some((inc.slot.clone(), Arc::new(ctx.clone())));
     }
 
     render_nodes_ssr(&comp.nodes, &child_ctx, counter, bind, false)
