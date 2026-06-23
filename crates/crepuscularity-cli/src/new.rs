@@ -102,7 +102,7 @@ fn main() {{
     )
 }
 
-fn to_pascal_case(s: &str) -> String {
+pub(crate) fn to_pascal_case(s: &str) -> String {
     s.split(&['-', '_', ' '][..])
         .filter(|p| !p.is_empty())
         .map(|p| {

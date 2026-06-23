@@ -158,35 +158,6 @@ fn parse_window_button_side(side: &str) -> Result<[Option<WindowButton>; MAX_BUT
     Ok(buttons)
 }
 
-pub trait TaskExt<T, E> {
-    fn detach_and_log_err(self, cx: &App);
-    fn detach_and_log_err_with_backtrace(self, cx: &App);
-}
-
-impl<T, E> TaskExt<T, E> for Task<Result<T, E>>
-where
-    T: 'static + Send,
-    E: 'static + std::fmt::Display + std::fmt::Debug + Send,
-{
-    fn detach_and_log_err(self, cx: &App) {
-        cx.background_spawn(async move {
-            if let Err(error) = self.await {
-                log::error!("{error}");
-            }
-        })
-        .detach();
-    }
-
-    fn detach_and_log_err_with_backtrace(self, cx: &App) {
-        cx.background_spawn(async move {
-            if let Err(error) = self.await {
-                log::error!("{error:?}");
-            }
-        })
-        .detach();
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use crate::{WindowButton, WindowButtonLayout};
