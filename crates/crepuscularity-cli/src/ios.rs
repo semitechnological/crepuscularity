@@ -15,6 +15,7 @@ use console::style;
 
 use crate::build_options::{strip_build_options_or_exit, BuildOptions};
 use crate::crepus_toml;
+use crate::new::to_pascal_case;
 use crate::ui;
 
 #[derive(Debug, Clone)]
@@ -552,17 +553,4 @@ fn find_xcodeproj(dir: &Path) -> Option<PathBuf> {
         }
     }
     None
-}
-
-fn to_pascal_case(s: &str) -> String {
-    s.split(|c: char| c == '-' || c == '_' || c.is_whitespace())
-        .filter(|p| !p.is_empty())
-        .map(|p| {
-            let mut c = p.chars();
-            match c.next() {
-                None => String::new(),
-                Some(f) => f.to_uppercase().collect::<String>() + c.as_str(),
-            }
-        })
-        .collect()
 }
