@@ -490,7 +490,10 @@ pub fn run(args: &[String]) {
             summary,
             suites: json_suites,
         };
-        println!("{}", serde_json::to_string_pretty(&report).unwrap());
+        match serde_json::to_string_pretty(&report) {
+            Ok(json) => println!("{json}"),
+            Err(e) => ui::error(&format!("failed to serialize JSON report: {e}")),
+        }
     } else {
         let outcomes = benchmark_outcomes_from_suites(&json_suites);
         #[cfg(feature = "tui")]
