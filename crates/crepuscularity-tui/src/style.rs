@@ -492,3 +492,81 @@ fn split_color_shade(s: &str) -> (&str, Option<u16>) {
     }
     (s, None)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_classes_happy_path() {
+        let classes = vec![
+            "bg-red-500".to_string(),
+            "text-white".to_string(),
+            "font-bold".to_string(),
+            "p-2".to_string(),
+            "w-full".to_string(),
+            "flex-col".to_string(),
+            "border".to_string(),
+            "gap-2".to_string(),
+        ];
+
+        let hints = parse_classes(&classes);
+
+        assert_eq!(hints.bg, Some(Color::Red));
+        assert_eq!(hints.fg, Some(Color::White));
+        assert!(hints.modifiers.contains(Modifier::BOLD));
+        assert_eq!(hints.padding.left, 2);
+        assert_eq!(hints.padding.right, 2);
+        assert_eq!(hints.padding.top, 2);
+        assert_eq!(hints.padding.bottom, 2);
+        assert_eq!(hints.direction, Direction::Vertical);
+        assert_eq!(hints.borders, Borders::ALL);
+        assert_eq!(hints.gap, 2);
+
+        match hints.width {
+            SizeHint::Percentage(100) => {},
+            _ => panic!("Expected width to be Percentage(100)"),
+        }
+    }
+
+    #[test]
+    fn parse_classes_empty_input() {
+        let hints = parse_classes(&[]);
+
+        assert_eq!(hints.bg, None);
+        assert_eq!(hints.fg, None);
+        assert!(hints.modifiers.is_empty());
+        assert_eq!(hints.padding.left, 0);
+        assert_eq!(hints.direction, Direction::Vertical); // default
+        assert_eq!(hints.borders, Borders::NONE);
+        assert_eq!(hints.gap, 0);
+
+        match hints.width {
+            SizeHint::Fill => {},
+            _ => panic!("Expected width to be Fill by default"),
+        }
+    }
+
+    #[test]
+    fn parse_classes_invalid_classes() {
+        let classes = vec![
+            "not-a-tailwind-class".to_string(),
+            "fake-style".to_string(),
+        ];
+
+        let hints = parse_classes(&classes);
+
+        assert_eq!(hints.bg, None);
+        assert_eq!(hints.fg, None);
+        assert!(hints.modifiers.is_empty());
+        assert_eq!(hints.padding.left, 0);
+        assert_eq!(hints.direction, Direction::Vertical); // default
+        assert_eq!(hints.borders, Borders::NONE);
+        assert_eq!(hints.gap, 0);
+
+        match hints.width {
+            SizeHint::Fill => {},
+            _ => panic!("Expected width to be Fill by default"),
+        }
+    }
+}
