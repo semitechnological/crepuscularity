@@ -10,7 +10,7 @@ use crate::bridge::Bridge;
 use crate::host_queue::{DeferredWindowDecorations, HostDeferred};
 
 /// Apply deferred window operations queued by native plugins (e.g. [`WindowPlugin`](crate::plugins::WindowPlugin)).
-/// Call this on the **UI thread** after [`V8Host::eval`](crate::v8_host::V8Host::eval) (or any work that may have invoked `Crepus.invoke`).
+/// Call this on the **UI thread** after [`V8Host::eval`](crate::V8Host) (or any work that may have invoked `Crepus.invoke`).
 pub fn apply_window_deferred(bridge: &Bridge, window: &mut Window) -> Option<String> {
     let mut latest_title = None;
     for cmd in bridge.drain_host_commands() {

@@ -36,7 +36,7 @@ pub struct CrepusLiteConfig {
     /// Used to load a shared library ahead of the guest body.
     #[serde(default)]
     pub guest_prelude: Vec<String>,
-    /// Relative path (from config base dir) to a UTF-8 script executed with [`V8Host::eval`](crate::v8_host::V8Host).
+    /// Relative path (from config base dir) to a UTF-8 script executed with [`V8Host::eval`](crate::V8Host).
     pub guest_entry: Option<String>,
     /// Optional development entry. When `CREPUS_LITE_MODE=dev`, this path is preferred over
     /// [`Self::guest_entry`] and may point at TypeScript / TSX that is transpiled in-process by Oxc.

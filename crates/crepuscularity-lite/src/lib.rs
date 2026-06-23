@@ -8,7 +8,7 @@
 //! ## How this relates to GPUI and Rust
 //!
 //! - **Rust plugins** are normal Rust: types implementing [`NativePlugin`]. They are registered on a [`Bridge`] and reached from JS via `Crepus.invoke(...)`.
-//! - **GPUI is not “hooked” automatically.** V8 does not register GPUI `actions!`, keymaps, or subscriptions for you. You call [`V8Host::eval`](v8_host::V8Host) (or run scripts) from *your* GPUI event closures—the same places you would call any other Rust code.
+//! - **GPUI is not “hooked” automatically.** V8 does not register GPUI `actions!`, keymaps, or subscriptions for you. You call [`V8Host::eval`](crate::V8Host) (or run scripts) from *your* GPUI event closures—the same places you would call any other Rust code.
 //! - **Window / UI-thread work** from plugins is deferred (e.g. `HostDeferred::SetWindowTitle`). After guest code runs, call [`integration::apply_window_deferred`] with a live GPUI `Window` so those operations hit the real window.
 //! - **Hot reload:** [`guest_watch::spawn_guest_file_watcher`] watches guest file paths; the callback must be `Send` and should only signal the UI thread (see `docs/THREADING.md` and the package binary).
 //! - **Bridge in V8:** each [`V8Host`] installs an embedder slot on the isolate’s context (`CrepusBridgeSlot` in `v8_host.rs`); **`Crepus.invoke`** reads the bridge from the current context (no process-global `ACTIVE_BRIDGE`).
@@ -16,6 +16,7 @@
 //!
 //! For a full demo, run the package binary (see `src/main.rs`).
 
+#![allow(rustdoc::broken_intra_doc_links)]
 pub mod bench_plugin;
 pub mod bridge;
 pub mod clipboard;

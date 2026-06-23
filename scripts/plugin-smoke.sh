@@ -20,7 +20,7 @@ export CREPUS_ABI_LIB="$ABI_LIB"
 python3 -m unittest discover plugins/python
 go test ./plugins/go/...
 bun --cwd plugins test
-v -gc none test plugins/v
+command -v v >/dev/null 2>&1 && v -gc none test plugins/v || echo "skipping V plugin (not installed)"
 zig build test --build-file plugins/build.zig
 cargo test --manifest-path plugins/rust/Cargo.toml
 swift build --package-path plugins

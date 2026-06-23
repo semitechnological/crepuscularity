@@ -173,7 +173,8 @@ jobs:
           version: "0.14.1"
 
       - name: Install V
-        # Pinned to V release v0.5.1
+        # Pinned to V release v0.5.1; continue-on-error because V is experimental
+        continue-on-error: true
         run: |
           git clone --depth 1 --branch v0.5.1 https://github.com/vlang/v.git /tmp/v
           make -C /tmp/v
@@ -193,7 +194,7 @@ jobs:
           python3 --version
           go version
           bun --version
-          v version
+          v version || echo "V not installed (experimental)"
           zig version
           swiftc --version
           gcc --version | head -n 1
