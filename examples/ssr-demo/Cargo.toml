@@ -4,6 +4,7 @@
 name = "ssr-demo"
 version = "0.1.0"
 edition = "2021"
+license = "MPL-2.0"
 
 [[bin]]
 name = "ssr-demo"

@@ -2,6 +2,7 @@
 name = "docs_site_renderer"
 version = "0.1.0"
 edition = "2021"
+license = "MPL-2.0"
 
 [dependencies]
 pulldown-cmark = "0.11"

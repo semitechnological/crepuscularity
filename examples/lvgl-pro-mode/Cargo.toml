@@ -6,4 +6,4 @@ license = "MPL-2.0"
 publish = false
 
 [dependencies]
-crepuscularity = { path = "../../crates/crepuscularity" }
+crepuscularity = { path = "../../crates/crepuscularity", version = "0.4.6" }
