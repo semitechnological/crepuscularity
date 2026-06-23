@@ -46,12 +46,12 @@ impl HostCommandQueue {
     pub fn push(&self, cmd: HostDeferred) {
         self.inner
             .lock()
-            .expect("HostCommandQueue mutex poisoned")
+            .unwrap_or_else(|e| e.into_inner())
             .push(cmd);
     }
 
     pub fn drain(&self) -> Vec<HostDeferred> {
-        let mut g = self.inner.lock().expect("HostCommandQueue mutex poisoned");
+        let mut g = self.inner.lock().unwrap_or_else(|e| e.into_inner());
         std::mem::take(&mut *g)
     }
 }

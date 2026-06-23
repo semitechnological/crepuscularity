@@ -29,6 +29,11 @@ use crepuscularity_native::{
 use serde::Deserialize;
 use serde_json::{json, Value};
 
+/// Maximum accepted JSON payload size (10 MB) for ABI inputs.
+const MAX_JSON_SIZE: usize = 10 * 1024 * 1024;
+/// Maximum number of files accepted in a `set_files_json` bundle.
+const MAX_FILES: usize = 10_000;
+
 // Safety: all `#[no_mangle] extern "C"` functions validate null pointers before
 // dereferencing. The `session` pointer passed to every function except
 // `crepus_session_new` MUST have been returned by `crepus_session_new` and MUST
@@ -127,9 +132,15 @@ pub extern "C" fn crepus_session_set_files_json(
     files_json_utf8: *const c_char,
 ) -> i32 {
     with_session(session, |session| {
-        let raw = read_required(files_json_utf8, "files_json")?;
+        let raw = read_required_json(files_json_utf8, "files_json")?;
         let env: FilesEnvelope =
             serde_json::from_str(&raw).map_err(|e| format!("files JSON: {e}"))?;
+        if env.files.len() > MAX_FILES {
+            return Err(format!(
+                "files JSON contains {} entries (max {MAX_FILES})",
+                env.files.len()
+            ));
+        }
         session.source = Some(Source::Files {
             entry: env.entry,
             files: env.files,
@@ -144,7 +155,7 @@ pub extern "C" fn crepus_session_set_context_json(
     context_json_utf8: *const c_char,
 ) -> i32 {
     with_session(session, |session| {
-        let raw = read_required(context_json_utf8, "context_json")?;
+        let raw = read_required_json(context_json_utf8, "context_json")?;
         let value: Value = serde_json::from_str(&raw).map_err(|e| format!("context JSON: {e}"))?;
         let mut ctx = TemplateContext::new();
         merge_json_ctx(&value, &mut ctx)?;
@@ -159,7 +170,7 @@ pub extern "C" fn crepus_session_apply_context_patch_json(
     context_json_utf8: *const c_char,
 ) -> i32 {
     with_session(session, |session| {
-        let raw = read_required(context_json_utf8, "context_json")?;
+        let raw = read_required_json(context_json_utf8, "context_json")?;
         let value: Value = serde_json::from_str(&raw).map_err(|e| format!("context JSON: {e}"))?;
         merge_json_ctx(&value, &mut session.context)?;
         Ok(())
@@ -251,7 +262,7 @@ fn dispatch_event(
     session: &mut CrepusSession,
     event_json_utf8: *const c_char,
 ) -> Result<String, String> {
-    let raw = read_required(event_json_utf8, "event_json")?;
+    let raw = read_required_json(event_json_utf8, "event_json")?;
     let event = parse_event(&raw)?;
 
     if let Some(context) = &event.context {
@@ -370,6 +381,18 @@ where
 
 fn read_required(ptr: *const c_char, label: &str) -> Result<String, String> {
     read_optional(ptr).ok_or_else(|| format!("{label} pointer is null"))
+}
+
+/// Read a required JSON string and enforce the maximum payload size.
+fn read_required_json(ptr: *const c_char, label: &str) -> Result<String, String> {
+    let raw = read_required(ptr, label)?;
+    if raw.len() > MAX_JSON_SIZE {
+        return Err(format!(
+            "{label} exceeds {MAX_JSON_SIZE} byte limit (got {})",
+            raw.len()
+        ));
+    }
+    Ok(raw)
 }
 
 fn read_optional(ptr: *const c_char) -> Option<String> {

@@ -168,7 +168,7 @@ impl DownloadPlugin {
             let mut guard = self
                 .manager
                 .lock()
-                .expect("download manager mutex poisoned");
+                .unwrap_or_else(|e| e.into_inner());
             let task = guard.insert(task);
             let _ = std::fs::create_dir_all(Self::task_dir());
             task
@@ -209,7 +209,7 @@ impl DownloadPlugin {
             .map_err(|e| format!("client build failed: {e}"))?;
 
         let (url, output_path) = {
-            let mut t = task.lock().expect("download task mutex poisoned");
+            let mut t = task.lock().unwrap_or_else(|e| e.into_inner());
             t.status = STATUS_ACTIVE.to_string();
             t.error = None;
             (t.url.clone(), t.output_path.clone())
@@ -301,7 +301,7 @@ impl DownloadPlugin {
         let mut last_completed = existing_len;
         loop {
             let (paused, removed) = {
-                let t = task.lock().expect("download task mutex poisoned");
+                let t = task.lock().unwrap_or_else(|e| e.into_inner());
                 (t.paused, t.removed)
             };
             if removed {
@@ -410,7 +410,7 @@ impl DownloadPlugin {
         self.start_download(task.clone());
         let snapshot = task
             .lock()
-            .expect("download task mutex poisoned")
+            .unwrap_or_else(|e| e.into_inner())
             .snapshot();
         Ok(snapshot)
     }
@@ -419,7 +419,7 @@ impl DownloadPlugin {
         let guard = self
             .manager
             .lock()
-            .expect("download manager mutex poisoned");
+            .unwrap_or_else(|e| e.into_inner());
         Ok(json!({ "revision": guard.revision, "tasks": guard.snapshot() }))
     }
 
@@ -434,7 +434,7 @@ impl DownloadPlugin {
         let guard = self
             .manager
             .lock()
-            .expect("download manager mutex poisoned");
+            .unwrap_or_else(|e| e.into_inner());
         let task = guard.get(gid).ok_or_else(|| {
             BridgeError::new("not_found", format!("unknown download gid {gid:?}"))
         })?;
@@ -458,7 +458,7 @@ impl DownloadPlugin {
         let guard = self
             .manager
             .lock()
-            .expect("download manager mutex poisoned");
+            .unwrap_or_else(|e| e.into_inner());
         let task = guard.get(gid).ok_or_else(|| {
             BridgeError::new("not_found", format!("unknown download gid {gid:?}"))
         })?;
@@ -484,7 +484,7 @@ impl DownloadPlugin {
         let guard = self
             .manager
             .lock()
-            .expect("download manager mutex poisoned");
+            .unwrap_or_else(|e| e.into_inner());
         let task = guard.get(gid).ok_or_else(|| {
             BridgeError::new("not_found", format!("unknown download gid {gid:?}"))
         })?;

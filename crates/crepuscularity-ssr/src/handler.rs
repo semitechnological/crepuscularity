@@ -3,6 +3,14 @@ use crepuscularity_core::{TemplateContext, TemplateValue};
 use crepuscularity_web::{render_ssr_document, SsrDocument};
 use std::{collections::HashMap, sync::Arc};
 
+/// Escape HTML special characters in error messages before injecting into HTML.
+fn escape_html_error(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+}
+
 #[derive(Clone)]
 pub struct SsrOptions {
     /// Template source string (content of a .crepus file).
@@ -46,7 +54,7 @@ impl SsrHandler {
 
         match html {
             Ok(page) => Html(page),
-            Err(e) => Html(format!("<pre style='color:red'>{e}</pre>")),
+            Err(e) => Html(format!("<pre style='color:red'>{}</pre>", escape_html_error(&e))),
         }
     }
 }

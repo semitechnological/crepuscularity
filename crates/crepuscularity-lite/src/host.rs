@@ -172,7 +172,7 @@ impl HostState {
 
     pub fn render_tree(&self, mut tree: HostNode) -> HostSnapshot {
         normalize_host_tree_classes(&mut tree);
-        let mut inner = self.inner.lock().expect("host state mutex poisoned");
+        let mut inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
         inner.tree = Some(tree);
         inner.render_count += 1;
         if inner.navigation.is_empty() {
@@ -185,19 +185,19 @@ impl HostState {
     }
 
     pub fn snapshot(&self) -> HostSnapshot {
-        let inner = self.inner.lock().expect("host state mutex poisoned");
+        let inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
         snapshot_from_inner(&inner)
     }
 
     pub fn navigation_push(&self, route: HostRoute) -> HostSnapshot {
-        let mut inner = self.inner.lock().expect("host state mutex poisoned");
+        let mut inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
         ensure_root_route(&mut inner);
         inner.navigation.push(route);
         snapshot_from_inner(&inner)
     }
 
     pub fn navigation_replace(&self, route: HostRoute) -> HostSnapshot {
-        let mut inner = self.inner.lock().expect("host state mutex poisoned");
+        let mut inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
         ensure_root_route(&mut inner);
         if inner.navigation.is_empty() {
             inner.navigation.push(route);
@@ -208,7 +208,7 @@ impl HostState {
     }
 
     pub fn navigation_pop(&self) -> HostSnapshot {
-        let mut inner = self.inner.lock().expect("host state mutex poisoned");
+        let mut inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
         ensure_root_route(&mut inner);
         if inner.navigation.len() > 1 {
             inner.navigation.pop();
@@ -217,29 +217,29 @@ impl HostState {
     }
 
     pub fn storage_get(&self, key: &str) -> Option<Value> {
-        let inner = self.inner.lock().expect("host state mutex poisoned");
+        let inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
         inner.storage.get(key).cloned()
     }
 
     pub fn storage_set(&self, key: impl Into<String>, value: Value) -> HostSnapshot {
-        let mut inner = self.inner.lock().expect("host state mutex poisoned");
+        let mut inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
         inner.storage.insert(key.into(), value);
         snapshot_from_inner(&inner)
     }
 
     pub fn storage_remove(&self, key: &str) -> HostSnapshot {
-        let mut inner = self.inner.lock().expect("host state mutex poisoned");
+        let mut inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
         inner.storage.remove(key);
         snapshot_from_inner(&inner)
     }
 
     pub fn record_event(&self, event: HostEventRecord) {
-        let mut inner = self.inner.lock().expect("host state mutex poisoned");
+        let mut inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
         inner.last_event = Some(event);
     }
 
     pub fn channel_send(&self, channel: impl Into<String>, message: Value) -> HostSnapshot {
-        let mut inner = self.inner.lock().expect("host state mutex poisoned");
+        let mut inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
         inner
             .channels
             .entry(channel.into())
@@ -249,7 +249,7 @@ impl HostState {
     }
 
     pub fn channel_poll(&self, channel: &str) -> Option<Value> {
-        let mut inner = self.inner.lock().expect("host state mutex poisoned");
+        let mut inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
         let queue = inner.channels.get_mut(channel)?;
         if queue.is_empty() {
             None
