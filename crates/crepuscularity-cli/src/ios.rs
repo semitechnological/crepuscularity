@@ -506,10 +506,15 @@ fn run_xcodebuild(
         ));
     });
 
+    let proj_name = proj
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or_else(|| ui::error("invalid .xcodeproj filename"));
+
     let mut cmd = Command::new("xcodebuild");
     cmd.current_dir(dir).args([
         "-project",
-        proj.file_name().unwrap().to_str().unwrap(),
+        proj_name,
         "-scheme",
         scheme,
         "-destination",
