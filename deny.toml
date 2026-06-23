@@ -4,8 +4,8 @@ all-features = true
 [advisories]
 version = 2
 yanked = "warn"
-unmaintained = "workspace"
-unsound = "workspace"
+unmaintained = "warn"
+unsound = "warn"
 
 [licenses]
 version = 2
@@ -23,6 +23,7 @@ allow = [
     "MPL-2.0",
     "NCSA",
     "Unicode-3.0",
+    "Unicode-DFS-2016",
     "Zlib",
 ]
 confidence-threshold = 0.8
@@ -30,7 +31,7 @@ exceptions = []
 
 [bans]
 multiple-versions = "warn"
-wildcards = "warn"
+wildcards = "deny"
 
 [sources]
 unknown-registry = "deny"
