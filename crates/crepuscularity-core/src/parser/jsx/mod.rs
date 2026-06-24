@@ -44,9 +44,7 @@ fn count_max_tag_nesting(src: &str) -> usize {
         if bytes[i] == b'<' {
             // Check for closing tag `</`
             if i + 1 < bytes.len() && bytes[i + 1] == b'/' {
-                if depth > 0 {
-                    depth -= 1;
-                }
+                depth = depth.saturating_sub(1);
                 i += 2;
                 continue;
             }
@@ -68,9 +66,7 @@ fn count_max_tag_nesting(src: &str) -> usize {
             }
         } else if bytes[i] == b'>' && i > 0 && bytes[i - 1] == b'/' {
             // Self-closing tag `/>` — pop the depth we just pushed.
-            if depth > 0 {
-                depth -= 1;
-            }
+            depth = depth.saturating_sub(1);
         }
         i += 1;
     }
