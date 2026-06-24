@@ -44,7 +44,8 @@ use crepuscularity_web::render_from_files;
 use axum::extract::State;
 
 use crate::crepus_toml::WebTargetMeta;
-use crate::web::{    ensure_web_dev_artifacts, load_site_head, merge_site_head_meta, merged_site_google_fonts,
+use crate::web::{
+    ensure_web_dev_artifacts, load_site_head, merge_site_head_meta, merged_site_google_fonts,
     merged_site_inline_css, render_index_html,
 };
 use crate::web_docs_hook::{docs_src_path, run_docs_hook, DocsHookTheme};
@@ -171,15 +172,15 @@ const RELOAD_SCRIPT: &str = "<script>
 
 // ── Startup validation ───────────────────────────────────────────────────────
 
-/// Recursively collect `.crepus` file paths under `dir`, relative to `base`.
-fn walk_crepus_files(base: &Path, dir: &Path, out: &mut Vec<PathBuf>) {
+/// Recursively collect `.crepus` file paths under `dir`.
+fn walk_crepus_files(dir: &Path, out: &mut Vec<PathBuf>) {
     let Ok(entries) = std::fs::read_dir(dir) else {
         return;
     };
     for entry in entries.flatten() {
         let path = entry.path();
         if path.is_dir() {
-            walk_crepus_files(base, &path, out);
+            walk_crepus_files(&path, out);
         } else if path.extension().and_then(|x| x.to_str()) == Some("crepus") {
             out.push(path);
         }
@@ -191,7 +192,7 @@ fn validate_templates(site_dir: &std::path::Path) {
     use crepuscularity_core::parser::parse_template;
     let mut found = false;
     let mut files = Vec::new();
-    walk_crepus_files(site_dir, site_dir, &mut files);
+    walk_crepus_files(site_dir, &mut files);
     for path in &files {
         found = true;
         let rel = path.strip_prefix(site_dir).unwrap_or(path);
@@ -1260,7 +1261,7 @@ async fn sse_handler(
 fn load_vfm(site_dir: &Path) -> Arc<RwLock<HashMap<String, String>>> {
     let mut files = HashMap::new();
     let mut paths = Vec::new();
-    walk_crepus_files(site_dir, site_dir, &mut paths);
+    walk_crepus_files(site_dir, &mut paths);
     for path in &paths {
         let rel = path
             .strip_prefix(site_dir)
@@ -1308,7 +1309,7 @@ fn watch_crepus_files(
             let mut files = vfm.write().unwrap_or_else(|e| e.into_inner());
             files.clear();
             let mut paths = Vec::new();
-            walk_crepus_files(site_dir, site_dir, &mut paths);
+            walk_crepus_files(site_dir, &mut paths);
             for path in &paths {
                 let rel = path
                     .strip_prefix(site_dir)
