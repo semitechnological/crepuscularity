@@ -208,7 +208,11 @@ div
         let dir = tempfile::tempdir().unwrap();
 
         let root_file = dir.path().join("root.crepus");
-        std::fs::write(&root_file, "div on-click={browser.storage.local.get('key')}").unwrap();
+        std::fs::write(
+            &root_file,
+            "div on-click={browser.storage.local.get('key')}",
+        )
+        .unwrap();
 
         let non_crepus_file = dir.path().join("ignored.txt");
         std::fs::write(&non_crepus_file, "browser.tabs").unwrap();

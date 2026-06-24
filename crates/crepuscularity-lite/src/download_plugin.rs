@@ -410,10 +410,7 @@ impl DownloadPlugin {
     }
 
     fn handle_list(&self, _payload: &Value) -> Result<Value, BridgeError> {
-        let guard = self
-            .manager
-            .lock()
-            .unwrap_or_else(|e| e.into_inner());
+        let guard = self.manager.lock().unwrap_or_else(|e| e.into_inner());
         Ok(json!({ "revision": guard.revision, "tasks": guard.snapshot() }))
     }
 
@@ -425,10 +422,7 @@ impl DownloadPlugin {
                 payload.clone(),
             )
         })?;
-        let guard = self
-            .manager
-            .lock()
-            .unwrap_or_else(|e| e.into_inner());
+        let guard = self.manager.lock().unwrap_or_else(|e| e.into_inner());
         let task = guard.get(gid).ok_or_else(|| {
             BridgeError::new("not_found", format!("unknown download gid {gid:?}"))
         })?;
@@ -449,10 +443,7 @@ impl DownloadPlugin {
                 payload.clone(),
             )
         })?;
-        let guard = self
-            .manager
-            .lock()
-            .unwrap_or_else(|e| e.into_inner());
+        let guard = self.manager.lock().unwrap_or_else(|e| e.into_inner());
         let task = guard.get(gid).ok_or_else(|| {
             BridgeError::new("not_found", format!("unknown download gid {gid:?}"))
         })?;
@@ -475,10 +466,7 @@ impl DownloadPlugin {
                 payload.clone(),
             )
         })?;
-        let guard = self
-            .manager
-            .lock()
-            .unwrap_or_else(|e| e.into_inner());
+        let guard = self.manager.lock().unwrap_or_else(|e| e.into_inner());
         let task = guard.get(gid).ok_or_else(|| {
             BridgeError::new("not_found", format!("unknown download gid {gid:?}"))
         })?;

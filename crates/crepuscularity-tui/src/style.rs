@@ -573,7 +573,7 @@ mod tests {
         assert_eq!(hints.gap, 2);
 
         match hints.width {
-            SizeHint::Percentage(100) => {},
+            SizeHint::Percentage(100) => {}
             _ => panic!("Expected width to be Percentage(100)"),
         }
     }
@@ -591,17 +591,14 @@ mod tests {
         assert_eq!(hints.gap, 0);
 
         match hints.width {
-            SizeHint::Fill => {},
+            SizeHint::Fill => {}
             _ => panic!("Expected width to be Fill by default"),
         }
     }
 
     #[test]
     fn parse_classes_invalid_classes() {
-        let classes = vec![
-            "not-a-tailwind-class".to_string(),
-            "fake-style".to_string(),
-        ];
+        let classes = vec!["not-a-tailwind-class".to_string(), "fake-style".to_string()];
 
         let hints = parse_classes(&classes);
 
@@ -614,7 +611,7 @@ mod tests {
         assert_eq!(hints.gap, 0);
 
         match hints.width {
-            SizeHint::Fill => {},
+            SizeHint::Fill => {}
             _ => panic!("Expected width to be Fill by default"),
         }
     }

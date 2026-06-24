@@ -39,7 +39,9 @@ pub async fn stream_ssr_response(
         .status(StatusCode::OK)
         .header("content-type", "text/html; charset=utf-8")
         .body(body)
-        .unwrap_or_else(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error").into_response())
+        .unwrap_or_else(|_| {
+            (StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error").into_response()
+        })
 }
 
 /// Convenience wrapper that accepts a `&'static str` template and renders with an empty context.

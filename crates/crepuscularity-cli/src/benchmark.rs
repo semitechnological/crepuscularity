@@ -1107,7 +1107,10 @@ fn run_shell(
         }
 
         let mut cmd = Command::new("cmd");
-        cmd.arg("/C").arg(bat_path.as_os_str()).current_dir(workdir).envs(envs);
+        cmd.arg("/C")
+            .arg(bat_path.as_os_str())
+            .current_dir(workdir)
+            .envs(envs);
         let _measure_memory = measure_memory; // RSS sampling not implemented on Windows
 
         let res = if inherit_io {
