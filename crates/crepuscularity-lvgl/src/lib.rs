@@ -122,7 +122,11 @@ struct XmlNode {
     children: Vec<XmlNode>,
 }
 
-fn render_nodes_list(nodes: &[Node], ctx: &TemplateContext, depth: usize) -> Result<Vec<XmlNode>, CrepusError> {
+fn render_nodes_list(
+    nodes: &[Node],
+    ctx: &TemplateContext,
+    depth: usize,
+) -> Result<Vec<XmlNode>, CrepusError> {
     let mut ctx = ctx.clone();
     let mut out = Vec::new();
     for node in nodes {
@@ -181,7 +185,11 @@ fn render_nodes_list(nodes: &[Node], ctx: &TemplateContext, depth: usize) -> Res
     Ok(out)
 }
 
-fn render_match(block: &MatchBlock, ctx: &TemplateContext, depth: usize) -> Result<Vec<XmlNode>, CrepusError> {
+fn render_match(
+    block: &MatchBlock,
+    ctx: &TemplateContext,
+    depth: usize,
+) -> Result<Vec<XmlNode>, CrepusError> {
     let value = value_to_str(&eval_expr(&block.expr, ctx)?);
     for arm in &block.arms {
         let pattern = arm.pattern.trim();
@@ -197,7 +205,11 @@ fn render_match(block: &MatchBlock, ctx: &TemplateContext, depth: usize) -> Resu
     Ok(Vec::new())
 }
 
-fn render_element(el: &Element, ctx: &TemplateContext, depth: usize) -> Result<XmlNode, CrepusError> {
+fn render_element(
+    el: &Element,
+    ctx: &TemplateContext,
+    depth: usize,
+) -> Result<XmlNode, CrepusError> {
     if el.tag == "slot" {
         let children = if let Some((nodes, slot_ctx)) = &ctx.slot {
             render_nodes_list(nodes, slot_ctx, depth)?

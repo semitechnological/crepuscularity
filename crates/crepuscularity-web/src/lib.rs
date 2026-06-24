@@ -293,7 +293,11 @@ fn template_value_to_json(value: &TemplateValue) -> serde_json::Value {
     }
 }
 
-fn render_element(el: &Element, ctx: &TemplateContext, depth: usize) -> Result<String, CrepusError> {
+fn render_element(
+    el: &Element,
+    ctx: &TemplateContext,
+    depth: usize,
+) -> Result<String, CrepusError> {
     if el.tag == "slot" {
         return if let Some((slot_nodes, slot_ctx)) = &ctx.slot {
             render_nodes_with_ctx(slot_nodes, None, slot_ctx, depth)
@@ -465,7 +469,11 @@ fn render_if(block: &IfBlock, ctx: &TemplateContext, depth: usize) -> Result<Str
     }
 }
 
-fn render_for(block: &ForBlock, ctx: &TemplateContext, depth: usize) -> Result<String, CrepusError> {
+fn render_for(
+    block: &ForBlock,
+    ctx: &TemplateContext,
+    depth: usize,
+) -> Result<String, CrepusError> {
     let items = ctx.get_list_ref(&block.iterator);
     let mut out = String::new();
     let pattern = block.pattern.trim();
@@ -489,13 +497,22 @@ fn render_for(block: &ForBlock, ctx: &TemplateContext, depth: usize) -> Result<S
                     .insert(pattern.to_string(), TemplateValue::Scope(item_ctx.clone()));
             }
         }
-        out.push_str(&render_nodes_with_ctx(&block.body, None, &child_ctx, depth)?);
+        out.push_str(&render_nodes_with_ctx(
+            &block.body,
+            None,
+            &child_ctx,
+            depth,
+        )?);
     }
 
     Ok(out)
 }
 
-fn render_match(block: &MatchBlock, ctx: &TemplateContext, depth: usize) -> Result<String, CrepusError> {
+fn render_match(
+    block: &MatchBlock,
+    ctx: &TemplateContext,
+    depth: usize,
+) -> Result<String, CrepusError> {
     let val = eval_expr(&block.expr, ctx)?;
     let value = value_to_str(&val);
 
@@ -533,7 +550,11 @@ pub(crate) fn read_file(ctx: &TemplateContext, path: &Path) -> Result<String, Cr
     }
 }
 
-fn render_include(inc: &IncludeNode, ctx: &TemplateContext, depth: usize) -> Result<String, CrepusError> {
+fn render_include(
+    inc: &IncludeNode,
+    ctx: &TemplateContext,
+    depth: usize,
+) -> Result<String, CrepusError> {
     if depth >= MAX_INCLUDE_DEPTH {
         return Err(CrepusError::render(format!(
             "maximum include depth ({MAX_INCLUDE_DEPTH}) exceeded; possible circular include involving '{}'",

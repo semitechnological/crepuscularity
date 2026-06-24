@@ -117,7 +117,10 @@ impl SsrHandler {
 
         match html {
             Ok(page) => Html(page),
-            Err(e) => Html(format!("<pre style='color:red'>{}</pre>", escape_html_error(&e))),
+            Err(e) => Html(format!(
+                "<pre style='color:red'>{}</pre>",
+                escape_html_error(&e)
+            )),
         }
     }
 }

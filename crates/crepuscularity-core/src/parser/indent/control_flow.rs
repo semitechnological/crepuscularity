@@ -2,10 +2,10 @@
 
 use crate::ast::*;
 
+use super::super::RawParseError;
 use super::attrs::merge_attr_only_children;
 use super::element::{parse_element_line, parse_text_template};
 use super::include::{try_parse_embed, try_parse_include};
-use super::super::RawParseError;
 
 /// Maximum nesting depth for recursive `parse_nodes` calls.
 /// Prevents stack overflow on pathologically deep input.
@@ -170,7 +170,8 @@ fn parse_if_node_with_depth(
             i += 1;
             if i < lines.len() && lines[i].0 > expected_indent {
                 let else_indent = lines[i].0;
-                let (else_nodes, next_i) = parse_nodes_with_depth(lines, i, else_indent, depth + 1)?;
+                let (else_nodes, next_i) =
+                    parse_nodes_with_depth(lines, i, else_indent, depth + 1)?;
                 i = next_i;
                 Some(else_nodes)
             } else {
@@ -183,7 +184,8 @@ fn parse_if_node_with_depth(
                 .to_string();
             let mut patched = lines.to_vec();
             patched[i].1 = rewritten;
-            let (else_if_node, next_i) = parse_if_node_with_depth(&patched, i, expected_indent, depth + 1)?;
+            let (else_if_node, next_i) =
+                parse_if_node_with_depth(&patched, i, expected_indent, depth + 1)?;
             i = next_i;
             Some(vec![else_if_node])
         } else {
