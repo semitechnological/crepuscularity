@@ -3,7 +3,7 @@
 //! Threading: see `docs/THREADING.md` in the repo root.
 
 use std::collections::{HashMap, HashSet};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
@@ -73,6 +73,9 @@ pub struct Bridge {
     quit_requested: Arc<AtomicBool>,
     host_queue: Arc<HostCommandQueue>,
     host_state: Arc<HostState>,
+    // ponytail: simple invoke counter prevents runaway calls
+    invoke_count: AtomicU64,
+    max_invocations: u64,
 }
 
 impl Bridge {
@@ -116,6 +119,8 @@ impl Bridge {
             quit_requested: quit,
             host_queue,
             host_state,
+            invoke_count: AtomicU64::new(0),
+            max_invocations: 10_000,
         })
     }
 
@@ -172,6 +177,8 @@ impl Bridge {
             quit_requested: quit,
             host_queue,
             host_state,
+            invoke_count: AtomicU64::new(0),
+            max_invocations: 10_000,
         })
     }
 

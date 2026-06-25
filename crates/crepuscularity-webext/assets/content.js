@@ -283,9 +283,9 @@
   }
 
   function sanitizeHTML(html) {
+    // ponytail: build DOM nodes directly, no innerHTML serialization = no mXSS
     const parser = new DOMParser();
     const doc = parser.parseFromString(html, "text/html");
-    const elements = doc.body.querySelectorAll("*");
 
     const ALLOWED_TAGS = new Set([
       "DIV", "SPAN", "P", "B", "I", "EM", "STRONG", "A", "UL", "OL", "LI",
@@ -293,21 +293,19 @@
       "TBODY", "TR", "TH", "TD", "BLOCKQUOTE", "PRE", "CODE"
     ]);
 
-    for (const el of elements) {
-      const nodeName = el.nodeName.toUpperCase();
-      if (!ALLOWED_TAGS.has(nodeName)) {
-        el.remove();
-        continue;
-      }
+    function cleanNode(node) {
+      if (node.nodeType === Node.TEXT_NODE) return node.cloneNode();
+      if (node.nodeType !== Node.ELEMENT_NODE) return null;
 
-      for (const attr of [...el.attributes]) {
+      const nodeName = node.nodeName.toUpperCase();
+      if (!ALLOWED_TAGS.has(nodeName)) return null;
+
+      const clone = document.createElement(nodeName);
+      for (const attr of node.attributes) {
         const name = attr.name.toLowerCase();
         const value = attr.value.trim().toLowerCase();
 
-        if (name.startsWith("on")) {
-          el.removeAttribute(attr.name);
-          continue;
-        }
+        if (name.startsWith("on")) continue;
 
         if (name === "href" || name === "src") {
           const isSafeUrl = value.startsWith("http://") ||
@@ -315,13 +313,24 @@
                             value.startsWith("mailto:") ||
                             value.startsWith("#") ||
                             value.startsWith("/") && !value.startsWith("//");
-          if (!isSafeUrl) {
-            el.removeAttribute(attr.name);
-          }
+          if (!isSafeUrl) continue;
         }
+        clone.setAttribute(attr.name, attr.value);
       }
+
+      for (const child of node.childNodes) {
+        const cleaned = cleanNode(child);
+        if (cleaned) clone.appendChild(cleaned);
+      }
+      return clone;
     }
-    return doc.body.innerHTML;
+
+    const fragment = document.createDocumentFragment();
+    for (const child of doc.body.childNodes) {
+      const cleaned = cleanNode(child);
+      if (cleaned) fragment.appendChild(cleaned);
+    }
+    return fragment;
   }
 
   function createInlineAnywhereMount(widget) {
@@ -352,7 +361,7 @@
     style.textContent = `${INLINE_HOST_CSS}${parts.css || ""}`;
     const root = document.createElement("div");
     root.className = "aa-widget-root";
-    root.innerHTML = sanitizeHTML(html);
+    root.appendChild(sanitizeHTML(html));
     shadow.append(style, root);
     return host;
   }
