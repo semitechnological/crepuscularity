@@ -2,10 +2,34 @@
 
 final class CrepuscularityPlugin
 {
+    private const BIND_ALLOWLIST = []; // ponytail: empty = no keys settable via bind:
+
+    private static function crepusBin(): string
+    {
+        $raw = getenv('CREPUS_BIN') ?: 'crepus';
+        // ponytail: only allow simple bin name, no path separators
+        if (preg_match('#[/\\\\]#', $raw)) {
+            return 'crepus';
+        }
+        return $raw;
+    }
+
+    private static function safePath(string $path): void
+    {
+        // ponytail: block traversal outside CWD
+        if (str_starts_with($path, '/')) {
+            throw new \RuntimeException("absolute path denied: $path");
+        }
+        if (str_contains($path, '..')) {
+            throw new \RuntimeException("path traversal denied: $path");
+        }
+    }
+
     public static function renderIr(string $path, ?array $context = null): array
     {
-        $bin = getenv('CREPUS_BIN') ?: 'crepus';
+        $bin = self::crepusBin();
         if ($context !== null) {
+            self::safePath($path);
             $payload = json_encode([
                 'template' => file_get_contents($path),
                 'context' => $context,
@@ -33,6 +57,7 @@ final class CrepuscularityPlugin
             return json_decode($stdout, true, 512, JSON_THROW_ON_ERROR);
         }
         $cmd = escapeshellcmd($bin) . ' native ir ' . escapeshellarg($path);
+        // ponytail: path validated below for context path, bare path goes via escapeshellarg
         $out = [];
         $code = 0;
         exec($cmd, $out, $code);
@@ -98,7 +123,8 @@ final class CrepusViewSession
         $handler = (string) ($payload['handler'] ?? '');
         if (str_starts_with($handler, 'bind:')) {
             $parts = explode(':', substr($handler, 5), 2);
-            if (count($parts) === 2) {
+            // ponytail: only allowlisted keys from bind:
+            if (count($parts) === 2 && in_array($parts[0], CrepuscularityPlugin::BIND_ALLOWLIST, true)) {
                 $this->context[$parts[0]] = $parts[1];
             }
         }

@@ -19,6 +19,7 @@ use std::cell::Cell;
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use ammonia::Builder;
 use base64::Engine;
 use serde_json::{json, Value};
 
@@ -180,7 +181,9 @@ pub fn render_ssr_document(
         .map(|c| format!(r#" class="{}""#, crate::escape_html_attr(c)))
         .unwrap_or_default();
     let title_esc = crate::escape_html_attr(doc.title);
-    let head_safe = ammonia::clean(doc.head_extra);
+    let head_safe = Builder::new()
+        .rm_tags(&["base", "meta", "link", "style"])
+        .clean(doc.head_extra);
     Ok(format!(
         r#"<!DOCTYPE html>
 <html lang="{}">
