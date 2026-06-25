@@ -3,6 +3,40 @@
 #include <cstdlib>
 #include <stdexcept>
 #include <string>
+#include <unistd.h>
+#include <sys/wait.h>
+
+static std::string exec_argv(const char *bin, const char *path) {
+    int pipefd[2];
+    if (pipe(pipefd) == -1) throw std::runtime_error("pipe failed");
+
+    pid_t pid = fork();
+    if (pid == -1) { close(pipefd[0]); close(pipefd[1]); throw std::runtime_error("fork failed"); }
+
+    if (pid == 0) {
+        close(pipefd[0]);
+        dup2(pipefd[1], STDOUT_FILENO);
+        close(pipefd[1]);
+        // ponytail: argv exec, no shell
+        execlp(bin, bin, "native", "ir", path, (char *)nullptr);
+        _exit(127);
+    }
+
+    close(pipefd[1]);
+    std::string result;
+    char buf[4096];
+    ssize_t n;
+    while ((n = read(pipefd[0], buf, sizeof(buf))) > 0) {
+        result.append(buf, n);
+    }
+    close(pipefd[0]);
+    int status;
+    waitpid(pid, &status, 0);
+    if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+        throw std::runtime_error("crepus native ir failed");
+    }
+    return result;
+}
 
 struct ViewIr {
     int version;
@@ -12,19 +46,7 @@ struct ViewIr {
 ViewIr render_ir(const std::string& path) {
     const char* env = std::getenv("CREPUS_BIN");
     std::string bin = env == nullptr ? "crepus" : env;
-    std::string cmd = "\"" + bin + "\" native ir \"" + path + "\"";
-    FILE* pipe = popen(cmd.c_str(), "r");
-    if (pipe == nullptr) {
-        throw std::runtime_error("crepus native ir failed");
-    }
-    std::array<char, 4096> buffer{};
-    std::string json;
-    while (fgets(buffer.data(), static_cast<int>(buffer.size()), pipe) != nullptr) {
-        json += buffer.data();
-    }
-    if (pclose(pipe) != 0) {
-        throw std::runtime_error("crepus native ir failed");
-    }
+    std::string json = exec_argv(bin.c_str(), path.c_str());
     int version = json.find("\"version\":4") != std::string::npos || json.find("\"version\": 4") != std::string::npos ? 4 : -1;
     return {version, json};
 }

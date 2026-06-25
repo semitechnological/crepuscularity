@@ -10,11 +10,10 @@ pub const UiDocument = struct {
 };
 
 pub fn renderIr(allocator: std.mem.Allocator, path: []const u8) !ViewIr {
-    const command = try std.fmt.allocPrint(allocator, "\"${{CREPUS_BIN:-crepus}}\" native ir \"{s}\"", .{path});
-    defer allocator.free(command);
+    // ponytail: argv exec, no shell
     const result = try std.process.Child.run(.{
         .allocator = allocator,
-        .argv = &.{ "/bin/sh", "-c", command },
+        .argv = &.{ "crepus", "native", "ir", path },
     });
     defer allocator.free(result.stderr);
     if (result.term.Exited != 0) return error.CrepusFailed;

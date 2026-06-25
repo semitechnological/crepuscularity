@@ -1,21 +1,37 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+#include <sys/wait.h>
 
 static int crepus_render_ir(const char *path, char *buf, size_t cap) {
     const char *bin = getenv("CREPUS_BIN");
     if (bin == NULL) {
         bin = "crepus";
     }
-    char cmd[4096];
-    snprintf(cmd, sizeof(cmd), "\"%s\" native ir \"%s\"", bin, path);
-    FILE *pipe = popen(cmd, "r");
-    if (pipe == NULL) {
-        return 1;
+    int pipefd[2];
+    if (pipe(pipefd) == -1) return 1;
+
+    pid_t pid = fork();
+    if (pid == -1) { close(pipefd[0]); close(pipefd[1]); return 1; }
+
+    if (pid == 0) {
+        close(pipefd[0]);
+        dup2(pipefd[1], STDOUT_FILENO);
+        close(pipefd[1]);
+        // ponytail: argv exec, no shell
+        execlp(bin, bin, "native", "ir", path, (char *)NULL);
+        _exit(127);
     }
-    size_t n = fread(buf, 1, cap - 1, pipe);
+
+    close(pipefd[1]);
+    ssize_t n = read(pipefd[0], buf, cap - 1);
+    close(pipefd[0]);
+    int status;
+    waitpid(pid, &status, 0);
+    if (n < 0) return 1;
     buf[n] = '\0';
-    return pclose(pipe) == 0 ? 0 : 1;
+    return WIFEXITED(status) && WEXITSTATUS(status) == 0 ? 0 : 1;
 }
 
 static int crepus_render_html(const char *path, char *buf, size_t cap) {
