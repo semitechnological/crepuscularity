@@ -1,5 +1,5 @@
 [contract]
-ir_version = 3
+ir_version = 4
 cli = "crepus native ir"
 abi_header = "crates/crepuscularity-abi/include/crepuscularity_abi.h"
 
@@ -48,12 +48,12 @@ test = "python3 -m unittest discover plugins/python"
 [[package]]
 language = "ruby"
 path = "plugins/ruby"
-test = "ruby -Iplugins/ruby -e 'require \"crepuscularity_plugin\"; raise unless CrepuscularityPlugin.render_ir(\"plugins/fixtures/hello.crepus\").version == 3'"
+test = "ruby -Iplugins/ruby -e 'require \"crepuscularity_plugin\"; raise unless CrepuscularityPlugin.render_ir(\"plugins/fixtures/hello.crepus\").version == 4'"
 
 [[package]]
 language = "php"
 path = "plugins/php"
-test = "php -r 'require \"plugins/php/CrepuscularityPlugin.php\"; if (CrepuscularityPlugin::renderIr(\"plugins/fixtures/hello.crepus\")[\"version\"] !== 3) exit(1);'"
+test = "php -r 'require \"plugins/php/CrepuscularityPlugin.php\"; if (CrepuscularityPlugin::renderIr(\"plugins/fixtures/hello.crepus\")[\"version\"] !== 4) exit(1);'"
 
 [[package]]
 language = "java"

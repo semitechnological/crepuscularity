@@ -30,8 +30,8 @@ gcc plugins/c/abi_smoke.c "$ABI_LIB" -o /tmp/crepus-c-abi-smoke
 /tmp/crepus-c-abi-smoke
 g++ plugins/cpp/crepuscularity_plugin.cpp -std=c++17 -o /tmp/crepus-cpp-smoke
 /tmp/crepus-cpp-smoke plugins/fixtures/hello.crepus
-ruby -Iplugins/ruby -e 'require "crepuscularity_plugin"; raise unless CrepuscularityPlugin.render_ir("plugins/fixtures/hello.crepus").version == 3; raise unless CrepuscularityPlugin.render_html("plugins/fixtures/hello.crepus").include?("data-crepus-kind")'
-php -r 'require "plugins/php/CrepuscularityPlugin.php"; if (CrepuscularityPlugin::renderIr("plugins/fixtures/hello.crepus")["version"] !== 3) exit(1);'
+ruby -Iplugins/ruby -e 'require "crepuscularity_plugin"; raise unless CrepuscularityPlugin.render_ir("plugins/fixtures/hello.crepus").version == 4; raise unless CrepuscularityPlugin.render_html("plugins/fixtures/hello.crepus").include?("data-crepus-kind")'
+php -r 'require "plugins/php/CrepuscularityPlugin.php"; if (CrepuscularityPlugin::renderIr("plugins/fixtures/hello.crepus")["version"] !== 4) exit(1);'
 php -r 'require "plugins/php/CrepuscularityAbi.php"; $s = new CrepuscularityAbiSession(); $s->setTemplate("input bind=count\nspan\n  \"Count {count}\""); $s->setContext(["count" => "1"]); $r = $s->dispatchEvent(["handler" => "bind:count:2"]); if (strpos(json_encode($r), "Count 2") === false) exit(1);'
 javac -d /tmp/crepus-java plugins/java/CrepuscularityPlugin.java
 kotlinc plugins/kotlin/CrepuscularityPlugin.kt -d /tmp/crepus-kotlin
