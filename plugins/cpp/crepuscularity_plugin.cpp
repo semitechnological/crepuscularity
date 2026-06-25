@@ -43,9 +43,16 @@ struct ViewIr {
     std::string json;
 };
 
-ViewIr render_ir(const std::string& path) {
+static std::string crepus_bin() {
     const char* env = std::getenv("CREPUS_BIN");
-    std::string bin = env == nullptr ? "crepus" : env;
+    if (env == nullptr) return "crepus";
+    // ponytail: only allow simple bin name, no path separators
+    if (std::strchr(env, '/') != nullptr || std::strchr(env, '\\') != nullptr) return "crepus";
+    return env;
+}
+
+ViewIr render_ir(const std::string& path) {
+    std::string bin = crepus_bin();
     std::string json = exec_argv(bin.c_str(), path.c_str());
     int version = json.find("\"version\":4") != std::string::npos || json.find("\"version\": 4") != std::string::npos ? 4 : -1;
     return {version, json};

@@ -193,6 +193,7 @@ fn run_ir_inner(args: &[String]) -> Result<String, String> {
         std::io::stdin()
             .read_to_string(&mut raw)
             .map_err(|e| format!("read stdin: {e}"))?;
+        check_template_size(raw.len())?;
         let env: IrEnvelope = serde_json::from_str(&raw).map_err(|e| format!("stdin JSON: {e}"))?;
         if let Some(value) = env.context {
             merge_json_ctx(&value, &mut ctx)?;
@@ -221,6 +222,7 @@ fn run_ir_inner(args: &[String]) -> Result<String, String> {
         std::io::stdin()
             .read_to_string(&mut template)
             .map_err(|e| format!("read stdin: {e}"))?;
+        check_template_size(template.len())?;
         ctx.base_dir = parsed.base_dir;
         let ir = if let Some(component) = parsed.component {
             render_component_file_to_ir(&template, &component, &ctx).map_err(|e| e.to_string())?
@@ -235,6 +237,7 @@ fn run_ir_inner(args: &[String]) -> Result<String, String> {
     })?;
     validate_path_notraverse(&path)?;
     let content = fs::read_to_string(&path).map_err(|e| format!("read {}: {e}", path.display()))?;
+    check_template_size(content.len())?;
     ctx.base_dir = path.parent().map(Path::to_path_buf);
     let ir = if let Some(component) = parsed.component {
         render_component_file_to_ir(&content, &component, &ctx).map_err(|e| e.to_string())?
@@ -1543,6 +1546,16 @@ fn capitalize_ascii(s: &str) -> String {
     }
     out.extend(chars);
     out
+}
+
+/// ponytail: cap template source at 10 MB
+const MAX_TEMPLATE_SIZE: usize = 10_000_000;
+
+fn check_template_size(len: usize) -> Result<(), String> {
+    if len > MAX_TEMPLATE_SIZE {
+        return Err(format!("template too large ({} bytes, max {})", len, MAX_TEMPLATE_SIZE));
+    }
+    Ok(())
 }
 
 fn validate_path_notraverse(path: &Path) -> Result<(), String> {
