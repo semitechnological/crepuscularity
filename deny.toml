@@ -4,8 +4,8 @@ all-features = true
 [advisories]
 version = 2
 yanked = "warn"
-unmaintained = "warn"
-unsound = "warn"
+unmaintained = "workspace"
+unsound = "workspace"
 
 [licenses]
 version = 2
