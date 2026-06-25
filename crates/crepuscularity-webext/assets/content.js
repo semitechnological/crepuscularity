@@ -314,7 +314,7 @@
                             value.startsWith("https://") ||
                             value.startsWith("mailto:") ||
                             value.startsWith("#") ||
-                            value.startsWith("/");
+                            value.startsWith("/") && !value.startsWith("//");
           if (!isSafeUrl) {
             el.removeAttribute(attr.name);
           }

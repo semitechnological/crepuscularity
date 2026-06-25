@@ -14,7 +14,7 @@
 use std::collections::HashMap;
 use std::fs;
 use std::io::Read;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use std::process::{Command, Stdio};
 
 use console::style;
@@ -233,6 +233,7 @@ fn run_ir_inner(args: &[String]) -> Result<String, String> {
     let path = parsed.path.ok_or_else(|| {
         "Usage: crepus native ir <file.crepus> [--component Name] [--ctx FILE] [--var k=v] [--pretty]".to_string()
     })?;
+    validate_path_notraverse(&path)?;
     let content = fs::read_to_string(&path).map_err(|e| format!("read {}: {e}", path.display()))?;
     ctx.base_dir = path.parent().map(Path::to_path_buf);
     let ir = if let Some(component) = parsed.component {
@@ -1542,6 +1543,17 @@ fn capitalize_ascii(s: &str) -> String {
     }
     out.extend(chars);
     out
+}
+
+fn validate_path_notraverse(path: &Path) -> Result<(), String> {
+    // ponytail: block traversal outside CWD
+    if path.components().any(|c| matches!(c, Component::ParentDir)) {
+        return Err(format!("path traversal denied: {}", path.display()));
+    }
+    if path.is_absolute() {
+        return Err(format!("absolute path denied: {}", path.display()));
+    }
+    Ok(())
 }
 
 fn print_native_usage() {
