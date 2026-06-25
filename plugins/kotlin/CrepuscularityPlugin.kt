@@ -50,7 +50,7 @@ object CrepuscularityPlugin {
         val code = process.waitFor()
         val json = stdout.toString(Charsets.UTF_8)
         if (code != 0) error(json)
-        val version = if (json.contains("\"version\":3") || json.contains("\"version\": 3")) 3 else -1
+        val version = if (json.contains("\"version\":4") || json.contains("\"version\": 4")) 4 else -1
         return ViewIr(version, json)
     }
 
