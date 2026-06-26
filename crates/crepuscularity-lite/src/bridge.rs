@@ -196,6 +196,19 @@ impl Bridge {
         method: &str,
         payload: &Value,
     ) -> Result<Value, BridgeError> {
+        // ponytail: rate limit check
+        let count = self.invoke_count.fetch_add(1, Ordering::Relaxed);
+        if count >= self.max_invocations {
+            return Err(BridgeError::new("rate_limited", "too many invocations"));
+        }
+        // ponytail: cap JSON payload at 1 MB
+        let payload_len = serde_json::to_string(payload).map(|s| s.len()).unwrap_or(0);
+        if payload_len > 1_000_000 {
+            return Err(BridgeError::new(
+                "payload_too_large",
+                format!("payload {} bytes exceeds 1 MB limit", payload_len),
+            ));
+        }
         let plugin = self.plugins.get(plugin_id).ok_or_else(|| {
             BridgeError::new(
                 "unknown_plugin",
