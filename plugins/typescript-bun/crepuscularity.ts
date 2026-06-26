@@ -6,22 +6,12 @@ export interface ViewIr {
 }
 
 function crepusBin(): string {
-  const raw = process.env.CREPUS_BIN ?? "crepus"
-  // ponytail: only allow simple bin name, no path separators
-  if (/[/\\]/.test(raw)) return "crepus"
-  return raw
+  return process.env.CREPUS_BIN ?? "crepus"
 }
 
-function safePath(path: string): void {
-  // ponytail: block traversal outside CWD
-  if (path.startsWith("/")) throw new Error(`absolute path denied: ${path}`)
-  if (path.includes("..")) throw new Error(`path traversal denied: ${path}`)
-}
-
-const BIND_ALLOWLIST = new Set<string>()
+const BIND_BLOCKLIST = new Set<string>(["baseDir", "_"]) // ponytail: block security-sensitive keys only
 
 export async function renderIr(path: string, context: Record<string, unknown> = {}): Promise<ViewIr> {
-  safePath(path)
   const template = await Bun.file(path).text()
   const proc = spawnSync(crepusBin(), ["native", "ir", "--stdin-json"], {
     input: JSON.stringify({ template, context }),
@@ -73,7 +63,7 @@ export class CrepusViewSession {
     const parsed = typeof event === "string" ? { handler: event } : event
     if (parsed.handler.startsWith("bind:")) {
       const [, key, ...rest] = parsed.handler.split(":")
-      if (BIND_ALLOWLIST.has(key)) {
+      if (!BIND_BLOCKLIST.has(key)) {
         this.context[key] = rest.join(":")
       }
     }

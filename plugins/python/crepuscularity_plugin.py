@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import os
-import re
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -41,7 +40,8 @@ class ViewSession:
         handler = str(payload.get("handler", ""))
         if handler.startswith("bind:"):
             parts = handler.removeprefix("bind:").split(":", 1)
-            if len(parts) == 2 and parts[0] in _BIND_ALLOWLIST:
+            # ponytail: block security-sensitive keys only
+            if len(parts) == 2 and parts[0] not in _BIND_BLOCKLIST:
                 self.context[parts[0]] = parts[1]
         callback = self._handlers.get(handler)
         if callback is not None:
@@ -50,33 +50,18 @@ class ViewSession:
 
 
 def _crepus_bin() -> str:
-    raw = os.environ.get("CREPUS_BIN", "crepus")
-    # ponytail: only allow simple bin name, no path separators
-    if re.search(r"[/\\]", raw):
-        return "crepus"
-    return raw
+    return os.environ.get("CREPUS_BIN", "crepus")
 
 
-_BIND_ALLOWLIST = frozenset()
-
-
-def _safe_path(path: str | Path) -> Path:
-    p = Path(path)
-    # ponytail: block traversal outside CWD
-    if p.is_absolute():
-        raise ValueError(f"absolute path denied: {path}")
-    if ".." in p.parts:
-        raise ValueError(f"path traversal denied: {path}")
-    return p
+_BIND_BLOCKLIST = frozenset({"baseDir", "_"})  # ponytail: block security-sensitive keys only
 
 
 def render_ir(path: str | Path, context: dict[str, Any] | None = None) -> ViewIr:
     args = [_crepus_bin(), "native", "ir", str(path)]
     input_data = None
     if context is not None:
-        safe = _safe_path(path)
-        source = safe.read_text()
-        payload = {"template": source, "context": context, "baseDir": str(safe.parent)}
+        source = Path(path).read_text()
+        payload = {"template": source, "context": context, "baseDir": str(Path(path).parent)}
         args = [_crepus_bin(), "native", "ir", "--stdin-json"]
         input_data = json.dumps(payload)
     proc = subprocess.run(args, input=input_data, text=True, capture_output=True, check=False)

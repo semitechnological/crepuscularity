@@ -5,13 +5,7 @@ require "cgi"
 module CrepuscularityPlugin
   ViewIr = Struct.new(:version, :root, keyword_init: true)
 
-  BIND_ALLOWLIST = [].freeze # ponytail: empty = no keys settable via bind:
-
-  def self.safe_path(path)
-    # ponytail: block traversal outside CWD
-    raise ArgumentError, "absolute path denied: #{path}" if path.start_with?("/")
-    raise ArgumentError, "path traversal denied: #{path}" if path.include?("..")
-  end
+  BIND_BLOCKLIST = ["baseDir", "_"].freeze # ponytail: block security-sensitive keys only
 
   class ViewSession
     attr_reader :path, :context
@@ -40,7 +34,7 @@ module CrepuscularityPlugin
       handler = payload.fetch("handler", "").to_s
       if handler.start_with?("bind:")
         key, value = handler.delete_prefix("bind:").split(":", 2)
-        @context[key] = value unless value.nil? || !BIND_ALLOWLIST.include?(key)
+        @context[key] = value unless value.nil? || BIND_BLOCKLIST.include?(key)
       end
       @handlers[handler]&.call(payload, self)
       render_ir
@@ -48,10 +42,7 @@ module CrepuscularityPlugin
   end
 
   def self.render_ir(path, context = nil)
-    raw = ENV.fetch("CREPUS_BIN", "crepus")
-    # ponytail: only allow simple bin name, no path separators
-    bin = raw.match?(%r{[/\\]}) ? "crepus" : raw
-    safe_path(path) if context
+    bin = ENV.fetch("CREPUS_BIN", "crepus")
     if context
       payload = JSON.generate({
         "template" => File.read(path),

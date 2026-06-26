@@ -45,10 +45,7 @@ struct ViewIr {
 
 static std::string crepus_bin() {
     const char* env = std::getenv("CREPUS_BIN");
-    if (env == nullptr) return "crepus";
-    // ponytail: only allow simple bin name, no path separators
-    if (std::strchr(env, '/') != nullptr || std::strchr(env, '\\') != nullptr) return "crepus";
-    return env;
+    return env != nullptr ? env : "crepus";
 }
 
 ViewIr render_ir(const std::string& path) {
