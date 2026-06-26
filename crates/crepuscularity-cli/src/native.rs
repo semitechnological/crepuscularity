@@ -1560,8 +1560,6 @@ fn check_template_size(len: usize) -> Result<(), String> {
     Ok(())
 }
 
-
-
 fn print_native_usage() {
     eprintln!(
         "{}",
