@@ -6,10 +6,7 @@
 
 static const char *crepus_bin(void) {
     const char *env = getenv("CREPUS_BIN");
-    if (env == NULL) return "crepus";
-    // ponytail: only allow simple bin name, no path separators
-    if (strchr(env, '/') != NULL || strchr(env, '\\') != NULL) return "crepus";
-    return env;
+    return env != NULL ? env : "crepus";
 }
 
 static int crepus_render_ir(const char *path, char *buf, size_t cap) {

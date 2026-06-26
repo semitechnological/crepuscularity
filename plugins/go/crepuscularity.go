@@ -7,7 +7,6 @@ import (
 	"html"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 )
 
@@ -31,32 +30,14 @@ type ViewSession struct {
 
 func crepusBin() string {
 	if bin := os.Getenv("CREPUS_BIN"); bin != "" {
-		// ponytail: only allow simple bin name, no path separators
-		if strings.ContainsAny(bin, "/\\") {
-			return "crepus"
-		}
 		return bin
 	}
 	return "crepus"
 }
 
-func safePath(path string) error {
-	// ponytail: block traversal outside CWD
-	if filepath.IsAbs(path) {
-		return fmt.Errorf("absolute path denied: %s", path)
-	}
-	if strings.Contains(path, "..") {
-		return fmt.Errorf("path traversal denied: %s", path)
-	}
-	return nil
-}
-
-var bindAllowlist = map[string]bool{} // ponytail: empty = no keys settable via bind:
+var bindBlocklist = map[string]bool{"baseDir": true, "_": true} // ponytail: block security-sensitive keys only
 
 func RenderIR(path string, context map[string]any) (ViewIr, error) {
-	if err := safePath(path); err != nil {
-		return ViewIr{}, err
-	}
 	payload, err := json.Marshal(map[string]any{
 		"template": mustRead(path),
 		"context":  context,
@@ -121,7 +102,7 @@ func (session *ViewSession) Dispatch(event Event) (ViewIr, error) {
 	if strings.HasPrefix(event.Handler, "bind:") {
 		parts := strings.SplitN(strings.TrimPrefix(event.Handler, "bind:"), ":", 2)
 		// ponytail: only allowlisted keys from bind:
-		if len(parts) == 2 && bindAllowlist[parts[0]] {
+		if len(parts) == 2 && !bindBlocklist[parts[0]] {
 			session.Context[parts[0]] = parts[1]
 		}
 	}
