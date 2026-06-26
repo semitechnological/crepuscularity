@@ -1553,18 +1553,18 @@ const MAX_TEMPLATE_SIZE: usize = 10_000_000;
 
 fn check_template_size(len: usize) -> Result<(), String> {
     if len > MAX_TEMPLATE_SIZE {
-        return Err(format!("template too large ({} bytes, max {})", len, MAX_TEMPLATE_SIZE));
+        return Err(format!(
+            "template too large ({} bytes, max {})",
+            len, MAX_TEMPLATE_SIZE
+        ));
     }
     Ok(())
 }
 
 fn validate_path_notraverse(path: &Path) -> Result<(), String> {
-    // ponytail: block traversal outside CWD
+    // ponytail: block traversal via parent-dir component
     if path.components().any(|c| matches!(c, Component::ParentDir)) {
         return Err(format!("path traversal denied: {}", path.display()));
-    }
-    if path.is_absolute() {
-        return Err(format!("absolute path denied: {}", path.display()));
     }
     Ok(())
 }
