@@ -11,4 +11,4 @@ path = "src/main.rs"
 
 [dependencies]
 gpui = { workspace = true }
-crepuscularity-gpui = { path = "../../crates/crepuscularity-gpui", version = "0.4.6" }
+crepuscularity-gpui = { path = "../../crates/crepuscularity-gpui", version = "0.5.0" }
