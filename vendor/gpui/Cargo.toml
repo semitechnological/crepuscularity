@@ -52,6 +52,7 @@ macos-blade = [
     "objc2-metal",
 ]
 runtime_shaders = []
+xkbcommon-x11 = ["xkbcommon/x11"]
 screen-capture = ["scap"]
 test-support = [
     "leak-detection",
