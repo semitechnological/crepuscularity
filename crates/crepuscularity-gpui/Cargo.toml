@@ -22,7 +22,7 @@ runtime-shaders = ["gpui/runtime_shaders"]
 test-support = ["gpui/test-support"]
 input-latency-histogram = []
 wayland = ["gpui/wayland"]
-x11 = ["gpui/x11"]
+x11 = ["gpui/x11", "gpui/xkbcommon-x11"]
 windows-manifest = ["gpui/windows-manifest"]
 gpui-text-extras = [
     "crepuscularity_macros/gpui_text_run_styles",
