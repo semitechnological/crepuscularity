@@ -1857,7 +1857,7 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-gpui"
-version = "0.4.7"
+version = "0.5.0"
 dependencies = [
  "crepuscularity-core",
  "crepuscularity-runtime",
@@ -1869,6 +1869,7 @@ dependencies = [
  "pollster 0.4.0",
  "schemars",
  "serde",
+ "xkbcommon",
 ]
 
 [[package]]
@@ -3752,6 +3753,8 @@ dependencies = [
  "naga",
  "num_cpus",
  "objc",
+ "objc2",
+ "objc2-metal",
  "oo7",
  "open",
  "parking",
@@ -5703,7 +5706,9 @@ checksum = "a0125f776a10d00af4152d74616409f0d4a2053a6f57fa5b7d6aa2854ac04794"
 dependencies = [
  "bitflags 2.13.0",
  "block2",
+ "dispatch2",
  "objc2",
+ "objc2-core-foundation",
  "objc2-foundation",
 ]
 
