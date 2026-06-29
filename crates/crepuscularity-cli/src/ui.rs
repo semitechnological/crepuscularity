@@ -73,10 +73,10 @@ pub fn done_in(elapsed: Duration) {
 pub fn spinner(msg: &str) -> ProgressBar {
     let pb = ProgressBar::new_spinner();
     pb.set_style(
-        ProgressStyle::default_spinner()
-            .template("{spinner:.cyan} {msg}")
-            .unwrap()
-            .tick_chars("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏ "),
+        match ProgressStyle::default_spinner().template("{spinner:.cyan} {msg}") {
+            Ok(style) => style.tick_chars("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏ "),
+            Err(_) => ProgressStyle::default_spinner().tick_chars("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏ "),
+        },
     );
     pb.enable_steady_tick(Duration::from_millis(80));
     pb.set_message(msg.to_string());
