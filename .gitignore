@@ -14,7 +14,6 @@ examples/**/target/
 examples/**/Cargo.lock
 docs-site/**/target/
 docs-site/**/Cargo.lock
-!docs-site/docs-renderer/Cargo.lock
 editors/vscode/node_modules/
 plugins/**/node_modules/
 examples/**/node_modules/

@@ -161,50 +161,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn resolve_docs_hook_prefers_built_cargo_run_binary() {
-        let site_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../docs-site")
-            .canonicalize()
-            .expect("docs-site");
-        let hook = DocsHookConfig {
-            command: "cargo".into(),
-            args: vec![
-                "run".into(),
-                "--quiet".into(),
-                "--locked".into(),
-                "--manifest-path".into(),
-                "docs-renderer/Cargo.toml".into(),
-                "--".into(),
-            ],
-            src: Some("../docs".into()),
-        };
-
-        let manifest = site_dir.join("docs-renderer/Cargo.toml");
-        let package_name = package_name_from_manifest(&manifest).expect("package name");
-        let binary_name = if cfg!(windows) {
-            format!("{package_name}.exe")
-        } else {
-            package_name
-        };
-        let expected_binary = site_dir
-            .join("docs-renderer/target/debug")
-            .join(binary_name);
-        if !expected_binary.is_file() {
-            eprintln!("skipping: docs renderer binary not built");
-            return;
-        }
-
-        let invocation = resolve_docs_hook_invocation(&site_dir, &hook);
-        assert_eq!(
-            invocation.program,
-            expected_binary
-                .canonicalize()
-                .expect("docs renderer binary")
-        );
-        assert!(invocation.args.is_empty());
-    }
-
-    #[test]
     fn resolve_docs_hook_falls_back_to_configured_command() {
         let hook = DocsHookConfig {
             command: "echo".into(),
@@ -214,15 +170,5 @@ mod tests {
         let invocation = resolve_docs_hook_invocation(Path::new("."), &hook);
         assert_eq!(invocation.program, PathBuf::from("echo"));
         assert_eq!(invocation.args, vec!["docs".to_string()]);
-    }
-
-    #[test]
-    fn package_name_from_manifest_reads_package_name() {
-        let manifest =
-            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs-site/docs-renderer/Cargo.toml");
-        assert_eq!(
-            package_name_from_manifest(&manifest).as_deref(),
-            Some("docs_site_renderer")
-        );
     }
 }

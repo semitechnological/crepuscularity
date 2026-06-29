@@ -121,59 +121,13 @@ fn web_build_docs_site_emits_wasm() {
         ])
         .status()
         .expect("spawn");
-    assert!(status.success());
+    assert!(status.success(), "docs-site web build should succeed");
 
     let has_wasm = std::fs::read_dir(out.path().join("pkg"))
         .expect("pkg dir")
         .flatten()
         .any(|e| e.path().extension().map(|x| x == "wasm").unwrap_or(false));
-    assert!(has_wasm);
-
-    let docs_index =
-        std::fs::read_to_string(out.path().join("docs/index.html")).expect("docs index");
-    assert!(
-        docs_index.contains("doc-grid") && docs_index.contains("Documentation"),
-        "expected markdown docs HTML hub"
-    );
-    let dsl = std::fs::read_to_string(out.path().join("docs/dsl.html")).expect("dsl.html");
-    assert!(
-        dsl.contains("prose") && dsl.contains("DSL"),
-        "expected dsl.md rendered to HTML"
-    );
-    assert!(
-        dsl.contains("position: sticky") && dsl.contains(".doc-toc"),
-        "docs sidebar should be sticky with in-page TOC"
-    );
-    assert!(
-        dsl.contains("aside.mobile-expanded { transform: translateX(0); }"),
-        "mobile sidebar should use the canonical slide-in state"
-    );
-    assert!(
-        !dsl.contains("aside.doc-nav-open"),
-        "generated docs should not include obsolete sidebar state selectors"
-    );
-    assert!(
-        !dsl.contains("}\n    }\n    aside {"),
-        "generated docs CSS should not contain stray closing braces before sidebar rules"
-    );
-    assert!(
-        dsl.contains("<h2 id=\""),
-        "prose headings should get anchor ids for TOC links"
-    );
-    assert!(
-        out.path().join(".nojekyll").is_file(),
-        "GitHub Pages should receive .nojekyll in site root"
-    );
-    assert!(
-        !docs_index.contains("WEB_BUILD_MIGRATION"),
-        "generated docs must not link removed migration pages"
-    );
-    let search = std::fs::read_to_string(out.path().join("docs/docs-search-index.json"))
-        .expect("docs-search-index.json");
-    assert!(
-        search.contains("\"entries\"") && search.contains("index.html"),
-        "expected fuzzy search index beside docs"
-    );
+    assert!(has_wasm, "WASM pkg should be emitted");
 }
 
 #[test]
@@ -181,113 +135,9 @@ fn web_build_docs_site_emits_wasm() {
     windows,
     ignore = "default desktop crepus.exe does not spawn reliably on Windows CI"
 )]
-fn web_build_via_crepus_toml_target_docs_emits_wasm() {
-    let _guard = DOCS_HOOK_TEST_LOCK.lock().expect("docs hook test lock");
-    if !wasm_build_prereqs_ok() {
-        eprintln!("skipping: wasm32 target or wasm-bindgen not installed");
-        return;
-    }
-    use std::path::Path;
-
-    let out = tempfile::tempdir().expect("tempdir");
-    let repo = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../..")
-        .canonicalize()
-        .expect("repo root");
-
-    let manifest = repo.join("docs-site/crepus.toml");
-    assert!(
-        manifest.is_file(),
-        "docs-site crepus.toml missing (needed for --target docs test)"
-    );
-
-    let status = crepus()
-        .current_dir(&repo)
-        .args([
-            "web",
-            "build",
-            "--target",
-            "docs",
-            "--manifest",
-            manifest.to_str().unwrap(),
-            "--out-dir",
-            out.path().to_str().unwrap(),
-        ])
-        .status()
-        .expect("spawn");
-    assert!(
-        status.success(),
-        "crepus web build --target docs should succeed"
-    );
-
-    let has_wasm = std::fs::read_dir(out.path().join("pkg"))
-        .expect("pkg dir")
-        .flatten()
-        .any(|e| e.path().extension().map(|x| x == "wasm").unwrap_or(false));
-    assert!(has_wasm);
-    let docs_index =
-        std::fs::read_to_string(out.path().join("docs/index.html")).expect("docs index");
-    assert!(
-        docs_index.contains("doc-grid") && docs_index.contains("Documentation"),
-        "root --target docs should run the configured docs hook"
-    );
-}
+// ponytail: docs-renderer binary removed; docs-target tests removed
 
 #[test]
-#[cfg_attr(
-    windows,
-    ignore = "default desktop crepus.exe does not spawn reliably on Windows CI"
-)]
-fn web_build_relative_manifest_writes_docs_to_default_out_dir() {
-    let _guard = DOCS_HOOK_TEST_LOCK.lock().expect("docs hook test lock");
-    if !wasm_build_prereqs_ok() {
-        eprintln!("skipping: wasm32 target or wasm-bindgen not installed");
-        return;
-    }
-
-    let repo = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../..")
-        .canonicalize()
-        .expect("repo root");
-    let out_dir = repo.join("docs-site/dist");
-    let nested_out_dir = repo.join("docs-site/docs-site/dist");
-    let _ = std::fs::remove_dir_all(&out_dir);
-    let _ = std::fs::remove_dir_all(&nested_out_dir);
-
-    let status = crepus()
-        .current_dir(&repo)
-        .args([
-            "web",
-            "build",
-            "--target",
-            "docs",
-            "--manifest",
-            "docs-site/crepus.toml",
-        ])
-        .status()
-        .expect("spawn");
-    assert!(
-        status.success(),
-        "crepus web build with relative --manifest should succeed"
-    );
-
-    let docs_index = std::fs::read_to_string(out_dir.join("docs/index.html"))
-        .expect("docs index in manifest out dir");
-    assert!(
-        docs_index.contains("doc-grid") && docs_index.contains("Documentation"),
-        "relative --manifest must render docs into docs-site/dist/docs (not docs-site/docs-site/dist/docs)"
-    );
-    assert!(
-        !nested_out_dir.exists(),
-        "docs hook must not write to a nested docs-site/docs-site/dist path"
-    );
-}
-
-#[test]
-#[cfg_attr(
-    windows,
-    ignore = "default desktop crepus.exe does not spawn reliably on Windows CI"
-)]
 fn root_build_uses_crepus_toml_lvgl_target() {
     let tmp = tempfile::tempdir().expect("tempdir");
     let root = tmp.path();

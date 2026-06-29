@@ -31,11 +31,7 @@ json_ld = [
   """{"@context":"https://schema.org","@type":"SoftwareSourceCode","name":"Crepuscularity","codeRepository":"https://github.com/tschk/crepuscularity","programmingLanguage":"Rust","url":"https://crepuscularity.undivisible.dev/"}"""
 ]
 
-[targets.docs]
-command = "cargo"
-args = ["run", "--quiet", "--locked", "--manifest-path", "docs-renderer/Cargo.toml", "--"]
-src = "../docs"
-
+# ponytail: docs-renderer binary removed; use `crepus render` for docs
 [targets.llms]
 enabled = true
 base_url = "https://crepuscularity.undivisible.dev"
