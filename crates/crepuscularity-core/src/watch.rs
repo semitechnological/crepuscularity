@@ -24,6 +24,72 @@ pub const COOLDOWN_MS: u64 = 200;
 /// requests inside the extension sandbox.
 pub const EXTENSION_POLL_MS: u64 = 1500;
 
+/// Create a `notify` watcher rooted at the *directory* containing `path`.
+///
+/// The watcher flips `*changed = true` when:
+/// - the watched template is modified / created / removed (covers
+///   atomic-save editor patterns), or
+/// - any sibling/descendant `.crepus` file changes (`include`d components
+///   trigger reload), or
+/// - a `context.toml` next to the template is updated.
+///
+/// `label` appears in error messages to distinguish the source (e.g.
+/// `"runtime"`, `"tui"`). Drop the returned handle to stop watching cleanly.
+#[cfg(feature = "notify")]
+use notify::Watcher;
+
+#[cfg(feature = "notify")]
+pub fn create_watcher(
+    path: impl Into<std::path::PathBuf>,
+    changed: std::sync::Arc<std::sync::Mutex<bool>>,
+    label: &'static str,
+) -> Result<Box<dyn notify::Watcher + Send>, String> {
+    let path: std::path::PathBuf = path.into();
+    let canonical_target = path.canonicalize().unwrap_or_else(|_| path.clone());
+    let watch_dir = canonical_target
+        .parent()
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(|| std::path::PathBuf::from("."));
+
+    let target = canonical_target.clone();
+    let root = watch_dir.clone();
+
+    let mut watcher = notify::recommended_watcher(move |res: notify::Result<notify::Event>| {
+        match res {
+            Ok(ev) => {
+                if !is_relevant_kind(&ev.kind) {
+                    return;
+                }
+                if !event_touches_relevant_path(&ev, &target, &root) {
+                    return;
+                }
+                if let Ok(mut flag) = changed.lock() {
+                    *flag = true;
+                }
+            }
+            Err(e) => eprintln!("[crepuscularity-{label}] watcher error: {e}"),
+        }
+    })
+    .map_err(|e| format!("could not create file watcher: {e}"))?;
+
+    watcher
+        .watch(&watch_dir, notify::RecursiveMode::Recursive)
+        .map_err(|e| format!("failed to watch {}: {e}", watch_dir.display()))?;
+
+    Ok(Box::new(watcher))
+}
+
+/// Returns true for Modify, Create, or Remove event kinds.
+#[cfg(feature = "notify")]
+pub fn is_relevant_kind(kind: &notify::EventKind) -> bool {
+    matches!(
+        kind,
+        notify::EventKind::Modify(_)
+            | notify::EventKind::Create(_)
+            | notify::EventKind::Remove(_)
+    )
+}
+
 #[cfg(feature = "notify")]
 pub fn event_touches_relevant_path(
     event: &notify::Event,
