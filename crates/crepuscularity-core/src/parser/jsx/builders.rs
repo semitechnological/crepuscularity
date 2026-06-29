@@ -96,7 +96,10 @@ pub(crate) fn jsx_build_element(tag: &str, attrs: Vec<JsxAttr>, children: Vec<No
         if key.starts_with("on") && key.len() > 2 {
             let rest = &key[2..];
             if rest.starts_with(|c: char| c.is_ascii_uppercase()) {
-                let first = rest.chars().next().unwrap();
+                let first = match rest.chars().next() {
+                    Some(c) => c,
+                    None => continue,
+                };
                 let event = format!(
                     "{}{}",
                     first.to_ascii_lowercase(),
