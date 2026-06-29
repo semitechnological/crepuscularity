@@ -75,7 +75,16 @@ pub fn cargo_build(
         }
     };
 
-    let stdout = child.stdout.take().unwrap();
+    let stdout = match child.stdout.take() {
+        Some(s) => s,
+        None => {
+            eprintln!("[crepus] Failed to capture cargo stdout");
+            return BuildOutcome {
+                success: false,
+                errors: vec![],
+            };
+        }
+    };
     let mut errors: Vec<BuildError> = Vec::new();
     let mut success = false;
 
