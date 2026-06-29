@@ -59,8 +59,8 @@
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
-use crepuscularity_core::watch::event_touches_relevant_path;
-use notify::{recommended_watcher, Event, EventKind, RecursiveMode, Watcher};
+use crepuscularity_core::watch;
+use notify::Watcher;
 use ratatui::layout::Rect;
 use ratatui::Frame;
 
@@ -176,60 +176,16 @@ impl HotTemplate {
         self.template.draw_full(frame)
     }
 
-    #[cfg(test)]
+        #[cfg(test)]
     pub(crate) fn changed_handle(&self) -> Arc<Mutex<bool>> {
         Arc::clone(&self.changed)
     }
 }
 
-/// Create a `notify` watcher rooted at the *directory* containing `path`,
-/// returning the owning handle. The watcher flips `*changed = true` when:
-///
-/// - the watched template is modified / created / removed (covers
-///   atomic-save editor patterns that would otherwise leave the inotify
-///   watch on a dead inode), or
-/// - any sibling/descendant `.crepus` file changes (`include`d components
-///   trigger reload), or
-/// - a `context.toml` next to the template is updated.
-///
-/// Drop the returned handle to stop watching cleanly.
+/// Create a `notify` watcher — thin wrapper delegating to [`watch::create_watcher`].
 fn create_file_watcher(
     path: PathBuf,
     changed: Arc<Mutex<bool>>,
 ) -> Result<Box<dyn Watcher + Send>, String> {
-    let canonical_target = path.canonicalize().unwrap_or_else(|_| path.clone());
-    let watch_dir = canonical_target
-        .parent()
-        .map(|p| p.to_path_buf())
-        .unwrap_or_else(|| PathBuf::from("."));
-
-    let target = canonical_target.clone();
-    let root = watch_dir.clone();
-
-    let mut watcher = recommended_watcher(move |res: notify::Result<Event>| match res {
-        Ok(ev) => {
-            if !matches!(
-                ev.kind,
-                EventKind::Modify(_) | EventKind::Create(_) | EventKind::Remove(_)
-            ) {
-                return;
-            }
-            if !event_touches_relevant_path(&ev, &target, &root) {
-                return;
-            }
-            if let Ok(mut flag) = changed.lock() {
-                *flag = true;
-            }
-        }
-        Err(e) => {
-            eprintln!("[crepuscularity-tui] watcher error: {e}");
-        }
-    })
-    .map_err(|e| format!("could not create file watcher: {e}"))?;
-
-    watcher
-        .watch(&watch_dir, RecursiveMode::Recursive)
-        .map_err(|e| format!("failed to watch {}: {e}", watch_dir.display()))?;
-
-    Ok(Box::new(watcher))
+    watch::create_watcher(path, changed, "tui")
 }
