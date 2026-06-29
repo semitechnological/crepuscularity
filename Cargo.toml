@@ -7,7 +7,6 @@ members = [
     "crates/crepuscularity-lsp",
     "crates/crepuscularity-native",
     "crates/crepuscularity-embedded",
-    "crates/crepuscularity-embedded-macros",
     "crates/crepuscularity-lvgl",
     "crates/crepuscularity-abi",
     "crates/crepuscularity-gpui",
@@ -24,14 +23,7 @@ members = [
     #   cargo build -p crepuscularity-lite
     #   cargo check --workspace --exclude crepuscularity-lite
     "crates/crepuscularity-lite",
-    "examples/text-features",
-    "examples/weather",
-    "examples/todo",
-    "examples/embedded-dashboard",
-    "examples/embedded-stm32/host-sim",
-    "examples/lvgl-pro-mode",
-    "examples/lvgl-stm32",
-]
+] # examples built explicitly: text-features, weather, todo, embedded-dashboard, host-sim, lvgl-*
 
 [profile.release]
 lto = "fat"

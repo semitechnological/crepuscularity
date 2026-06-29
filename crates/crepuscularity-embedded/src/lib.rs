@@ -100,9 +100,7 @@ pub use crepuscularity_core::{
     build, parse_component_file, parse_template, CrepusError, TemplateContext, TemplateValue,
 };
 #[cfg(feature = "macros")]
-pub use crepuscularity_embedded_macros as macros;
-#[cfg(feature = "macros")]
-pub use crepuscularity_embedded_macros::embedded_template;
+pub use crepuscularity_macros::embedded_template;
 pub use display::{
     flush_framebuffer, swap_rgb565_bytes_bgr, DisplayError, PanelConfig, Rgb565ByteOrder,
     Rgb565Display,
