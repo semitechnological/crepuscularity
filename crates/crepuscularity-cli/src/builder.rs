@@ -183,3 +183,110 @@ pub fn find_bin_name(cwd: &Path, override_name: Option<&str>) -> Option<String> 
 
     package_name
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_build_finished_msg() {
+        let json = r#"{"reason":"build-finished","success":true}"#;
+        let msg: CargoLine = serde_json::from_str(json).unwrap();
+        assert_eq!(msg.reason, "build-finished");
+        assert_eq!(msg.success, Some(true));
+    }
+
+    #[test]
+    fn parse_compiler_error_msg() {
+        let json = r#"{
+            "reason": "compiler-message",
+            "package_id": "foo 0.1.0",
+            "target": {},
+            "message": {
+                "level": "error",
+                "message": "expected `;`",
+                "rendered": "error: expected `;`\n --> src/main.rs:1:1\n",
+                "spans": [{"file_name": "src/main.rs", "line_start": 1, "line_end": 1, "byte_start": 0, "byte_end": 1, "column_start": 1, "column_end": 1, "text": [], "is_primary": true}]
+            }
+        }"#;
+        let msg: CargoLine = serde_json::from_str(json).unwrap();
+        assert_eq!(msg.reason, "compiler-message");
+        let cm = msg.message.unwrap();
+        assert_eq!(cm.level, "error");
+        assert_eq!(cm.message, "expected `;`");
+        assert!(cm.rendered.unwrap().contains("expected `;`"));
+        assert_eq!(cm.spans[0].file_name, "src/main.rs");
+        assert_eq!(cm.spans[0].line_start, 1);
+    }
+
+    #[test]
+    fn parse_compiler_warning_msg() {
+        let json = r#"{
+            "reason": "compiler-message",
+            "package_id": "bar 0.2.0",
+            "target": {},
+            "message": {
+                "level": "warning",
+                "message": "unused variable",
+                "rendered": "warning: unused variable `x`\n --> src/lib.rs:5:9\n",
+                "spans": [{"file_name": "src/lib.rs", "line_start": 5, "line_end": 5, "byte_start": 0, "byte_end": 1, "column_start": 9, "column_end": 10, "text": [], "is_primary": true}]
+            }
+        }"#;
+        let msg: CargoLine = serde_json::from_str(json).unwrap();
+        let cm = msg.message.unwrap();
+        assert_eq!(cm.level, "warning");
+        assert_eq!(cm.message, "unused variable");
+    }
+
+    #[test]
+    fn parse_invalid_json_does_not_panic() {
+        let result: Result<CargoLine, _> = serde_json::from_str("not json");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn find_bin_name_prefers_bin_over_package() {
+        let dir = tempfile::tempdir().unwrap();
+        let toml_path = dir.path().join("Cargo.toml");
+        std::fs::write(
+            &toml_path,
+            r#"[package]
+name = "my-lib"
+
+[[bin]]
+name = "my-app"
+"#,
+        )
+        .unwrap();
+        assert_eq!(find_bin_name(dir.path(), None), Some("my-app".into()));
+    }
+
+    #[test]
+    fn find_bin_name_falls_back_to_package() {
+        let dir = tempfile::tempdir().unwrap();
+        let toml_path = dir.path().join("Cargo.toml");
+        std::fs::write(
+            &toml_path,
+            r#"[package]
+name = "my-lib"
+"#,
+        )
+        .unwrap();
+        assert_eq!(find_bin_name(dir.path(), None), Some("my-lib".into()));
+    }
+
+    #[test]
+    fn find_bin_name_override_wins() {
+        let dir = tempfile::tempdir().unwrap();
+        assert_eq!(
+            find_bin_name(dir.path(), Some("custom-bin")),
+            Some("custom-bin".into())
+        );
+    }
+
+    #[test]
+    fn find_bin_name_no_toml_returns_none() {
+        let dir = tempfile::tempdir().unwrap();
+        assert_eq!(find_bin_name(dir.path(), None), None);
+    }
+}
