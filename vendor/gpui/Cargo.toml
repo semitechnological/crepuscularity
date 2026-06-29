@@ -573,6 +573,7 @@ package = "zed-xim"
 version = "0.8.0"
 features = [
     "wayland",
+    "x11",
 ]
 optional = true
 
