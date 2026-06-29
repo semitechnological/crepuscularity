@@ -1977,3 +1977,27 @@ fn arbitrary_length(inner: &str) -> Option<TokenStream2> {
 fn tailwind_color(family: &str, shade: &str) -> Option<u32> {
     crepuscularity_core::tailwind::lookup_color_u32(&format!("{family}-{shade}"))
 }
+
+/// Parse-check a `.crepus` template at compile time and expand to its source `&str`.
+///
+/// Equivalent to `include_str!(…)` plus a build-time parse error if the template is invalid.
+#[proc_macro]
+pub fn embedded_template(input: TokenStream) -> TokenStream {
+    let path = parse_macro_input!(input as LitStr);
+    let path_value = path.value();
+    let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".into());
+    let full = std::path::Path::new(&manifest_dir).join(&path_value);
+    let source = std::fs::read_to_string(&full).unwrap_or_else(|e| {
+        panic!("embedded_template!: could not read {}: {e}", full.display());
+    });
+    if let Err(err) = crepuscularity_core::parser::parse_template(&source) {
+        panic!(
+            "embedded_template!: invalid .crepus at {}: {err}",
+            full.display()
+        );
+    }
+    quote! {{
+        include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/", #path_value))
+    }}
+    .into()
+}

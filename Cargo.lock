@@ -1829,7 +1829,7 @@ name = "crepuscularity-embedded"
 version = "0.1.16"
 dependencies = [
  "crepuscularity-core",
- "crepuscularity-embedded-macros",
+ "crepuscularity_macros",
  "display-interface",
  "display-interface-spi",
  "embassy-embedded-hal",
@@ -1843,16 +1843,6 @@ dependencies = [
  "sha2 0.11.0",
  "static_cell",
  "tempfile",
-]
-
-[[package]]
-name = "crepuscularity-embedded-macros"
-version = "0.1.3"
-dependencies = [
- "crepuscularity-core",
- "proc-macro2",
- "quote",
- "syn 2.0.118",
 ]
 
 [[package]]
@@ -2794,14 +2784,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "embedded-dashboard"
-version = "0.1.0"
-dependencies = [
- "crepuscularity-core",
- "crepuscularity-embedded",
-]
-
-[[package]]
 name = "embedded-graphics"
 version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2893,15 +2875,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2564b9f813c544241430e147d8bc454815ef9ac998878d30cc3055449f7fd4c0"
 dependencies = [
  "embedded-io 0.7.1",
-]
-
-[[package]]
-name = "embedded-stm32-host-sim"
-version = "0.1.0"
-dependencies = [
- "crepuscularity-core",
- "crepuscularity-embedded",
- "crepuscularity-embedded-macros",
 ]
 
 [[package]]
@@ -5009,20 +4982,6 @@ dependencies = [
  "serde_json",
  "serde_repr",
  "url",
-]
-
-[[package]]
-name = "lvgl-pro-mode"
-version = "0.1.0"
-dependencies = [
- "crepuscularity",
-]
-
-[[package]]
-name = "lvgl-stm32"
-version = "0.1.0"
-dependencies = [
- "crepuscularity",
 ]
 
 [[package]]
@@ -8634,14 +8593,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "text-features"
-version = "0.1.0"
-dependencies = [
- "crepuscularity-gpui",
- "gpui",
-]
-
-[[package]]
 name = "textwrap"
 version = "0.16.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8818,14 +8769,6 @@ name = "tinyvec_macros"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
-
-[[package]]
-name = "todo"
-version = "0.1.0"
-dependencies = [
- "crepuscularity-gpui",
- "gpui",
-]
 
 [[package]]
 name = "tokio"
@@ -9742,14 +9685,6 @@ dependencies = [
  "log",
  "once_cell",
  "pkg-config",
-]
-
-[[package]]
-name = "weather"
-version = "0.3.0"
-dependencies = [
- "crepuscularity-gpui",
- "gpui",
 ]
 
 [[package]]
