@@ -633,12 +633,18 @@ pub(crate) fn build_site_wasm(cli: &WebBuildArgs) {
 
     // Auto-detect docs/ directory (like Svelte/Next.js — just works)
     if let Some(src) = docs_src_candidate(&b.site_dir) {
-        let has_md = std::fs::read_dir(&src).is_ok_and(|mut d| d.any(|e| e.ok().is_some_and(|e| {
-            e.path().extension().and_then(|x| x.to_str()) == Some("md")
-        })));
+        let has_md = std::fs::read_dir(&src).is_ok_and(|mut d| {
+            d.any(|e| {
+                e.ok()
+                    .is_some_and(|e| e.path().extension().and_then(|x| x.to_str()) == Some("md"))
+            })
+        });
         if has_md && b.meta.as_ref().and_then(|m| m.docs.as_ref()).is_none() {
             if let Err(e) = docs_generator::generate_docs(
-                &src, &b.out_dir.join("docs"), &head.theme, &head.page_title,
+                &src,
+                &b.out_dir.join("docs"),
+                &head.theme,
+                &head.page_title,
             ) {
                 ui::warning(&format!("docs generation: {e}"));
             }

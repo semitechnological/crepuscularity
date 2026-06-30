@@ -28,7 +28,11 @@ pub(crate) fn generate_docs(
         if path.extension().and_then(|e| e.to_str()) != Some("md") {
             continue;
         }
-        let stem = path.file_stem().and_then(|s| s.to_str()).map(String::from).unwrap_or_default();
+        let stem = path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .map(String::from)
+            .unwrap_or_default();
         let content = std::fs::read_to_string(&path)?;
         let (title, body_html) = render_md(&content);
         pages.push((stem.clone(), title.clone()));
@@ -43,11 +47,14 @@ pub(crate) fn generate_docs(
     }
 
     // Search index
-    let idx: Vec<serde_json::Value> = pages.iter().map(|(stem, title)| {
-        serde_json::json!({"path": format!("{stem}.html"), "title": title})
-    }).collect();
-    std::fs::write(out_dir.join("docs-search-index.json"),
-        serde_json::to_string_pretty(&serde_json::json!(idx))?)?;
+    let idx: Vec<serde_json::Value> = pages
+        .iter()
+        .map(|(stem, title)| serde_json::json!({"path": format!("{stem}.html"), "title": title}))
+        .collect();
+    std::fs::write(
+        out_dir.join("docs-search-index.json"),
+        serde_json::to_string_pretty(&serde_json::json!(idx))?,
+    )?;
 
     Ok(())
 }
@@ -67,15 +74,24 @@ fn render_md(md: &str) -> (String, String) {
     }
     let mut body = String::new();
     html::push_html(&mut body, Parser::new_ext(md, opts));
-    if title.is_empty() { title = "Documentation".into(); }
+    if title.is_empty() {
+        title = "Documentation".into();
+    }
     (title, body)
 }
 
 fn render_nav(pages: &[(String, String)], current: &str) -> String {
     let mut items = String::new();
     for (stem, page_title) in pages {
-        let active = if stem == current { " class=\"active\"" } else { "" };
-        items.push_str(&format!("<li><a href=\"{stem}.html\"{active}>{}</a></li>", esc(page_title)));
+        let active = if stem == current {
+            " class=\"active\""
+        } else {
+            ""
+        };
+        items.push_str(&format!(
+            "<li><a href=\"{stem}.html\"{active}>{}</a></li>",
+            esc(page_title)
+        ));
     }
     format!("<nav aria-label=\"Documentation\"><ul class=\"doc-nav\">{items}</ul></nav>")
 }
@@ -134,5 +150,8 @@ fn render_shell(body: &str, title: &str, nav: &str, theme: &ThemeCss, site_name:
 }
 
 fn esc(s: &str) -> String {
-    s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;").replace('"', "&quot;")
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
 }
