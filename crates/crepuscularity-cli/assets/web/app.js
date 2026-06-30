@@ -308,18 +308,26 @@ async function main() {
   currentBundle = bundle;
   currentIslandManifest = await loadIslandManifest();
 
-  await wasmPromise;
   const root = document.getElementById("crepus-root");
   if (root) {
     currentRoot = root;
-    if (!(root.querySelector("[data-crepus-root]") || root.querySelector("[data-crepus-id]"))) {
+    const hasSsr = root.querySelector("[data-crepus-root]") || root.querySelector("[data-crepus-id]");
+    if (hasSsr) {
+      // ponytail: reveal SSR content immediately — UnoCSS already scanned before app.js loads
+      initDelegatedEvents(root);
+      root.style.opacity = "1";
+      // WASM needed for islands, signal bindings, and heading animations
+      await wasmPromise;
+      initInteractive(root);
+      if (window.__unocss_runtime) window.__unocss_runtime.extractAll();
+    } else {
+      await wasmPromise;
       setRootHtml(root, runtime.crepus_render(JSON.stringify(bundle)));
+      initDelegatedEvents(root);
+      initInteractive(root);
+      if (window.__unocss_runtime) window.__unocss_runtime.extractAll();
+      root.style.opacity = "1";
     }
-    initDelegatedEvents(root);
-    initInteractive(root);
-    if (window.__unocss_runtime) window.__unocss_runtime.extractAll();
-    // ponytail: reveal content after UnoCSS has processed
-    root.style.opacity = "1";
   }
 }
 
