@@ -36,6 +36,8 @@ __CREPUS_EXTRA_HEAD__
       display: block;
       will-change: transform, opacity, filter;
     }
+    /* ponytail: hide until UnoCSS + app.js are ready to prevent FOUC */
+    #crepus-root { opacity: 0; }
   </style>
   <script src="./vendor/unocss.js"></script>
 </head>

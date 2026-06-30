@@ -318,6 +318,8 @@ async function main() {
     initDelegatedEvents(root);
     initInteractive(root);
     if (window.__unocss_runtime) window.__unocss_runtime.extractAll();
+    // ponytail: reveal content after UnoCSS has processed
+    root.style.opacity = "1";
   }
 }
 
@@ -326,6 +328,7 @@ main().catch((e) => {
   const root = document.getElementById("crepus-root");
   if (root) {
     root.textContent = "";
+    root.style.opacity = "1";
     const wrap = document.createElement("div");
     wrap.style.cssText = "padding:2rem;font-family:monospace;color:#ef4444";
     const strong = document.createElement("strong");
