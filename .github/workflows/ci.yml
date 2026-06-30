@@ -15,7 +15,6 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
-  WASM_BINDGEN_VERSION: 0.2.122
 
 jobs:
   test:
@@ -59,7 +58,9 @@ jobs:
       - name: WASM target and wasm-bindgen (crepus web build integration tests)
         run: |
           rustup target add wasm32-unknown-unknown
-          cargo install wasm-bindgen-cli --version "$WASM_BINDGEN_VERSION" --locked
+          VERSION=$(grep -A2 'name = "wasm-bindgen"' Cargo.lock | grep '^version' | head -1 | sed 's/version = "\(.*\)"/\1/')
+          echo "wasm-bindgen $VERSION (from Cargo.lock)"
+          cargo install wasm-bindgen-cli --version "$VERSION" --locked
         shell: bash
 
       - name: Check formatting
@@ -245,7 +246,9 @@ jobs:
       - name: Install WASM target + wasm-bindgen
         run: |
           rustup target add wasm32-unknown-unknown
-          cargo install wasm-bindgen-cli --version "$WASM_BINDGEN_VERSION" --locked
+          VERSION=$(grep -A2 'name = "wasm-bindgen"' Cargo.lock | grep '^version' | head -1 | sed 's/version = "\(.*\)"/\1/')
+          echo "wasm-bindgen $VERSION (from Cargo.lock)"
+          cargo install wasm-bindgen-cli --version "$VERSION" --locked
 
       - name: Build WASM client
         run: |

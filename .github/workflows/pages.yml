@@ -16,9 +16,6 @@ concurrency:
   group: pages
   cancel-in-progress: true
 
-env:
-  WASM_BINDGEN_VERSION: 0.2.122
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -35,7 +32,9 @@ jobs:
       - name: WASM + wasm-bindgen
         run: |
           rustup target add wasm32-unknown-unknown
-          cargo install wasm-bindgen-cli --version "$WASM_BINDGEN_VERSION" --locked
+          VERSION=$(grep -A2 'name = "wasm-bindgen"' Cargo.lock | grep '^version' | head -1 | sed 's/version = "\(.*\)"/\1/')
+          echo "wasm-bindgen $VERSION (from Cargo.lock)"
+          cargo install wasm-bindgen-cli --version "$VERSION" --locked
 
       - name: Build docs site
         run: |
