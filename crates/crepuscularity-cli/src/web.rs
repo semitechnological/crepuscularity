@@ -21,6 +21,7 @@ use std::time::Instant;
 
 use crate::build_options::BuildOptions;
 use crate::ui;
+use crepuscularity_web::render_bundle_with_ssr;
 use crate::wasm_bundle::{
     cargo_build_wasm32, find_wasm_file, run_wasm_bindgen, run_wasm_opt, wasm_profile_dirs,
     WasmOptStatus,
@@ -575,7 +576,15 @@ pub(crate) fn build_site_wasm(cli: &WebBuildArgs) {
     }
 
     copy_unocss(&vendor_dir);
-    let index_html = render_index_html(&head, &google_fonts, &inline_css, &template_head_html);
+    let mut index_html = render_index_html(&head, &google_fonts, &inline_css, &template_head_html);
+    // SSR: pre-render entry template at build time for instant first paint
+    if let Ok(ssr_html) = render_bundle_with_ssr(&bundle_str, true) {
+        let needle = r#"<div id="crepus-root"></div>"#;
+        if let Some(pos) = index_html.find(needle) {
+            let replacement = format!(r#"<div id="crepus-root">{}</div>"#, ssr_html);
+            index_html.replace_range(pos..pos + needle.len(), &replacement);
+        }
+    }
     std::fs::write(b.out_dir.join(".nojekyll"), b"")
         .unwrap_or_else(|e| ui::error(&format!("write .nojekyll: {e}")));
     std::fs::write(b.out_dir.join("index.html"), index_html).unwrap_or_else(|e| {

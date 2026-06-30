@@ -54,8 +54,8 @@ pub fn create_watcher(
     let target = canonical_target.clone();
     let root = watch_dir.clone();
 
-    let mut watcher = notify::recommended_watcher(move |res: notify::Result<notify::Event>| {
-        match res {
+    let mut watcher =
+        notify::recommended_watcher(move |res: notify::Result<notify::Event>| match res {
             Ok(ev) => {
                 if !is_relevant_kind(&ev.kind) {
                     return;
@@ -68,9 +68,8 @@ pub fn create_watcher(
                 }
             }
             Err(e) => eprintln!("[crepuscularity-{label}] watcher error: {e}"),
-        }
-    })
-    .map_err(|e| format!("could not create file watcher: {e}"))?;
+        })
+        .map_err(|e| format!("could not create file watcher: {e}"))?;
 
     watcher
         .watch(&watch_dir, notify::RecursiveMode::Recursive)
@@ -84,9 +83,7 @@ pub fn create_watcher(
 pub fn is_relevant_kind(kind: &notify::EventKind) -> bool {
     matches!(
         kind,
-        notify::EventKind::Modify(_)
-            | notify::EventKind::Create(_)
-            | notify::EventKind::Remove(_)
+        notify::EventKind::Modify(_) | notify::EventKind::Create(_) | notify::EventKind::Remove(_)
     )
 }
 

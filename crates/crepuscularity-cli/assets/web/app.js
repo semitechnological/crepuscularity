@@ -291,8 +291,11 @@ window.addEventListener("crepus-rerender-editor", () => {
 });
 
 async function main() {
-  await init();
-  const res = await fetch("./crepus-bundle.json", { cache: "no-store" });
+  // ponytail: parallelize WASM compilation + bundle fetch
+  const [, res] = await Promise.all([
+    init(),
+    fetch("./crepus-bundle.json", { cache: "no-store" }),
+  ]);
   if (!res.ok) {
     throw new Error(`crepus-bundle.json: HTTP ${res.status}`);
   }
@@ -302,13 +305,15 @@ async function main() {
   const root = document.getElementById("crepus-root");
   if (root) {
     currentRoot = root;
-    setRootHtml(root, runtime.crepus_render(JSON.stringify(bundle)));
+    // ponytail: SSR content already rendered — skip full render, just init events
+    if (root.querySelector("[data-crepus-root]") || root.querySelector("[data-crepus-id]")) {
+      // first paint from SSR, WASM only needed for interactivity
+    } else {
+      setRootHtml(root, runtime.crepus_render(JSON.stringify(bundle)));
+    }
     initDelegatedEvents(root);
     initInteractive(root);
-    // Force UnoCSS to re-extract after WASM render
-    if (window.__unocss_runtime) {
-      window.__unocss_runtime.extractAll();
-    }
+    if (window.__unocss_runtime) window.__unocss_runtime.extractAll();
   }
 }
 

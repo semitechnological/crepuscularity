@@ -2,9 +2,9 @@
 //!
 //! Thin re-export of [`crepuscularity_core::watch::create_watcher`].
 
+use notify::Watcher;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
-use notify::Watcher;
 
 /// Create and start a file-system watcher rooted at the parent directory of
 /// `path`.
