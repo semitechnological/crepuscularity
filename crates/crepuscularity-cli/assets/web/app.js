@@ -291,24 +291,28 @@ window.addEventListener("crepus-rerender-editor", () => {
 });
 
 async function main() {
-  // ponytail: parallelize WASM compilation + bundle fetch
-  const [, res] = await Promise.all([
-    init(),
-    fetch("./crepus-bundle.json", { cache: "no-store" }),
-  ]);
-  if (!res.ok) {
-    throw new Error(`crepus-bundle.json: HTTP ${res.status}`);
+  // ponytail: inline bundle from SSR HTML — saves one HTTP round trip
+  const bundleEl = document.getElementById("__crepus_bundle__");
+  let bundle, wasmPromise;
+  if (bundleEl) {
+    bundle = JSON.parse(bundleEl.textContent);
+    bundleEl.remove();
+    wasmPromise = init(); // start WASM init, no fetch needed
+  } else {
+    // start both in parallel
+    wasmPromise = init();
+    const res = await fetch("./crepus-bundle.json", { cache: "no-store" });
+    if (!res.ok) throw new Error(`crepus-bundle.json: HTTP ${res.status}`);
+    bundle = await res.json();
   }
-  const bundle = await res.json();
   currentBundle = bundle;
   currentIslandManifest = await loadIslandManifest();
+
+  await wasmPromise;
   const root = document.getElementById("crepus-root");
   if (root) {
     currentRoot = root;
-    // ponytail: SSR content already rendered — skip full render, just init events
-    if (root.querySelector("[data-crepus-root]") || root.querySelector("[data-crepus-id]")) {
-      // first paint from SSR, WASM only needed for interactivity
-    } else {
+    if (!(root.querySelector("[data-crepus-root]") || root.querySelector("[data-crepus-id]"))) {
       setRootHtml(root, runtime.crepus_render(JSON.stringify(bundle)));
     }
     initDelegatedEvents(root);

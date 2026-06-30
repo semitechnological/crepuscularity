@@ -323,6 +323,11 @@ crate-type = ["cdylib", "rlib"]
 crepuscularity-web = "0.4.3"
 wasm-bindgen = "0.2"
 
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = "z"
+
 [workspace]
 "#
     );
@@ -577,11 +582,15 @@ pub(crate) fn build_site_wasm(cli: &WebBuildArgs) {
 
     copy_unocss(&vendor_dir);
     let mut index_html = render_index_html(&head, &google_fonts, &inline_css, &template_head_html);
-    // SSR: pre-render entry template at build time for instant first paint
+    // SSR + inline bundle: pre-render entry, embed bundle JSON to eliminate HTTP fetch
     if let Ok(ssr_html) = render_bundle_with_ssr(&bundle_str, true) {
         let needle = r#"<div id="crepus-root"></div>"#;
         if let Some(pos) = index_html.find(needle) {
-            let replacement = format!(r#"<div id="crepus-root">{}</div>"#, ssr_html);
+            let bundle_escaped = ssr_escape_json(&bundle_str);
+            let replacement = format!(
+                r#"<div id="crepus-root">{}</div><script id="__crepus_bundle__" type="application/json">{}</script>"#,
+                ssr_html, bundle_escaped
+            );
             index_html.replace_range(pos..pos + needle.len(), &replacement);
         }
     }
@@ -974,6 +983,14 @@ pub(crate) fn render_index_html(
         .replace("__THEME_TEXT__", &escape_html_attr(&t.text))
         .replace("__THEME_MUTED__", &escape_html_attr(&t.muted))
         .replace("__THEME_BORDER__", &escape_html_attr(&t.border))
+}
+
+/// Escape JSON string for safe embedding in HTML `<script type="application/json">`.
+/// Replaces `</script>` with the Unicode escape sequence so the parser doesn't see a closing tag.
+fn ssr_escape_json(json: &str) -> String {
+    json.replace("</script>", "<\\/script>")
+        .replace("</Script>", "<\\/Script>")
+        .replace("</SCRIPT>", "<\\/SCRIPT>")
 }
 
 fn render_seo_head(head: &SiteHead) -> String {
