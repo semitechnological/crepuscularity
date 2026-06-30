@@ -833,10 +833,7 @@ fn serve_index_document(
         if let Some(pos) = html.find(needle) {
             let ssr_inner = match render_from_files_with_ssr(&files, entry, &ctx, true) {
                 Ok(h) => h,
-                Err(e) => format!(
-                    "<!-- ssr error: {} -->",
-                    html_escape(&e.to_string())
-                ),
+                Err(e) => format!("<!-- ssr error: {} -->", html_escape(&e.to_string())),
             };
             // Embed bundle JSON inline to eliminate separate HTTP fetch
             let bundle = serde_json::json!({"entry": entry, "files": &files});
