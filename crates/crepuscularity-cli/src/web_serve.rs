@@ -39,7 +39,7 @@ use rayon::iter::ParallelIterator;
 use serde_json::json;
 
 use crepuscularity_core::context::TemplateContext;
-use crepuscularity_web::render_from_files;
+use crepuscularity_web::{render_from_files, render_from_files_with_ssr};
 
 use axum::extract::State;
 
@@ -808,7 +808,8 @@ fn handle_connection(mut stream: TcpStream, ctx: DevRequestContext) {
     }
 }
 
-/// Full production-style document: UnoCSS + `app.js` + WASM bootstrap; `#crepus-root` filled client-side.
+/// Full document with SSR: pre-renders entry template server-side so content is visible
+/// immediately while WASM loads in background for interactivity.
 fn serve_index_document(
     stream: &mut TcpStream,
     vfm: &Arc<RwLock<HashMap<String, String>>>,
@@ -826,6 +827,20 @@ fn serve_index_document(
         let msg = format!("file not found in virtual fs: {entry}");
         html = error_document(&msg);
     } else {
+        // SSR: render entry template server-side so first paint is instant
+        let ctx = TemplateContext::new();
+        let needle = r#"<div id="crepus-root"></div>"#;
+        if let Some(pos) = html.find(needle) {
+            let ssr_inner = match render_from_files_with_ssr(&files, entry, &ctx, true) {
+                Ok(h) => h,
+                Err(e) => format!(
+                    "<!-- ssr error: {} -->",
+                    html_escape(&e.to_string())
+                ),
+            };
+            let replacement = format!(r#"<div id="crepus-root">{}</div>"#, ssr_inner);
+            html.replace_range(pos..pos + needle.len(), &replacement);
+        }
         inject_reload_before_body_end(&mut html);
     }
 

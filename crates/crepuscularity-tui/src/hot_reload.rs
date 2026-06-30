@@ -176,7 +176,7 @@ impl HotTemplate {
         self.template.draw_full(frame)
     }
 
-        #[cfg(test)]
+    #[cfg(test)]
     pub(crate) fn changed_handle(&self) -> Arc<Mutex<bool>> {
         Arc::clone(&self.changed)
     }
