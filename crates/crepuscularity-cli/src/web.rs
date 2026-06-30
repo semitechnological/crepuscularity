@@ -20,6 +20,7 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use crate::build_options::BuildOptions;
+use crate::docs_generator;
 use crate::ui;
 use crate::wasm_bundle::{
     cargo_build_wasm32, find_wasm_file, run_wasm_bindgen, run_wasm_opt, wasm_profile_dirs,
@@ -628,6 +629,20 @@ pub(crate) fn build_site_wasm(cli: &WebBuildArgs) {
         copy_dir_recursive(&static_src, &b.out_dir.join("static")).unwrap_or_else(|e| {
             ui::error(&format!("copy static/: {e}"));
         });
+    }
+
+    // Auto-detect docs/ directory (like Svelte/Next.js — just works)
+    if let Some(src) = docs_src_candidate(&b.site_dir) {
+        let has_md = std::fs::read_dir(&src).is_ok_and(|mut d| d.any(|e| e.ok().is_some_and(|e| {
+            e.path().extension().and_then(|x| x.to_str()) == Some("md")
+        })));
+        if has_md && b.meta.as_ref().and_then(|m| m.docs.as_ref()).is_none() {
+            if let Err(e) = docs_generator::generate_docs(
+                &src, &b.out_dir.join("docs"), &head.theme, &head.page_title,
+            ) {
+                ui::warning(&format!("docs generation: {e}"));
+            }
+        }
     }
 
     if let Err(e) = crate::web_islands::build_web_islands(&b.site_dir, &b.out_dir, &files) {
@@ -1542,6 +1557,27 @@ fn escape_xml_text(s: &str) -> String {
     s.replace('&', "&amp;")
         .replace('<', "&lt;")
         .replace('>', "&gt;")
+}
+
+/// Find a docs/ or public/ directory relative to the site dir.
+fn docs_src_candidate(site_dir: &Path) -> Option<PathBuf> {
+    let dirs = [
+        site_dir.join("../docs"),
+        site_dir.join("docs"),
+        site_dir.join("public"),
+    ];
+    for d in &dirs {
+        if d.is_dir() {
+            return Some(d.clone());
+        }
+    }
+    if let Some(parent) = site_dir.parent() {
+        let p = parent.join("docs");
+        if p.is_dir() {
+            return Some(p);
+        }
+    }
+    None
 }
 
 fn render_head_raw(head_raw: &str) -> String {

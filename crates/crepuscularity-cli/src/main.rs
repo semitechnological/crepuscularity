@@ -44,6 +44,7 @@ mod build_options;
 #[cfg(feature = "desktop")]
 mod builder;
 mod crepus_toml;
+mod docs_generator;
 #[cfg(feature = "desktop")]
 mod dev;
 mod embedded;
