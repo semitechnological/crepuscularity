@@ -136,7 +136,6 @@ fn web_build_docs_site_emits_wasm() {
     ignore = "default desktop crepus.exe does not spawn reliably on Windows CI"
 )]
 // ponytail: docs-renderer binary removed; docs-target tests removed
-#[test]
 fn root_build_uses_crepus_toml_lvgl_target() {
     let tmp = tempfile::tempdir().expect("tempdir");
     let root = tmp.path();

@@ -21,12 +21,12 @@ use std::time::Instant;
 
 use crate::build_options::BuildOptions;
 use crate::ui;
-use crepuscularity_web::render_bundle_with_ssr;
 use crate::wasm_bundle::{
     cargo_build_wasm32, find_wasm_file, run_wasm_bindgen, run_wasm_opt, wasm_profile_dirs,
     WasmOptStatus,
 };
 use crate::web_serve::ServeOptions;
+use crepuscularity_web::render_bundle_with_ssr;
 
 const WEB_INDEX_HTML: &str = include_str!("../assets/web/index.html");
 const WEB_APP_JS: &str = include_str!("../assets/web/app.js");
