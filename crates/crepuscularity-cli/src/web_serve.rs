@@ -838,7 +838,16 @@ fn serve_index_document(
                     html_escape(&e.to_string())
                 ),
             };
-            let replacement = format!(r#"<div id="crepus-root">{}</div>"#, ssr_inner);
+            // Embed bundle JSON inline to eliminate separate HTTP fetch
+            let bundle = serde_json::json!({"entry": entry, "files": &files});
+            let bundle_str = serde_json::to_string(&bundle).unwrap_or_default();
+            let bundle_escaped = bundle_str
+                .replace("</script>", "<\\/script>")
+                .replace("</Script>", "<\\/Script>");
+            let replacement = format!(
+                r#"<div id="crepus-root">{}</div><script id="__crepus_bundle__" type="application/json">{}</script>"#,
+                ssr_inner, bundle_escaped
+            );
             html.replace_range(pos..pos + needle.len(), &replacement);
         }
         inject_reload_before_body_end(&mut html);

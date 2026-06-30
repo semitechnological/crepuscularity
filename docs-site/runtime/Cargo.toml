@@ -16,4 +16,10 @@ wasm-bindgen = "=0.2.121"
 wasm-bindgen-futures = "0.4"
 web-sys = { version = "0.3", features = ["Document", "Element", "Event", "EventTarget", "MouseEvent", "NodeList", "PointerEvent", "Response", "Window"] }
 
+# ponytail: LTO + size opts shrinks WASM ~40% over wasm-opt alone
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = "z"
+
 [workspace]

@@ -1770,7 +1770,7 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-cli"
-version = "0.9.10"
+version = "0.9.11"
 dependencies = [
  "axum",
  "console",
