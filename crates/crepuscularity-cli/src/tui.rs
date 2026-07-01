@@ -188,43 +188,6 @@ fn delegate_to_cargo(mut cmd: Command, verb: &str) {
     }
 }
 
-fn print_tui_usage() {
-    eprintln!(
-        "{}",
-        style("crepus tui — Terminal User Interface applications")
-            .cyan()
-            .bold()
-    );
-    eprintln!();
-    eprintln!("{}", style("COMMANDS").dim());
-    eprintln!(
-        "  {}  {}",
-        style("new <name>      ").green(),
-        style("scaffold a new TUI app").dim()
-    );
-    eprintln!(
-        "  {}  {}",
-        style("build [--debug|--dev|--release] [--opt-level LEVEL]").green(),
-        style("build the TUI app").dim()
-    );
-    eprintln!(
-        "  {}  {}",
-        style("run              ").green(),
-        style("run the TUI app").dim()
-    );
-    eprintln!(
-        "  {}  {}",
-        style("preview <file>  ").green(),
-        style("live-preview a .crepus template in the terminal").dim()
-    );
-    eprintln!();
-    eprintln!("{}", style("EXAMPLES").dim());
-    eprintln!("  crepus tui new my-tui-app");
-    eprintln!("  cd my-tui-app && crepus tui build");
-    eprintln!("  crepus tui run");
-    eprintln!("  crepus tui preview app.crepus     # hot-reload preview, q/Esc to quit");
-}
-
 /// Live-preview a `.crepus` template in the current terminal.
 ///
 /// Sets up crossterm raw mode via `ratatui::init`, watches the file for

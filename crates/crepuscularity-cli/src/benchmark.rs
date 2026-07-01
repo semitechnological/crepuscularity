@@ -623,14 +623,6 @@ fn print_collapsed_elide(s: &str, max: usize) -> String {
     }
 }
 
-/// Drop leading `all` / `run` so `crepus benchmark all` is an explicit full run.
-fn normalize_benchmark_invocation_args(args: &[String]) -> Vec<String> {
-    match args.first().map(|s| s.as_str()) {
-        Some("all" | "run") => args[1..].to_vec(),
-        _ => args.to_vec(),
-    }
-}
-
 #[allow(clippy::too_many_arguments)]
 fn print_run_header(
     cfg_path: &Path,
@@ -682,71 +674,6 @@ fn elide_shell_script(s: &str, max: usize) -> String {
     } else {
         format!("{}…", &t[..max])
     }
-}
-
-fn print_benchmark_usage() {
-    eprintln!("{} benchmark", style("crepus").cyan().bold());
-    eprintln!();
-    eprintln!("{}", style("USAGE").dim());
-    eprintln!(
-        "  crepus benchmark [all|run] [--config PATH] [--suite web|desktop|webext|all]\n\
-                   [--only id,id] [--work-root DIR] [--repo DIR] [--clean] [--dry-run]\n\
-                   [--json] [-v|--verbose] [-q|--quiet] [--no-tui] [--memory] [--no-memory]"
-    );
-    eprintln!("  crepus benchmark check [--config PATH] [--suite …] [--only id,id] [--json]");
-    eprintln!();
-    eprintln!(
-        "{}",
-        style("Default: compact (child output buffered). -v streams live npm/cargo logs. TTY: end dashboard (q to close).")
-            .dim()
-    );
-    eprintln!();
-    eprintln!(
-        "{}",
-        style("With no --suite / --only, every target in benchmark.toml runs.").dim()
-    );
-    eprintln!(
-        "{}",
-        style(
-            "check probes CLIs (git, cargo, node, npm, dotnet, …) needed by the selected targets."
-        )
-        .dim()
-    );
-    eprintln!();
-    eprintln!("{}", style("EXAMPLES").dim());
-    eprintln!("  crepus benchmark all");
-    eprintln!("  crepus benchmark --config examples/benchmarks/benchmark.toml");
-    eprintln!("  crepus benchmark check --config examples/benchmarks/benchmark.toml");
-    eprintln!("  crepus benchmark --only crepus-web,crepus-webext --json > bench.json");
-    eprintln!("  examples/benchmarks/run-all.sh --json   # same from repo root via shell");
-    eprintln!(
-        "{}",
-        style("JSON includes summary.by_wall_time (ranked timings + % of total wall).").dim()
-    );
-}
-
-fn print_benchmark_check_usage() {
-    eprintln!("{} benchmark check", style("crepus").cyan().bold());
-    eprintln!();
-    eprintln!("{}", style("USAGE").dim());
-    eprintln!(
-        "  crepus benchmark check [--config PATH] [--suite web|desktop|webext|all]\n\
-                   [--only id,id] [--repo DIR] [--json]"
-    );
-    eprintln!();
-    eprintln!(
-        "{}",
-        style(
-            "Walks the same target filters as `crepus benchmark`, runs quick version probes,\n\
-and lists install hints for anything missing. Exit 1 if a non-optional target lacks a tool."
-        )
-        .dim()
-    );
-    eprintln!();
-    eprintln!("{}", style("EXAMPLES").dim());
-    eprintln!("  crepus benchmark check");
-    eprintln!("  crepus benchmark check help");
-    eprintln!("  crepus benchmark check --only nextjs,dotnet-avalonia --json");
 }
 
 fn planned_step_count(t: &BenchTarget) -> usize {
