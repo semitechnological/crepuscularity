@@ -21,7 +21,9 @@ python3 -m unittest discover plugins/python
 go test ./plugins/go/...
 bun --cwd plugins test
 command -v v >/dev/null 2>&1 && v -gc none test plugins/v || echo "skipping V plugin (not installed)"
-zig build test --build-file plugins/build.zig
+# ponytail: shell smoke only — zig build test links build.zig runner and breaks on macOS CI (Zig 0.14)
+fixture="$ROOT/plugins/fixtures/hello.crepus"
+"$CREPUS_BIN" native ir "$fixture" | grep -q '"version":4'
 cargo test --manifest-path plugins/rust/Cargo.toml
 swift build --package-path plugins
 gcc plugins/c/crepuscularity_plugin.c -o /tmp/crepus-c-smoke
