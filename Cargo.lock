@@ -9718,6 +9718,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "weather"
+version = "0.3.0"
+dependencies = [
+ "crepuscularity-gpui",
+ "gpui",
+]
+
+[[package]]
 name = "web-sys"
 version = "0.3.102"
 source = "registry+https://github.com/rust-lang/crates.io-index"
