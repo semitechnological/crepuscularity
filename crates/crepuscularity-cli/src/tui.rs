@@ -29,9 +29,9 @@ pub fn execute(cmd: TuiCommands) {
         TuiCommands::Run { build, extra } => {
             run_tui_app(build.into_options_or_exit(), &extra);
         }
-        TuiCommands::Preview { file } => {
+        TuiCommands::Preview { file: path } => {
             #[cfg(feature = "tui")]
-            preview_tui_template(&file);
+            preview_tui_template(&path);
             #[cfg(not(feature = "tui"))]
             ui::error("TUI preview not compiled in. Rebuild crepus with --features tui.");
         }

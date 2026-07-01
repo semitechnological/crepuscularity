@@ -381,14 +381,22 @@ pub enum MobileCommands {
     Build {
         #[arg(long, default_value = "all")]
         platform: MobilePlatformArg,
-        #[arg(last = true)]
-        rest: Vec<String>,
+        #[arg(long)]
+        dir: Option<PathBuf>,
+        #[arg(long, default_value = "simulator")]
+        target: NativeIosTargetArg,
+        #[arg(long, default_value = "Debug")]
+        configuration: String,
+        #[arg(long, default_value = "Debug")]
+        flavor: String,
     },
     Run {
-        #[arg(long)]
+        #[arg(long, default_value = "android")]
         platform: MobilePlatformArg,
-        #[arg(last = true)]
-        rest: Vec<String>,
+        #[arg(long)]
+        dir: Option<PathBuf>,
+        #[arg(long, default_value = "Debug")]
+        flavor: String,
     },
     Doctor {
         #[arg(long, default_value = "all")]
@@ -397,17 +405,17 @@ pub enum MobileCommands {
     Sync {
         #[arg(default_value = "views/main.crepus")]
         template: PathBuf,
-        #[arg(long)]
-        dir: Option<PathBuf>,
+        #[arg(long, default_value = ".")]
+        dir: PathBuf,
         #[arg(long = "var", value_name = "KEY=VALUE")]
         vars: Vec<String>,
         #[arg(long)]
         pretty: bool,
-        #[arg(last = true)]
-        rest: Vec<String>,
     },
     Codegen {
         template: Option<PathBuf>,
+        #[arg(long, default_value = ".")]
+        dir: PathBuf,
         #[arg(long)]
         platform: Option<MobileCodegenPlatformArg>,
         #[arg(long)]
@@ -416,8 +424,6 @@ pub enum MobileCommands {
         view_name: Option<String>,
         #[arg(long = "var", value_name = "KEY=VALUE")]
         vars: Vec<String>,
-        #[arg(last = true)]
-        rest: Vec<String>,
     },
 }
 

@@ -17,9 +17,6 @@ use serde_json::Value;
 
 use crate::{native, ui};
 
-const DEFAULT_PORT: u16 = 4001;
-const DEFAULT_TEMPLATE: &str = "views/main.crepus";
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum MobilePlatform {
     Ios,
@@ -48,11 +45,12 @@ struct MobileDevState {
     last_event: RwLock<HotReloadEnvelope>,
 }
 
+use crate::cli::NativeIosTargetArg;
 use crate::cli::{
     MobileCodegenPlatformArg, MobileCommands, NativeBuildCommands, NativeCodegenCliArgs,
     NativeCodegenPlatformArg, NativeCommands, NativeRunCommands, NativeSyncArgs,
 };
-use crate::dispatch::{mobile_platform, native_ios_target_from_rest};
+use crate::dispatch::mobile_platform;
 
 pub fn execute(cmd: MobileCommands) {
     match cmd {
@@ -64,11 +62,7 @@ pub fn execute(cmd: MobileCommands) {
             dir,
             vars,
             pretty,
-            rest,
         } => {
-            let dir = dir.unwrap_or_else(|| {
-                parse_dir_from_rest(&rest).unwrap_or_else(|_| PathBuf::from("."))
-            });
             native::execute(NativeCommands::Sync {
                 args: NativeSyncArgs {
                     template: Some(template),
@@ -84,22 +78,34 @@ pub fn execute(cmd: MobileCommands) {
         }
         MobileCommands::Codegen {
             template,
+            dir,
             platform,
             out,
             view_name,
             vars,
-            rest,
         } => {
-            run_codegen_full(template, platform, out, view_name, &vars, &rest)
+            run_codegen_full(template, dir, platform, out, view_name, &vars)
                 .unwrap_or_else(|e| ui::error(&e));
         }
-        MobileCommands::Build { platform, rest } => {
-            run_build_platform(mobile_platform(platform), &rest)
-        }
-        MobileCommands::Run { platform, rest } => {
-            run_mobile_platform(mobile_platform(platform), &rest)
-        }
-        MobileCommands::Doctor { platform } => run_doctor_platform(mobile_platform(platform)),
+        MobileCommands::Build {
+            platform,
+            dir,
+            target,
+            configuration,
+            flavor,
+        } => run_mobile_build(
+            mobile_platform(platform),
+            dir,
+            target,
+            configuration,
+            flavor,
+        ),
+        MobileCommands::Run {
+            platform,
+            dir,
+            flavor,
+        } => run_mobile_run(mobile_platform(platform), dir, flavor),
+        MobileCommands::Doctor { platform } => run_doctor(mobile_platform(platform)),
         MobileCommands::Dev {
             dir,
             port,
@@ -130,20 +136,15 @@ pub fn execute(cmd: MobileCommands) {
     }
 }
 
-fn parse_dir_from_rest(rest: &[String]) -> Result<PathBuf, String> {
-    parse_dir_arg(rest)
-}
-
 fn run_codegen_full(
     template: Option<PathBuf>,
+    dir: PathBuf,
     platform: Option<MobileCodegenPlatformArg>,
     out: Option<PathBuf>,
     view_name: Option<String>,
     vars: &[String],
-    rest: &[String],
 ) -> Result<(), String> {
     let template = template.ok_or_else(|| "expected template path".to_string())?;
-    let dir = parse_dir_arg(rest).unwrap_or_else(|_| PathBuf::from("."));
     let view_name = view_name.unwrap_or_else(|| "CrepusGeneratedView".into());
     let plats = match platform {
         None => vec![MobilePlatform::Ios, MobilePlatform::Android],
@@ -188,75 +189,50 @@ fn run_codegen_full(
     Ok(())
 }
 
-fn run_doctor_platform(platform: MobilePlatform) {
-    run_doctor_strings(platform_to_cli_args(platform))
-}
-
-fn platform_to_cli_args(platform: MobilePlatform) -> Vec<String> {
-    match platform {
-        MobilePlatform::Ios => vec!["--platform".into(), "ios".into()],
-        MobilePlatform::Android => vec!["--platform".into(), "android".into()],
-        MobilePlatform::All => vec!["--platform".into(), "all".into()],
-    }
-}
-
-fn run_doctor_strings(args: Vec<String>) {
-    run_doctor(&args);
-}
-
-fn run_build_platform(platform: MobilePlatform, rest: &[String]) {
-    run_build_with_platform(platform, rest);
-}
-
-fn run_mobile_platform(platform: MobilePlatform, rest: &[String]) {
-    run_mobile_app_with_platform(platform, rest);
-}
-
-fn run_build_with_platform(platform: MobilePlatform, args: &[String]) {
-    reject_mobile_release_flag(args);
-    let rest = strip_mobile_only_args(args);
-    let dir = native::dir_from_cli_args(&rest);
+fn run_mobile_build(
+    platform: MobilePlatform,
+    dir: Option<PathBuf>,
+    target: NativeIosTargetArg,
+    configuration: String,
+    flavor: String,
+) {
     match platform {
         MobilePlatform::Ios => native::execute(NativeCommands::Build {
             platform: NativeBuildCommands::Ios {
-                dir: Some(dir),
-                target: native_ios_target_from_rest(&rest),
-                configuration: native::configuration_from_cli_args(&rest),
+                dir,
+                target,
+                configuration,
             },
         }),
         MobilePlatform::Android => native::execute(NativeCommands::Build {
-            platform: NativeBuildCommands::Android {
-                dir: Some(dir),
-                flavor: native::flavor_from_cli_args(&rest),
-            },
+            platform: NativeBuildCommands::Android { dir, flavor },
         }),
         MobilePlatform::All => {
-            run_build_with_platform(MobilePlatform::Ios, args);
-            run_build_with_platform(MobilePlatform::Android, args);
+            run_mobile_build(
+                MobilePlatform::Ios,
+                dir.clone(),
+                target,
+                configuration.clone(),
+                flavor.clone(),
+            );
+            run_mobile_build(MobilePlatform::Android, dir, target, configuration, flavor);
         }
     }
 }
 
-fn run_mobile_app_with_platform(platform: MobilePlatform, args: &[String]) {
-    reject_mobile_release_flag(args);
-    let rest = strip_mobile_only_args(args);
-    let dir = native::dir_from_cli_args(&rest);
+fn run_mobile_run(platform: MobilePlatform, dir: Option<PathBuf>, flavor: String) {
     match platform {
         MobilePlatform::Ios => native::execute(NativeCommands::Run {
-            platform: NativeRunCommands::Ios { dir: Some(dir) },
+            platform: NativeRunCommands::Ios { dir },
         }),
         MobilePlatform::Android => native::execute(NativeCommands::Run {
-            platform: NativeRunCommands::Android {
-                dir: Some(dir),
-                flavor: native::flavor_from_cli_args(&rest),
-            },
+            platform: NativeRunCommands::Android { dir, flavor },
         }),
         MobilePlatform::All => ui::error("crepus mobile run expects --platform ios or android"),
     }
 }
 
-fn run_doctor(args: &[String]) {
-    let platform = parse_platform_arg(args).unwrap_or(MobilePlatform::All);
+fn run_doctor(platform: MobilePlatform) {
     let mut ok = true;
     eprintln!("{}", style("crepus mobile doctor").cyan().bold());
     ok &= doctor_command("cargo", &["--version"]);
@@ -558,68 +534,6 @@ fn android_ndk_clang(ndk: &Path) -> Option<PathBuf> {
                 .join("aarch64-linux-android26-clang")
         })
         .find(|path| path.exists())
-}
-
-fn parse_dir_arg(args: &[String]) -> Result<PathBuf, String> {
-    for window in args.windows(2) {
-        if window[0] == "--dir" {
-            return Ok(PathBuf::from(&window[1]));
-        }
-    }
-    for arg in args {
-        if let Some(value) = arg.strip_prefix("--dir=") {
-            return Ok(PathBuf::from(value));
-        }
-    }
-    Ok(PathBuf::from("."))
-}
-
-fn parse_platform_arg(args: &[String]) -> Option<MobilePlatform> {
-    for window in args.windows(2) {
-        if window[0] == "--platform" {
-            return parse_platform_value(&window[1]).ok();
-        }
-    }
-    for arg in args {
-        if let Some(value) = arg.strip_prefix("--platform=") {
-            return parse_platform_value(value).ok();
-        }
-    }
-    None
-}
-
-fn parse_platform_value(raw: &str) -> Result<MobilePlatform, String> {
-    match raw {
-        "ios" | "swift" | "swiftui" => Ok(MobilePlatform::Ios),
-        "android" | "compose" | "kotlin" => Ok(MobilePlatform::Android),
-        "all" => Ok(MobilePlatform::All),
-        _ => Err(format!("unknown mobile platform: {raw}")),
-    }
-}
-
-fn strip_mobile_only_args(args: &[String]) -> Vec<String> {
-    let mut out = Vec::new();
-    let mut i = 0;
-    while i < args.len() {
-        let arg = &args[i];
-        if arg == "--platform" {
-            i += 2;
-            continue;
-        }
-        if arg.starts_with("--platform=") {
-            i += 1;
-            continue;
-        }
-        out.push(arg.clone());
-        i += 1;
-    }
-    out
-}
-
-fn reject_mobile_release_flag(args: &[String]) {
-    if args.iter().any(|arg| arg == "--release") {
-        ui::error("crepus mobile build does not use --release; use --configuration Release for iOS or --flavor Release for Android");
-    }
 }
 
 fn run_dev(args: MobileDevArgs) -> Result<(), String> {

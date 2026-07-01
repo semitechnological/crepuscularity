@@ -3,7 +3,6 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use console::style;
 use crepuscularity_core::context::{TemplateContext, TemplateValue};
 use crepuscularity_core::parser::{parse_component_file, parse_template};
 use crepuscularity_embedded::{write_ppm, Ui};

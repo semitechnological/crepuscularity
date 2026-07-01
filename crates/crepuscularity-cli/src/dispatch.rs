@@ -235,10 +235,3 @@ pub fn native_ios_target(t: NativeIosTargetArg) -> crate::native::IosBuildTarget
         NativeIosTargetArg::Device => crate::native::IosBuildTarget::Device,
     }
 }
-
-pub fn native_ios_target_from_rest(rest: &[String]) -> NativeIosTargetArg {
-    match crate::native::ios_target_from_cli_args(rest) {
-        crate::native::IosBuildTarget::Simulator => NativeIosTargetArg::Simulator,
-        crate::native::IosBuildTarget::Device => NativeIosTargetArg::Device,
-    }
-}

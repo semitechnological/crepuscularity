@@ -40,22 +40,6 @@ pub(crate) enum IosBuildTarget {
     Device,
 }
 
-pub(crate) fn dir_from_cli_args(args: &[String]) -> PathBuf {
-    parse_dir_arg(args)
-}
-
-pub(crate) fn ios_target_from_cli_args(args: &[String]) -> IosBuildTarget {
-    parse_ios_target(args).unwrap_or(IosBuildTarget::Simulator)
-}
-
-pub(crate) fn configuration_from_cli_args(args: &[String]) -> String {
-    parse_configuration(args).unwrap_or_else(|| "Debug".to_string())
-}
-
-pub(crate) fn flavor_from_cli_args(args: &[String]) -> String {
-    parse_flavor(args).unwrap_or_else(|| "Debug".to_string())
-}
-
 pub fn execute(cmd: NativeCommands) {
     match cmd {
         NativeCommands::New { name } => scaffold_native_app(&name),
@@ -159,10 +143,6 @@ fn codegen_from_cli(a: NativeCodegenCliArgs) -> Result<PathBuf, String> {
         ctx_file: a.ctx,
         vars: parse_kv_vars(&a.vars),
     })
-}
-
-pub(crate) fn parse_kv_strings(vars: &[String]) -> Vec<(String, String)> {
-    parse_kv_vars(vars)
 }
 
 fn parse_kv_vars(vars: &[String]) -> Vec<(String, String)> {
@@ -722,93 +702,6 @@ fn scaffold_native_app(name: &str) {
         "                    crepus native build android --dir {dir}",
         dir = name
     );
-}
-
-fn parse_dir_arg(args: &[String]) -> PathBuf {
-    for window in args.windows(2) {
-        if window[0] == "--dir" {
-            return PathBuf::from(&window[1]);
-        }
-    }
-    for arg in args {
-        if let Some(rest) = arg.strip_prefix("--dir=") {
-            return PathBuf::from(rest);
-        }
-    }
-    PathBuf::from(".")
-}
-
-fn parse_flavor(args: &[String]) -> Option<String> {
-    for window in args.windows(2) {
-        if window[0] == "--flavor" {
-            return Some(window[1].clone());
-        }
-    }
-    for arg in args {
-        if let Some(rest) = arg.strip_prefix("--flavor=") {
-            return Some(rest.to_string());
-        }
-    }
-    None
-}
-
-fn parse_ios_target(args: &[String]) -> Option<IosBuildTarget> {
-    for window in args.windows(2) {
-        if window[0] == "--target" {
-            return Some(parse_ios_target_value(&window[1]));
-        }
-    }
-    for arg in args {
-        if let Some(rest) = arg.strip_prefix("--target=") {
-            return Some(parse_ios_target_value(rest));
-        }
-        match arg.as_str() {
-            "--simulator" => return Some(IosBuildTarget::Simulator),
-            "--device" => return Some(IosBuildTarget::Device),
-            _ => {}
-        }
-    }
-    None
-}
-
-fn parse_ios_target_value(value: &str) -> IosBuildTarget {
-    match value {
-        "simulator" | "sim" => IosBuildTarget::Simulator,
-        "device" | "ios" => IosBuildTarget::Device,
-        other => ui::error(&format!(
-            "unknown iOS target '{other}'; expected simulator or device"
-        )),
-    }
-}
-
-fn parse_configuration(args: &[String]) -> Option<String> {
-    for window in args.windows(2) {
-        if window[0] == "--configuration" {
-            return Some(normalize_configuration(&window[1]));
-        }
-    }
-    for arg in args {
-        if let Some(rest) = arg.strip_prefix("--configuration=") {
-            return Some(normalize_configuration(rest));
-        }
-    }
-    None
-}
-
-fn normalize_configuration(value: &str) -> String {
-    match value {
-        "Debug" | "debug" => "Debug".to_string(),
-        "Release" | "release" => "Release".to_string(),
-        other => ui::error(&format!(
-            "unknown iOS configuration '{other}'; expected Debug or Release"
-        )),
-    }
-}
-
-fn reject_native_release_flag(args: &[String]) {
-    if args.iter().any(|arg| arg == "--release") {
-        ui::error("native/mobile builds do not use --release; use --configuration Release for iOS or --flavor Release for Android");
-    }
 }
 
 fn build_ios(dir: &Path, target: IosBuildTarget, configuration: &str) {
@@ -1393,46 +1286,6 @@ mod tests {
         assert_eq!(capitalize_ascii("Release"), "Release");
         assert_eq!(capitalize_ascii(""), "");
         assert_eq!(capitalize_ascii("a"), "A");
-    }
-
-    #[test]
-    fn parse_dir_arg_handles_both_styles() {
-        let v = vec!["--dir".to_string(), "/tmp/x".to_string()];
-        assert_eq!(parse_dir_arg(&v), PathBuf::from("/tmp/x"));
-        let v = vec!["--dir=/tmp/y".to_string()];
-        assert_eq!(parse_dir_arg(&v), PathBuf::from("/tmp/y"));
-        let v: Vec<String> = vec![];
-        assert_eq!(parse_dir_arg(&v), PathBuf::from("."));
-    }
-
-    #[test]
-    fn parse_flavor_handles_both_styles() {
-        let v = vec!["--flavor".to_string(), "Release".to_string()];
-        assert_eq!(parse_flavor(&v), Some("Release".to_string()));
-        let v = vec!["--flavor=Debug".to_string()];
-        assert_eq!(parse_flavor(&v), Some("Debug".to_string()));
-        let v: Vec<String> = vec![];
-        assert_eq!(parse_flavor(&v), None);
-    }
-
-    #[test]
-    fn parse_ios_target_handles_device_and_simulator() {
-        let v = vec!["--target".to_string(), "device".to_string()];
-        assert_eq!(parse_ios_target(&v), Some(IosBuildTarget::Device));
-        let v = vec!["--target=simulator".to_string()];
-        assert_eq!(parse_ios_target(&v), Some(IosBuildTarget::Simulator));
-        let v = vec!["--device".to_string()];
-        assert_eq!(parse_ios_target(&v), Some(IosBuildTarget::Device));
-    }
-
-    #[test]
-    fn parse_configuration_handles_both_styles() {
-        let v = vec!["--configuration".to_string(), "release".to_string()];
-        assert_eq!(parse_configuration(&v), Some("Release".to_string()));
-        let v = vec!["--configuration=Debug".to_string()];
-        assert_eq!(parse_configuration(&v), Some("Debug".to_string()));
-        let v: Vec<String> = vec![];
-        assert_eq!(parse_configuration(&v), None);
     }
 
     #[test]
