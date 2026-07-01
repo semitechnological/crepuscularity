@@ -1,3 +1,5 @@
+use clap::Args;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum BuildMode {
     Debug,
@@ -13,10 +15,62 @@ pub(crate) enum OptimizationLevel {
     Aggressive,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Args)]
+pub struct BuildOptionsArgs {
+    #[arg(long, conflicts_with_all = ["dev", "release"])]
+    pub debug: bool,
+    #[arg(long, conflicts_with_all = ["debug", "release"])]
+    pub dev: bool,
+    #[arg(long, conflicts_with_all = ["debug", "dev"])]
+    pub release: bool,
+    #[arg(long = "opt-level", value_name = "LEVEL")]
+    pub opt_level: Option<OptLevelArg>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, clap::ValueEnum)]
+pub enum OptLevelArg {
+    None,
+    Fast,
+    Size,
+    Aggressive,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct BuildOptions {
     pub(crate) mode: BuildMode,
     pub(crate) optimization: OptimizationLevel,
+}
+
+impl BuildOptionsArgs {
+    pub(crate) fn into_options(self) -> Result<BuildOptions, String> {
+        let mode = if self.release {
+            BuildMode::Release
+        } else if self.dev {
+            BuildMode::Dev
+        } else {
+            BuildMode::Debug
+        };
+        let optimization = self
+            .opt_level
+            .map(OptLevelArg::into_level)
+            .unwrap_or_else(|| mode.default_optimization());
+        Ok(BuildOptions { mode, optimization })
+    }
+
+    pub(crate) fn into_options_or_exit(self) -> BuildOptions {
+        self.into_options().unwrap_or_else(|e| crate::ui::error(&e))
+    }
+}
+
+impl OptLevelArg {
+    fn into_level(self) -> OptimizationLevel {
+        match self {
+            Self::None => OptimizationLevel::None,
+            Self::Fast => OptimizationLevel::Fast,
+            Self::Size => OptimizationLevel::Size,
+            Self::Aggressive => OptimizationLevel::Aggressive,
+        }
+    }
 }
 
 impl BuildOptions {
@@ -25,39 +79,6 @@ impl BuildOptions {
             mode: BuildMode::Debug,
             optimization: OptimizationLevel::None,
         }
-    }
-
-    pub(crate) fn parse(args: &[String]) -> Result<Self, String> {
-        let mut mode = None;
-        let mut optimization = None;
-        let mut i = 0;
-        while i < args.len() {
-            match args[i].as_str() {
-                "--debug" => set_mode(&mut mode, BuildMode::Debug)?,
-                "--dev" => set_mode(&mut mode, BuildMode::Dev)?,
-                "--release" => set_mode(&mut mode, BuildMode::Release)?,
-                "--opt-level" => {
-                    i += 1;
-                    let Some(value) = args.get(i) else {
-                        return Err("--opt-level expects none, fast, size, or aggressive".into());
-                    };
-                    optimization = Some(OptimizationLevel::parse(value)?);
-                }
-                arg if arg.starts_with("--opt-level=") => {
-                    let value = arg.trim_start_matches("--opt-level=");
-                    optimization = Some(OptimizationLevel::parse(value)?);
-                }
-                _ => {}
-            }
-            i += 1;
-        }
-        let mode = mode.unwrap_or(BuildMode::Debug);
-        let optimization = optimization.unwrap_or_else(|| mode.default_optimization());
-        Ok(Self { mode, optimization })
-    }
-
-    pub(crate) fn parse_or_exit(args: &[String]) -> Self {
-        Self::parse(args).unwrap_or_else(|e| crate::ui::error(&e))
     }
 
     pub(crate) fn release(self) -> bool {
@@ -87,18 +108,6 @@ impl BuildMode {
 }
 
 impl OptimizationLevel {
-    fn parse(value: &str) -> Result<Self, String> {
-        match value {
-            "none" => Ok(Self::None),
-            "fast" => Ok(Self::Fast),
-            "size" => Ok(Self::Size),
-            "aggressive" => Ok(Self::Aggressive),
-            other => Err(format!(
-                "unknown --opt-level {other:?}; expected none, fast, size, or aggressive"
-            )),
-        }
-    }
-
     pub(crate) fn wasm_opt_flag(self) -> Option<&'static str> {
         match self {
             Self::None => None,
@@ -109,48 +118,13 @@ impl OptimizationLevel {
     }
 }
 
-pub(crate) fn strip_build_options(args: &[String]) -> Result<Vec<String>, String> {
-    let mut out = Vec::new();
-    let mut i = 0;
-    while i < args.len() {
-        match args[i].as_str() {
-            "--debug" | "--dev" | "--release" => {}
-            "--opt-level" => {
-                i += 1;
-                if args.get(i).is_none() {
-                    return Err("--opt-level expects none, fast, size, or aggressive".into());
-                }
-            }
-            arg if arg.starts_with("--opt-level=") => {}
-            _ => out.push(args[i].clone()),
-        }
-        i += 1;
-    }
-    Ok(out)
-}
-
-pub(crate) fn strip_build_options_or_exit(args: &[String]) -> Vec<String> {
-    strip_build_options(args).unwrap_or_else(|e| crate::ui::error(&e))
-}
-
-fn set_mode(slot: &mut Option<BuildMode>, next: BuildMode) -> Result<(), String> {
-    if let Some(existing) = *slot {
-        if existing != next {
-            return Err("choose only one of --debug, --dev, or --release".into());
-        }
-    }
-    *slot = Some(next);
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn defaults_to_debug_with_no_post_optimization() {
-        let args: Vec<String> = vec![];
-        let opts = BuildOptions::parse(&args).expect("parse");
+        let opts = BuildOptionsArgs::default().into_options().expect("parse");
         assert_eq!(opts.mode, BuildMode::Debug);
         assert_eq!(opts.optimization, OptimizationLevel::None);
         assert!(!opts.release());
@@ -159,8 +133,12 @@ mod tests {
 
     #[test]
     fn release_defaults_to_fast_optimization() {
-        let args = vec!["--release".to_string()];
-        let opts = BuildOptions::parse(&args).expect("parse");
+        let opts = BuildOptionsArgs {
+            release: true,
+            ..Default::default()
+        }
+        .into_options()
+        .expect("parse");
         assert_eq!(opts.mode, BuildMode::Release);
         assert_eq!(opts.optimization, OptimizationLevel::Fast);
         assert!(opts.release());
@@ -169,32 +147,14 @@ mod tests {
 
     #[test]
     fn explicit_optimization_overrides_mode_default() {
-        let args = vec![
-            "--release".to_string(),
-            "--opt-level".to_string(),
-            "size".to_string(),
-        ];
-        let opts = BuildOptions::parse(&args).expect("parse");
+        let opts = BuildOptionsArgs {
+            release: true,
+            opt_level: Some(OptLevelArg::Size),
+            ..Default::default()
+        }
+        .into_options()
+        .expect("parse");
         assert_eq!(opts.mode, BuildMode::Release);
         assert_eq!(opts.optimization, OptimizationLevel::Size);
-    }
-
-    #[test]
-    fn conflicting_modes_are_rejected() {
-        let args = vec!["--debug".to_string(), "--release".to_string()];
-        let err = BuildOptions::parse(&args).expect_err("conflict");
-        assert!(err.contains("choose only one"));
-    }
-
-    #[test]
-    fn recognized_flags_can_be_stripped_for_target_parsers() {
-        let args = vec![
-            "--release".to_string(),
-            "--opt-level=size".to_string(),
-            "--target".to_string(),
-            "docs".to_string(),
-        ];
-        let stripped = strip_build_options(&args).expect("strip");
-        assert_eq!(stripped, vec!["--target".to_string(), "docs".to_string()]);
     }
 }

@@ -27,28 +27,30 @@ use crepuscularity_native::{
 use serde::Deserialize;
 use serde_json::Value;
 
+use crate::cli::{
+    NativeBuildCommands, NativeCodegenCliArgs, NativeCodegenPlatformArg, NativeCommands,
+    NativeIrArgs, NativeRunCommands, NativeSyncArgs,
+};
+use crate::dispatch::native_ios_target;
 use crate::ui;
 
-pub fn run(args: &[String]) {
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum IosBuildTarget {
+    Simulator,
+    Device,
+}
+
+/// Bridge for `crepus mobile` forwards until those paths use typed `execute`.
+pub fn execute_from_argv(args: &[String]) {
+    if args.is_empty() {
+        ui::error("native: expected subcommand");
+    }
     match args.first().map(|s| s.as_str()) {
         Some("new") => {
             let name = args.get(1).map(|s| s.as_str()).unwrap_or_else(|| {
                 ui::error("Usage: crepus native new <name>");
             });
             scaffold_native_app(name);
-        }
-        Some("ir") => {
-            run_ir(&args[1..]);
-        }
-        Some("sync") => {
-            if let Err(e) = sync_native_fixture_inner(&args[1..]) {
-                ui::error(&e);
-            }
-        }
-        Some("codegen") => {
-            if let Err(e) = codegen_native_source_inner(&args[1..]) {
-                ui::error(&e);
-            }
         }
         Some("build") => match args.get(1).map(|s| s.as_str()) {
             Some("ios") => {
@@ -80,8 +82,154 @@ pub fn run(args: &[String]) {
             }
             _ => ui::error("Usage: crepus native run ios|android [--dir <path>]"),
         },
-        _ => print_native_usage(),
+        Some("sync") => {
+            if let Err(e) = sync_native_fixture_inner(
+                parse_sync_args(&args[1..]).unwrap_or_else(|e| ui::error(&e)),
+            ) {
+                ui::error(&e);
+            }
+        }
+        Some("codegen") => {
+            if let Err(e) = codegen_native_source_inner(
+                parse_codegen_args(&args[1..]).unwrap_or_else(|e| ui::error(&e)),
+            ) {
+                ui::error(&e);
+            }
+        }
+        Some("ir") => run_ir(&args[1..]),
+        _ => ui::error(&format!("unknown native command: {}", args[0])),
     }
+}
+
+fn run_ir(args: &[String]) {
+    match run_ir_inner(args) {
+        Ok(out) => print!("{out}"),
+        Err(e) => {
+            let payload = serde_json::json!({ "error": e });
+            eprintln!("{payload}");
+            std::process::exit(1);
+        }
+    }
+}
+
+fn run_ir_inner(args: &[String]) -> Result<String, String> {
+    run_ir_parsed(parse_ir_args(args)?)
+}
+
+pub fn execute(cmd: NativeCommands) {
+    match cmd {
+        NativeCommands::New { name } => scaffold_native_app(&name),
+        NativeCommands::Ir { args } => run_ir_from(args),
+        NativeCommands::Sync { args } => {
+            if let Err(e) = sync_from_cli(args) {
+                ui::error(&e);
+            }
+        }
+        NativeCommands::Codegen { args } => {
+            if let Err(e) = codegen_from_cli(args) {
+                ui::error(&e);
+            }
+        }
+        NativeCommands::Build { platform } => match platform {
+            NativeBuildCommands::Ios {
+                dir,
+                target,
+                configuration,
+            } => build_ios(
+                &dir.unwrap_or_else(default_native_dir),
+                native_ios_target(target),
+                &configuration,
+            ),
+            NativeBuildCommands::Android { dir, flavor } => {
+                build_android(&dir.unwrap_or_else(default_native_dir), &flavor)
+            }
+        },
+        NativeCommands::Run { platform } => match platform {
+            NativeRunCommands::Ios { dir } => {
+                run_ios_help(&dir.unwrap_or_else(default_native_dir));
+            }
+            NativeRunCommands::Android { dir, flavor } => {
+                run_android(&dir.unwrap_or_else(default_native_dir), &flavor);
+            }
+        },
+    }
+}
+
+fn default_native_dir() -> PathBuf {
+    PathBuf::from(".")
+}
+
+fn run_ir_from(a: NativeIrArgs) {
+    let parsed = IrArgs {
+        path: a.file,
+        component: a.component,
+        ctx_file: a.ctx,
+        vars: parse_kv_vars(&a.vars),
+        pretty: a.pretty,
+        stdin: a.stdin,
+        stdin_json: a.stdin_json,
+        base_dir: a.base_dir,
+    };
+    match run_ir_parsed(parsed) {
+        Ok(out) => print!("{out}"),
+        Err(e) => {
+            let payload = serde_json::json!({ "error": e });
+            eprintln!("{payload}");
+            std::process::exit(1);
+        }
+    }
+}
+
+fn sync_from_cli(a: NativeSyncArgs) -> Result<(), String> {
+    let template = a
+        .template
+        .ok_or_else(|| "expected <file.crepus>".to_string())?;
+    sync_native_fixture_inner(SyncArgs {
+        template,
+        dir: a.dir,
+        outputs: a.out,
+        defaults: !a.no_defaults,
+        component: a.component,
+        ctx_file: a.ctx,
+        vars: parse_kv_vars(&a.vars),
+        pretty: a.pretty,
+    })
+}
+
+fn codegen_from_cli(a: NativeCodegenCliArgs) -> Result<PathBuf, String> {
+    let template = a.template.ok_or_else(|| {
+        "Usage: crepus native codegen <file.crepus> --platform swiftui|compose --out DIR --view-name NAME".to_string()
+    })?;
+    let platform = a
+        .platform
+        .ok_or_else(|| "--platform swiftui|compose is required".to_string())?;
+    let out_dir = a.out.ok_or_else(|| "--out DIR is required".to_string())?;
+    let view_name = a
+        .view_name
+        .ok_or_else(|| "--view-name NAME is required".to_string())?;
+    codegen_native_source_inner(CodegenArgs {
+        template,
+        platform: match platform {
+            NativeCodegenPlatformArg::SwiftUi => NativeCodegenTarget::SwiftUi,
+            NativeCodegenPlatformArg::Compose => NativeCodegenTarget::Compose,
+        },
+        out_dir,
+        view_name,
+        component: a.component,
+        ctx_file: a.ctx,
+        vars: parse_kv_vars(&a.vars),
+    })
+}
+
+fn parse_kv_vars(vars: &[String]) -> Vec<(String, String)> {
+    vars.iter()
+        .map(|raw| {
+            raw.split_once('=')
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .ok_or_else(|| format!("--var expects key=value, got: {raw}"))
+        })
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap_or_else(|e| ui::error(&e))
 }
 
 #[derive(Debug, Deserialize)]
@@ -128,12 +276,6 @@ struct CodegenArgs {
     vars: Vec<(String, String)>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum IosBuildTarget {
-    Simulator,
-    Device,
-}
-
 impl IosBuildTarget {
     fn sdk(self) -> &'static str {
         match self {
@@ -163,19 +305,7 @@ struct MobileAndroidConfig {
     namespace: Option<String>,
 }
 
-fn run_ir(args: &[String]) {
-    match run_ir_inner(args) {
-        Ok(out) => print!("{out}"),
-        Err(e) => {
-            let payload = serde_json::json!({ "error": e });
-            eprintln!("{payload}");
-            std::process::exit(1);
-        }
-    }
-}
-
-fn run_ir_inner(args: &[String]) -> Result<String, String> {
-    let parsed = parse_ir_args(args)?;
+fn run_ir_parsed(parsed: IrArgs) -> Result<String, String> {
     if parsed.stdin && parsed.stdin_json {
         return Err("--stdin and --stdin-json are mutually exclusive".to_string());
     }
@@ -399,8 +529,7 @@ fn stringify_ir(ir: &crepuscularity_native::ViewIr, pretty: bool) -> Result<Stri
     }
 }
 
-fn sync_native_fixture_inner(args: &[String]) -> Result<(), String> {
-    let parsed = parse_sync_args(args)?;
+fn sync_native_fixture_inner(parsed: SyncArgs) -> Result<(), String> {
     if !parsed.dir.exists() {
         return Err(format!(
             "native scaffold dir not found: {}",
@@ -478,8 +607,7 @@ fn sync_native_fixture_inner(args: &[String]) -> Result<(), String> {
     Ok(())
 }
 
-fn codegen_native_source_inner(args: &[String]) -> Result<PathBuf, String> {
-    let parsed = parse_codegen_args(args)?;
+fn codegen_native_source_inner(parsed: CodegenArgs) -> Result<PathBuf, String> {
     let template = fs::read_to_string(&parsed.template)
         .map_err(|e| format!("read {}: {e}", parsed.template.display()))?;
 
@@ -1432,39 +1560,42 @@ fn sync_default_mobile_artifacts(root: &Path, ios: bool, android: bool) {
     }
     let template_arg = "views/main.crepus".to_string();
     let root_arg = root.display().to_string();
-    sync_native_fixture_inner(&[
-        template_arg.clone(),
-        "--dir".to_string(),
-        root_arg,
-        "--pretty".to_string(),
-    ])
+    let _ = template_arg;
+    sync_native_fixture_inner(SyncArgs {
+        template: template.clone(),
+        dir: root.to_path_buf(),
+        outputs: Vec::new(),
+        defaults: true,
+        component: None,
+        ctx_file: None,
+        vars: Vec::new(),
+        pretty: true,
+    })
     .unwrap_or_else(|e| ui::error(&e));
     if ios {
-        codegen_native_source_inner(&[
-            template.display().to_string(),
-            "--platform".to_string(),
-            "swiftui".to_string(),
-            "--out".to_string(),
-            root.join("ios/Sources/NativeShell/Generated")
-                .display()
-                .to_string(),
-            "--view-name".to_string(),
-            "CrepusGeneratedView".to_string(),
-        ])
+        codegen_native_source_inner(CodegenArgs {
+            template: template.clone(),
+            platform: NativeCodegenTarget::SwiftUi,
+            out_dir: root.join("ios/Sources/NativeShell/Generated"),
+            view_name: "CrepusGeneratedView".to_string(),
+            component: None,
+            ctx_file: None,
+            vars: Vec::new(),
+        })
         .unwrap_or_else(|e| ui::error(&e));
     }
     if android {
         let out_dir =
             root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/generated");
-        codegen_native_source_inner(&[
-            template.display().to_string(),
-            "--platform".to_string(),
-            "compose".to_string(),
-            "--out".to_string(),
-            out_dir.display().to_string(),
-            "--view-name".to_string(),
-            "CrepusGeneratedView".to_string(),
-        ])
+        codegen_native_source_inner(CodegenArgs {
+            template: template.clone(),
+            platform: NativeCodegenTarget::Compose,
+            out_dir: out_dir.clone(),
+            view_name: "CrepusGeneratedView".to_string(),
+            component: None,
+            ctx_file: None,
+            vars: Vec::new(),
+        })
         .unwrap_or_else(|e| ui::error(&e));
         prepend_kotlin_package(&out_dir.join("CrepusGeneratedView.kt"));
     }
@@ -1786,16 +1917,16 @@ scheme = "CrepusMobileApp"
         )
         .unwrap();
 
-        sync_native_fixture_inner(&[
-            "views/main.crepus".to_string(),
-            "--dir".to_string(),
-            root.display().to_string(),
-            "--var".to_string(),
-            "name=Cupboard".to_string(),
-            "--out".to_string(),
-            "linux/share/dashboard.view-ir.json".to_string(),
-            "--pretty".to_string(),
-        ])
+        sync_native_fixture_inner(SyncArgs {
+            template: root.join("views/main.crepus"),
+            dir: root.clone(),
+            outputs: vec![root.join("linux/share/dashboard.view-ir.json")],
+            defaults: true,
+            component: None,
+            ctx_file: None,
+            vars: vec![("name".into(), "Cupboard".into())],
+            pretty: true,
+        })
         .unwrap();
 
         let root_fixture = fs::read_to_string(root.join("fixture.json")).unwrap();
@@ -1824,17 +1955,16 @@ scheme = "CrepusMobileApp"
         )
         .unwrap();
 
-        sync_native_fixture_inner(&[
-            "views/main.crepus".to_string(),
-            "--dir".to_string(),
-            root.display().to_string(),
-            "--no-defaults".to_string(),
-            "--out".to_string(),
-            "desktop/dashboard.view-ir.json".to_string(),
-            "--var".to_string(),
-            "name=Cupboard".to_string(),
-            "--pretty".to_string(),
-        ])
+        sync_native_fixture_inner(SyncArgs {
+            template: root.join("views/main.crepus"),
+            dir: root.clone(),
+            outputs: vec![root.join("desktop/dashboard.view-ir.json")],
+            defaults: false,
+            component: None,
+            ctx_file: None,
+            vars: vec![("name".into(), "Cupboard".into())],
+            pretty: true,
+        })
         .unwrap();
 
         let desktop_fixture =

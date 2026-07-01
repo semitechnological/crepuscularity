@@ -13,7 +13,8 @@ use std::time::Instant;
 
 use console::style;
 
-use crate::build_options::{strip_build_options_or_exit, BuildOptions};
+use crate::build_options::BuildOptions;
+use crate::cli::IosCommands;
 use crate::crepus_toml;
 use crate::new::to_pascal_case;
 use crate::ui;
@@ -29,36 +30,29 @@ struct IosSection {
     allow_provisioning_updates: bool,
 }
 
-pub fn run(args: &[String]) {
-    match args.first().map(|s| s.as_str()) {
-        Some("new") => {
-            let name = args.get(1).map(|s| s.as_str()).unwrap_or_else(|| {
-                ui::error("Usage: crepus ios new <name>");
-            });
-            scaffold_ios_app(name);
-        }
-        Some("generate") | Some("gen") => {
-            let (root, cfg) = resolve_ios_root_and_config(&parse_optional_dir(&args[1..]));
-            let spec = parse_spec_override(&args[1..]).unwrap_or(cfg.xcodegen_spec);
+pub fn execute(cmd: IosCommands) {
+    match cmd {
+        IosCommands::New { name } => scaffold_ios_app(&name),
+        IosCommands::Generate { dir, spec } => {
+            let (root, cfg) = resolve_ios_root_and_config(&dir);
+            let spec = spec.unwrap_or(cfg.xcodegen_spec);
             run_xcodegen(&root, &spec);
         }
-        Some("build") => {
-            let options = BuildOptions::parse_or_exit(&args[1..]);
-            let stripped = strip_build_options_or_exit(&args[1..]);
-            let explicit_dir = parse_optional_dir(&stripped);
-            let spec_ov = parse_spec_override(&stripped);
-            let scheme_ov = parse_scheme_override(&stripped);
-            let dest_ov = parse_destination_override(&stripped);
-
-            let (root, cfg) = resolve_ios_root_and_config(&explicit_dir);
-            let spec = spec_ov.unwrap_or(cfg.xcodegen_spec.clone());
-            let scheme = scheme_ov.unwrap_or(cfg.scheme.clone());
-            let destination = dest_ov.unwrap_or(cfg.ios_destination.clone());
-
+        IosCommands::Build {
+            build,
+            dir,
+            spec,
+            scheme,
+            destination,
+        } => {
+            let options = build.into_options_or_exit();
+            let (root, cfg) = resolve_ios_root_and_config(&dir);
+            let spec = spec.unwrap_or(cfg.xcodegen_spec.clone());
+            let scheme = scheme.unwrap_or(cfg.scheme.clone());
+            let destination = destination.unwrap_or(cfg.ios_destination.clone());
             run_xcodegen(&root, &spec);
             run_xcodebuild(&root, &scheme, &destination, &cfg, options);
         }
-        _ => print_ios_usage(),
     }
 }
 

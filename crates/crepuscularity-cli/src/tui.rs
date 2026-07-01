@@ -11,7 +11,8 @@ use std::process::Command;
 
 use console::style;
 
-use crate::build_options::{strip_build_options_or_exit, BuildOptions};
+use crate::build_options::BuildOptions;
+use crate::cli::TuiCommands;
 use crate::ui;
 
 /// Caret-style version requirement injected into scaffolded TUI apps for
@@ -19,38 +20,21 @@ use crate::ui;
 /// minor; pre-1.0 caret on `0.x.y` resolves to `>=0.x.y, <0.(x+1).0`.
 const SCAFFOLD_TUI_VERSION: &str = "0.4";
 
-pub fn run(args: &[String]) {
-    match args.first().map(|s| s.as_str()) {
-        Some("new") => {
-            let name = args.get(1).map(|s| s.as_str()).unwrap_or_else(|| {
-                ui::error("Usage: crepus tui new <name>");
-            });
-            scaffold_tui_app(name);
+pub fn execute(cmd: TuiCommands) {
+    match cmd {
+        TuiCommands::New { name } => scaffold_tui_app(&name),
+        TuiCommands::Build { build, extra } => {
+            build_tui_app(build.into_options_or_exit(), &extra);
         }
-        Some("build") => {
-            let options = BuildOptions::parse_or_exit(args);
-            let stripped = strip_build_options_or_exit(args);
-            let extra = stripped.into_iter().skip(1).collect::<Vec<_>>();
-            build_tui_app(options, &extra);
+        TuiCommands::Run { build, extra } => {
+            run_tui_app(build.into_options_or_exit(), &extra);
         }
-        Some("run") => {
-            let options = BuildOptions::parse_or_exit(args);
-            let stripped = strip_build_options_or_exit(args);
-            let extra = stripped.into_iter().skip(1).collect::<Vec<_>>();
-            run_tui_app(options, &extra);
-        }
-        #[cfg(feature = "tui")]
-        Some("preview") => {
-            let path = args.get(1).map(PathBuf::from).unwrap_or_else(|| {
-                ui::error("Usage: crepus tui preview <file.crepus>");
-            });
-            preview_tui_template(&path);
-        }
-        #[cfg(not(feature = "tui"))]
-        Some("preview") => {
+        TuiCommands::Preview { file } => {
+            #[cfg(feature = "tui")]
+            preview_tui_template(&file);
+            #[cfg(not(feature = "tui"))]
             ui::error("TUI preview not compiled in. Rebuild crepus with --features tui.");
         }
-        _ => print_tui_usage(),
     }
 }
 

@@ -6,8 +6,8 @@ use std::time::Duration;
 
 use console::style;
 
-pub fn run(args: &[String]) {
-    if args.is_empty() || args.first().is_some_and(|a| a == "--help" || a == "-h") {
+pub fn run_forwarded(args: &[String]) {
+    if args.is_empty() {
         print_usage();
         return;
     }

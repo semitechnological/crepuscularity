@@ -11,18 +11,22 @@ use std::process::Command;
 )]
 fn benchmark_help_subcommand_prints_usage() {
     let out = crepus()
-        .args(["benchmark", "help"])
+        .args(["benchmark", "--help"])
         .output()
-        .expect("spawn crepus benchmark help");
+        .expect("spawn crepus benchmark --help");
     assert!(
         out.status.success(),
         "stderr:\n{}",
         String::from_utf8_lossy(&out.stderr)
     );
-    let stderr = String::from_utf8_lossy(&out.stderr);
+    let help = format!(
+        "{}{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
     assert!(
-        stderr.contains("USAGE") && stderr.contains("benchmark"),
-        "{stderr}"
+        help.to_lowercase().contains("benchmark"),
+        "{help}"
     );
 }
 

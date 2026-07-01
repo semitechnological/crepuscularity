@@ -20,13 +20,13 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use crate::build_options::BuildOptions;
+use crate::cli::WebCommands;
 use crate::docs_generator;
 use crate::ui;
 use crate::wasm_bundle::{
     cargo_build_wasm32, find_wasm_file, run_wasm_bindgen, run_wasm_opt, wasm_profile_dirs,
     WasmOptStatus,
 };
-use crate::web_serve::ServeOptions;
 use crepuscularity_web::render_bundle_with_ssr;
 
 const WEB_INDEX_HTML: &str = include_str!("../assets/web/index.html");
@@ -35,100 +35,69 @@ const UNOCSS_JS: &[u8] = include_bytes!("../assets/vendor/unocss.js");
 
 // ── Entry point ──────────────────────────────────────────────────────────────
 
-pub fn run(args: &[String]) {
-    match args.first().map(|s| s.as_str()) {
-        Some("new") => {
-            let name = args.get(1).map(|s| s.as_str()).unwrap_or_else(|| {
-                ui::error("Usage: crepus web new <name>");
-            });
-            scaffold_site(name);
-        }
-
-        Some("build") => {
-            let b = parse_build_args(&args[1..]);
+pub fn execute(cmd: WebCommands) {
+    match cmd {
+        WebCommands::New { name } => scaffold_site(&name),
+        WebCommands::Build {
+            build,
+            site,
+            out_dir,
+            output,
+            entry,
+            target_id,
+            manifest,
+        } => {
+            let b = WebBuildArgs {
+                site_dir: site,
+                out_dir: out_dir.or(output),
+                entry,
+                target_id,
+                manifest,
+                meta: None,
+                options: build.into_options_or_exit(),
+            };
             build_site_wasm(&b);
         }
-
-        Some("dev") | Some("serve") => {
-            let opts = parse_dev_args(&args[1..]);
+        WebCommands::Dev {
+            site,
+            port,
+            entry,
+            target_id,
+            manifest,
+            axum,
+        } => {
+            let opts = resolve_dev_options(site, port, entry, target_id, manifest, axum);
             crate::web_serve::run(opts);
         }
-
-        Some("build-full") => {
-            let b = parse_build_full_args(&args[1..]);
-            run_build_full(&b);
+        WebCommands::BuildFull { site, wasm, server } => {
+            let site_dir = site.unwrap_or_else(|| {
+                std::env::current_dir().unwrap_or_else(|e| {
+                    ui::error(&format!("cannot determine current directory: {e}"));
+                })
+            });
+            run_build_full(&BuildFullArgs {
+                site_dir,
+                wasm,
+                server,
+            });
         }
-
-        _ => print_web_usage(),
     }
 }
 
-fn parse_target_and_manifest(args: &[String]) -> (Option<String>, Option<PathBuf>) {
-    let mut target = None;
-    let mut manifest = None;
-    let mut i = 0;
-    while i < args.len() {
-        match args[i].as_str() {
-            "--target" | "-t" => {
-                if let Some(x) = args.get(i + 1) {
-                    target = Some(x.clone());
-                    i += 1;
-                }
-            }
-            "--manifest" => {
-                if let Some(x) = args.get(i + 1) {
-                    manifest = Some(PathBuf::from(x));
-                    i += 1;
-                }
-            }
-            _ => {}
-        }
-        i += 1;
-    }
-    (target, manifest)
-}
-
-fn parse_dev_args(args: &[String]) -> ServeOptions {
-    let (target_id, manifest) = parse_target_and_manifest(args);
-
-    let mut site_dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-    let mut port: u16 = 4000;
-    let mut entry = "index.crepus".to_string();
-    let mut explicit_site = false;
-    let mut entry_from_args = false;
+fn resolve_dev_options(
+    site: Option<PathBuf>,
+    port: u16,
+    entry: String,
+    target_id: Option<String>,
+    manifest: Option<PathBuf>,
+    axum: bool,
+) -> crate::web_serve::ServeOptions {
+    let explicit_site = site.is_some();
+    let mut site_dir =
+        site.unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
+    let entry_from_args = entry != "index.crepus";
+    let mut entry = entry;
     let mut meta = None;
-    let mut axum = false;
-
-    let mut i = 0;
-    while i < args.len() {
-        match args[i].as_str() {
-            "--site" => {
-                if let Some(p) = args.get(i + 1) {
-                    site_dir = PathBuf::from(p);
-                    explicit_site = true;
-                    i += 1;
-                }
-            }
-            "--port" => {
-                if let Some(p) = args.get(i + 1) {
-                    port = p.parse().unwrap_or(4000);
-                    i += 1;
-                }
-            }
-            "--entry" => {
-                if let Some(e) = args.get(i + 1) {
-                    entry = e.clone();
-                    entry_from_args = true;
-                    i += 1;
-                }
-            }
-            "--axum" => {
-                axum = true;
-            }
-            _ => {}
-        }
-        i += 1;
-    }
 
     if explicit_site {
         if let Some(targets) =
@@ -141,119 +110,23 @@ fn parse_dev_args(args: &[String]) -> ServeOptions {
             }
             meta = Some(picked.meta);
         }
-    } else {
-        if let Some(targets) = crate::crepus_toml::load_web_targets(manifest) {
-            let picked = crate::crepus_toml::resolve_pick(&targets, target_id.as_deref())
-                .unwrap_or_else(|m| ui::error(&m));
-            site_dir = picked.site_dir;
-            if !entry_from_args {
-                entry = picked.entry;
-            }
-            meta = Some(picked.meta);
+    } else if let Some(targets) = crate::crepus_toml::load_web_targets(manifest) {
+        let picked = crate::crepus_toml::resolve_pick(&targets, target_id.as_deref())
+            .unwrap_or_else(|m| ui::error(&m));
+        site_dir = picked.site_dir;
+        if !entry_from_args {
+            entry = picked.entry;
         }
+        meta = Some(picked.meta);
     }
 
-    ServeOptions {
+    crate::web_serve::ServeOptions {
         site_dir,
         port,
         entry,
         meta,
         axum,
     }
-}
-
-fn print_web_usage() {
-    eprintln!("{}", style("crepus web").cyan().bold());
-    eprintln!(
-        "{}",
-        style(".crepus templates + WASM runtime (same model as crepus webext)").dim()
-    );
-    eprintln!();
-    eprintln!("{}", style("COMMANDS").dim());
-    eprintln!(
-        "  {}  {}",
-        style("new <name>                     ").green(),
-        style("scaffold index.crepus + runtime/ + crepus.toml").dim()
-    );
-    eprintln!(
-        "  {}  {}",
-        style("build [--site DIR] [--release]").green(),
-        style("emit dist/ (HTML shell + WASM + crepus-bundle.json)").dim()
-    );
-    eprintln!(
-        "  {}  {}",
-        style("dev [--site DIR] [--port N]     ").green(),
-        style("live-reload dev server (alias: serve)").dim()
-    );
-    eprintln!(
-        "  {}  {}",
-        style("build-full [OPTIONS]           ").green(),
-        style("parallel .crepus render + optional wasm/server cargo builds").dim()
-    );
-    eprintln!();
-    eprintln!("{}", style("DEV ARGS").dim());
-    eprintln!(
-        "  {}  {}",
-        style("--site DIR             ").green(),
-        style("directory of .crepus files (default: cwd)").dim()
-    );
-    eprintln!(
-        "  {}  {}",
-        style("--port N               ").green(),
-        style("HTTP port (default: 4000)").dim()
-    );
-    eprintln!(
-        "  {}  {}",
-        style("--entry FILE           ").green(),
-        style("entry template (default: index.crepus)").dim()
-    );
-    eprintln!(
-        "  {}  {}",
-        style("--target, -t ID        ").green(),
-        style("web target id from crepus.toml (when multiple)").dim()
-    );
-    eprintln!(
-        "  {}  {}",
-        style("--manifest FILE        ").green(),
-        style("path to crepus.toml (skip walk-up)").dim()
-    );
-    eprintln!();
-    eprintln!("{}", style("BUILD ARGS").dim());
-    eprintln!(
-        "  {}  {}",
-        style("--site DIR              ").green(),
-        style("site root (default: cwd, or crepus.toml target)").dim()
-    );
-    eprintln!(
-        "  {}  {}",
-        style("--out-dir, -o DIR       ").green(),
-        style("output directory (default: SITE/dist or target out)").dim()
-    );
-    eprintln!(
-        "  {}  {}",
-        style("--entry FILE            ").green(),
-        style("entry .crepus path relative to site (default: index.crepus)").dim()
-    );
-    eprintln!(
-        "  {}  {}",
-        style("--target, -t ID         ").green(),
-        style("pick [[targets]] type=web entry (multiple sites)").dim()
-    );
-    eprintln!(
-        "  {}  {}",
-        style("--manifest FILE         ").green(),
-        style("crepus.toml path").dim()
-    );
-    eprintln!(
-        "  {}  {}",
-        style("--debug | --dev | --release").green(),
-        style("build mode (default: --debug)").dim()
-    );
-    eprintln!(
-        "  {}  {}",
-        style("--opt-level LEVEL       ").green(),
-        style("none, fast, size, or aggressive").dim()
-    );
 }
 
 // ── scaffold ─────────────────────────────────────────────────────────────────
@@ -378,61 +251,6 @@ pub(crate) struct WebBuildArgs {
     pub(crate) manifest: Option<PathBuf>,
     pub(crate) meta: Option<crate::crepus_toml::WebTargetMeta>,
     pub(crate) options: BuildOptions,
-}
-
-fn parse_build_args(args: &[String]) -> WebBuildArgs {
-    if args.iter().any(|a| a == "--json") {
-        ui::error("crepus web build no longer supports --json for site.json paths.");
-    }
-
-    let (target_id, manifest) = parse_target_and_manifest(args);
-    let options = BuildOptions::parse_or_exit(args);
-
-    let mut site_dir = None;
-    let mut out_dir = None;
-    let mut entry = None;
-
-    let mut i = 0;
-    while i < args.len() {
-        match args[i].as_str() {
-            "--site" => {
-                if let Some(p) = args.get(i + 1) {
-                    site_dir = Some(PathBuf::from(p));
-                    i += 1;
-                }
-            }
-            "--out-dir" => {
-                if let Some(p) = args.get(i + 1) {
-                    out_dir = Some(PathBuf::from(p));
-                    i += 1;
-                }
-            }
-            "--entry" => {
-                if let Some(p) = args.get(i + 1) {
-                    entry = Some(p.clone());
-                    i += 1;
-                }
-            }
-            "-o" | "--output" | "--out" => {
-                if let Some(p) = args.get(i + 1) {
-                    out_dir = Some(PathBuf::from(p));
-                    i += 1;
-                }
-            }
-            _ => {}
-        }
-        i += 1;
-    }
-
-    WebBuildArgs {
-        site_dir,
-        out_dir,
-        entry,
-        target_id,
-        manifest,
-        meta: None,
-        options,
-    }
 }
 
 fn resolve_wasm_build_args(args: &WebBuildArgs) -> WasmBuildArgs {
@@ -1712,34 +1530,6 @@ struct BuildFullArgs {
     site_dir: PathBuf,
     wasm: bool,
     server: bool,
-}
-
-fn parse_build_full_args(args: &[String]) -> BuildFullArgs {
-    let mut site_dir = std::env::current_dir().unwrap_or_else(|e| {
-        ui::error(&format!("cannot determine current directory: {e}"));
-    });
-    let mut wasm = false;
-    let mut server = false;
-    let mut i = 0;
-    while i < args.len() {
-        match args[i].as_str() {
-            "--site" => {
-                if let Some(p) = args.get(i + 1) {
-                    site_dir = PathBuf::from(p);
-                    i += 1;
-                }
-            }
-            "--wasm" => wasm = true,
-            "--server" => server = true,
-            _ => {}
-        }
-        i += 1;
-    }
-    BuildFullArgs {
-        site_dir,
-        wasm,
-        server,
-    }
 }
 
 fn run_build_full(args: &BuildFullArgs) {

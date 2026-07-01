@@ -12,50 +12,13 @@ use serde_json::Value;
 
 use crate::ui;
 
-pub fn run(args: &[String]) {
-    let mut path: Option<PathBuf> = None;
-    let mut ctx_file: Option<PathBuf> = None;
-    let mut vars: Vec<(String, String)> = Vec::new();
-    let mut component: Option<String> = None;
-
-    let mut i = 0;
-    while i < args.len() {
-        match args[i].as_str() {
-            "--ctx" => {
-                i += 1;
-                ctx_file = args.get(i).map(PathBuf::from);
-            }
-            "--var" => {
-                i += 1;
-                if let Some(kv) = args.get(i) {
-                    if let Some(eq) = kv.find('=') {
-                        vars.push((kv[..eq].to_string(), kv[eq + 1..].to_string()));
-                    } else {
-                        ui::error(&format!("--var expects key=value, got: {kv}"));
-                    }
-                }
-            }
-            "--component" => {
-                i += 1;
-                component = args.get(i).cloned();
-            }
-            other => {
-                if other.starts_with('-') {
-                    ui::error(&format!("unknown option: {other}"));
-                } else if path.is_none() {
-                    path = Some(PathBuf::from(other));
-                } else {
-                    ui::error(&format!("unexpected argument: {other}"));
-                }
-            }
-        }
-        i += 1;
-    }
-
-    let path = path.unwrap_or_else(|| {
-        eprintln!("Usage: crepus render <file.crepus> [--ctx FILE] [--var k=v] [--component Name]");
-        std::process::exit(1);
-    });
+pub fn execute(
+    path: PathBuf,
+    ctx_file: Option<PathBuf>,
+    var_strings: Vec<String>,
+    component: Option<String>,
+) {
+    let vars = parse_var_pairs(&var_strings);
 
     if !path.exists() {
         ui::error(&format!("file not found: {}", path.display()));
@@ -90,6 +53,18 @@ pub fn run(args: &[String]) {
         Ok(out) => print!("{out}"),
         Err(e) => ui::error(&format!("Render error: {e}")),
     }
+}
+
+fn parse_var_pairs(var_strings: &[String]) -> Vec<(String, String)> {
+    let mut vars = Vec::new();
+    for kv in var_strings {
+        if let Some(eq) = kv.find('=') {
+            vars.push((kv[..eq].to_string(), kv[eq + 1..].to_string()));
+        } else {
+            ui::error(&format!("--var expects key=value, got: {kv}"));
+        }
+    }
+    vars
 }
 
 fn load_toml_ctx(path: &Path, ctx: &mut TemplateContext) {
