@@ -24,10 +24,7 @@ fn benchmark_help_subcommand_prints_usage() {
         String::from_utf8_lossy(&out.stdout),
         String::from_utf8_lossy(&out.stderr)
     );
-    assert!(
-        help.to_lowercase().contains("benchmark"),
-        "{help}"
-    );
+    assert!(help.to_lowercase().contains("benchmark"), "{help}");
 }
 
 fn crepus() -> Command {

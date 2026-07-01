@@ -59,25 +59,40 @@ pub fn execute(cmd: MobileCommands) {
         MobileCommands::New { name } => {
             native::execute(NativeCommands::New { name });
         }
-        MobileCommands::Sync { template, rest } => {
+        MobileCommands::Sync {
+            template,
+            dir,
+            vars,
+            pretty,
+            rest,
+        } => {
+            let dir = dir.unwrap_or_else(|| {
+                parse_dir_from_rest(&rest).unwrap_or_else(|_| PathBuf::from("."))
+            });
             native::execute(NativeCommands::Sync {
                 args: NativeSyncArgs {
                     template: Some(template),
-                    dir: parse_dir_from_rest(&rest).unwrap_or_else(|e| ui::error(&e)),
+                    dir,
                     out: Vec::new(),
                     no_defaults: false,
                     component: None,
                     ctx: None,
-                    vars: Vec::new(),
-                    pretty: false,
+                    vars,
+                    pretty,
                 },
             });
         }
         MobileCommands::Codegen {
             template,
             platform,
+            out,
+            view_name,
+            vars,
             rest,
-        } => run_codegen_cli(template, platform, &rest).unwrap_or_else(|e| ui::error(&e)),
+        } => {
+            run_codegen_full(template, platform, out, view_name, &vars, &rest)
+                .unwrap_or_else(|e| ui::error(&e));
+        }
         MobileCommands::Build { platform, rest } => {
             run_build_platform(mobile_platform(platform), &rest)
         }
@@ -115,8 +130,72 @@ pub fn execute(cmd: MobileCommands) {
     }
 }
 
+fn parse_kv_strings(vars: &[String]) -> Vec<(String, String)> {
+    vars.iter()
+        .map(|kv| {
+            kv.split_once('=')
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .unwrap_or_else(|| ui::error(&format!("--var expects key=value, got: {kv}")))
+        })
+        .collect()
+}
+
 fn parse_dir_from_rest(rest: &[String]) -> Result<PathBuf, String> {
     parse_dir_arg(rest)
+}
+
+fn run_codegen_full(
+    template: Option<PathBuf>,
+    platform: Option<MobileCodegenPlatformArg>,
+    out: Option<PathBuf>,
+    view_name: Option<String>,
+    vars: &[String],
+    rest: &[String],
+) -> Result<(), String> {
+    let template = template.ok_or_else(|| "expected template path".to_string())?;
+    let dir = parse_dir_arg(rest).unwrap_or_else(|_| PathBuf::from("."));
+    let view_name = view_name.unwrap_or_else(|| "CrepusGeneratedView".into());
+    let plats = match platform {
+        None => vec![MobilePlatform::Ios, MobilePlatform::Android],
+        Some(MobileCodegenPlatformArg::Ios) => vec![MobilePlatform::Ios],
+        Some(MobileCodegenPlatformArg::Android) => vec![MobilePlatform::Android],
+    };
+    let template_path = resolve_template_path(&dir, &template);
+    let plat_count = plats.len();
+    let single_out = out.clone();
+    for plat in plats {
+        let (default_out, plat_arg) = match plat {
+            MobilePlatform::Ios => (
+                dir.join("ios/Sources/NativeShell/Generated"),
+                NativeCodegenPlatformArg::SwiftUi,
+            ),
+            MobilePlatform::Android => (
+                dir.join("android/app/src/main/java/dev/crepuscularity/nativeshell/generated"),
+                NativeCodegenPlatformArg::Compose,
+            ),
+            MobilePlatform::All => continue,
+        };
+        let out_dir = if plat_count == 1 {
+            single_out.clone().unwrap_or(default_out)
+        } else {
+            default_out
+        };
+        native::execute(NativeCommands::Codegen {
+            args: NativeCodegenCliArgs {
+                template: Some(template_path.clone()),
+                platform: Some(plat_arg),
+                out: Some(out_dir.clone()),
+                view_name: Some(view_name.clone()),
+                component: None,
+                ctx: None,
+                vars: vars.to_vec(),
+            },
+        });
+        if plat == MobilePlatform::Android {
+            prepend_kotlin_package(&out_dir.join(format!("{view_name}.kt")));
+        }
+    }
+    Ok(())
 }
 
 fn run_doctor_platform(platform: MobilePlatform) {

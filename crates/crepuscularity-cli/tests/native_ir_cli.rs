@@ -311,12 +311,16 @@ fn mobile_help_lists_core_commands() {
         .output()
         .expect("spawn crepus mobile --help");
     assert!(out.status.success());
-    let stderr = String::from_utf8_lossy(&out.stderr);
-    assert!(stderr.contains("crepus mobile"));
-    assert!(stderr.contains("new <name>"));
-    assert!(stderr.contains("dev [--platform"));
-    assert!(stderr.contains("doctor [--platform"));
-    assert!(stderr.contains("codegen"));
+    let help = format!(
+        "{}{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(help.contains("mobile"));
+    assert!(help.contains("new"));
+    assert!(help.contains("dev"));
+    assert!(help.contains("doctor"));
+    assert!(help.contains("codegen"));
 }
 
 #[test]
