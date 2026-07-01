@@ -9,6 +9,7 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
 
+#[cfg(feature = "tui")]
 use console::style;
 
 use crate::build_options::BuildOptions;
@@ -29,11 +30,14 @@ pub fn execute(cmd: TuiCommands) {
         TuiCommands::Run { build, extra } => {
             run_tui_app(build.into_options_or_exit(), &extra);
         }
-        TuiCommands::Preview { file: path } => {
+        TuiCommands::Preview { file } => {
             #[cfg(feature = "tui")]
-            preview_tui_template(&path);
+            preview_tui_template(&file);
             #[cfg(not(feature = "tui"))]
-            ui::error("TUI preview not compiled in. Rebuild crepus with --features tui.");
+            {
+                let _ = &file;
+                ui::error("TUI preview not compiled in. Rebuild crepus with --features tui.");
+            }
         }
     }
 }

@@ -1770,7 +1770,7 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-cli"
-version = "0.9.12"
+version = "0.9.14"
 dependencies = [
  "axum",
  "clap",

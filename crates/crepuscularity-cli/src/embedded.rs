@@ -60,7 +60,7 @@ fn parse_var_pairs(var_strings: &[String]) -> Vec<(String, String)> {
 }
 
 fn run_check_file(path: &Path, component: Option<String>) -> Result<(), String> {
-    let content = fs::read_to_string(&path).map_err(|e| format!("read {}: {e}", path.display()))?;
+    let content = fs::read_to_string(path).map_err(|e| format!("read {}: {e}", path.display()))?;
     if let Some(name) = component {
         let file = parse_component_file(&content).map_err(|e| e.to_string())?;
         file.components
