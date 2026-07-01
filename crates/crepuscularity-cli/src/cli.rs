@@ -397,14 +397,25 @@ pub enum MobileCommands {
     Sync {
         #[arg(default_value = "views/main.crepus")]
         template: PathBuf,
+        #[arg(long)]
+        dir: Option<PathBuf>,
+        #[arg(long = "var", value_name = "KEY=VALUE")]
+        vars: Vec<String>,
+        #[arg(long)]
+        pretty: bool,
         #[arg(last = true)]
         rest: Vec<String>,
     },
     Codegen {
-        #[arg(default_value = "views/main.crepus")]
-        template: PathBuf,
+        template: Option<PathBuf>,
         #[arg(long)]
         platform: Option<MobileCodegenPlatformArg>,
+        #[arg(long)]
+        out: Option<PathBuf>,
+        #[arg(long)]
+        view_name: Option<String>,
+        #[arg(long = "var", value_name = "KEY=VALUE")]
+        vars: Vec<String>,
         #[arg(last = true)]
         rest: Vec<String>,
     },
