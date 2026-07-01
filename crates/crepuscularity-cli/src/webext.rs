@@ -56,34 +56,6 @@ fn app_path_or_cwd(app: Option<PathBuf>) -> PathBuf {
     })
 }
 
-#[allow(dead_code)]
-fn print_webext_usage() {
-    eprintln!("{}", style("crepus webext").cyan().bold());
-    eprintln!("{}", style("Browser extension commands").dim());
-    eprintln!();
-    eprintln!("{}", style("COMMANDS").dim());
-    eprintln!(
-        "  {}  {}",
-        style("new <name>            ").green(),
-        style("scaffold a new browser extension").dim()
-    );
-    eprintln!(
-        "  {}  {}",
-        style("build [--app PATH] [--browser ...] [--release]").green(),
-        style("build extension to dist/unpacked/ or dist/<browser>/").dim()
-    );
-    eprintln!(
-        "  {}  {}",
-        style("dev [--app PATH] [--browser ...] [--debug]    ").green(),
-        style("build, watch, and hot-reload").dim()
-    );
-    eprintln!(
-        "  {}  {}",
-        style("manifest [--app PATH] [--browser chromium|firefox]").green(),
-        style("print generated manifest.json").dim()
-    );
-}
-
 // ── scaffold ─────────────────────────────────────────────────────────────────
 
 fn scaffold_extension(name: &str) {
