@@ -1,5 +1,10 @@
 # Changelog — `crepuscularity-cli`
 
+## 0.9.15
+
+- CI: Zig **0.16.0** in plugin-smoke; restore `zig build test` for plugins.
+- No CLI behavior change vs 0.9.14 (release tag includes CI/audit fixes on main).
+
 ## 0.9.14
 
 - **Mobile CLI:** `build`, `run`, `sync`, and `codegen` use typed `clap` flags (`--dir`, `--target`, `--configuration`, `--flavor`) instead of trailing `rest` argv slices.
