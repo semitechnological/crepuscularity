@@ -197,81 +197,44 @@ struct JsonStepResult {
     stderr_tail: Option<String>,
 }
 
-pub fn run(args: &[String]) {
-    let args = normalize_benchmark_invocation_args(args);
-    if args.iter().any(|a| a == "--help" || a == "-h") || (args.len() == 1 && args[0] == "help") {
-        print_benchmark_usage();
-        return;
-    }
-
-    let mut config_path: Option<PathBuf> = None;
-    let mut suite_filter: Option<String> = None;
-    let mut only: Option<Vec<String>> = None;
-    let mut json_out = false;
-    let mut dry_run = false;
-    let mut clean = false;
-    let mut repo_override: Option<PathBuf> = None;
-    let mut work_override: Option<PathBuf> = None;
-    // None: default verbose for human runs; Some: explicit --verbose / --quiet.
-    let mut verbose_override: Option<bool> = None;
-    let mut measure_memory = true;
+pub struct RunOptions {
+    pub config_path: Option<PathBuf>,
+    pub suite_filter: Option<String>,
+    pub only: Option<Vec<String>>,
+    pub json_out: bool,
+    pub dry_run: bool,
+    pub clean: bool,
+    pub repo_override: Option<PathBuf>,
+    pub work_override: Option<PathBuf>,
+    pub verbose: bool,
+    pub measure_memory: bool,
     #[cfg(feature = "tui")]
-    let mut no_tui = false;
+    pub no_tui: bool,
+}
 
-    let mut i = 0;
-    while i < args.len() {
-        match args[i].as_str() {
-            "--config" | "-c" => {
-                i += 1;
-                config_path = args.get(i).map(PathBuf::from);
-            }
-            "--suite" | "-s" => {
-                i += 1;
-                suite_filter = args.get(i).cloned();
-            }
-            "--only" => {
-                i += 1;
-                if let Some(s) = args.get(i) {
-                    only = Some(
-                        s.split(',')
-                            .map(|x| x.trim().to_string())
-                            .filter(|x| !x.is_empty())
-                            .collect(),
-                    );
-                }
-            }
-            "--json" => json_out = true,
-            "--dry-run" | "-n" => dry_run = true,
-            "--verbose" | "-v" => verbose_override = Some(true),
-            "--quiet" | "-q" => verbose_override = Some(false),
-            "--memory" => measure_memory = true,
-            "--no-memory" => measure_memory = false,
-            "--clean" => clean = true,
-            "--repo" => {
-                i += 1;
-                repo_override = args.get(i).map(PathBuf::from);
-            }
-            "--work-root" => {
-                i += 1;
-                work_override = args.get(i).map(PathBuf::from);
-            }
-            "--help" | "-h" => {
-                print_benchmark_usage();
-                return;
-            }
-            #[cfg(feature = "tui")]
-            "--no-tui" => no_tui = true,
-            _ => {}
-        }
-        i += 1;
-    }
+pub struct CheckOptions {
+    pub config_path: Option<PathBuf>,
+    pub suite_filter: Option<String>,
+    pub only: Option<Vec<String>>,
+    pub json_out: bool,
+    pub repo_override: Option<PathBuf>,
+}
 
-    // Default: compact (child output captured). Use -v / --verbose for live npm/cargo logs.
-    let verbose = if json_out {
-        false
-    } else {
-        verbose_override.unwrap_or(false)
-    };
+pub fn execute_run(opts: RunOptions) {
+    let RunOptions {
+        config_path,
+        suite_filter,
+        only,
+        json_out,
+        dry_run,
+        clean,
+        repo_override,
+        work_override,
+        verbose,
+        measure_memory,
+        #[cfg(feature = "tui")]
+        no_tui,
+    } = opts;
 
     let cfg_path = resolve_config_path(config_path);
     let raw = std::fs::read_to_string(&cfg_path).unwrap_or_else(|e| {
@@ -1919,53 +1882,14 @@ fn print_bench_stack_notes(selected: &[&BenchTarget], json_out: bool) {
 }
 
 /// Probe CLIs required by benchmark.toml targets (respects `--suite` / `--only` like `benchmark run`).
-pub fn run_check(args: &[String]) {
-    if args.iter().any(|a| a == "--help" || a == "-h") || (args.len() == 1 && args[0] == "help") {
-        print_benchmark_check_usage();
-        return;
-    }
-
-    let mut config_path: Option<PathBuf> = None;
-    let mut suite_filter: Option<String> = None;
-    let mut only: Option<Vec<String>> = None;
-    let mut json_out = false;
-    let mut repo_override: Option<PathBuf> = None;
-
-    let mut i = 0;
-    while i < args.len() {
-        match args[i].as_str() {
-            "--config" | "-c" => {
-                i += 1;
-                config_path = args.get(i).map(PathBuf::from);
-            }
-            "--suite" | "-s" => {
-                i += 1;
-                suite_filter = args.get(i).cloned();
-            }
-            "--only" => {
-                i += 1;
-                if let Some(s) = args.get(i) {
-                    only = Some(
-                        s.split(',')
-                            .map(|x| x.trim().to_string())
-                            .filter(|x| !x.is_empty())
-                            .collect(),
-                    );
-                }
-            }
-            "--json" => json_out = true,
-            "--repo" => {
-                i += 1;
-                repo_override = args.get(i).map(PathBuf::from);
-            }
-            "--help" | "-h" => {
-                print_benchmark_check_usage();
-                return;
-            }
-            _ => {}
-        }
-        i += 1;
-    }
+pub fn execute_check(opts: CheckOptions) {
+    let CheckOptions {
+        config_path,
+        suite_filter,
+        only,
+        json_out,
+        repo_override,
+    } = opts;
 
     let cfg_path = resolve_config_path(config_path);
     let raw = std::fs::read_to_string(&cfg_path).unwrap_or_else(|e| {

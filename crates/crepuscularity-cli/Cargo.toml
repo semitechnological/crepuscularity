@@ -1,6 +1,6 @@
 [package]
 name = "crepuscularity-cli"
-version = "0.9.11"
+version = "0.9.12"
 edition = "2021"
 license = "MPL-2.0"
 description = "crepus CLI — scaffolding and builds for Crepuscularity (UNSTABLE; in active development)."
@@ -74,6 +74,7 @@ futures-util = { workspace = true }
 ratatui = { version = "0.30", default-features = false, features = ["crossterm"], optional = true }
 ctrlc = "3"
 pulldown-cmark = "0.11"
+clap = { version = "4.5", features = ["derive"] }
 
 [dev-dependencies]
 tempfile = { workspace = true }

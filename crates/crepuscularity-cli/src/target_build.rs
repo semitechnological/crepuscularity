@@ -11,9 +11,17 @@ use crepuscularity_native::{
     render_component_file_to_ir, render_template_to_ir, to_json, to_json_pretty,
 };
 
-use crate::build_options::{strip_build_options_or_exit, BuildOptions};
+use crate::build_options::BuildOptions;
 use crate::crepus_toml::{pick_targets, ResolvedTarget};
 use crate::ui;
+
+pub struct ManifestBuildArgs {
+    pub options: BuildOptions,
+    pub target_id: Option<String>,
+    pub selector: Option<String>,
+    pub manifest: Option<PathBuf>,
+    pub all: bool,
+}
 
 pub(crate) fn has_manifest_targets(manifest: Option<PathBuf>) -> bool {
     matches!(
@@ -22,74 +30,35 @@ pub(crate) fn has_manifest_targets(manifest: Option<PathBuf>) -> bool {
     )
 }
 
-pub(crate) fn run(args: &[String]) {
-    let options = BuildOptions::parse_or_exit(args);
-    let stripped = strip_build_options_or_exit(args);
-    let parsed = parse_args(&stripped);
-    let targets = crate::crepus_toml::load_manifest_targets(parsed.manifest)
-        .unwrap_or_else(|e| ui::error(&e))
-        .unwrap_or_else(|| ui::error("no crepus.toml found"));
-    if targets.is_empty() {
-        ui::error("crepus.toml has no [[targets]] entries");
-    }
-    let picked = if let Some(selector) = parsed.selector.as_deref() {
-        pick_targets_by_selector(&targets, selector).unwrap_or_else(|e| ui::error(&e))
-    } else {
-        pick_targets(&targets, parsed.target_id.as_deref()).unwrap_or_else(|e| ui::error(&e))
-    };
-    for target in picked {
-        build_target(&target, options);
-    }
-}
-
-struct BuildArgs {
-    target_id: Option<String>,
-    selector: Option<String>,
-    manifest: Option<PathBuf>,
-}
-
-fn parse_args(args: &[String]) -> BuildArgs {
-    let mut target_id = None;
-    let mut selector = None;
-    let mut manifest = None;
-    let mut all = false;
-    let mut i = 0;
-    while i < args.len() {
-        match args[i].as_str() {
-            "--target" | "-t" => {
-                i += 1;
-                target_id = args.get(i).cloned();
-                if target_id.is_none() {
-                    ui::error("--target expects an id");
-                }
-            }
-            "--manifest" => {
-                i += 1;
-                manifest = args.get(i).map(PathBuf::from);
-                if manifest.is_none() {
-                    ui::error("--manifest expects a path");
-                }
-            }
-            "--all" => all = true,
-            other if other.starts_with('-') => ui::error(&format!("unknown option: {other}")),
-            other => {
-                if selector.replace(other.to_string()).is_some() {
-                    ui::error("crepus build accepts only one target selector");
-                }
-            }
-        }
-        i += 1;
-    }
+pub(crate) fn execute(args: ManifestBuildArgs) {
+    let ManifestBuildArgs {
+        options,
+        target_id,
+        selector,
+        manifest,
+        all,
+    } = args;
     if target_id.is_some() && selector.is_some() {
         ui::error("use either --target ID or a positional selector, not both");
     }
     if all && (target_id.is_some() || selector.is_some()) {
         ui::error("use either --all or a target selector, not both");
     }
-    BuildArgs {
-        target_id,
-        selector,
-        manifest,
+    let targets = crate::crepus_toml::load_manifest_targets(manifest)
+        .unwrap_or_else(|e| ui::error(&e))
+        .unwrap_or_else(|| ui::error("no crepus.toml found"));
+    if targets.is_empty() {
+        ui::error("crepus.toml has no [[targets]] entries");
+    }
+    let picked = if all {
+        targets
+    } else if let Some(sel) = selector.as_deref() {
+        pick_targets_by_selector(&targets, sel).unwrap_or_else(|e| ui::error(&e))
+    } else {
+        pick_targets(&targets, target_id.as_deref()).unwrap_or_else(|e| ui::error(&e))
+    };
+    for target in picked {
+        build_target(&target, options);
     }
 }
 

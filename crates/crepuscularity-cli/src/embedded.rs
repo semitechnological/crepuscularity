@@ -9,28 +9,58 @@ use crepuscularity_core::parser::{parse_component_file, parse_template};
 use crepuscularity_embedded::{write_ppm, Ui};
 use serde_json::Value;
 
-pub fn run(args: &[String]) {
-    match args.first().map(|s| s.as_str()) {
-        Some("check") => match run_check(&args[1..]) {
+use crate::cli::EmbeddedCommands;
+
+pub fn execute(cmd: EmbeddedCommands) {
+    match cmd {
+        EmbeddedCommands::Check { file, component } => match run_check_file(&file, component) {
             Ok(()) => {}
             Err(e) => {
                 eprintln!("{e}");
                 std::process::exit(1);
             }
         },
-        Some("snapshot") => match run_snapshot(&args[1..]) {
+        EmbeddedCommands::Snapshot {
+            file,
+            width,
+            height,
+            out,
+            ctx,
+            vars,
+            component,
+        } => match run_snapshot_parsed(SnapshotArgs {
+            path: file,
+            width,
+            height,
+            out,
+            ctx_file: ctx,
+            vars: parse_var_pairs(&vars),
+            component,
+        }) {
             Ok(()) => {}
             Err(e) => {
                 eprintln!("{e}");
                 std::process::exit(1);
             }
         },
-        _ => print_embedded_usage(),
     }
 }
 
-fn run_check(args: &[String]) -> Result<(), String> {
-    let (path, component) = parse_file_args(args)?;
+fn parse_var_pairs(var_strings: &[String]) -> Vec<(String, String)> {
+    var_strings
+        .iter()
+        .map(|kv| {
+            kv.split_once('=')
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .unwrap_or_else(|| {
+                    eprintln!("--var expects key=value, got: {kv}");
+                    std::process::exit(1);
+                })
+        })
+        .collect()
+}
+
+fn run_check_file(path: &Path, component: Option<String>) -> Result<(), String> {
     let content = fs::read_to_string(&path).map_err(|e| format!("read {}: {e}", path.display()))?;
     if let Some(name) = component {
         let file = parse_component_file(&content).map_err(|e| e.to_string())?;
@@ -44,9 +74,7 @@ fn run_check(args: &[String]) -> Result<(), String> {
     Ok(())
 }
 
-fn run_snapshot(args: &[String]) -> Result<(), String> {
-    let parsed = parse_snapshot_args(args)?;
-
+fn run_snapshot_parsed(parsed: SnapshotArgs) -> Result<(), String> {
     let mut ctx = TemplateContext::new();
     if let Some(path) = &parsed.ctx_file {
         load_json_ctx(path, &mut ctx)?;

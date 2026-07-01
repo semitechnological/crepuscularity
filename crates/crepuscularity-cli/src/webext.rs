@@ -6,6 +6,8 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use crate::build_options::BuildOptions;
+use crate::cli::WebextCommands;
+use crate::dispatch::browser_target;
 use crate::ui;
 use crate::wasm_bundle::{
     cargo_build_wasm32, find_wasm_file, run_wasm_bindgen, run_wasm_opt, wasm_profile_dirs,
@@ -17,82 +19,44 @@ use crepuscularity_webext::BrowserTarget;
 
 // ── Entry point ──────────────────────────────────────────────────────────────
 
-pub fn run(args: &[String]) {
-    match args.first().map(|s| s.as_str()) {
-        Some("new") => {
-            let name = args.get(1).map(|s| s.as_str()).unwrap_or_else(|| {
-                ui::error("Usage: crepus webext new <name>");
-            });
-            scaffold_extension(name);
+pub fn execute(cmd: WebextCommands) {
+    match cmd {
+        WebextCommands::New { name } => scaffold_extension(&name),
+        WebextCommands::Build {
+            build,
+            app,
+            browser,
+        } => {
+            let app_path = app_path_or_cwd(app);
+            let options = build.into_options_or_exit();
+            build_extension(&app_path, false, browser_target(browser), options);
         }
-
-        Some("build") => {
-            let opts = parse_webext_options(&args[1..]);
-            build_extension(&opts.app_path, false, opts.browser, opts.build);
+        WebextCommands::Dev {
+            build,
+            app,
+            browser,
+        } => {
+            let app_path = app_path_or_cwd(app);
+            let browser = browser_target(browser);
+            let options = build.into_options_or_exit();
+            build_extension(&app_path, true, browser, options);
+            watch_and_reload(&app_path, browser, options);
         }
-
-        Some("dev") => {
-            let opts = parse_webext_options(&args[1..]);
-            build_extension(&opts.app_path, true, opts.browser, opts.build);
-            watch_and_reload(&opts.app_path, opts.browser, opts.build);
+        WebextCommands::Manifest { app, browser } => {
+            print_manifest(&app_path_or_cwd(app), browser_target(browser));
         }
-
-        Some("manifest") => {
-            let opts = parse_webext_options(&args[1..]);
-            print_manifest(&opts.app_path, opts.browser);
-        }
-
-        _ => print_webext_usage(),
     }
 }
 
-struct WebextOptions {
-    app_path: PathBuf,
-    browser: Option<BrowserTarget>,
-    build: BuildOptions,
-}
-
-fn parse_webext_options(args: &[String]) -> WebextOptions {
-    WebextOptions {
-        app_path: parse_app_path(args),
-        browser: parse_browser_target(args),
-        build: BuildOptions::parse_or_exit(args),
-    }
-}
-
-fn parse_app_path(args: &[String]) -> PathBuf {
-    let mut i = 0;
-    while i < args.len() {
-        if args[i] == "--app" {
-            if let Some(path) = args.get(i + 1) {
-                return PathBuf::from(path);
-            }
-        }
-        i += 1;
-    }
-    std::env::current_dir().unwrap_or_else(|e| {
-        ui::error(&format!("cannot determine current directory: {e}"));
+fn app_path_or_cwd(app: Option<PathBuf>) -> PathBuf {
+    app.unwrap_or_else(|| {
+        std::env::current_dir().unwrap_or_else(|e| {
+            ui::error(&format!("cannot determine current directory: {e}"));
+        })
     })
 }
 
-fn parse_browser_target(args: &[String]) -> Option<BrowserTarget> {
-    let mut i = 0;
-    while i < args.len() {
-        if args[i] == "--browser" {
-            let Some(value) = args.get(i + 1) else {
-                ui::error("Usage: --browser <chromium|firefox>");
-            };
-            return BrowserTarget::parse(value).or_else(|| {
-                ui::error(&format!(
-                    "unknown browser target {value:?}; expected chromium or firefox"
-                ));
-            });
-        }
-        i += 1;
-    }
-    None
-}
-
+#[allow(dead_code)]
 fn print_webext_usage() {
     eprintln!("{}", style("crepus webext").cyan().bold());
     eprintln!("{}", style("Browser extension commands").dim());
