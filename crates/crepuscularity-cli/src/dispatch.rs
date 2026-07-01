@@ -175,15 +175,7 @@ pub fn browser_target(b: Option<BrowserArg>) -> Option<crepuscularity_webext::Br
 }
 
 pub fn benchmark_run_options(args: BenchmarkRunArgs) -> crate::benchmark::RunOptions {
-    let verbose = if args.json {
-        false
-    } else if args.quiet {
-        false
-    } else if args.verbose {
-        true
-    } else {
-        false
-    };
+    let verbose = args.verbose && !args.json && !args.quiet;
     let measure_memory = !args.no_memory;
     crate::benchmark::RunOptions {
         config_path: args.common.config,
