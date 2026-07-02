@@ -721,6 +721,26 @@ fn swiftui_frame(out: &mut String, style: &ViewStyle, pad: &str) {
             "\n{pad}.frame(width: {width}, height: {height}, alignment: .topLeading)"
         ));
     }
+    if style.min_width.is_some()
+        || style.max_width.is_some()
+        || style.min_height.is_some()
+        || style.max_height.is_some()
+    {
+        let min_width = swiftui_dimension(style.min_width);
+        let max_width = swiftui_dimension(style.max_width);
+        let min_height = swiftui_dimension(style.min_height);
+        let max_height = swiftui_dimension(style.max_height);
+        out.push_str(&format!(
+            "\n{pad}.frame(minWidth: {min_width}, maxWidth: {max_width}, minHeight: {min_height}, maxHeight: {max_height}, alignment: .topLeading)"
+        ));
+    }
+}
+
+fn swiftui_dimension(value: Option<f32>) -> String {
+    value
+        .filter(|value| *value > 0.0)
+        .map(|value| format!("{value:.1}"))
+        .unwrap_or_else(|| "nil".to_string())
 }
 
 fn swiftui_text_align(value: Option<&str>) -> Option<&'static str> {
@@ -748,7 +768,7 @@ fn swiftui_font_weight(weight: u16) -> &'static str {
 fn generate_compose(ir: &ViewIr, view_name: &str) -> String {
     let body = compose_nodes(&ir.root, 1, None, None);
     format!(
-        "import androidx.compose.foundation.background\nimport androidx.compose.foundation.border\nimport androidx.compose.foundation.horizontalScroll\nimport androidx.compose.foundation.layout.Arrangement\nimport androidx.compose.foundation.layout.Column\nimport androidx.compose.foundation.layout.ExperimentalLayoutApi\nimport androidx.compose.foundation.layout.FlowRow\nimport androidx.compose.foundation.layout.PaddingValues\nimport androidx.compose.foundation.layout.Row\nimport androidx.compose.foundation.layout.Spacer\nimport androidx.compose.foundation.layout.fillMaxHeight\nimport androidx.compose.foundation.layout.fillMaxSize\nimport androidx.compose.foundation.layout.fillMaxWidth\nimport androidx.compose.foundation.layout.height\nimport androidx.compose.foundation.layout.offset\nimport androidx.compose.foundation.layout.padding\nimport androidx.compose.foundation.layout.width\nimport androidx.compose.foundation.rememberScrollState\nimport androidx.compose.foundation.shape.RoundedCornerShape\nimport androidx.compose.foundation.verticalScroll\nimport androidx.compose.material3.Button\nimport androidx.compose.material3.ButtonDefaults\nimport androidx.compose.material3.Divider\nimport androidx.compose.material3.FilterChip\nimport androidx.compose.material3.LinearProgressIndicator\nimport androidx.compose.material3.LocalContentColor\nimport androidx.compose.material3.Slider\nimport androidx.compose.material3.Switch\nimport androidx.compose.material3.Text\nimport androidx.compose.material3.TextField\nimport androidx.compose.runtime.Composable\nimport androidx.compose.runtime.CompositionLocalProvider\nimport androidx.compose.ui.Modifier\nimport androidx.compose.ui.draw.alpha\nimport androidx.compose.ui.draw.clip\nimport androidx.compose.ui.draw.rotate\nimport androidx.compose.ui.draw.scale\nimport androidx.compose.ui.graphics.Color\nimport androidx.compose.ui.text.font.FontStyle\nimport androidx.compose.ui.text.font.FontWeight\nimport androidx.compose.ui.text.input.PasswordVisualTransformation\nimport androidx.compose.ui.text.style.TextAlign\nimport androidx.compose.ui.text.style.TextDecoration\nimport androidx.compose.ui.unit.dp\nimport androidx.compose.ui.unit.sp\nimport kotlinx.serialization.json.JsonElement\nimport kotlinx.serialization.json.JsonPrimitive\n\nobject CrepusActions {{\n    var dispatch: (String) -> String = {{ \"{{}}\" }}\n    var resultSink: (String) -> Unit = {{}}\n\n    fun applyResult(raw: String) {{\n        CrepusStateStore.applyResult(raw)\n    }}\n\n    fun perform(action: String) {{\n        val dispatch = dispatch\n        val resultSink = resultSink\n        Thread {{\n            val result = dispatch(action)\n            android.os.Handler(android.os.Looper.getMainLooper()).post {{\n                resultSink(result)\n            }}\n        }}.start()\n    }}\n\n    fun performChange(action: String?, bind: String, value: JsonElement) {{\n        resultSink(CrepusRustActions.dispatchChangeJson(action ?: \"\", bind, value.toString()))\n    }}\n}}\n\n@OptIn(ExperimentalLayoutApi::class)\n@Composable\nfun {view_name}(modifier: Modifier = Modifier) {{\n{body}\n}}\n"
+        "import androidx.compose.foundation.background\nimport androidx.compose.foundation.border\nimport androidx.compose.foundation.horizontalScroll\nimport androidx.compose.foundation.layout.Arrangement\nimport androidx.compose.foundation.layout.Column\nimport androidx.compose.foundation.layout.ExperimentalLayoutApi\nimport androidx.compose.foundation.layout.FlowRow\nimport androidx.compose.foundation.layout.PaddingValues\nimport androidx.compose.foundation.layout.Row\nimport androidx.compose.foundation.layout.Spacer\nimport androidx.compose.foundation.layout.fillMaxHeight\nimport androidx.compose.foundation.layout.fillMaxSize\nimport androidx.compose.foundation.layout.fillMaxWidth\nimport androidx.compose.foundation.layout.height\nimport androidx.compose.foundation.layout.heightIn\nimport androidx.compose.foundation.layout.offset\nimport androidx.compose.foundation.layout.padding\nimport androidx.compose.foundation.layout.width\nimport androidx.compose.foundation.layout.widthIn\nimport androidx.compose.foundation.rememberScrollState\nimport androidx.compose.foundation.shape.RoundedCornerShape\nimport androidx.compose.foundation.verticalScroll\nimport androidx.compose.material3.Button\nimport androidx.compose.material3.ButtonDefaults\nimport androidx.compose.material3.Divider\nimport androidx.compose.material3.FilterChip\nimport androidx.compose.material3.LinearProgressIndicator\nimport androidx.compose.material3.LocalContentColor\nimport androidx.compose.material3.Slider\nimport androidx.compose.material3.Switch\nimport androidx.compose.material3.Text\nimport androidx.compose.material3.TextField\nimport androidx.compose.runtime.Composable\nimport androidx.compose.runtime.CompositionLocalProvider\nimport androidx.compose.ui.Modifier\nimport androidx.compose.ui.draw.alpha\nimport androidx.compose.ui.draw.clip\nimport androidx.compose.ui.draw.rotate\nimport androidx.compose.ui.draw.scale\nimport androidx.compose.ui.graphics.Color\nimport androidx.compose.ui.text.font.FontStyle\nimport androidx.compose.ui.text.font.FontWeight\nimport androidx.compose.ui.text.input.PasswordVisualTransformation\nimport androidx.compose.ui.text.style.TextAlign\nimport androidx.compose.ui.text.style.TextDecoration\nimport androidx.compose.ui.unit.dp\nimport androidx.compose.ui.unit.sp\nimport kotlinx.serialization.json.JsonElement\nimport kotlinx.serialization.json.JsonPrimitive\n\nobject CrepusActions {{\n    var dispatch: (String) -> String = {{ \"{{}}\" }}\n    var resultSink: (String) -> Unit = {{}}\n\n    fun applyResult(raw: String) {{\n        CrepusStateStore.applyResult(raw)\n    }}\n\n    fun perform(action: String) {{\n        val dispatch = dispatch\n        val resultSink = resultSink\n        Thread {{\n            val result = dispatch(action)\n            android.os.Handler(android.os.Looper.getMainLooper()).post {{\n                resultSink(result)\n            }}\n        }}.start()\n    }}\n\n    fun performChange(action: String?, bind: String, value: JsonElement) {{\n        resultSink(CrepusRustActions.dispatchChangeJson(action ?: \"\", bind, value.toString()))\n    }}\n}}\n\n@OptIn(ExperimentalLayoutApi::class)\n@Composable\nfun {view_name}(modifier: Modifier = Modifier) {{\n{body}\n}}\n"
     )
 }
 
@@ -1380,11 +1400,27 @@ fn compose_modifier_chain(base: Option<String>, style: Option<&ViewStyle>) -> Op
                 modifier.push_str(&format!(".width({width:.0}.dp)"));
                 used = true;
             }
+            if style.min_width.is_some() || style.max_width.is_some() {
+                modifier.push_str(&format!(
+                    ".widthIn(min = {}, max = {})",
+                    compose_dp_or_unspecified(style.min_width),
+                    compose_dp_or_unspecified(style.max_width)
+                ));
+                used = true;
+            }
             if style.height == Some(-1.0) || style.max_height == Some(-1.0) {
                 modifier.push_str(".fillMaxHeight()");
                 used = true;
             } else if let Some(height) = style.height.filter(|v| *v > 0.0) {
                 modifier.push_str(&format!(".height({height:.0}.dp)"));
+                used = true;
+            }
+            if style.min_height.is_some() || style.max_height.is_some() {
+                modifier.push_str(&format!(
+                    ".heightIn(min = {}, max = {})",
+                    compose_dp_or_unspecified(style.min_height),
+                    compose_dp_or_unspecified(style.max_height)
+                ));
                 used = true;
             }
         }
@@ -1444,6 +1480,13 @@ fn compose_modifier_chain(base: Option<String>, style: Option<&ViewStyle>) -> Op
         }
     }
     used.then_some(modifier)
+}
+
+fn compose_dp_or_unspecified(value: Option<f32>) -> String {
+    value
+        .filter(|value| *value > 0.0)
+        .map(|value| format!("{value:.0}.dp"))
+        .unwrap_or_else(|| "androidx.compose.ui.unit.Dp.Unspecified".to_string())
 }
 
 fn compose_spacing_values(style: &ViewStyle, kind: &str) -> Vec<String> {
