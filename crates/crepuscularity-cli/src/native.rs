@@ -1570,6 +1570,10 @@ scheme = "CrepusMobileApp"
             *rel == "android/app/src/main/AndroidManifest.xml"
                 && content.contains("android.permission.BLUETOOTH_SCAN")
         }));
+        assert!(TEMPLATE_FILES.iter().any(|(rel, content)| {
+            *rel == "ios/project.yml"
+                && content.contains("INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription")
+        }));
         assert!(TEMPLATE_FILES.iter().any(|(rel, _)| {
             *rel == "android/app/src/main/java/com/nonpolynomial/btleplug/android/impl/Adapter.java"
         }));

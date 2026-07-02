@@ -25,6 +25,7 @@ targets:
         EXCLUDED_ARCHS[sdk=iphonesimulator*]: "x86_64"
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription: "$(PRODUCT_NAME) uses Bluetooth for nearby device setup."
         PRODUCT_BUNDLE_IDENTIFIER: dev.crepuscularity.mobile
     dependencies:
       - package: NativeShell
