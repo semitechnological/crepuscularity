@@ -338,11 +338,16 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<ViewNode, Crepu
             })
             .unwrap_or_default();
         let multiline = classes.iter().any(|c| c == "multiline") || tag == "textarea";
+        let secure = binding_raw(el, "type")
+            .map(|value| value.eq_ignore_ascii_case("password"))
+            .unwrap_or(false)
+            || classes.iter().any(|c| c == "secure");
         let hints = style::extract_stack_hints(&classes, Some(ctx));
         return Ok(ViewNode::Input {
             placeholder,
             bind,
             multiline,
+            secure,
             on_change: event_handler(el, "change"),
             style: hints.style.opt(),
         });

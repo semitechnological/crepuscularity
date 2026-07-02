@@ -116,6 +116,21 @@ fn empty_bound_element_renders_dynamic_text() {
 }
 
 #[test]
+fn password_input_emits_secure_native_fields() {
+    let ir = render_template_to_ir(
+        "div\n  input type=password bind=setup_secret placeholder=\"Setup secret\"",
+        &TemplateContext::new(),
+    )
+    .unwrap();
+
+    let swift = generate_native_source(&ir, NativeCodegenTarget::SwiftUi, "SecretView");
+    assert!(swift.contains("SecureField(\"Setup secret\", text: Binding"));
+
+    let compose = generate_native_source(&ir, NativeCodegenTarget::Compose, "SecretView");
+    assert!(compose.contains("visualTransformation = PasswordVisualTransformation()"));
+}
+
+#[test]
 fn codegen_preserves_control_change_bindings() {
     let ir = render_template_to_ir(
         "div\n toggle bind=enabled @change=\"sync_enabled\"\n  \"Enabled\"\n slider bind=volume @change=\"sync_volume\" min=0 max=100\n input bind=name @change=\"sync_name\" placeholder=\"Name\"\n picker bind=mode @change=\"sync_mode\"\n  option value=\"auto\"\n    \"Auto\"\n  option value=\"manual\"\n    \"Manual\"",

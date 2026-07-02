@@ -313,6 +313,7 @@ fn diff_node(old: &ViewNode, new: &ViewNode, path: &[usize], out: &mut Vec<IrMut
                 placeholder: op,
                 bind: ob,
                 multiline: om,
+                secure: osq,
                 on_change: oc,
                 style: os,
             },
@@ -320,11 +321,12 @@ fn diff_node(old: &ViewNode, new: &ViewNode, path: &[usize], out: &mut Vec<IrMut
                 placeholder: np,
                 bind: nb,
                 multiline: nm,
+                secure: nsq,
                 on_change: nc,
                 style: ns,
             },
         ) => {
-            if op != np || ob != nb || om != nm || oc != nc {
+            if op != np || ob != nb || om != nm || osq != nsq || oc != nc {
                 out.push(IrMutation::ReplaceNode {
                     path: path.to_vec(),
                     node: new.clone(),

@@ -494,6 +494,8 @@ pub enum ViewNode {
         bind: String,
         #[serde(default)]
         multiline: bool,
+        #[serde(default)]
+        secure: bool,
         #[serde(skip_serializing_if = "Option::is_none")]
         on_change: Option<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
