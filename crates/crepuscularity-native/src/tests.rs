@@ -90,8 +90,10 @@ fn codegen_wraps_native_rows() {
     .unwrap();
     let swift = generate_native_source(&ir, NativeCodegenTarget::SwiftUi, "WrappedView");
     assert!(swift.contains("LazyVGrid(columns: [GridItem(.adaptive(minimum: 72), spacing: 8.0)]"));
+    assert!(swift.contains("alignment: .leading"));
     let compose = generate_native_source(&ir, NativeCodegenTarget::Compose, "WrappedView");
     assert!(compose.contains("import androidx.compose.foundation.layout.FlowRow"));
+    assert!(compose.contains("@OptIn(ExperimentalLayoutApi::class)"));
     assert!(compose.contains("FlowRow("));
     assert!(compose.contains("verticalArrangement = Arrangement.spacedBy(8.dp)"));
 }
@@ -171,6 +173,7 @@ fn codegen_preserves_control_change_bindings() {
         .contains("CrepusActions.performChange(\"sync_name\", bind: \"name\", value: newValue)"));
     assert!(swift
         .contains("CrepusActions.performChange(\"sync_mode\", bind: \"mode\", value: newValue)"));
+    assert!(swift.contains(".pickerStyle(.segmented)"));
 
     let compose = generate_native_source(&ir, NativeCodegenTarget::Compose, "ControlsView");
     assert!(
@@ -189,6 +192,7 @@ fn codegen_preserves_control_change_bindings() {
     );
     assert!(compose
         .contains("CrepusActions.performChange(\"sync_mode\", \"mode\", JsonPrimitive(\"auto\"))"));
+    assert!(compose.contains("FilterChip(selected = CrepusStateStore.text(\"mode\") == \"auto\""));
 }
 
 #[test]

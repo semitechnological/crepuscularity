@@ -105,8 +105,9 @@ fn swiftui_node(
             let mut out = if *axis == StackAxis::Row
                 && style.as_ref().and_then(|style| style.flex_wrap) == Some(true)
             {
+                let grid_align = swiftui_grid_alignment(align_items.as_deref());
                 format!(
-                    "{pad}LazyVGrid(columns: [GridItem(.adaptive(minimum: 72), spacing: {gap:.1})], alignment: {align}, spacing: {gap:.1}) {{\n{inner}\n{pad}}}"
+                    "{pad}LazyVGrid(columns: [GridItem(.adaptive(minimum: 72), spacing: {gap:.1})], alignment: {grid_align}, spacing: {gap:.1}) {{\n{inner}\n{pad}}}"
                 )
             } else {
                 let view = match axis {
@@ -435,6 +436,9 @@ fn swiftui_node(
                 swift_model_text(bind, scope_name, scope_var),
                 swiftui_change(on_change.as_deref(), bind, "newValue")
             );
+            out.push_str("\n");
+            out.push_str(&indent_str(indent));
+            out.push_str(".pickerStyle(.segmented)");
             swiftui_style(&mut out, style.as_ref(), false, indent);
             if first.is_empty() {
                 out = out.replace("Binding(get: {  }, set: { _ in })", ".constant(\"\")");
@@ -548,6 +552,14 @@ fn swiftui_stack_alignment(axis: StackAxis, align_items: Option<&str>) -> &'stat
             Some("end") => ".bottom",
             _ => ".top",
         },
+    }
+}
+
+fn swiftui_grid_alignment(align_items: Option<&str>) -> &'static str {
+    match align_items {
+        Some("center") => ".center",
+        Some("end") => ".trailing",
+        _ => ".leading",
     }
 }
 
@@ -736,7 +748,7 @@ fn swiftui_font_weight(weight: u16) -> &'static str {
 fn generate_compose(ir: &ViewIr, view_name: &str) -> String {
     let body = compose_nodes(&ir.root, 1, None, None);
     format!(
-        "import androidx.compose.foundation.background\nimport androidx.compose.foundation.border\nimport androidx.compose.foundation.clickable\nimport androidx.compose.foundation.horizontalScroll\nimport androidx.compose.foundation.layout.Arrangement\nimport androidx.compose.foundation.layout.Column\nimport androidx.compose.foundation.layout.FlowRow\nimport androidx.compose.foundation.layout.PaddingValues\nimport androidx.compose.foundation.layout.Row\nimport androidx.compose.foundation.layout.Spacer\nimport androidx.compose.foundation.layout.fillMaxHeight\nimport androidx.compose.foundation.layout.fillMaxSize\nimport androidx.compose.foundation.layout.fillMaxWidth\nimport androidx.compose.foundation.layout.height\nimport androidx.compose.foundation.layout.offset\nimport androidx.compose.foundation.layout.padding\nimport androidx.compose.foundation.layout.width\nimport androidx.compose.foundation.rememberScrollState\nimport androidx.compose.foundation.shape.RoundedCornerShape\nimport androidx.compose.foundation.verticalScroll\nimport androidx.compose.material3.Button\nimport androidx.compose.material3.ButtonDefaults\nimport androidx.compose.material3.Divider\nimport androidx.compose.material3.LinearProgressIndicator\nimport androidx.compose.material3.LocalContentColor\nimport androidx.compose.material3.Slider\nimport androidx.compose.material3.Switch\nimport androidx.compose.material3.Text\nimport androidx.compose.material3.TextField\nimport androidx.compose.runtime.Composable\nimport androidx.compose.runtime.CompositionLocalProvider\nimport androidx.compose.ui.Modifier\nimport androidx.compose.ui.draw.alpha\nimport androidx.compose.ui.draw.clip\nimport androidx.compose.ui.draw.rotate\nimport androidx.compose.ui.draw.scale\nimport androidx.compose.ui.graphics.Color\nimport androidx.compose.ui.text.font.FontStyle\nimport androidx.compose.ui.text.font.FontWeight\nimport androidx.compose.ui.text.input.PasswordVisualTransformation\nimport androidx.compose.ui.text.style.TextAlign\nimport androidx.compose.ui.text.style.TextDecoration\nimport androidx.compose.ui.unit.dp\nimport androidx.compose.ui.unit.sp\nimport kotlinx.serialization.json.JsonElement\nimport kotlinx.serialization.json.JsonPrimitive\n\nobject CrepusActions {{\n    var dispatch: (String) -> String = {{ \"{{}}\" }}\n    var resultSink: (String) -> Unit = {{}}\n\n    fun applyResult(raw: String) {{\n        CrepusStateStore.applyResult(raw)\n    }}\n\n    fun perform(action: String) {{\n        val dispatch = dispatch\n        val resultSink = resultSink\n        Thread {{\n            val result = dispatch(action)\n            android.os.Handler(android.os.Looper.getMainLooper()).post {{\n                resultSink(result)\n            }}\n        }}.start()\n    }}\n\n    fun performChange(action: String?, bind: String, value: JsonElement) {{\n        resultSink(CrepusRustActions.dispatchChangeJson(action ?: \"\", bind, value.toString()))\n    }}\n}}\n\n@Composable\nfun {view_name}(modifier: Modifier = Modifier) {{\n{body}\n}}\n"
+        "import androidx.compose.foundation.background\nimport androidx.compose.foundation.border\nimport androidx.compose.foundation.horizontalScroll\nimport androidx.compose.foundation.layout.Arrangement\nimport androidx.compose.foundation.layout.Column\nimport androidx.compose.foundation.layout.ExperimentalLayoutApi\nimport androidx.compose.foundation.layout.FlowRow\nimport androidx.compose.foundation.layout.PaddingValues\nimport androidx.compose.foundation.layout.Row\nimport androidx.compose.foundation.layout.Spacer\nimport androidx.compose.foundation.layout.fillMaxHeight\nimport androidx.compose.foundation.layout.fillMaxSize\nimport androidx.compose.foundation.layout.fillMaxWidth\nimport androidx.compose.foundation.layout.height\nimport androidx.compose.foundation.layout.offset\nimport androidx.compose.foundation.layout.padding\nimport androidx.compose.foundation.layout.width\nimport androidx.compose.foundation.rememberScrollState\nimport androidx.compose.foundation.shape.RoundedCornerShape\nimport androidx.compose.foundation.verticalScroll\nimport androidx.compose.material3.Button\nimport androidx.compose.material3.ButtonDefaults\nimport androidx.compose.material3.Divider\nimport androidx.compose.material3.FilterChip\nimport androidx.compose.material3.LinearProgressIndicator\nimport androidx.compose.material3.LocalContentColor\nimport androidx.compose.material3.Slider\nimport androidx.compose.material3.Switch\nimport androidx.compose.material3.Text\nimport androidx.compose.material3.TextField\nimport androidx.compose.runtime.Composable\nimport androidx.compose.runtime.CompositionLocalProvider\nimport androidx.compose.ui.Modifier\nimport androidx.compose.ui.draw.alpha\nimport androidx.compose.ui.draw.clip\nimport androidx.compose.ui.draw.rotate\nimport androidx.compose.ui.draw.scale\nimport androidx.compose.ui.graphics.Color\nimport androidx.compose.ui.text.font.FontStyle\nimport androidx.compose.ui.text.font.FontWeight\nimport androidx.compose.ui.text.input.PasswordVisualTransformation\nimport androidx.compose.ui.text.style.TextAlign\nimport androidx.compose.ui.text.style.TextDecoration\nimport androidx.compose.ui.unit.dp\nimport androidx.compose.ui.unit.sp\nimport kotlinx.serialization.json.JsonElement\nimport kotlinx.serialization.json.JsonPrimitive\n\nobject CrepusActions {{\n    var dispatch: (String) -> String = {{ \"{{}}\" }}\n    var resultSink: (String) -> Unit = {{}}\n\n    fun applyResult(raw: String) {{\n        CrepusStateStore.applyResult(raw)\n    }}\n\n    fun perform(action: String) {{\n        val dispatch = dispatch\n        val resultSink = resultSink\n        Thread {{\n            val result = dispatch(action)\n            android.os.Handler(android.os.Looper.getMainLooper()).post {{\n                resultSink(result)\n            }}\n        }}.start()\n    }}\n\n    fun performChange(action: String?, bind: String, value: JsonElement) {{\n        resultSink(CrepusRustActions.dispatchChangeJson(action ?: \"\", bind, value.toString()))\n    }}\n}}\n\n@OptIn(ExperimentalLayoutApi::class)\n@Composable\nfun {view_name}(modifier: Modifier = Modifier) {{\n{body}\n}}\n"
     )
 }
 
@@ -1089,16 +1101,15 @@ fn compose_node_with_base(
                         &format!("JsonPrimitive(\"{}\")", kotlin_escape(&option.value)),
                     );
                     format!(
-                        "{}Text(text = if ({current} == \"{}\") \"{}\" else \"{}\", modifier = Modifier.clickable {{ {click} }})",
+                        "{}FilterChip(selected = {current} == \"{}\", onClick = {{ {click} }}, label = {{ Text(\"{}\") }})",
                         indent_str(indent + 1),
                         kotlin_escape(&option.value),
-                        kotlin_escape(&option.label),
                         kotlin_escape(&option.label)
                     )
                 })
                 .collect::<Vec<_>>()
                 .join("\n");
-            format!("{pad}Column{modifier} {{\n{inner}\n{pad}}}")
+            format!("{pad}FlowRow{modifier} {{\n{inner}\n{pad}}}")
         }
     }
 }
