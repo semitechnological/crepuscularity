@@ -48,7 +48,8 @@ fn codegen_swiftui_emits_standalone_view_source() {
     assert!(source.contains("public enum CrepusActions"));
     assert!(source.contains("public static var dispatch: (String) -> String"));
     assert!(source.contains("public static func perform(_ action: String)"));
-    assert!(source.contains("resultSink(dispatch(action))"));
+    assert!(source.contains("DispatchQueue.global(qos: .userInitiated).async"));
+    assert!(source.contains("DispatchQueue.main.async"));
     assert!(!source.contains("knownActions"));
     assert!(source.contains("public struct HelloScreen: View"));
     assert!(source.contains("VStack(alignment: .leading, spacing: 16.0)"));
@@ -74,7 +75,8 @@ fn codegen_compose_emits_composable_source() {
     assert!(source.contains("object CrepusActions"));
     assert!(source.contains("var dispatch: (String) -> String"));
     assert!(source.contains("fun perform(action: String)"));
-    assert!(source.contains("resultSink(dispatch(action))"));
+    assert!(source.contains("Thread {"));
+    assert!(source.contains("android.os.Handler(android.os.Looper.getMainLooper()).post"));
     assert!(!source.contains("knownActions"));
     assert!(source.contains("Button(onClick = { CrepusActions.perform(\"tap\") })"));
 }
