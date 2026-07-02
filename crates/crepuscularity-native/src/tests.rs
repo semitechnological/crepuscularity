@@ -198,7 +198,7 @@ fn codegen_preserves_control_change_bindings() {
 #[test]
 fn compose_button_colors_use_material_colors() {
     let ir = render_template_to_ir(
-        "button @click=\"tap\" bg-[#ffffff] text-[#000000] px-6 py-5\n  \"Tap\"",
+        "button @click=\"tap\" rounded-lg bg-[#ffffff] text-[#000000] px-6 py-5\n  \"Tap\"",
         &TemplateContext::new(),
     )
     .unwrap();
@@ -208,6 +208,7 @@ fn compose_button_colors_use_material_colors() {
     assert!(source.contains("contentPadding = PaddingValues(horizontal = 24.dp, vertical = 20.dp)"));
     assert!(source.contains("colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFFFFF), contentColor = Color(0xFF000000))"));
     assert!(source.contains("elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp, pressedElevation = 0.dp, focusedElevation = 0.dp, hoveredElevation = 0.dp, disabledElevation = 0.dp)"));
+    assert!(source.contains("shape = RoundedCornerShape(8.dp)"));
     assert!(!source.contains("modifier = Modifier.padding(horizontal = 24.dp, vertical = 20.dp)"));
     assert!(!source.contains("Modifier.background(Color(0xFFFFFFFF))"));
 }
@@ -237,6 +238,34 @@ fn compose_stack_text_color_inherits_to_children() {
     assert!(
         source.contains("CompositionLocalProvider(LocalContentColor provides Color(0xFFFFFFFF))")
     );
+}
+
+#[test]
+fn native_registry_classes_emit_real_platform_styles() {
+    let ir = render_template_to_ir(
+        "div flex flex-col gap-2 bg-zinc-900 rounded-lg overflow-y-auto\n  span text-xs text-zinc-100\n    \"Tiny\"\n  span text-sm\n    \"Small\"\n  span text-2xl font-semibold\n    \"Large\"",
+        &TemplateContext::new(),
+    )
+    .unwrap();
+
+    let swift = generate_native_source(&ir, NativeCodegenTarget::SwiftUi, "RegistryParityView");
+    assert!(swift.contains("VStack(alignment: .leading, spacing: 8.0)"));
+    assert!(swift.contains(".background(Color(red:"));
+    assert!(swift.contains(".clipShape(RoundedRectangle(cornerRadius: 8.0))"));
+    assert!(swift.contains(".font(.system(size: 12.0))"));
+    assert!(swift.contains(".font(.system(size: 14.0))"));
+    assert!(swift.contains(".font(.system(size: 24.0))"));
+    assert!(swift.contains(".fontWeight(.semibold)"));
+
+    let compose = generate_native_source(&ir, NativeCodegenTarget::Compose, "RegistryParityView");
+    assert!(compose.contains(".clip(RoundedCornerShape(8.dp))"));
+    assert!(compose.contains(".background(Color(0xFF18181B))"));
+    assert!(compose.contains("verticalArrangement = Arrangement.spacedBy(8.dp)"));
+    assert!(compose.contains("color = Color(0xFFF4F4F5)"));
+    assert!(compose.contains("fontSize = 12.0.sp"));
+    assert!(compose.contains("fontSize = 14.0.sp"));
+    assert!(compose.contains("fontSize = 24.0.sp"));
+    assert!(compose.contains("fontWeight = FontWeight.SemiBold"));
 }
 
 #[test]

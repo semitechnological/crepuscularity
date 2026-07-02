@@ -88,6 +88,7 @@ fn main() {
     ] {
         if let Some(body) = extract_fn_until_next_fn(&style_src, name) {
             native_literals.extend(extract_match_arm_classes_from_body(body));
+            native_literals.extend(extract_quoted_tailwind_tokens(body));
         }
     }
     if let Some(body) = extract_fn_until_next_fn(&style_src, "is_scroll_container") {
@@ -316,10 +317,69 @@ fn native_covers_class(class: &str, native: &BTreeSet<String>) -> bool {
     if native.contains(class) {
         return true;
     }
-    native.contains("gap-")
+    if native.contains("gap-")
         && class.starts_with("gap-")
         && class.len() > 4
         && class[4..].chars().all(|c| c.is_ascii_digit())
+    {
+        return true;
+    }
+    if native.contains("bg-") && class.strip_prefix("bg-").is_some_and(native_palette_or_hex) {
+        return true;
+    }
+    if native.contains("text-")
+        && class
+            .strip_prefix("text-")
+            .is_some_and(|rest| native_text_size(rest) || native_palette_or_hex(rest))
+    {
+        return true;
+    }
+    false
+}
+
+fn native_text_size(value: &str) -> bool {
+    matches!(
+        value,
+        "xs" | "sm"
+            | "base"
+            | "lg"
+            | "xl"
+            | "2xl"
+            | "3xl"
+            | "4xl"
+            | "5xl"
+            | "6xl"
+            | "7xl"
+            | "8xl"
+            | "9xl"
+    )
+}
+
+fn native_palette_or_hex(value: &str) -> bool {
+    matches!(value, "black" | "white" | "transparent" | "clear")
+        || value.starts_with("[#")
+        || value.starts_with("zinc-")
+        || value.starts_with("slate-")
+        || value.starts_with("gray-")
+        || value.starts_with("neutral-")
+        || value.starts_with("stone-")
+        || value.starts_with("red-")
+        || value.starts_with("orange-")
+        || value.starts_with("amber-")
+        || value.starts_with("yellow-")
+        || value.starts_with("lime-")
+        || value.starts_with("green-")
+        || value.starts_with("emerald-")
+        || value.starts_with("teal-")
+        || value.starts_with("cyan-")
+        || value.starts_with("sky-")
+        || value.starts_with("blue-")
+        || value.starts_with("indigo-")
+        || value.starts_with("violet-")
+        || value.starts_with("purple-")
+        || value.starts_with("fuchsia-")
+        || value.starts_with("pink-")
+        || value.starts_with("rose-")
 }
 
 fn is_class_literal(s: &str) -> bool {

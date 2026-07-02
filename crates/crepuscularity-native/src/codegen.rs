@@ -436,7 +436,7 @@ fn swiftui_node(
                 swift_model_text(bind, scope_name, scope_var),
                 swiftui_change(on_change.as_deref(), bind, "newValue")
             );
-            out.push_str("\n");
+            out.push('\n');
             out.push_str(&indent_str(indent));
             out.push_str(".pickerStyle(.segmented)");
             swiftui_style(&mut out, style.as_ref(), false, indent);
@@ -1315,6 +1315,9 @@ fn compose_button_args(style: Option<&ViewStyle>) -> String {
                 "elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp, pressedElevation = 0.dp, focusedElevation = 0.dp, hoveredElevation = 0.dp, disabledElevation = 0.dp)"
                     .to_string(),
             );
+        }
+        if let Some(radius) = style.corner_radius {
+            args.push(format!("shape = RoundedCornerShape({radius:.0}.dp)"));
         }
         if let Some(padding) = compose_button_content_padding(style) {
             args.push(format!("contentPadding = {padding}"));

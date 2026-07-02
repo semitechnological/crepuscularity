@@ -464,7 +464,14 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<ViewNode, Crepu
         return Ok(ViewNode::Scroll {
             axis,
             style: hints.style.opt(),
-            children,
+            children: vec![ViewNode::Stack {
+                axis,
+                spacing,
+                align_items: hints.align_items,
+                justify_content: hints.justify_content,
+                style: None,
+                children,
+            }],
         });
     }
 
