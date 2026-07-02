@@ -243,7 +243,7 @@ fn compose_stack_text_color_inherits_to_children() {
 #[test]
 fn native_registry_classes_emit_real_platform_styles() {
     let ir = render_template_to_ir(
-        "div flex flex-col gap-2 bg-zinc-900 rounded-lg overflow-y-auto max-w-[360px]\n  span text-xs text-zinc-100\n    \"Tiny\"\n  span text-sm\n    \"Small\"\n  span text-2xl font-semibold\n    \"Large\"",
+        "div flex flex-col gap-2 bg-zinc-900 rounded-lg overflow-y-auto w-full max-w-[360px]\n  span text-xs text-zinc-100\n    \"Tiny\"\n  span text-sm\n    \"Small\"\n  span text-2xl font-semibold\n    \"Large\"",
         &TemplateContext::new(),
     )
     .unwrap();
@@ -252,6 +252,7 @@ fn native_registry_classes_emit_real_platform_styles() {
     assert!(swift.contains("VStack(alignment: .leading, spacing: 8.0)"));
     assert!(swift.contains(".background(Color(red:"));
     assert!(swift.contains(".clipShape(RoundedRectangle(cornerRadius: 8.0))"));
+    assert!(swift.contains(".frame(maxWidth: .infinity, maxHeight: nil, alignment: .topLeading)"));
     assert!(swift.contains(".frame(minWidth: nil, maxWidth: 360.0, minHeight: nil, maxHeight: nil, alignment: .topLeading)"));
     assert!(swift.contains(".font(.system(size: 12.0))"));
     assert!(swift.contains(".font(.system(size: 14.0))"));

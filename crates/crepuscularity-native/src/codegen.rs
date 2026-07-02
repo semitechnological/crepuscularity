@@ -704,9 +704,7 @@ fn swiftui_frame(out: &mut String, style: &ViewStyle, pad: &str) {
         out.push_str(&format!(
             "\n{pad}.frame(maxWidth: {max_width}, maxHeight: {max_height}, alignment: .topLeading)"
         ));
-        return;
-    }
-    if style.width.is_some() || style.height.is_some() {
+    } else if style.width.is_some() || style.height.is_some() {
         let width = style
             .width
             .filter(|v| *v > 0.0)
