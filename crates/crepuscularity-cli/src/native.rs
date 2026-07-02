@@ -626,6 +626,118 @@ const TEMPLATE_FILES: &[(&str, &str)] = &[
         ),
     ),
     (
+        "android/app/src/main/java/com/nonpolynomial/btleplug/android/impl/Adapter.java",
+        include_str!("../templates/native/android/app/src/main/java/com/nonpolynomial/btleplug/android/impl/Adapter.java"),
+    ),
+    (
+        "android/app/src/main/java/com/nonpolynomial/btleplug/android/impl/BluetoothException.java",
+        include_str!("../templates/native/android/app/src/main/java/com/nonpolynomial/btleplug/android/impl/BluetoothException.java"),
+    ),
+    (
+        "android/app/src/main/java/com/nonpolynomial/btleplug/android/impl/NoBluetoothAdapterException.java",
+        include_str!("../templates/native/android/app/src/main/java/com/nonpolynomial/btleplug/android/impl/NoBluetoothAdapterException.java"),
+    ),
+    (
+        "android/app/src/main/java/com/nonpolynomial/btleplug/android/impl/NoSuchCharacteristicException.java",
+        include_str!("../templates/native/android/app/src/main/java/com/nonpolynomial/btleplug/android/impl/NoSuchCharacteristicException.java"),
+    ),
+    (
+        "android/app/src/main/java/com/nonpolynomial/btleplug/android/impl/NotConnectedException.java",
+        include_str!("../templates/native/android/app/src/main/java/com/nonpolynomial/btleplug/android/impl/NotConnectedException.java"),
+    ),
+    (
+        "android/app/src/main/java/com/nonpolynomial/btleplug/android/impl/Peripheral.java",
+        include_str!("../templates/native/android/app/src/main/java/com/nonpolynomial/btleplug/android/impl/Peripheral.java"),
+    ),
+    (
+        "android/app/src/main/java/com/nonpolynomial/btleplug/android/impl/PermissionDeniedException.java",
+        include_str!("../templates/native/android/app/src/main/java/com/nonpolynomial/btleplug/android/impl/PermissionDeniedException.java"),
+    ),
+    (
+        "android/app/src/main/java/com/nonpolynomial/btleplug/android/impl/ScanFilter.java",
+        include_str!("../templates/native/android/app/src/main/java/com/nonpolynomial/btleplug/android/impl/ScanFilter.java"),
+    ),
+    (
+        "android/app/src/main/java/com/nonpolynomial/btleplug/android/impl/UnexpectedCallbackException.java",
+        include_str!("../templates/native/android/app/src/main/java/com/nonpolynomial/btleplug/android/impl/UnexpectedCallbackException.java"),
+    ),
+    (
+        "android/app/src/main/java/com/nonpolynomial/btleplug/android/impl/UnexpectedCharacteristicException.java",
+        include_str!("../templates/native/android/app/src/main/java/com/nonpolynomial/btleplug/android/impl/UnexpectedCharacteristicException.java"),
+    ),
+    (
+        "android/app/src/main/java/io/github/gedgygedgy/rust/future/Future.java",
+        include_str!("../templates/native/android/app/src/main/java/io/github/gedgygedgy/rust/future/Future.java"),
+    ),
+    (
+        "android/app/src/main/java/io/github/gedgygedgy/rust/future/FutureException.java",
+        include_str!("../templates/native/android/app/src/main/java/io/github/gedgygedgy/rust/future/FutureException.java"),
+    ),
+    (
+        "android/app/src/main/java/io/github/gedgygedgy/rust/future/SimpleFuture.java",
+        include_str!("../templates/native/android/app/src/main/java/io/github/gedgygedgy/rust/future/SimpleFuture.java"),
+    ),
+    (
+        "android/app/src/main/java/io/github/gedgygedgy/rust/ops/FnAdapter.java",
+        include_str!("../templates/native/android/app/src/main/java/io/github/gedgygedgy/rust/ops/FnAdapter.java"),
+    ),
+    (
+        "android/app/src/main/java/io/github/gedgygedgy/rust/ops/FnBiFunction.java",
+        include_str!("../templates/native/android/app/src/main/java/io/github/gedgygedgy/rust/ops/FnBiFunction.java"),
+    ),
+    (
+        "android/app/src/main/java/io/github/gedgygedgy/rust/ops/FnBiFunctionImpl.java",
+        include_str!("../templates/native/android/app/src/main/java/io/github/gedgygedgy/rust/ops/FnBiFunctionImpl.java"),
+    ),
+    (
+        "android/app/src/main/java/io/github/gedgygedgy/rust/ops/FnFunction.java",
+        include_str!("../templates/native/android/app/src/main/java/io/github/gedgygedgy/rust/ops/FnFunction.java"),
+    ),
+    (
+        "android/app/src/main/java/io/github/gedgygedgy/rust/ops/FnFunctionImpl.java",
+        include_str!("../templates/native/android/app/src/main/java/io/github/gedgygedgy/rust/ops/FnFunctionImpl.java"),
+    ),
+    (
+        "android/app/src/main/java/io/github/gedgygedgy/rust/ops/FnRunnable.java",
+        include_str!("../templates/native/android/app/src/main/java/io/github/gedgygedgy/rust/ops/FnRunnable.java"),
+    ),
+    (
+        "android/app/src/main/java/io/github/gedgygedgy/rust/ops/FnRunnableImpl.java",
+        include_str!("../templates/native/android/app/src/main/java/io/github/gedgygedgy/rust/ops/FnRunnableImpl.java"),
+    ),
+    (
+        "android/app/src/main/java/io/github/gedgygedgy/rust/panic/PanicException.java",
+        include_str!("../templates/native/android/app/src/main/java/io/github/gedgygedgy/rust/panic/PanicException.java"),
+    ),
+    (
+        "android/app/src/main/java/io/github/gedgygedgy/rust/stream/QueueStream.java",
+        include_str!("../templates/native/android/app/src/main/java/io/github/gedgygedgy/rust/stream/QueueStream.java"),
+    ),
+    (
+        "android/app/src/main/java/io/github/gedgygedgy/rust/stream/Stream.java",
+        include_str!("../templates/native/android/app/src/main/java/io/github/gedgygedgy/rust/stream/Stream.java"),
+    ),
+    (
+        "android/app/src/main/java/io/github/gedgygedgy/rust/stream/StreamPoll.java",
+        include_str!("../templates/native/android/app/src/main/java/io/github/gedgygedgy/rust/stream/StreamPoll.java"),
+    ),
+    (
+        "android/app/src/main/java/io/github/gedgygedgy/rust/task/PollResult.java",
+        include_str!("../templates/native/android/app/src/main/java/io/github/gedgygedgy/rust/task/PollResult.java"),
+    ),
+    (
+        "android/app/src/main/java/io/github/gedgygedgy/rust/task/Waker.java",
+        include_str!("../templates/native/android/app/src/main/java/io/github/gedgygedgy/rust/task/Waker.java"),
+    ),
+    (
+        "android/app/src/main/java/io/github/gedgygedgy/rust/thread/LocalThreadChecker.java",
+        include_str!("../templates/native/android/app/src/main/java/io/github/gedgygedgy/rust/thread/LocalThreadChecker.java"),
+    ),
+    (
+        "android/app/src/main/java/io/github/gedgygedgy/rust/thread/LocalThreadException.java",
+        include_str!("../templates/native/android/app/src/main/java/io/github/gedgygedgy/rust/thread/LocalThreadException.java"),
+    ),
+    (
         "android/app/src/main/java/dev/crepuscularity/nativeshell/generated/CrepusGeneratedView.kt",
         include_str!(
             "../templates/native/android/app/src/main/java/dev/crepuscularity/nativeshell/generated/CrepusGeneratedView.kt"
@@ -1454,6 +1566,16 @@ scheme = "CrepusMobileApp"
         for (rel, content) in TEMPLATE_FILES {
             assert!(!content.is_empty(), "empty template content at {rel}");
         }
+        assert!(TEMPLATE_FILES.iter().any(|(rel, content)| {
+            *rel == "android/app/src/main/AndroidManifest.xml"
+                && content.contains("android.permission.BLUETOOTH_SCAN")
+        }));
+        assert!(TEMPLATE_FILES.iter().any(|(rel, _)| {
+            *rel == "android/app/src/main/java/com/nonpolynomial/btleplug/android/impl/Adapter.java"
+        }));
+        assert!(TEMPLATE_FILES.iter().any(|(rel, _)| {
+            *rel == "android/app/src/main/java/io/github/gedgygedgy/rust/future/Future.java"
+        }));
     }
 
     #[test]
