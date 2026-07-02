@@ -80,6 +80,21 @@ fn codegen_compose_emits_composable_source() {
 }
 
 #[test]
+fn codegen_wraps_native_rows() {
+    let ir = render_template_to_ir(
+        "div flex flex-wrap gap-2\n  button\n    \"One\"\n  button\n    \"Two\"",
+        &TemplateContext::new(),
+    )
+    .unwrap();
+    let swift = generate_native_source(&ir, NativeCodegenTarget::SwiftUi, "WrappedView");
+    assert!(swift.contains("LazyVGrid(columns: [GridItem(.adaptive(minimum: 72), spacing: 8.0)]"));
+    let compose = generate_native_source(&ir, NativeCodegenTarget::Compose, "WrappedView");
+    assert!(compose.contains("import androidx.compose.foundation.layout.FlowRow"));
+    assert!(compose.contains("FlowRow("));
+    assert!(compose.contains("verticalArrangement = Arrangement.spacedBy(8.dp)"));
+}
+
+#[test]
 fn codegen_preserves_dynamic_state_bindings() {
     let ir = render_template_to_ir(
         "div\n if {count > 1}\n  span\n    \"Many\"\n else\n  span\n    \"One\"\n for hub in {hubs}\n  span\n    \"{hub.name}\"\n span\n  \"{pairing_code}\"",
