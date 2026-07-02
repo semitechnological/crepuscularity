@@ -50,7 +50,6 @@ fn swiftui_stack_children(
     let child_lines = swiftui_children(children, indent, scope_name, scope_var);
     let spacer = format!("{}Spacer()", indent_str(indent));
     match justify_content {
-        Some("center") => format!("{spacer}\n{child_lines}\n{spacer}"),
         Some("end") => format!("{spacer}\n{child_lines}"),
         Some("between") if children.len() > 1 => children
             .iter()
@@ -146,7 +145,13 @@ fn swiftui_node(
                 };
                 format!("{pad}{view}(alignment: {align}, spacing: {gap:.1}) {{\n{inner}\n{pad}}}")
             };
-            swiftui_style(&mut out, style.as_ref(), false, indent);
+            swiftui_style_with_alignment(
+                &mut out,
+                style.as_ref(),
+                false,
+                indent,
+                swiftui_frame_alignment(*axis, justify_content.as_deref(), align_items.as_deref()),
+            );
             out
         }
         ViewNode::Button {
@@ -625,6 +630,16 @@ fn swiftui_grid_alignment(align_items: Option<&str>) -> &'static str {
 }
 
 fn swiftui_style(out: &mut String, style: Option<&ViewStyle>, is_text: bool, indent: usize) {
+    swiftui_style_with_alignment(out, style, is_text, indent, ".topLeading");
+}
+
+fn swiftui_style_with_alignment(
+    out: &mut String,
+    style: Option<&ViewStyle>,
+    is_text: bool,
+    indent: usize,
+    frame_alignment: &str,
+) {
     let Some(style) = style else {
         return;
     };
@@ -658,7 +673,7 @@ fn swiftui_style(out: &mut String, style: Option<&ViewStyle>, is_text: bool, ind
             out.push_str(&format!("\n{pad}.lineLimit({lines})"));
         }
     }
-    swiftui_frame(out, style, &pad);
+    swiftui_frame(out, style, &pad, frame_alignment);
     swiftui_spacing(out, style, &pad, "padding");
     swiftui_spacing(out, style, &pad, "margin");
     if let Some(opacity) = style.opacity {
@@ -750,7 +765,7 @@ fn swiftui_spacing(out: &mut String, style: &ViewStyle, pad: &str, kind: &str) {
     }
 }
 
-fn swiftui_frame(out: &mut String, style: &ViewStyle, pad: &str) {
+fn swiftui_frame(out: &mut String, style: &ViewStyle, pad: &str, alignment: &str) {
     if style.width == Some(-1.0) || style.height == Some(-1.0) {
         let max_width = if style.width == Some(-1.0) {
             ".infinity".to_string()
@@ -763,7 +778,7 @@ fn swiftui_frame(out: &mut String, style: &ViewStyle, pad: &str) {
             "nil".to_string()
         };
         out.push_str(&format!(
-            "\n{pad}.frame(maxWidth: {max_width}, maxHeight: {max_height}, alignment: .topLeading)"
+            "\n{pad}.frame(maxWidth: {max_width}, maxHeight: {max_height}, alignment: {alignment})"
         ));
     } else if style.width.is_some() || style.height.is_some() {
         let width = style
@@ -777,7 +792,7 @@ fn swiftui_frame(out: &mut String, style: &ViewStyle, pad: &str) {
             .map(|v| format!("{v:.1}"))
             .unwrap_or_else(|| "nil".to_string());
         out.push_str(&format!(
-            "\n{pad}.frame(width: {width}, height: {height}, alignment: .topLeading)"
+            "\n{pad}.frame(width: {width}, height: {height}, alignment: {alignment})"
         ));
     }
     if style.min_width.is_some()
@@ -790,8 +805,30 @@ fn swiftui_frame(out: &mut String, style: &ViewStyle, pad: &str) {
         let min_height = swiftui_dimension(style.min_height);
         let max_height = swiftui_dimension(style.max_height);
         out.push_str(&format!(
-            "\n{pad}.frame(minWidth: {min_width}, maxWidth: {max_width}, minHeight: {min_height}, maxHeight: {max_height}, alignment: .topLeading)"
+            "\n{pad}.frame(minWidth: {min_width}, maxWidth: {max_width}, minHeight: {min_height}, maxHeight: {max_height}, alignment: {alignment})"
         ));
+    }
+}
+
+fn swiftui_frame_alignment(
+    axis: StackAxis,
+    justify_content: Option<&str>,
+    align_items: Option<&str>,
+) -> &'static str {
+    match (axis, justify_content, align_items) {
+        (StackAxis::Column, Some("center"), Some("center")) => ".center",
+        (StackAxis::Column, Some("center"), Some("end")) => ".trailing",
+        (StackAxis::Column, Some("center"), _) => ".leading",
+        (StackAxis::Column, Some("end"), Some("center")) => ".bottom",
+        (StackAxis::Column, Some("end"), Some("end")) => ".bottomTrailing",
+        (StackAxis::Column, Some("end"), _) => ".bottomLeading",
+        (StackAxis::Row, Some("center"), Some("center")) => ".center",
+        (StackAxis::Row, Some("center"), Some("end")) => ".bottom",
+        (StackAxis::Row, Some("center"), _) => ".top",
+        (StackAxis::Row, Some("end"), Some("center")) => ".trailing",
+        (StackAxis::Row, Some("end"), Some("end")) => ".bottomTrailing",
+        (StackAxis::Row, Some("end"), _) => ".topTrailing",
+        _ => ".topLeading",
     }
 }
 

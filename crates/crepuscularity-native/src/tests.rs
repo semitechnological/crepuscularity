@@ -107,8 +107,8 @@ fn codegen_honors_native_justify_center() {
     .unwrap();
 
     let swift = generate_native_source(&ir, NativeCodegenTarget::SwiftUi, "CenteredView");
-    assert!(swift.contains("Spacer()"));
-    assert!(swift.contains(".frame(maxWidth: nil, maxHeight: .infinity"));
+    assert!(!swift.contains("Spacer()"));
+    assert!(swift.contains(".frame(maxWidth: nil, maxHeight: .infinity, alignment: .leading)"));
 
     let compose = generate_native_source(&ir, NativeCodegenTarget::Compose, "CenteredView");
     assert!(compose.contains("import androidx.compose.ui.Alignment"));
