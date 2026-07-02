@@ -89,9 +89,18 @@ fn dispatch_change_json(action: &str, bind: &str, value_json: &str) -> String {
         Ok(value) => value,
         Err(error) => {
             let state = lock_action_state();
-            return action_json(false, action, None, Some(&format!("invalid change payload: {error}")), &state);
+            return action_json(
+                false,
+                action,
+                None,
+                Some(&format!("invalid change payload: {error}")),
+                &state,
+            );
         }
     };
+    if action.is_empty() {
+        return merge_view_value(bind, value).to_string();
+    }
     let mut payload = serde_json::Map::new();
     payload.insert(bind.to_string(), value);
     if let Some((capability, method)) = action.split_once('.') {
@@ -106,9 +115,28 @@ fn dispatch_change_json(action: &str, bind: &str, value_json: &str) -> String {
         );
     }
     if !action.is_empty() {
-        payload.insert("action".to_string(), serde_json::Value::String(action.to_string()));
+        payload.insert(
+            "action".to_string(),
+            serde_json::Value::String(action.to_string()),
+        );
     }
     dispatch_action_json(&serde_json::Value::Object(payload).to_string())
+}
+
+fn merge_view_value(bind: &str, value: serde_json::Value) -> serde_json::Value {
+    let mut state = lock_view_state();
+    if !state.is_object() {
+        *state = serde_json::json!({});
+    }
+    if let Some(map) = state.as_object_mut() {
+        map.insert(bind.to_string(), value.clone());
+    }
+    serde_json::json!({
+        "ok": true,
+        "action": "bind",
+        "value": { bind: value },
+        "state": state.clone(),
+    })
 }
 
 fn parse_action_error(result: &str) -> Option<String> {
@@ -196,10 +224,7 @@ fn preferences_backend(
     match method {
         "get" => {
             let key = payload_string(payload, "key")?;
-            Ok(prefs
-                .get(&key)
-                .cloned()
-                .unwrap_or(serde_json::Value::Null))
+            Ok(prefs.get(&key).cloned().unwrap_or(serde_json::Value::Null))
         }
         "set" => {
             let key = payload_string(payload, "key")?;
@@ -397,7 +422,7 @@ fn parse_action_request(input: &str) -> serde_json::Value {
         .unwrap_or_else(|| serde_json::json!({ "action": input }))
 }
 
-fn legacy_action_name<'a>(request: &'a serde_json::Value) -> Option<&'a str> {
+fn legacy_action_name(request: &serde_json::Value) -> Option<&str> {
     request.get("action").and_then(|value| value.as_str())
 }
 
@@ -427,10 +452,7 @@ fn request_payload(request: &serde_json::Value) -> Option<&serde_json::Value> {
     request.get("payload")
 }
 
-fn payload_string(
-    payload: Option<&serde_json::Value>,
-    key: &str,
-) -> Result<String, String> {
+fn payload_string(payload: Option<&serde_json::Value>, key: &str) -> Result<String, String> {
     payload
         .and_then(|value| value.get(key))
         .and_then(|value| value.as_str())
@@ -446,9 +468,9 @@ fn data_root_dir() -> PathBuf {
 }
 
 fn probe_socket(host: &str, port: u16, timeout_ms: u64) -> bool {
-    resolve_socket_addrs(host, port)
-        .into_iter()
-        .any(|address| TcpStream::connect_timeout(&address, Duration::from_millis(timeout_ms)).is_ok())
+    resolve_socket_addrs(host, port).into_iter().any(|address| {
+        TcpStream::connect_timeout(&address, Duration::from_millis(timeout_ms)).is_ok()
+    })
 }
 
 fn resolve_socket_addrs(host: &str, port: u16) -> Vec<SocketAddr> {
@@ -544,7 +566,9 @@ fn parse_http_response(response: &str) -> Result<HttpResponse, String> {
         .split_once("\r\n\r\n")
         .ok_or_else(|| "invalid HTTP response".to_string())?;
     let mut lines = head.lines();
-    let status_line = lines.next().ok_or_else(|| "missing status line".to_string())?;
+    let status_line = lines
+        .next()
+        .ok_or_else(|| "missing status line".to_string())?;
     let status = status_line
         .split_whitespace()
         .nth(1)
@@ -561,9 +585,7 @@ fn preferences_file_path() -> PathBuf {
     data_root_dir().join("preferences.json")
 }
 
-fn load_json_map(
-    path: &Path,
-) -> Result<serde_json::Map<String, serde_json::Value>, String> {
+fn load_json_map(path: &Path) -> Result<serde_json::Map<String, serde_json::Value>, String> {
     if !path.exists() {
         return Ok(serde_json::Map::new());
     }
@@ -590,8 +612,7 @@ fn ensure_parent_dir(path: &Path) -> Result<(), String> {
     let Some(parent) = path.parent() else {
         return Ok(());
     };
-    fs::create_dir_all(parent)
-        .map_err(|error| format!("mkdir {}: {error}", parent.display()))
+    fs::create_dir_all(parent).map_err(|error| format!("mkdir {}: {error}", parent.display()))
 }
 
 fn scoped_data_path(raw: &str) -> Result<PathBuf, String> {
@@ -620,7 +641,8 @@ fn sanitize_relative_path(raw: &str) -> Result<PathBuf, String> {
 }
 
 fn file_stat_json(path: &Path) -> Result<serde_json::Value, String> {
-    let metadata = fs::metadata(path).map_err(|error| format!("stat {}: {error}", path.display()))?;
+    let metadata =
+        fs::metadata(path).map_err(|error| format!("stat {}: {error}", path.display()))?;
     Ok(serde_json::json!({
         "path": path_string(path),
         "isDir": metadata.is_dir(),
@@ -708,15 +730,33 @@ pub extern "C" fn crepus_mobile_dispatch_change_json(
     output_len: usize,
 ) -> usize {
     let Some(action) = action_from_ffi(action_ptr, action_len) else {
-        let result = action_json(false, "", None, Some("invalid action pointer"), &MobileActionState::default());
+        let result = action_json(
+            false,
+            "",
+            None,
+            Some("invalid action pointer"),
+            &MobileActionState::default(),
+        );
         return copy_json_to_output(&result, output_ptr, output_len);
     };
     let Some(bind) = action_from_ffi(bind_ptr, bind_len) else {
-        let result = action_json(false, action.as_ref(), None, Some("invalid bind pointer"), &MobileActionState::default());
+        let result = action_json(
+            false,
+            action.as_ref(),
+            None,
+            Some("invalid bind pointer"),
+            &MobileActionState::default(),
+        );
         return copy_json_to_output(&result, output_ptr, output_len);
     };
     let Some(value_json) = action_from_ffi(value_ptr, value_len) else {
-        let result = action_json(false, action.as_ref(), None, Some("invalid value pointer"), &MobileActionState::default());
+        let result = action_json(
+            false,
+            action.as_ref(),
+            None,
+            Some("invalid value pointer"),
+            &MobileActionState::default(),
+        );
         return copy_json_to_output(&result, output_ptr, output_len);
     };
     copy_json_to_output(
@@ -750,6 +790,7 @@ pub extern "C" fn crepus_mobile_last_error() -> *mut c_char {
 }
 
 #[no_mangle]
+#[allow(clippy::missing_safety_doc)]
 pub unsafe extern "C" fn crepus_mobile_free_string(ptr: *mut c_char) {
     if !ptr.is_null() {
         libc::free(ptr.cast());
@@ -798,10 +839,24 @@ fn copy_json_to_output(result: &str, output_ptr: *mut c_char, output_len: usize)
     bytes.len()
 }
 
-fn store_view_state(raw: &str) -> bool {
+fn store_result_json(raw: &str) -> bool {
     match serde_json::from_str::<serde_json::Value>(raw) {
         Ok(value) => {
-            *lock_view_state() = value;
+            let mut state = lock_action_state();
+            state.last_error = parse_action_error(raw);
+            state.last_result = raw.to_string();
+            drop(state);
+            if let Some(fields) = value.get("value").and_then(|value| value.as_object()) {
+                let mut view_state = lock_view_state();
+                if !view_state.is_object() {
+                    *view_state = serde_json::json!({});
+                }
+                if let Some(map) = view_state.as_object_mut() {
+                    for (key, value) in fields {
+                        map.insert(key.clone(), value.clone());
+                    }
+                }
+            }
             true
         }
         Err(_) => false,
@@ -827,7 +882,11 @@ fn eval_items_json(expr: &str, scope_name: Option<&str>, scope_json: Option<&str
     }
 }
 
-fn resolve_expr(expr: &str, scope_name: Option<&str>, scope_json: Option<&str>) -> serde_json::Value {
+fn resolve_expr(
+    expr: &str,
+    scope_name: Option<&str>,
+    scope_json: Option<&str>,
+) -> serde_json::Value {
     let trimmed = expr.trim();
     if let Some(rest) = trimmed.strip_prefix('!') {
         return serde_json::Value::Bool(!truthy_value(&resolve_expr(rest, scope_name, scope_json)));
@@ -842,7 +901,11 @@ fn resolve_expr(expr: &str, scope_name: Option<&str>, scope_json: Option<&str>) 
     resolve_path(trimmed, scope_name, scope_json)
 }
 
-fn resolve_path(expr: &str, scope_name: Option<&str>, scope_json: Option<&str>) -> serde_json::Value {
+fn resolve_path(
+    expr: &str,
+    scope_name: Option<&str>,
+    scope_json: Option<&str>,
+) -> serde_json::Value {
     if let Some(literal) = literal_value(expr) {
         return literal;
     }
@@ -877,7 +940,9 @@ fn lookup_path(path: &str, root: &serde_json::Value) -> Option<serde_json::Value
     for segment in path.split('.') {
         match current {
             serde_json::Value::Object(map) => current = map.get(segment)?,
-            serde_json::Value::Array(items) => current = items.get(segment.parse::<usize>().ok()?)?,
+            serde_json::Value::Array(items) => {
+                current = items.get(segment.parse::<usize>().ok()?)?
+            }
             _ => return None,
         }
     }
@@ -956,7 +1021,7 @@ pub extern "C" fn crepus_mobile_store_result_json(
     json_len: usize,
 ) -> bool {
     action_from_ffi(json_ptr, json_len)
-        .map(|json| store_view_state(json.as_ref()))
+        .map(|json| store_result_json(json.as_ref()))
         .unwrap_or(false)
 }
 
@@ -1073,7 +1138,9 @@ pub extern "system" fn Java_dev_crepuscularity_nativeshell_CrepusRustActions_dis
 
 #[cfg(target_os = "android")]
 #[no_mangle]
-pub extern "system" fn Java_dev_crepuscularity_nativeshell_CrepusRustActions_dispatchActionJson<'a>(
+pub extern "system" fn Java_dev_crepuscularity_nativeshell_CrepusRustActions_dispatchActionJson<
+    'a,
+>(
     mut env: JNIEnv<'a>,
     _class: JClass<'a>,
     action: JString<'a>,
@@ -1109,7 +1176,9 @@ pub extern "system" fn Java_dev_crepuscularity_nativeshell_CrepusRustActions_dis
 
 #[cfg(target_os = "android")]
 #[no_mangle]
-pub extern "system" fn Java_dev_crepuscularity_nativeshell_CrepusRustActions_dispatchChangeJson<'a>(
+pub extern "system" fn Java_dev_crepuscularity_nativeshell_CrepusRustActions_dispatchChangeJson<
+    'a,
+>(
     mut env: JNIEnv<'a>,
     _class: JClass<'a>,
     action: JString<'a>,
@@ -1145,7 +1214,7 @@ pub extern "system" fn Java_dev_crepuscularity_nativeshell_CrepusRustActions_sto
     json: JString<'_>,
 ) -> bool {
     match env.get_string(&json) {
-        Ok(json) => store_view_state(json.to_string_lossy().as_ref()),
+        Ok(json) => store_result_json(json.to_string_lossy().as_ref()),
         Err(_) => false,
     }
 }
@@ -1173,7 +1242,8 @@ pub extern "system" fn Java_dev_crepuscularity_nativeshell_CrepusRustActions_eva
         .ok()
         .map(|value| value.to_string_lossy().into_owned())
         .filter(|value| !value.is_empty());
-    env.new_string(eval_text(&expr, scope_name.as_deref(), scope.as_deref())).unwrap()
+    env.new_string(eval_text(&expr, scope_name.as_deref(), scope.as_deref()))
+        .unwrap()
 }
 
 #[cfg(target_os = "android")]
@@ -1251,7 +1321,12 @@ pub extern "system" fn Java_dev_crepuscularity_nativeshell_CrepusRustActions_eva
         .ok()
         .map(|value| value.to_string_lossy().into_owned())
         .filter(|value| !value.is_empty());
-    env.new_string(eval_items_json(&expr, scope_name.as_deref(), scope.as_deref())).unwrap()
+    env.new_string(eval_items_json(
+        &expr,
+        scope_name.as_deref(),
+        scope.as_deref(),
+    ))
+    .unwrap()
 }
 
 #[cfg(target_os = "android")]
@@ -1264,7 +1339,9 @@ pub extern "system" fn Java_dev_crepuscularity_nativeshell_CrepusRustActions_sta
     let result = if ptr.is_null() {
         String::new()
     } else {
-        let result = unsafe { CStr::from_ptr(ptr) }.to_string_lossy().into_owned();
+        let result = unsafe { CStr::from_ptr(ptr) }
+            .to_string_lossy()
+            .into_owned();
         unsafe { crepus_mobile_free_string(ptr) };
         result
     };
@@ -1281,7 +1358,9 @@ pub extern "system" fn Java_dev_crepuscularity_nativeshell_CrepusRustActions_las
     let result = if ptr.is_null() {
         String::new()
     } else {
-        let result = unsafe { CStr::from_ptr(ptr) }.to_string_lossy().into_owned();
+        let result = unsafe { CStr::from_ptr(ptr) }
+            .to_string_lossy()
+            .into_owned();
         unsafe { crepus_mobile_free_string(ptr) };
         result
     };
@@ -1298,7 +1377,9 @@ pub extern "system" fn Java_dev_crepuscularity_nativeshell_CrepusRustActions_las
     let result = if ptr.is_null() {
         String::new()
     } else {
-        let result = unsafe { CStr::from_ptr(ptr) }.to_string_lossy().into_owned();
+        let result = unsafe { CStr::from_ptr(ptr) }
+            .to_string_lossy()
+            .into_owned();
         unsafe { crepus_mobile_free_string(ptr) };
         result
     };
@@ -1316,9 +1397,7 @@ pub extern "system" fn Java_dev_crepuscularity_nativeshell_CrepusRustActions_ini
 
 #[cfg(target_os = "android")]
 #[no_mangle]
-pub extern "system" fn Java_dev_crepuscularity_nativeshell_CrepusRustActions_shutdownAndroid<
-    'a,
->(
+pub extern "system" fn Java_dev_crepuscularity_nativeshell_CrepusRustActions_shutdownAndroid<'a>(
     _env: JNIEnv<'a>,
     _class: JClass<'a>,
 ) {
@@ -1368,7 +1447,9 @@ mod tests {
         reset_action_state();
         assert!(dispatch_action("sync"));
         assert!(dispatch_action("preview"));
-        assert!(dispatch_action(r#"{"kind":"plugin","capability":"device","method":"info"}"#));
+        assert!(dispatch_action(
+            r#"{"kind":"plugin","capability":"device","method":"info"}"#
+        ));
         let state = lock_action_state();
         assert_eq!(state.sync_count, 0);
         assert_eq!(state.preview_count, 0);
@@ -1479,7 +1560,9 @@ mod tests {
         let _guard = test_lock();
         reset_action_state();
         let first_ptr = crepus_mobile_start_auto_scan();
-        let first = unsafe { CStr::from_ptr(first_ptr) }.to_string_lossy().into_owned();
+        let first = unsafe { CStr::from_ptr(first_ptr) }
+            .to_string_lossy()
+            .into_owned();
         unsafe { crepus_mobile_free_string(first_ptr) };
         let second_ptr = crepus_mobile_start_auto_scan();
         let second = unsafe { CStr::from_ptr(second_ptr) }
@@ -1490,6 +1573,32 @@ mod tests {
         let second: serde_json::Value = serde_json::from_str(&second).expect("json");
         assert_eq!(first["ok"], true);
         assert_eq!(second["ok"], true);
+    }
+
+    #[test]
+    fn bind_only_change_updates_view_state() {
+        let _guard = test_lock();
+        reset_action_state();
+        *lock_view_state() = serde_json::json!({});
+
+        let result = dispatch_change_json("", "setup_secret", "\"Smoke-Setup-2026\"");
+
+        let result: serde_json::Value = serde_json::from_str(&result).expect("json");
+        assert_eq!(result["ok"], true);
+        assert_eq!(result["action"], "bind");
+        assert_eq!(eval_text("setup_secret", None, None), "Smoke-Setup-2026");
+    }
+
+    #[test]
+    fn result_sink_keeps_bound_input_state() {
+        let _guard = test_lock();
+        reset_action_state();
+        *lock_view_state() = serde_json::json!({});
+        let result = dispatch_change_json("", "setup_secret", "\"Smoke-Setup-2026\"");
+
+        assert!(store_result_json(&result));
+
+        assert_eq!(eval_text("setup_secret", None, None), "Smoke-Setup-2026");
     }
 
     #[test]
