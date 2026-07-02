@@ -39,6 +39,28 @@ fn swiftui_nodes(
     }
 }
 
+fn swiftui_stack_children(
+    _axis: StackAxis,
+    justify_content: Option<&str>,
+    children: &[ViewNode],
+    indent: usize,
+    scope_name: Option<&str>,
+    scope_var: Option<&str>,
+) -> String {
+    let child_lines = swiftui_children(children, indent, scope_name, scope_var);
+    let spacer = format!("{}Spacer()", indent_str(indent));
+    match justify_content {
+        Some("center") => format!("{spacer}\n{child_lines}\n{spacer}"),
+        Some("end") => format!("{spacer}\n{child_lines}"),
+        Some("between") if children.len() > 1 => children
+            .iter()
+            .map(|child| swiftui_node(child, indent, scope_name, scope_var))
+            .collect::<Vec<_>>()
+            .join(&format!("\n{spacer}\n")),
+        _ => child_lines,
+    }
+}
+
 fn swiftui_node(
     node: &ViewNode,
     indent: usize,
@@ -95,13 +117,21 @@ fn swiftui_node(
             axis,
             spacing,
             align_items,
+            justify_content,
             style,
             children,
             ..
         } => {
             let align = swiftui_stack_alignment(*axis, align_items.as_deref());
             let gap = spacing.unwrap_or(8.0);
-            let inner = swiftui_children(children, indent + 1, scope_name, scope_var);
+            let inner = swiftui_stack_children(
+                *axis,
+                justify_content.as_deref(),
+                children,
+                indent + 1,
+                scope_name,
+                scope_var,
+            );
             let mut out = if *axis == StackAxis::Row
                 && style.as_ref().and_then(|style| style.flex_wrap) == Some(true)
             {
@@ -764,7 +794,7 @@ fn swiftui_font_weight(weight: u16) -> &'static str {
 fn generate_compose(ir: &ViewIr, view_name: &str) -> String {
     let body = compose_nodes(&ir.root, 1, None, None);
     format!(
-        "import androidx.compose.foundation.background\nimport androidx.compose.foundation.border\nimport androidx.compose.foundation.horizontalScroll\nimport androidx.compose.foundation.layout.Arrangement\nimport androidx.compose.foundation.layout.Column\nimport androidx.compose.foundation.layout.ExperimentalLayoutApi\nimport androidx.compose.foundation.layout.FlowRow\nimport androidx.compose.foundation.layout.PaddingValues\nimport androidx.compose.foundation.layout.Row\nimport androidx.compose.foundation.layout.Spacer\nimport androidx.compose.foundation.layout.fillMaxHeight\nimport androidx.compose.foundation.layout.fillMaxSize\nimport androidx.compose.foundation.layout.fillMaxWidth\nimport androidx.compose.foundation.layout.height\nimport androidx.compose.foundation.layout.heightIn\nimport androidx.compose.foundation.layout.offset\nimport androidx.compose.foundation.layout.padding\nimport androidx.compose.foundation.layout.width\nimport androidx.compose.foundation.layout.widthIn\nimport androidx.compose.foundation.lazy.LazyColumn\nimport androidx.compose.foundation.rememberScrollState\nimport androidx.compose.foundation.shape.RoundedCornerShape\nimport androidx.compose.foundation.verticalScroll\nimport androidx.compose.material3.Button\nimport androidx.compose.material3.ButtonDefaults\nimport androidx.compose.material3.Divider\nimport androidx.compose.material3.FilterChip\nimport androidx.compose.material3.LinearProgressIndicator\nimport androidx.compose.material3.LocalContentColor\nimport androidx.compose.material3.Slider\nimport androidx.compose.material3.Switch\nimport androidx.compose.material3.Text\nimport androidx.compose.material3.TextField\nimport androidx.compose.runtime.Composable\nimport androidx.compose.runtime.CompositionLocalProvider\nimport androidx.compose.ui.Modifier\nimport androidx.compose.ui.draw.alpha\nimport androidx.compose.ui.draw.clip\nimport androidx.compose.ui.draw.rotate\nimport androidx.compose.ui.draw.scale\nimport androidx.compose.ui.graphics.Color\nimport androidx.compose.ui.text.font.FontStyle\nimport androidx.compose.ui.text.font.FontWeight\nimport androidx.compose.ui.text.input.PasswordVisualTransformation\nimport androidx.compose.ui.text.style.TextAlign\nimport androidx.compose.ui.text.style.TextDecoration\nimport androidx.compose.ui.unit.dp\nimport androidx.compose.ui.unit.sp\nimport kotlinx.serialization.json.JsonElement\nimport kotlinx.serialization.json.JsonPrimitive\n\nobject CrepusActions {{\n    var dispatch: (String) -> String = {{ \"{{}}\" }}\n    var resultSink: (String) -> Unit = {{}}\n\n    fun applyResult(raw: String) {{\n        CrepusStateStore.applyResult(raw)\n    }}\n\n    fun perform(action: String) {{\n        val dispatch = dispatch\n        val resultSink = resultSink\n        Thread {{\n            val result = dispatch(action)\n            android.os.Handler(android.os.Looper.getMainLooper()).post {{\n                resultSink(result)\n            }}\n        }}.start()\n    }}\n\n    fun performChange(action: String?, bind: String, value: JsonElement) {{\n        resultSink(CrepusRustActions.dispatchChangeJson(action ?: \"\", bind, value.toString()))\n    }}\n}}\n\n@OptIn(ExperimentalLayoutApi::class)\n@Composable\nfun {view_name}(modifier: Modifier = Modifier) {{\n{body}\n}}\n"
+        "import androidx.compose.foundation.background\nimport androidx.compose.foundation.border\nimport androidx.compose.foundation.horizontalScroll\nimport androidx.compose.foundation.layout.Arrangement\nimport androidx.compose.foundation.layout.Column\nimport androidx.compose.foundation.layout.ExperimentalLayoutApi\nimport androidx.compose.foundation.layout.FlowRow\nimport androidx.compose.foundation.layout.PaddingValues\nimport androidx.compose.foundation.layout.Row\nimport androidx.compose.foundation.layout.Spacer\nimport androidx.compose.foundation.layout.fillMaxHeight\nimport androidx.compose.foundation.layout.fillMaxSize\nimport androidx.compose.foundation.layout.fillMaxWidth\nimport androidx.compose.foundation.layout.height\nimport androidx.compose.foundation.layout.heightIn\nimport androidx.compose.foundation.layout.offset\nimport androidx.compose.foundation.layout.padding\nimport androidx.compose.foundation.layout.width\nimport androidx.compose.foundation.layout.widthIn\nimport androidx.compose.foundation.lazy.LazyColumn\nimport androidx.compose.foundation.rememberScrollState\nimport androidx.compose.foundation.shape.RoundedCornerShape\nimport androidx.compose.foundation.verticalScroll\nimport androidx.compose.material3.Button\nimport androidx.compose.material3.ButtonDefaults\nimport androidx.compose.material3.Divider\nimport androidx.compose.material3.FilterChip\nimport androidx.compose.material3.LinearProgressIndicator\nimport androidx.compose.material3.LocalContentColor\nimport androidx.compose.material3.Slider\nimport androidx.compose.material3.Switch\nimport androidx.compose.material3.Text\nimport androidx.compose.material3.TextField\nimport androidx.compose.runtime.Composable\nimport androidx.compose.runtime.CompositionLocalProvider\nimport androidx.compose.ui.Alignment\nimport androidx.compose.ui.Modifier\nimport androidx.compose.ui.draw.alpha\nimport androidx.compose.ui.draw.clip\nimport androidx.compose.ui.draw.rotate\nimport androidx.compose.ui.draw.scale\nimport androidx.compose.ui.graphics.Color\nimport androidx.compose.ui.text.font.FontStyle\nimport androidx.compose.ui.text.font.FontWeight\nimport androidx.compose.ui.text.input.PasswordVisualTransformation\nimport androidx.compose.ui.text.style.TextAlign\nimport androidx.compose.ui.text.style.TextDecoration\nimport androidx.compose.ui.unit.dp\nimport androidx.compose.ui.unit.sp\nimport kotlinx.serialization.json.JsonElement\nimport kotlinx.serialization.json.JsonPrimitive\n\nobject CrepusActions {{\n    var dispatch: (String) -> String = {{ \"{{}}\" }}\n    var resultSink: (String) -> Unit = {{}}\n\n    fun applyResult(raw: String) {{\n        CrepusStateStore.applyResult(raw)\n    }}\n\n    fun perform(action: String) {{\n        val dispatch = dispatch\n        val resultSink = resultSink\n        Thread {{\n            val result = dispatch(action)\n            android.os.Handler(android.os.Looper.getMainLooper()).post {{\n                resultSink(result)\n            }}\n        }}.start()\n    }}\n\n    fun performChange(action: String?, bind: String, value: JsonElement) {{\n        resultSink(CrepusRustActions.dispatchChangeJson(action ?: \"\", bind, value.toString()))\n    }}\n}}\n\n@OptIn(ExperimentalLayoutApi::class)\n@Composable\nfun {view_name}(modifier: Modifier = Modifier) {{\n{body}\n}}\n"
     )
 }
 
@@ -786,6 +816,27 @@ fn compose_nodes(
         let pad = indent_str(indent);
         let inner = compose_children(nodes, indent + 1, scope_name, scope_var);
         format!("{pad}Column {{\n{inner}\n{pad}}}")
+    }
+}
+
+fn compose_arrangement(axis: StackAxis, spacing: f32, justify_content: Option<&str>) -> String {
+    let alignment = match (axis, justify_content) {
+        (StackAxis::Column, Some("center")) => Some("Alignment.CenterVertically"),
+        (StackAxis::Column, Some("end")) => Some("Alignment.Bottom"),
+        (StackAxis::Column, Some("between")) => return "Arrangement.SpaceBetween".to_string(),
+        (StackAxis::Column, Some("around")) => return "Arrangement.SpaceAround".to_string(),
+        (StackAxis::Column, Some("evenly")) => return "Arrangement.SpaceEvenly".to_string(),
+        (StackAxis::Row, Some("center")) => Some("Alignment.CenterHorizontally"),
+        (StackAxis::Row, Some("end")) => Some("Alignment.End"),
+        (StackAxis::Row, Some("between")) => return "Arrangement.SpaceBetween".to_string(),
+        (StackAxis::Row, Some("around")) => return "Arrangement.SpaceAround".to_string(),
+        (StackAxis::Row, Some("evenly")) => return "Arrangement.SpaceEvenly".to_string(),
+        _ => None,
+    };
+    if let Some(alignment) = alignment {
+        format!("Arrangement.spacedBy({spacing:.0}.dp, {alignment})")
+    } else {
+        format!("Arrangement.spacedBy({spacing:.0}.dp)")
     }
 }
 
@@ -849,6 +900,7 @@ fn compose_node_with_base(
         ViewNode::Stack {
             axis,
             spacing,
+            justify_content,
             style,
             children,
             ..
@@ -869,8 +921,8 @@ fn compose_node_with_base(
                 StackAxis::Column => "verticalArrangement",
             };
             args.push(format!(
-                "{arrangement} = Arrangement.spacedBy({:.0}.dp)",
-                spacing.unwrap_or(8.0)
+                "{arrangement} = {}",
+                compose_arrangement(*axis, spacing.unwrap_or(8.0), justify_content.as_deref())
             ));
             if wrap {
                 args.push(format!(

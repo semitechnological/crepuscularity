@@ -99,6 +99,24 @@ fn codegen_wraps_native_rows() {
 }
 
 #[test]
+fn codegen_honors_native_justify_center() {
+    let ir = render_template_to_ir(
+        "div flex flex-col justify-center h-full\n  span\n    \"Centered\"",
+        &TemplateContext::new(),
+    )
+    .unwrap();
+
+    let swift = generate_native_source(&ir, NativeCodegenTarget::SwiftUi, "CenteredView");
+    assert!(swift.contains("Spacer()"));
+    assert!(swift.contains(".frame(maxWidth: nil, maxHeight: .infinity"));
+
+    let compose = generate_native_source(&ir, NativeCodegenTarget::Compose, "CenteredView");
+    assert!(compose.contains("import androidx.compose.ui.Alignment"));
+    assert!(compose
+        .contains("verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically)"));
+}
+
+#[test]
 fn codegen_emits_native_lists() {
     let ir = render_template_to_ir(
         "ol\n  li\n    \"One\"\n  li\n    \"Two\"",
