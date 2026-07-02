@@ -99,6 +99,26 @@ fn codegen_wraps_native_rows() {
 }
 
 #[test]
+fn codegen_emits_native_lists() {
+    let ir = render_template_to_ir(
+        "ol\n  li\n    \"One\"\n  li\n    \"Two\"",
+        &TemplateContext::new(),
+    )
+    .unwrap();
+
+    let swift = generate_native_source(&ir, NativeCodegenTarget::SwiftUi, "ListView");
+    assert!(swift.contains("List {"));
+    assert!(swift.contains("Text(\"1.\")"));
+    assert!(!swift.contains("VStack(alignment: .leading, spacing: 8.0)"));
+
+    let compose = generate_native_source(&ir, NativeCodegenTarget::Compose, "ListView");
+    assert!(compose.contains("import androidx.compose.foundation.lazy.LazyColumn"));
+    assert!(compose.contains("LazyColumn"));
+    assert!(compose.contains("item {"));
+    assert!(compose.contains("Text(\"1.\")"));
+}
+
+#[test]
 fn codegen_preserves_dynamic_state_bindings() {
     let ir = render_template_to_ir(
         "div\n if {count > 1}\n  span\n    \"Many\"\n else\n  span\n    \"One\"\n for hub in {hubs}\n  span\n    \"{hub.name}\"\n span\n  \"{pairing_code}\"",
