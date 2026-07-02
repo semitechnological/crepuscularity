@@ -386,6 +386,7 @@ fn mobile_new_scaffolds_runtime_files() {
         .contains("$(PROJECT_DIR)/build/rust/aarch64-apple-ios/libcrepus_mobile_actions.a"));
     assert!(project_yml
         .contains("$(PROJECT_DIR)/build/rust/aarch64-apple-ios-sim/libcrepus_mobile_actions.a"));
+    assert!(project_yml.contains("-framework CoreBluetooth"));
     assert!(!project_yml
         .contains("$(PROJECT_DIR)/build/rust/$(PLATFORM_NAME)/libcrepus_mobile_actions.a"));
 }
