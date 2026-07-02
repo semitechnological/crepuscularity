@@ -473,6 +473,39 @@ fn swiftui_node(
             }
             out
         }
+        ViewNode::Tabs {
+            bind,
+            tabs,
+            on_change,
+            style,
+            ..
+        } => {
+            let first = tabs.first().map(|tab| tab.value.as_str()).unwrap_or("");
+            let rows = tabs
+                .iter()
+                .map(|tab| {
+                    let content = swiftui_nodes(&tab.children, indent + 1, scope_name, scope_var);
+                    format!(
+                        "{content}\n{}.tabItem {{ Text(\"{}\") }}\n{}.tag(\"{}\")",
+                        indent_str(indent + 1),
+                        swift_escape(&tab.label),
+                        indent_str(indent + 1),
+                        swift_escape(&tab.value)
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join("\n");
+            let mut out = format!(
+                "{pad}TabView(selection: Binding(get: {{ {} }}, set: {{ newValue in {} }})) {{\n{rows}\n{pad}}}",
+                swift_model_text(bind, scope_name, scope_var),
+                swiftui_change(on_change.as_deref(), bind, "newValue")
+            );
+            swiftui_style(&mut out, style.as_ref(), false, indent);
+            if first.is_empty() {
+                out = out.replace("Binding(get: {  }, set: { _ in })", ".constant(\"\")");
+            }
+            out
+        }
     }
 }
 
@@ -794,7 +827,7 @@ fn swiftui_font_weight(weight: u16) -> &'static str {
 fn generate_compose(ir: &ViewIr, view_name: &str) -> String {
     let body = compose_nodes(&ir.root, 1, None, None);
     format!(
-        "import androidx.compose.foundation.background\nimport androidx.compose.foundation.border\nimport androidx.compose.foundation.horizontalScroll\nimport androidx.compose.foundation.layout.Arrangement\nimport androidx.compose.foundation.layout.Column\nimport androidx.compose.foundation.layout.ExperimentalLayoutApi\nimport androidx.compose.foundation.layout.FlowRow\nimport androidx.compose.foundation.layout.PaddingValues\nimport androidx.compose.foundation.layout.Row\nimport androidx.compose.foundation.layout.Spacer\nimport androidx.compose.foundation.layout.fillMaxHeight\nimport androidx.compose.foundation.layout.fillMaxSize\nimport androidx.compose.foundation.layout.fillMaxWidth\nimport androidx.compose.foundation.layout.height\nimport androidx.compose.foundation.layout.heightIn\nimport androidx.compose.foundation.layout.offset\nimport androidx.compose.foundation.layout.padding\nimport androidx.compose.foundation.layout.width\nimport androidx.compose.foundation.layout.widthIn\nimport androidx.compose.foundation.lazy.LazyColumn\nimport androidx.compose.foundation.rememberScrollState\nimport androidx.compose.foundation.shape.RoundedCornerShape\nimport androidx.compose.foundation.verticalScroll\nimport androidx.compose.material3.Button\nimport androidx.compose.material3.ButtonDefaults\nimport androidx.compose.material3.Divider\nimport androidx.compose.material3.FilterChip\nimport androidx.compose.material3.LinearProgressIndicator\nimport androidx.compose.material3.LocalContentColor\nimport androidx.compose.material3.Slider\nimport androidx.compose.material3.Switch\nimport androidx.compose.material3.Text\nimport androidx.compose.material3.TextField\nimport androidx.compose.runtime.Composable\nimport androidx.compose.runtime.CompositionLocalProvider\nimport androidx.compose.ui.Alignment\nimport androidx.compose.ui.Modifier\nimport androidx.compose.ui.draw.alpha\nimport androidx.compose.ui.draw.clip\nimport androidx.compose.ui.draw.rotate\nimport androidx.compose.ui.draw.scale\nimport androidx.compose.ui.graphics.Color\nimport androidx.compose.ui.text.font.FontStyle\nimport androidx.compose.ui.text.font.FontWeight\nimport androidx.compose.ui.text.input.PasswordVisualTransformation\nimport androidx.compose.ui.text.style.TextAlign\nimport androidx.compose.ui.text.style.TextDecoration\nimport androidx.compose.ui.unit.dp\nimport androidx.compose.ui.unit.sp\nimport kotlinx.serialization.json.JsonElement\nimport kotlinx.serialization.json.JsonPrimitive\n\nobject CrepusActions {{\n    var dispatch: (String) -> String = {{ \"{{}}\" }}\n    var resultSink: (String) -> Unit = {{}}\n\n    fun applyResult(raw: String) {{\n        CrepusStateStore.applyResult(raw)\n    }}\n\n    fun perform(action: String) {{\n        val dispatch = dispatch\n        val resultSink = resultSink\n        Thread {{\n            val result = dispatch(action)\n            android.os.Handler(android.os.Looper.getMainLooper()).post {{\n                resultSink(result)\n            }}\n        }}.start()\n    }}\n\n    fun performChange(action: String?, bind: String, value: JsonElement) {{\n        resultSink(CrepusRustActions.dispatchChangeJson(action ?: \"\", bind, value.toString()))\n    }}\n}}\n\n@OptIn(ExperimentalLayoutApi::class)\n@Composable\nfun {view_name}(modifier: Modifier = Modifier) {{\n{body}\n}}\n"
+        "import androidx.compose.foundation.background\nimport androidx.compose.foundation.border\nimport androidx.compose.foundation.horizontalScroll\nimport androidx.compose.foundation.layout.Arrangement\nimport androidx.compose.foundation.layout.Column\nimport androidx.compose.foundation.layout.ExperimentalLayoutApi\nimport androidx.compose.foundation.layout.FlowRow\nimport androidx.compose.foundation.layout.PaddingValues\nimport androidx.compose.foundation.layout.Row\nimport androidx.compose.foundation.layout.Spacer\nimport androidx.compose.foundation.layout.fillMaxHeight\nimport androidx.compose.foundation.layout.fillMaxSize\nimport androidx.compose.foundation.layout.fillMaxWidth\nimport androidx.compose.foundation.layout.height\nimport androidx.compose.foundation.layout.heightIn\nimport androidx.compose.foundation.layout.offset\nimport androidx.compose.foundation.layout.padding\nimport androidx.compose.foundation.layout.width\nimport androidx.compose.foundation.layout.widthIn\nimport androidx.compose.foundation.lazy.LazyColumn\nimport androidx.compose.foundation.rememberScrollState\nimport androidx.compose.foundation.shape.RoundedCornerShape\nimport androidx.compose.foundation.verticalScroll\nimport androidx.compose.material3.Button\nimport androidx.compose.material3.ButtonDefaults\nimport androidx.compose.material3.Divider\nimport androidx.compose.material3.FilterChip\nimport androidx.compose.material3.LinearProgressIndicator\nimport androidx.compose.material3.LocalContentColor\nimport androidx.compose.material3.NavigationBar\nimport androidx.compose.material3.NavigationBarItem\nimport androidx.compose.material3.Scaffold\nimport androidx.compose.material3.Slider\nimport androidx.compose.material3.Switch\nimport androidx.compose.material3.Text\nimport androidx.compose.material3.TextField\nimport androidx.compose.runtime.Composable\nimport androidx.compose.runtime.CompositionLocalProvider\nimport androidx.compose.ui.Alignment\nimport androidx.compose.ui.Modifier\nimport androidx.compose.ui.draw.alpha\nimport androidx.compose.ui.draw.clip\nimport androidx.compose.ui.draw.rotate\nimport androidx.compose.ui.draw.scale\nimport androidx.compose.ui.graphics.Color\nimport androidx.compose.ui.text.font.FontStyle\nimport androidx.compose.ui.text.font.FontWeight\nimport androidx.compose.ui.text.input.PasswordVisualTransformation\nimport androidx.compose.ui.text.style.TextAlign\nimport androidx.compose.ui.text.style.TextDecoration\nimport androidx.compose.ui.unit.dp\nimport androidx.compose.ui.unit.sp\nimport kotlinx.serialization.json.JsonElement\nimport kotlinx.serialization.json.JsonPrimitive\n\nobject CrepusActions {{\n    var dispatch: (String) -> String = {{ \"{{}}\" }}\n    var resultSink: (String) -> Unit = {{}}\n\n    fun applyResult(raw: String) {{\n        CrepusStateStore.applyResult(raw)\n    }}\n\n    fun perform(action: String) {{\n        val dispatch = dispatch\n        val resultSink = resultSink\n        Thread {{\n            val result = dispatch(action)\n            android.os.Handler(android.os.Looper.getMainLooper()).post {{\n                resultSink(result)\n            }}\n        }}.start()\n    }}\n\n    fun performChange(action: String?, bind: String, value: JsonElement) {{\n        resultSink(CrepusRustActions.dispatchChangeJson(action ?: \"\", bind, value.toString()))\n    }}\n}}\n\n@OptIn(ExperimentalLayoutApi::class)\n@Composable\nfun {view_name}(modifier: Modifier = Modifier) {{\n{body}\n}}\n"
     )
 }
 
@@ -1212,6 +1245,55 @@ fn compose_node_with_base(
                 .collect::<Vec<_>>()
                 .join("\n");
             format!("{pad}FlowRow{modifier} {{\n{inner}\n{pad}}}")
+        }
+        ViewNode::Tabs {
+            bind,
+            tabs,
+            on_change,
+            style,
+            ..
+        } => {
+            let modifier = compose_modifier_param(style.as_ref());
+            let current = compose_model_text(bind, scope_name, scope_var);
+            let items = tabs
+                .iter()
+                .map(|tab| {
+                    let click = compose_change(
+                        on_change.as_deref(),
+                        bind,
+                        &format!("JsonPrimitive(\"{}\")", kotlin_escape(&tab.value)),
+                    );
+                    format!(
+                        "{}NavigationBarItem(selected = {current} == \"{}\", onClick = {{ {click} }}, icon = {{}}, label = {{ Text(\"{}\") }})",
+                        indent_str(indent + 3),
+                        kotlin_escape(&tab.value),
+                        kotlin_escape(&tab.label)
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join("\n");
+            let pages = tabs
+                .iter()
+                .map(|tab| {
+                    let content =
+                        compose_children(&tab.children, indent + 3, scope_name, scope_var);
+                    format!(
+                        "{}if ({current} == \"{}\") {{\n{content}\n{}}}",
+                        indent_str(indent + 2),
+                        kotlin_escape(&tab.value),
+                        indent_str(indent + 2)
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join("\n");
+            format!(
+                "{pad}Scaffold(bottomBar = {{\n{}NavigationBar {{\n{items}\n{}}}\n{}}}{modifier}) {{ innerPadding ->\n{}Column(modifier = Modifier.padding(innerPadding)) {{\n{pages}\n{}}}\n{pad}}}",
+                indent_str(indent + 1),
+                indent_str(indent + 2),
+                indent_str(indent + 1),
+                indent_str(indent + 1),
+                indent_str(indent + 2)
+            )
         }
     }
 }

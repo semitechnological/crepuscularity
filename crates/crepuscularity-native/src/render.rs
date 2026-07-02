@@ -10,7 +10,7 @@ use crepuscularity_core::preprocess::slot_rotate_child_phrases;
 use crepuscularity_core::CrepusError;
 
 use crate::include_expand;
-use crate::ir::{PickerOption, StackAxis, ViewIr, ViewNode, IR_VERSION};
+use crate::ir::{PickerOption, StackAxis, TabItem, ViewIr, ViewNode, IR_VERSION};
 use crate::style;
 
 /// Render from a virtual file map (`entry` may use `#Component` suffix).
@@ -379,6 +379,37 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<ViewNode, Crepu
         return Ok(ViewNode::Picker {
             bind,
             options,
+            on_change: event_handler(el, "change"),
+            style: hints.style.opt(),
+        });
+    }
+
+    if tag == "tabs" || tag == "tabview" || tag == "page-switcher" {
+        let bind = binding_raw(el, "bind").unwrap_or_default();
+        let mut tabs = Vec::new();
+        for child in &el.children {
+            if let Node::Element(inner) = child {
+                let inner_tag = inner.tag.to_ascii_lowercase();
+                if matches!(inner_tag.as_str(), "tab" | "page") {
+                    let value = binding_raw(inner, "value").unwrap_or_else(|| {
+                        binding_string(inner, "label", ctx)
+                            .map(|label| slug_option_value(&label))
+                            .unwrap_or_default()
+                    });
+                    let label = binding_string(inner, "label", ctx)
+                        .unwrap_or_else(|| value.replace('-', " "));
+                    tabs.push(TabItem {
+                        value,
+                        label,
+                        children: render_nodes_list(&inner.children, ctx)?,
+                    });
+                }
+            }
+        }
+        let hints = style::extract_stack_hints(&classes, Some(ctx));
+        return Ok(ViewNode::Tabs {
+            bind,
+            tabs,
             on_change: event_handler(el, "change"),
             style: hints.style.opt(),
         });

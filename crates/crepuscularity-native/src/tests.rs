@@ -658,6 +658,30 @@ div flex flex-col
 }
 
 #[test]
+fn tabs_ir_and_native_codegen() {
+    let tpl = r#"
+tabs bind=page
+  tab value="photos" label="Photos"
+    div "Photos screen"
+  tab value="files" label="Files"
+    div "Files screen"
+"#;
+    let ir = render_template_to_ir(tpl, &TemplateContext::new()).unwrap();
+    let v = serde_json::to_value(&ir).unwrap();
+    assert_eq!(v["root"][0]["kind"], "tabs");
+    assert_eq!(v["root"][0]["tabs"][0]["value"], "photos");
+
+    let swift = generate_native_source(&ir, NativeCodegenTarget::SwiftUi, "TabsView");
+    assert!(swift.contains("TabView(selection: Binding"));
+    assert!(swift.contains(".tabItem { Text(\"Photos\") }"));
+
+    let compose = generate_native_source(&ir, NativeCodegenTarget::Compose, "TabsView");
+    assert!(compose.contains("Scaffold(bottomBar = {"));
+    assert!(compose
+        .contains("NavigationBarItem(selected = CrepusStateStore.text(\"page\") == \"photos\""));
+}
+
+#[test]
 fn file_picker_ir_and_codegen_actions() {
     let tpl = r#"
 file-picker accept="image/*,video/*" multiple @pick="pickMedia" "Choose media"

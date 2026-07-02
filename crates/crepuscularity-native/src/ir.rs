@@ -512,6 +512,15 @@ pub enum ViewNode {
         #[serde(skip_serializing_if = "Option::is_none")]
         style: Option<ViewStyle>,
     },
+    #[serde(rename = "tabs")]
+    Tabs {
+        bind: String,
+        tabs: Vec<TabItem>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        on_change: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        style: Option<ViewStyle>,
+    },
 }
 
 /// One selectable option in a [`ViewNode::Picker`].
@@ -521,6 +530,15 @@ pub enum ViewNode {
 pub struct PickerOption {
     pub value: String,
     pub label: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+#[serde(rename_all = "camelCase")]
+pub struct TabItem {
+    pub value: String,
+    pub label: String,
+    pub children: Vec<ViewNode>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

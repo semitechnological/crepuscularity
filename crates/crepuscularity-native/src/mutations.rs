@@ -443,6 +443,7 @@ fn node_style_mut(node: &mut ViewNode) -> Option<&mut Option<ViewStyle>> {
         | ViewNode::SlotRotate { style, .. }
         | ViewNode::Input { style, .. }
         | ViewNode::Picker { style, .. }
+        | ViewNode::Tabs { style, .. }
         | ViewNode::If { style, .. }
         | ViewNode::ForEach { style, .. } => Some(style),
     }
