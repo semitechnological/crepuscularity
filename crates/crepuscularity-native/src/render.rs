@@ -434,6 +434,17 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<ViewNode, Crepu
         }
     }
 
+    if el.children.is_empty() {
+        if let Some(bind) = binding_raw(el, "bind") {
+            let st = style::extract_text_style(&classes, Some(ctx)).opt();
+            return Ok(ViewNode::Text {
+                content: String::new(),
+                bind: Some(bind),
+                style: st,
+            });
+        }
+    }
+
     let axis = if tag == "view" {
         StackAxis::Column
     } else {

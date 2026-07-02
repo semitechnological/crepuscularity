@@ -106,6 +106,16 @@ fn codegen_preserves_dynamic_state_bindings() {
 }
 
 #[test]
+fn empty_bound_element_renders_dynamic_text() {
+    let ir = render_template_to_ir("div\n  div bind=last_action", &TemplateContext::new()).unwrap();
+    let swift = generate_native_source(&ir, NativeCodegenTarget::SwiftUi, "BoundTextView");
+    assert!(swift.contains("Text(CrepusActions.model.text(\"last_action\"))"));
+
+    let compose = generate_native_source(&ir, NativeCodegenTarget::Compose, "BoundTextView");
+    assert!(compose.contains("Text(CrepusStateStore.text(\"last_action\"))"));
+}
+
+#[test]
 fn codegen_preserves_control_change_bindings() {
     let ir = render_template_to_ir(
         "div\n toggle bind=enabled @change=\"sync_enabled\"\n  \"Enabled\"\n slider bind=volume @change=\"sync_volume\" min=0 max=100\n input bind=name @change=\"sync_name\" placeholder=\"Name\"\n picker bind=mode @change=\"sync_mode\"\n  option value=\"auto\"\n    \"Auto\"\n  option value=\"manual\"\n    \"Manual\"",
