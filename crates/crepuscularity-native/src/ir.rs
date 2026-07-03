@@ -538,6 +538,8 @@ pub struct PickerOption {
 pub struct TabItem {
     pub value: String,
     pub label: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub icon: Option<String>,
     pub children: Vec<ViewNode>,
 }
 

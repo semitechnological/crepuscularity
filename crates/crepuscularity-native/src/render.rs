@@ -398,9 +398,11 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<ViewNode, Crepu
                     });
                     let label = binding_string(inner, "label", ctx)
                         .unwrap_or_else(|| value.replace('-', " "));
+                    let icon = binding_string(inner, "icon", ctx);
                     tabs.push(TabItem {
                         value,
                         label,
+                        icon,
                         children: render_nodes_list(&inner.children, ctx)?,
                     });
                 }

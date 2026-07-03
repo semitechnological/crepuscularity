@@ -661,7 +661,7 @@ div flex flex-col
 fn tabs_ir_and_native_codegen() {
     let tpl = r#"
 tabs bind=page
-  tab value="photos" label="Photos"
+  tab value="photos" label="Photos" icon="photo.on.rectangle"
     div "Photos screen"
   tab value="files" label="Files"
     div "Files screen"
@@ -670,10 +670,11 @@ tabs bind=page
     let v = serde_json::to_value(&ir).unwrap();
     assert_eq!(v["root"][0]["kind"], "tabs");
     assert_eq!(v["root"][0]["tabs"][0]["value"], "photos");
+    assert_eq!(v["root"][0]["tabs"][0]["icon"], "photo.on.rectangle");
 
     let swift = generate_native_source(&ir, NativeCodegenTarget::SwiftUi, "TabsView");
     assert!(swift.contains("TabView(selection: Binding"));
-    assert!(swift.contains(".tabItem { Text(\"Photos\") }"));
+    assert!(swift.contains(".tabItem { Label(\"Photos\", systemImage: \"photo.on.rectangle\") }"));
 
     let compose = generate_native_source(&ir, NativeCodegenTarget::Compose, "TabsView");
     assert!(compose.contains("Scaffold(bottomBar = {"));

@@ -490,10 +490,18 @@ fn swiftui_node(
                 .iter()
                 .map(|tab| {
                     let content = swiftui_nodes(&tab.children, indent + 1, scope_name, scope_var);
+                    let tab_item = if let Some(icon) = tab.icon.as_deref() {
+                        format!(
+                            "Label(\"{}\", systemImage: \"{}\")",
+                            swift_escape(&tab.label),
+                            swift_escape(icon)
+                        )
+                    } else {
+                        format!("Text(\"{}\")", swift_escape(&tab.label))
+                    };
                     format!(
-                        "{content}\n{}.tabItem {{ Text(\"{}\") }}\n{}.tag(\"{}\")",
+                        "{content}\n{}.tabItem {{ {tab_item} }}\n{}.tag(\"{}\")",
                         indent_str(indent + 1),
-                        swift_escape(&tab.label),
                         indent_str(indent + 1),
                         swift_escape(&tab.value)
                     )
