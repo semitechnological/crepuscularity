@@ -1709,11 +1709,8 @@ targets:
 
     #[test]
     fn macos_share_target_uses_macos_sources_and_rust_target() {
-        let target = share_extension_target(
-            "AcmeMacShare",
-            "hk.tsc.acme",
-            ShareExtensionPlatform::Macos,
-        );
+        let target =
+            share_extension_target("AcmeMacShare", "hk.tsc.acme", ShareExtensionPlatform::Macos);
         assert!(target.contains("  AcmeMacShare:"));
         assert!(target.contains("platform: macOS"));
         assert!(target.contains("path: MacShareExtension"));

@@ -7,6 +7,8 @@ pub use crepuscularity_macros::view;
 pub use gpui::*;
 pub use pollster::block_on;
 
+pub mod animation;
+
 pub const GPUI_MANIFEST_DIR: &str = env!("CARGO_MANIFEST_DIR");
 
 pub fn gpui_window_options(
@@ -31,12 +33,14 @@ pub fn gpui_window_options(
 pub use gpui_symbols::Icon;
 
 pub mod prelude {
+    pub use crate::animation;
     pub use crate::gpui_window_options;
     pub use crepuscularity_macros::view;
     pub use gpui::prelude::*;
     pub use gpui::{
-        black, div, px, relative, rems, rgb, white, App, AppContext, Application, Context, Entity,
-        FontWeight, IntoElement, Render, SharedString, Window, WindowOptions,
+        black, div, px, relative, rems, rgb, white, Animation, AnimationExt, App, AppContext,
+        Application, Context, Entity, FontWeight, IntoElement, Render, SharedString, Window,
+        WindowOptions,
     };
     #[cfg(feature = "symbols")]
     pub use gpui_symbols::Icon;
