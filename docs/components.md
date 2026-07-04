@@ -164,7 +164,7 @@ include component.crepus              # color is "blue"
 
 ## UI Library Components
 
-Crepuscularity ships a small set of reusable UI components in [`examples/ui-library/`](examples/ui-library/). They are intentionally generic so they can be used across projects (e.g., Acme's gallery, file browser, settings, and pairing screens in [`examples/acme-demo/`](examples/acme-demo/)).
+Crepuscularity ships a small set of reusable UI components in [`examples/ui-library/`](examples/ui-library/). They are intentionally generic so they can be used across projects; see the `examples/ui-library/examples/` demos for sample usage.
 
 ### Available components
 
@@ -174,6 +174,13 @@ Crepuscularity ships a small set of reusable UI components in [`examples/ui-libr
 | `Panel` | `ui-library.crepus` | `title`, `collapsible`, `defaultExpanded` | Grouped settings, collapsible sections |
 | `Wizard` | `ui-library.crepus` | `steps`, `currentStep`, `showProgress`, `allowSkip` | Pairing flows, onboarding |
 | `List` | `ui-library.crepus` | `items` (`label`, `detail`), `selectable` | File lists, logs, settings |
+| `Card` | `ui-library.crepus` | `title`, `subtitle`, slot | Dashboards, detail panels |
+| `Badge` | `ui-library.crepus` | `label`, `color` | Status indicators |
+| `Button` | `ui-library.crepus` | `label`, `variant` | Actions, forms |
+| `Alert` | `ui-library.crepus` | `message`, `kind` | Feedback banners |
+| `Tabs` | `ui-library.crepus` | `tabs`, `active` | Navigation, settings |
+| `EmptyState` | `ui-library.crepus` | `message`, `action` | Empty lists, pages |
+| `Avatar` | `ui-library.crepus` | `src`, `label`, `size` | User avatars, icons |
 | `TransferProgress` | `transfer-progress.crepus` | `label`, `fileName`, `value`, `max`, `speed`, `eta` | Upload/download progress |
 
 ### Example usage

@@ -41,5 +41,5 @@ cd examples/extensions/rs_vimium && crepus webext build
 | `native` | `native-shells` |
 | `embedded` | `embedded-dashboard`, `embedded-stm32`, `embedded-esp32` |
 | `lvgl` | `lvgl-pro-mode`, `lvgl-stm32` |
-| `render` | `render/`, `ui-library/`, `acme-demo/`, `*.crepus` demos at this level |
+| `render` | `render/`, `ui-library/`, `*.crepus` demos at this level |
 | `benchmark` | [`benchmarks/`](benchmarks/) — `crepus benchmark` |

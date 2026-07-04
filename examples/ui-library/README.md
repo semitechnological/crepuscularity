@@ -12,6 +12,13 @@ Multi-component file containing:
 - **Panel** — collapsible section with `title`, `collapsible`, and `defaultExpanded` props.
 - **Wizard** — multi-step flow with `steps`, `currentStep`, `showProgress`, and `allowSkip` props.
 - **List** — vertical list of items with `label`/`detail` fields and `selectable` prop.
+- **Card** — bordered card with `title`, `subtitle`, and slot content.
+- **Badge** — status badge with `label` and `color` props.
+- **Button** — clickable button with `label` and `variant` props.
+- **Alert** — banner alert with `message` and `kind` props.
+- **Tabs** — horizontal tab list with `tabs` and `active` props.
+- **EmptyState** — centered placeholder with `message` and optional `action`.
+- **Avatar** — rounded image or text avatar with `src`, `label`, and `size` props.
 
 ### `transfer-progress.crepus`
 
@@ -24,6 +31,10 @@ include ui-library/ui-library.crepus#Grid columns=4 gap=4
   for photo in {photos}
     img src={photo.thumb} w-full h-full object-cover
 ```
+
+## Examples
+
+See `examples/` for demo screens built from the library components.
 
 ## Compatibility
 
