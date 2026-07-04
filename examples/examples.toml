@@ -152,6 +152,18 @@ label = "JSX interop demo"
 path = "jsx-demo.crepus"
 
 [[examples]]
+target = "render"
+id = "ui-library"
+label = "Reusable UI library components"
+path = "ui-library"
+
+[[examples]]
+target = "render"
+id = "acme-demo"
+label = "Acme screens using ui-library"
+path = "acme-demo"
+
+[[examples]]
 target = "benchmark"
 id = "benchmarks"
 label = "Build-time compare harness"

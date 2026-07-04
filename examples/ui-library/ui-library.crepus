@@ -1,0 +1,90 @@
++++
+[Grid]
+description = "Responsive grid layout with configurable columns, gap, and item aspect ratio"
+
+[Grid.defaults]
+columns = 3
+gap = 4
+aspectRatio = "square"
+
+[Panel]
+description = "Collapsible panel with header and content slot"
+
+[Panel.defaults]
+title = "Panel"
+collapsible = true
+defaultExpanded = true
+
+[Wizard]
+description = "Multi-step wizard with progress bar and navigation"
+
+[Wizard.defaults]
+currentStep = 0
+showProgress = true
+allowSkip = false
+
+[List]
+description = "Vertical list of items with a label and optional detail"
+
+[List.defaults]
+selectable = false
++++
+
+--- Grid
+div grid grid-cols-{columns} gap-{gap} w-full
+  slot
+
+--- Panel
+$: default expanded = {defaultExpanded}
+div border border-zinc-700 rounded-lg overflow-hidden bg-zinc-900 mb-4
+  div flex items-center justify-between p-4 bg-zinc-800 cursor-pointer
+    div font-semibold text-white
+      "{title}"
+    if {collapsible}
+      if {expanded}
+        div text-zinc-400
+          "▼"
+      else
+        div text-zinc-400
+          "▶"
+  if {expanded}
+    div p-4
+      slot
+
+--- Wizard
+$: default step = {currentStep}
+div flex flex-col gap-4 w-full
+  if {showProgress}
+    div flex gap-2
+      for s in {steps}
+        div flex-1 h-1 rounded-full
+          if {s.index < step}
+            div h-full w-full bg-green-500 rounded-full
+          else if {s.index == step}
+            div h-full w-full bg-blue-500 rounded-full
+          else
+            div h-full w-full bg-zinc-700 rounded-full
+  div flex-1
+    slot
+  div flex justify-between items-center pt-4
+    if {step > 0}
+      button px-4 py-2 rounded bg-zinc-700 text-white
+        "Previous"
+    else
+      div
+    if {step < steps.length - 1}
+      button px-4 py-2 rounded bg-blue-600 text-white
+        "Next"
+    else
+      button px-4 py-2 rounded bg-green-600 text-white
+        "Complete"
+
+--- List
+div flex flex-col w-full border border-zinc-700 rounded-lg overflow-hidden bg-zinc-900
+  for item in {items}
+    div flex items-center justify-between p-3 border-b border-zinc-800 hover:bg-zinc-800
+      div text-sm text-white
+        "{item.label}"
+      if {item.detail}
+        div text-sm text-zinc-400
+          "{item.detail}"

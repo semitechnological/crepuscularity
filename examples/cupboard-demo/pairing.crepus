@@ -1,0 +1,8 @@
+$: default steps = [{"index":0,"label":"Scan"}, {"index":1,"label":"Confirm"}, {"index":2,"label":"Done"}]
+
+div w-full h-full bg-zinc-950 text-white p-8 flex flex-col gap-6
+  div text-2xl font-bold
+    "Pair Device"
+  include ui-library/ui-library.crepus#Wizard currentStep=0 showProgress=true allowSkip=false steps={steps}
+    div p-4
+      "Follow the instructions on the other device to complete pairing."

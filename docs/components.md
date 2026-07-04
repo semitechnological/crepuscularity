@@ -162,6 +162,31 @@ include component.crepus color="red"  # color is "red"
 include component.crepus              # color is "blue"
 ```
 
+## UI Library Components
+
+Crepuscularity ships a small set of reusable UI components in [`examples/ui-library/`](examples/ui-library/). They are intentionally generic so they can be used across projects (e.g., Acme's gallery, file browser, settings, and pairing screens in [`examples/acme-demo/`](examples/acme-demo/)).
+
+### Available components
+
+| Component | File | Props | Use case |
+| --- | --- | --- | --- |
+| `Grid` | `ui-library.crepus` | `columns`, `gap`, `aspectRatio` | Photo galleries, dashboards |
+| `Panel` | `ui-library.crepus` | `title`, `collapsible`, `defaultExpanded` | Grouped settings, collapsible sections |
+| `Wizard` | `ui-library.crepus` | `steps`, `currentStep`, `showProgress`, `allowSkip` | Pairing flows, onboarding |
+| `List` | `ui-library.crepus` | `items` (`label`, `detail`), `selectable` | File lists, logs, settings |
+| `TransferProgress` | `transfer-progress.crepus` | `label`, `fileName`, `value`, `max`, `speed`, `eta` | Upload/download progress |
+
+### Example usage
+
+```text
+include ui-library/ui-library.crepus#Grid columns=4 gap=4
+  for photo in {photos}
+    div aspect-square rounded-lg overflow-hidden
+      img src={photo.thumb} object-cover w-full h-full
+```
+
+Components are documented by their TOML frontmatter and can be rendered with `crepus render` or any supported target.
+
 ## Runtime vs Compile-Time
 
 The `include` statement and multi-component files are **runtime-only** features. The compile-time `view!` macro does not support includes.
