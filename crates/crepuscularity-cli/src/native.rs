@@ -45,7 +45,10 @@ pub fn execute(cmd: NativeCommands) {
         NativeCommands::New { name } => scaffold_native_app(&name),
         NativeCommands::Extension { extension } => match extension {
             NativeExtensionCommands::IosShare { dir, name } => {
-                scaffold_ios_share_extension(&dir, &name)
+                scaffold_share_extension(&dir, &name, ShareExtensionPlatform::Ios)
+            }
+            NativeExtensionCommands::MacosShare { dir, name } => {
+                scaffold_share_extension(&dir, &name, ShareExtensionPlatform::Macos)
             }
         },
         NativeCommands::Ir { args } => run_ir_from(args),
@@ -889,7 +892,122 @@ final class ShareViewController: UIViewController {
 }
 "#;
 
-fn scaffold_ios_share_extension(dir: &Path, name: &str) {
+const MACOS_SHARE_VIEW_CONTROLLER: &str = r#"import AppKit
+import NativeShell
+import UniformTypeIdentifiers
+
+final class ShareViewController: NSViewController {
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        Task {
+            let payload = await Self.payload(from: extensionContext)
+            let data = try? JSONSerialization.data(withJSONObject: [
+                "action": "share.receive",
+                "value": payload,
+            ])
+            if let data, let json = String(data: data, encoding: .utf8) {
+                _ = CrepusRustActions.dispatchStored(json)
+            }
+            extensionContext?.completeRequest(returningItems: nil, completionHandler: nil)
+        }
+    }
+
+    private static func payload(from context: NSExtensionContext?) async -> [String: Any] {
+        var items: [[String: String]] = []
+        for case let item as NSExtensionItem in context?.inputItems ?? [] {
+            for provider in item.attachments ?? [] {
+                if let text = await loadString(provider, .plainText) {
+                    items.append(["kind": "text", "value": text])
+                } else if let url = await loadString(provider, .url) {
+                    items.append(["kind": "url", "value": url])
+                }
+            }
+        }
+        return ["items": items]
+    }
+
+    private static func loadString(_ provider: NSItemProvider, _ type: UTType) async -> String? {
+        guard provider.hasItemConformingToTypeIdentifier(type.identifier) else {
+            return nil
+        }
+        return await withCheckedContinuation { continuation in
+            provider.loadItem(forTypeIdentifier: type.identifier) { item, _ in
+                if let text = item as? String {
+                    continuation.resume(returning: text)
+                } else if let url = item as? URL {
+                    continuation.resume(returning: url.absoluteString)
+                } else {
+                    continuation.resume(returning: nil)
+                }
+            }
+        }
+    }
+}
+"#;
+
+#[derive(Clone, Copy)]
+enum ShareExtensionPlatform {
+    Ios,
+    Macos,
+}
+
+impl ShareExtensionPlatform {
+    fn xcode_platform(self) -> &'static str {
+        match self {
+            Self::Ios => "iOS",
+            Self::Macos => "macOS",
+        }
+    }
+
+    fn source_dir(self) -> &'static str {
+        match self {
+            Self::Ios => "ShareExtension",
+            Self::Macos => "MacShareExtension",
+        }
+    }
+
+    fn controller(self) -> &'static str {
+        match self {
+            Self::Ios => IOS_SHARE_VIEW_CONTROLLER,
+            Self::Macos => MACOS_SHARE_VIEW_CONTROLLER,
+        }
+    }
+
+    fn rust_target_script(self) -> &'static str {
+        match self {
+            Self::Ios => {
+                "if [ \"${PLATFORM_NAME:-iphonesimulator}\" = \"iphoneos\" ]; then\n            rust_target=aarch64-apple-ios\n          else\n            rust_target=aarch64-apple-ios-sim\n          fi"
+            }
+            Self::Macos => {
+                "case \"${CURRENT_ARCH:-$(uname -m)}\" in\n            arm64) rust_target=aarch64-apple-darwin ;;\n            x86_64) rust_target=x86_64-apple-darwin ;;\n            *) echo \"unsupported macOS arch: ${CURRENT_ARCH:-$(uname -m)}\" >&2; exit 1 ;;\n          esac"
+            }
+        }
+    }
+
+    fn library_search_paths(self) -> &'static str {
+        match self {
+            Self::Ios => {
+                "        LIBRARY_SEARCH_PATHS[sdk=iphoneos*]: \"$(PROJECT_DIR)/build/rust/aarch64-apple-ios\"\n        LIBRARY_SEARCH_PATHS[sdk=iphonesimulator*]: \"$(PROJECT_DIR)/build/rust/aarch64-apple-ios-sim\""
+            }
+            Self::Macos => {
+                "        LIBRARY_SEARCH_PATHS: \"$(PROJECT_DIR)/build/rust/aarch64-apple-darwin $(PROJECT_DIR)/build/rust/x86_64-apple-darwin\""
+            }
+        }
+    }
+
+    fn output_files(self) -> &'static str {
+        match self {
+            Self::Ios => {
+                "          - \"$(PROJECT_DIR)/build/rust/aarch64-apple-ios/libcrepus_mobile_actions.a\"\n          - \"$(PROJECT_DIR)/build/rust/aarch64-apple-ios-sim/libcrepus_mobile_actions.a\""
+            }
+            Self::Macos => {
+                "          - \"$(PROJECT_DIR)/build/rust/aarch64-apple-darwin/libcrepus_mobile_actions.a\"\n          - \"$(PROJECT_DIR)/build/rust/x86_64-apple-darwin/libcrepus_mobile_actions.a\""
+            }
+        }
+    }
+}
+
+fn scaffold_share_extension(dir: &Path, name: &str, platform: ShareExtensionPlatform) {
     let ios_dir = dir.join("ios");
     if !ios_dir.is_dir() {
         ui::error(&format!(
@@ -897,7 +1015,7 @@ fn scaffold_ios_share_extension(dir: &Path, name: &str) {
             dir.display()
         ));
     }
-    let extension_dir = ios_dir.join("ShareExtension");
+    let extension_dir = ios_dir.join(platform.source_dir());
     fs::create_dir_all(&extension_dir).unwrap_or_else(|e| {
         ui::error(&format!(
             "failed to create '{}': {e}",
@@ -907,17 +1025,24 @@ fn scaffold_ios_share_extension(dir: &Path, name: &str) {
     write_new_file(&extension_dir.join("Info.plist"), IOS_SHARE_INFO_PLIST);
     write_new_file(
         &extension_dir.join("ShareViewController.swift"),
-        IOS_SHARE_VIEW_CONTROLLER,
+        platform.controller(),
     );
     let project = ios_dir.join("project.yml");
     let mut text = fs::read_to_string(&project)
         .unwrap_or_else(|e| ui::error(&format!("read {}: {e}", project.display())));
     if !text.contains(&format!("  {name}:")) {
-        text.push_str(&ios_share_target(name, &main_bundle_id(&text)));
+        text.push_str(&share_extension_target(
+            name,
+            &main_bundle_id(&text),
+            platform,
+        ));
         fs::write(&project, text)
             .unwrap_or_else(|e| ui::error(&format!("write {}: {e}", project.display())));
     }
-    ui::success(&format!("added iOS share extension target '{name}'"));
+    ui::success(&format!(
+        "added {} share extension target '{name}'",
+        platform.xcode_platform()
+    ));
 }
 
 fn write_new_file(path: &Path, content: &str) {
@@ -937,9 +1062,18 @@ fn main_bundle_id(project_yml: &str) -> String {
         .to_string()
 }
 
-fn ios_share_target(name: &str, main_bundle_id: &str) -> String {
+fn share_extension_target(
+    name: &str,
+    main_bundle_id: &str,
+    platform: ShareExtensionPlatform,
+) -> String {
     format!(
-        "\n  {name}:\n    type: app-extension\n    platform: iOS\n    sources:\n      - path: ShareExtension\n    settings:\n      base:\n        LIBRARY_SEARCH_PATHS[sdk=iphoneos*]: \"$(PROJECT_DIR)/build/rust/aarch64-apple-ios\"\n        LIBRARY_SEARCH_PATHS[sdk=iphonesimulator*]: \"$(PROJECT_DIR)/build/rust/aarch64-apple-ios-sim\"\n        OTHER_LDFLAGS: \"-lcrepus_mobile_actions\"\n        EXCLUDED_ARCHS[sdk=iphonesimulator*]: \"x86_64\"\n        INFOPLIST_FILE: ShareExtension/Info.plist\n        PRODUCT_BUNDLE_IDENTIFIER: {main_bundle_id}.share\n    dependencies:\n      - package: NativeShell\n        product: NativeShell\n    preBuildScripts:\n      - name: Build Rust Actions\n        outputFiles:\n          - \"$(PROJECT_DIR)/build/rust/aarch64-apple-ios/libcrepus_mobile_actions.a\"\n          - \"$(PROJECT_DIR)/build/rust/aarch64-apple-ios-sim/libcrepus_mobile_actions.a\"\n        script: |\n          set -euo pipefail\n          export PATH=\"$HOME/.cargo/bin:/opt/homebrew/bin:/usr/local/bin:$PATH\"\n          if [ \"${{PLATFORM_NAME:-iphonesimulator}}\" = \"iphoneos\" ]; then\n            rust_target=aarch64-apple-ios\n          else\n            rust_target=aarch64-apple-ios-sim\n          fi\n          rustup target add \"$rust_target\" >/dev/null\n          cargo_profile=debug\n          if [ \"${{CONFIGURATION:-Debug}}\" = \"Release\" ]; then\n            cargo_profile=release\n          fi\n          cargo build --manifest-path \"$PROJECT_DIR/../rust/Cargo.toml\" \\\n            --target \"$rust_target\" \\\n            $([ \"$cargo_profile\" = release ] && echo \"--release\") \\\n            --no-default-features\n          mkdir -p \"$PROJECT_DIR/build/rust/$rust_target\"\n          cp \"$PROJECT_DIR/../rust/target/$rust_target/$cargo_profile/libcrepus_mobile_actions.a\" \"$PROJECT_DIR/build/rust/$rust_target/\"\n"
+        "\n  {name}:\n    type: app-extension\n    platform: {xcode_platform}\n    sources:\n      - path: {source_dir}\n    settings:\n      base:\n{library_search_paths}\n        OTHER_LDFLAGS: \"-lcrepus_mobile_actions\"\n        EXCLUDED_ARCHS[sdk=iphonesimulator*]: \"x86_64\"\n        INFOPLIST_FILE: {source_dir}/Info.plist\n        PRODUCT_BUNDLE_IDENTIFIER: {main_bundle_id}.share\n    dependencies:\n      - package: NativeShell\n        product: NativeShell\n    preBuildScripts:\n      - name: Build Rust Actions\n        outputFiles:\n{output_files}\n        script: |\n          set -euo pipefail\n          export PATH=\"$HOME/.cargo/bin:/opt/homebrew/bin:/usr/local/bin:$PATH\"\n          {rust_target_script}\n          rustup target add \"$rust_target\" >/dev/null\n          cargo_profile=debug\n          if [ \"${{CONFIGURATION:-Debug}}\" = \"Release\" ]; then\n            cargo_profile=release\n          fi\n          cargo build --manifest-path \"$PROJECT_DIR/../rust/Cargo.toml\" \\\n            --target \"$rust_target\" \\\n            $([ \"$cargo_profile\" = release ] && echo \"--release\") \\\n            --no-default-features\n          mkdir -p \"$PROJECT_DIR/build/rust/$rust_target\"\n          cp \"$PROJECT_DIR/../rust/target/$rust_target/$cargo_profile/libcrepus_mobile_actions.a\" \"$PROJECT_DIR/build/rust/$rust_target/\"\n",
+        xcode_platform = platform.xcode_platform(),
+        source_dir = platform.source_dir(),
+        library_search_paths = platform.library_search_paths(),
+        output_files = platform.output_files(),
+        rust_target_script = platform.rust_target_script(),
     )
 }
 
@@ -1560,11 +1694,31 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: hk.tsc.acme
 "#;
         assert_eq!(main_bundle_id(project), "hk.tsc.acme");
-        let target = ios_share_target("AcmeShare", &main_bundle_id(project));
+        let target = share_extension_target(
+            "AcmeShare",
+            &main_bundle_id(project),
+            ShareExtensionPlatform::Ios,
+        );
         assert!(target.contains("  AcmeShare:"));
         assert!(target.contains("type: app-extension"));
+        assert!(target.contains("platform: iOS"));
+        assert!(target.contains("path: ShareExtension"));
         assert!(target.contains("PRODUCT_BUNDLE_IDENTIFIER: hk.tsc.acme.share"));
         assert!(target.contains("Build Rust Actions"));
+    }
+
+    #[test]
+    fn macos_share_target_uses_macos_sources_and_rust_target() {
+        let target = share_extension_target(
+            "AcmeMacShare",
+            "hk.tsc.acme",
+            ShareExtensionPlatform::Macos,
+        );
+        assert!(target.contains("  AcmeMacShare:"));
+        assert!(target.contains("platform: macOS"));
+        assert!(target.contains("path: MacShareExtension"));
+        assert!(target.contains("aarch64-apple-darwin"));
+        assert!(target.contains("x86_64-apple-darwin"));
     }
 
     #[test]

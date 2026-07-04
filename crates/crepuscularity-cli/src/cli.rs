@@ -271,6 +271,13 @@ pub enum NativeExtensionCommands {
         #[arg(long, default_value = "CrepusShareExtension")]
         name: String,
     },
+    #[command(name = "macos-share")]
+    MacosShare {
+        #[arg(long, default_value = ".")]
+        dir: PathBuf,
+        #[arg(long, default_value = "CrepusMacShareExtension")]
+        name: String,
+    },
 }
 
 #[derive(Subcommand, Debug)]
