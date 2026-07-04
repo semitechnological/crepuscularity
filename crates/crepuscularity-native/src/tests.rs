@@ -683,6 +683,31 @@ tabs bind=page
 }
 
 #[test]
+fn native_codegen_keeps_conditional_sections() {
+    let tpl = r#"
+div flex flex-col
+  if {signed_in}
+    div
+      "Home"
+  if {!signed_in}
+    div
+      "Setup"
+"#;
+    let ir = render_template_to_ir(tpl, &TemplateContext::new()).unwrap();
+    let swift = generate_native_source(&ir, NativeCodegenTarget::SwiftUi, "ConditionalView");
+    assert!(swift.contains("if CrepusActions.model.bool(\"signed_in\")"));
+    assert!(swift.contains("Text(\"Home\")"));
+    assert!(swift.contains("if CrepusActions.model.bool(\"!signed_in\")"));
+    assert!(swift.contains("Text(\"Setup\")"));
+
+    let compose = generate_native_source(&ir, NativeCodegenTarget::Compose, "ConditionalView");
+    assert!(compose.contains("if (CrepusStateStore.bool(\"signed_in\"))"));
+    assert!(compose.contains("Text(\"Home\")"));
+    assert!(compose.contains("if (CrepusStateStore.bool(\"!signed_in\"))"));
+    assert!(compose.contains("Text(\"Setup\")"));
+}
+
+#[test]
 fn file_picker_ir_and_codegen_actions() {
     let tpl = r#"
 file-picker accept="image/*,video/*" multiple @pick="pickMedia" "Choose media"

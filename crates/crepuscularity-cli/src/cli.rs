@@ -236,6 +236,10 @@ pub enum NativeCommands {
     New {
         name: String,
     },
+    Extension {
+        #[command(subcommand)]
+        extension: NativeExtensionCommands,
+    },
     Ir {
         #[command(flatten)]
         args: NativeIrArgs,
@@ -255,6 +259,17 @@ pub enum NativeCommands {
     Run {
         #[command(subcommand)]
         platform: NativeRunCommands,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+pub enum NativeExtensionCommands {
+    #[command(name = "ios-share")]
+    IosShare {
+        #[arg(long, default_value = ".")]
+        dir: PathBuf,
+        #[arg(long, default_value = "CrepusShareExtension")]
+        name: String,
     },
 }
 
