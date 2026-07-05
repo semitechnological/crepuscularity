@@ -718,6 +718,21 @@ fn template_reload_without_path_fails() {
 }
 
 #[test]
+fn template_from_path_missing_file_fails() {
+    let dir = temp_case("missing-file");
+    let path = dir.join("does_not_exist.crepus");
+
+    let res = crate::Template::from_path(&path);
+    assert!(res.is_err(), "from_path should fail for missing file");
+    if let Err(err) = res {
+        assert!(
+            err.contains("template error"),
+            "Expected error to contain 'template error', got: {err}"
+        );
+    }
+}
+
+#[test]
 fn hot_template_initial_render_uses_disk_source() {
     let dir = temp_case("hot-initial");
     let path = dir.join("ui.crepus");
