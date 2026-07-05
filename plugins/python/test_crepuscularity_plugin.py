@@ -1,10 +1,34 @@
 import pathlib
 import unittest
 
-from crepuscularity_plugin import ViewSession, render_html, render_ir
+import os
+from unittest.mock import patch
+from crepuscularity_plugin import ViewSession, render_html, render_ir, _crepus_bin
 
 
 class CrepuscularityPluginTests(unittest.TestCase):
+    def test_crepus_bin_validation(self):
+        valid_paths = [
+            "crepus",
+            "crepus.exe",
+            "/usr/bin/crepus",
+            "/opt/crepuscularity/crepus.exe",
+        ]
+        invalid_paths = [
+            "sh",
+            "/bin/sh",
+            "../crepus",
+            "./crepus",
+        ]
+
+        for path in valid_paths:
+            with patch.dict(os.environ, {"CREPUS_BIN": path}):
+                self.assertEqual(_crepus_bin(), path)
+
+        for path in invalid_paths:
+            with patch.dict(os.environ, {"CREPUS_BIN": path}):
+                with self.assertRaises(ValueError):
+                    _crepus_bin()
     def test_render_ir(self):
         fixture = pathlib.Path(__file__).parents[1] / "fixtures" / "hello.crepus"
         allowed_dir = pathlib.Path(__file__).parents[1] / "fixtures"
