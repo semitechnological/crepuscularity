@@ -363,60 +363,7 @@ fn build_extension_inner(
     }
 
     // ── Step 2: runtime assets ───────────────────────────────────────────────
-    {
-        let sp = ui::spinner("writing runtime assets");
-        use crepuscularity_webext::extension_assets as a;
-
-        macro_rules! w {
-            ($name:expr, $path:expr, $content:expr) => {
-                std::fs::write($path, $content).unwrap_or_else(|e| {
-                    ui::error(&format!("write {}: {e}", $name));
-                });
-            };
-        }
-
-        w!("popup.html", src_dir.join("popup.html"), a::POPUP_HTML);
-        w!("popup.css", src_dir.join("popup.css"), a::POPUP_CSS);
-        w!("popup.js", src_dir.join("popup.js"), a::POPUP_JS);
-        w!("options.js", src_dir.join("options.js"), a::OPTIONS_JS);
-        w!(
-            "background.js",
-            src_dir.join("background.js"),
-            a::BACKGROUND_JS
-        );
-        let custom_bg = app_path.join("src/background.js");
-        if custom_bg.exists() {
-            std::fs::copy(&custom_bg, src_dir.join("background.js")).unwrap_or_else(|e| {
-                ui::error(&format!("copy custom background.js: {e}"));
-            });
-        }
-        w!("content.js", src_dir.join("content.js"), a::CONTENT_JS);
-        w!("content.css", src_dir.join("content.css"), a::CONTENT_CSS);
-        w!(
-            "browser-shim.js",
-            src_dir.join("browser-shim.js"),
-            a::BROWSER_SHIM
-        );
-        w!(
-            "runtime-as-adapter.js",
-            src_dir.join("runtime-as-adapter.js"),
-            a::RUNTIME_ADAPTER
-        );
-        if dev {
-            w!("dev.js", src_dir.join("dev.js"), a::DEV_JS);
-        }
-        w!("unocss.js", vendor_dir.join("unocss.js"), a::UNOCSS_JS);
-        copy_app_assets(app_path, &dist).unwrap_or_else(|e| {
-            ui::error(&format!("copy app assets: {e}"));
-        });
-        render_crepus_css_assets(app_path, &dist).unwrap_or_else(|e| {
-            ui::error(&format!("render extension .css.crepus assets: {e}"));
-        });
-        render_crepus_pages(app_path, &dist, manifest).unwrap_or_else(|e| {
-            ui::error(&format!("render extension .crepus pages: {e}"));
-        });
-        ui::spinner_ok(&sp, "runtime assets");
-    }
+    write_runtime_assets(app_path, &dist, &src_dir, &vendor_dir, dev, manifest);
 
     // ── Step 3: WASM runtime ─────────────────────────────────────────────────
     let runtime_dir = app_path.join("runtime");
@@ -486,6 +433,68 @@ fn build_extension_inner(
         ),
     }
     ui::done_in(t0.elapsed());
+}
+
+fn write_runtime_assets(
+    app_path: &Path,
+    dist: &Path,
+    src_dir: &Path,
+    vendor_dir: &Path,
+    dev: bool,
+    manifest: &crepuscularity_webext::ExtensionManifest,
+) {
+    let sp = ui::spinner("writing runtime assets");
+    use crepuscularity_webext::extension_assets as a;
+
+    macro_rules! w {
+        ($name:expr, $path:expr, $content:expr) => {
+            std::fs::write($path, $content).unwrap_or_else(|e| {
+                ui::error(&format!("write {}: {e}", $name));
+            });
+        };
+    }
+
+    w!("popup.html", src_dir.join("popup.html"), a::POPUP_HTML);
+    w!("popup.css", src_dir.join("popup.css"), a::POPUP_CSS);
+    w!("popup.js", src_dir.join("popup.js"), a::POPUP_JS);
+    w!("options.js", src_dir.join("options.js"), a::OPTIONS_JS);
+    w!(
+        "background.js",
+        src_dir.join("background.js"),
+        a::BACKGROUND_JS
+    );
+    let custom_bg = app_path.join("src/background.js");
+    if custom_bg.exists() {
+        std::fs::copy(&custom_bg, src_dir.join("background.js")).unwrap_or_else(|e| {
+            ui::error(&format!("copy custom background.js: {e}"));
+        });
+    }
+    w!("content.js", src_dir.join("content.js"), a::CONTENT_JS);
+    w!("content.css", src_dir.join("content.css"), a::CONTENT_CSS);
+    w!(
+        "browser-shim.js",
+        src_dir.join("browser-shim.js"),
+        a::BROWSER_SHIM
+    );
+    w!(
+        "runtime-as-adapter.js",
+        src_dir.join("runtime-as-adapter.js"),
+        a::RUNTIME_ADAPTER
+    );
+    if dev {
+        w!("dev.js", src_dir.join("dev.js"), a::DEV_JS);
+    }
+    w!("unocss.js", vendor_dir.join("unocss.js"), a::UNOCSS_JS);
+    copy_app_assets(app_path, dist).unwrap_or_else(|e| {
+        ui::error(&format!("copy app assets: {e}"));
+    });
+    render_crepus_css_assets(app_path, dist).unwrap_or_else(|e| {
+        ui::error(&format!("render extension .css.crepus assets: {e}"));
+    });
+    render_crepus_pages(app_path, dist, manifest).unwrap_or_else(|e| {
+        ui::error(&format!("render extension .crepus pages: {e}"));
+    });
+    ui::spinner_ok(&sp, "runtime assets");
 }
 
 fn load_extension_manifest(
@@ -917,19 +926,32 @@ fn render_crepus_pages(
     let cache = DriverCache::open(app_path);
 
     for entry in &entries {
-        let source = files
-            .get(entry)
-            .ok_or_else(|| format!("missing page source: {entry}"))?;
-        let stem = Path::new(entry)
-            .file_stem()
-            .and_then(|s| s.to_str())
-            .unwrap_or("page");
-        // WASM exports use underscore, not hyphen
-        let fn_name = stem.replace('-', "_");
+        render_crepus_page(entry, &files, &src_dir, &out_dir, manifest, &cache)?;
+    }
+    Ok(())
+}
 
-        let js_vendor_prefix = page_script_prefix(entry);
-        let js = format!(
-            r#"import init, * as runtime from "{prefix}vendor/runtime.js";
+fn render_crepus_page(
+    entry: &str,
+    files: &HashMap<String, String>,
+    src_dir: &Path,
+    out_dir: &Path,
+    manifest: &crepuscularity_webext::ExtensionManifest,
+    cache: &DriverCache,
+) -> Result<(), String> {
+    let source = files
+        .get(entry)
+        .ok_or_else(|| format!("missing page source: {entry}"))?;
+    let stem = Path::new(entry)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("page");
+    // WASM exports use underscore, not hyphen
+    let fn_name = stem.replace('-', "_");
+
+    let js_vendor_prefix = page_script_prefix(entry);
+    let js = format!(
+        r#"import init, * as runtime from "{prefix}vendor/runtime.js";
 try {{
   const wasmBytes = await fetch("{prefix}vendor/runtime_bg.wasm").then(r => r.arrayBuffer());
   await init({{ module_or_path: wasmBytes }});
@@ -1004,33 +1026,31 @@ try {{
     throw error;
   }}
 }}"#,
-            prefix = js_vendor_prefix,
-            fn = fn_name
-        );
-        let js_output = src_dir.join(page_script_relative_path(entry));
-        if let Some(parent) = js_output.parent() {
-            std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-        }
-        std::fs::write(&js_output, &js)
-            .map_err(|e| format!("write {}: {e}", js_output.display()))?;
-
-        let html = render_crepus_page_html(source, &files, entry, manifest)?;
-        let output = out_dir
-            .join(entry.trim_end_matches(".crepus"))
-            .with_extension("html");
-
-        // Cache skip: avoid re-rendering unchanged page templates.
-        let fp = Fingerprint::new(source, Some(entry), "webext-page");
-        if output.is_file() && cache.is_up_to_date(&fp, &html) {
-            continue;
-        }
-
-        if let Some(parent) = output.parent() {
-            std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-        }
-        std::fs::write(output, &html).map_err(|e| e.to_string())?;
-        cache.record(&fp, &html);
+        prefix = js_vendor_prefix,
+        fn = fn_name
+    );
+    let js_output = src_dir.join(page_script_relative_path(entry));
+    if let Some(parent) = js_output.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
+    std::fs::write(&js_output, &js).map_err(|e| format!("write {}: {e}", js_output.display()))?;
+
+    let html = render_crepus_page_html(source, files, entry, manifest)?;
+    let output = out_dir
+        .join(entry.trim_end_matches(".crepus"))
+        .with_extension("html");
+
+    // Cache skip: avoid re-rendering unchanged page templates.
+    let fp = Fingerprint::new(source, Some(entry), "webext-page");
+    if output.is_file() && cache.is_up_to_date(&fp, &html) {
+        return Ok(());
+    }
+
+    if let Some(parent) = output.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    std::fs::write(output, &html).map_err(|e| e.to_string())?;
+    cache.record(&fp, &html);
     Ok(())
 }
 
