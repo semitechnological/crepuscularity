@@ -185,7 +185,7 @@ fn swiftui_node(
                         swiftui_change(on_change.as_deref(), bind, "newValue")
                     )
                 })
-                .unwrap_or_else(|| format!(".constant({})", swift_bool(*checked)));
+                .unwrap_or_else(|| format!(".constant({})", bool_literal(*checked)));
             let mut out = format!("{pad}Toggle(\"{}\", isOn: {binding})", swift_escape(label));
             swiftui_style(&mut out, style.as_ref(), false, indent);
             out
@@ -207,7 +207,7 @@ fn swiftui_node(
                         swiftui_change(on_change.as_deref(), bind, "newValue")
                     )
                 })
-                .unwrap_or_else(|| format!(".constant({})", swift_bool(*checked)));
+                .unwrap_or_else(|| format!(".constant({})", bool_literal(*checked)));
             let mut out = format!("{pad}Toggle(\"{}\", isOn: {binding})", swift_escape(label));
             swiftui_style(&mut out, style.as_ref(), false, indent);
             out
@@ -1046,7 +1046,7 @@ fn compose_node_with_base(
             let checked_value = bind
                 .as_deref()
                 .map(|bind| compose_model_bool(bind, scope_name, scope_var))
-                .unwrap_or_else(|| kotlin_bool(*checked).to_string());
+                .unwrap_or_else(|| bool_literal(*checked).to_string());
             let on_change = bind
                 .as_deref()
                 .map(|bind| compose_change(on_change.as_deref(), bind, "JsonPrimitive(it)"))
@@ -1818,15 +1818,7 @@ fn kotlin_escape(s: &str) -> String {
     s.replace('\\', "\\\\").replace('"', "\\\"")
 }
 
-fn swift_bool(value: bool) -> &'static str {
-    if value {
-        "true"
-    } else {
-        "false"
-    }
-}
-
-fn kotlin_bool(value: bool) -> &'static str {
+fn bool_literal(value: bool) -> &'static str {
     if value {
         "true"
     } else {

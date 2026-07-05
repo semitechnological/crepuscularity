@@ -466,23 +466,18 @@ fn collect_ids_from_nodes(
 }
 
 fn make_rust_ident(id: &str) -> Option<syn::Ident> {
-    let mut out = String::new();
-    for (i, ch) in id.chars().enumerate() {
-        if ch.is_ascii_alphanumeric() || ch == '_' {
-            if i == 0 && ch.is_ascii_digit() {
-                out.push('_');
-            }
-            out.push(ch);
-        } else {
-            out.push('_');
-        }
-    }
-    if out.is_empty() {
-        None
-    } else if syn::parse_str::<syn::Ident>(&out).is_ok() {
-        Some(syn::Ident::new(&out, Span::call_site()))
+    let id = id.replace(|c: char| !c.is_alphanumeric() && c != '_', "_");
+    let id = if id.starts_with(|c: char| c.is_ascii_digit()) {
+        format!("_{id}")
     } else {
-        Some(syn::Ident::new(&format!("_{out}"), Span::call_site()))
+        id
+    };
+    if id.is_empty() {
+        None
+    } else if syn::parse_str::<syn::Ident>(&id).is_ok() {
+        Some(syn::Ident::new(&id, Span::call_site()))
+    } else {
+        Some(syn::Ident::new(&format!("_{id}"), Span::call_site()))
     }
 }
 

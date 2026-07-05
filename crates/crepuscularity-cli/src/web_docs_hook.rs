@@ -2,9 +2,20 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use serde::Deserialize;
 use serde_json::json;
 
 use crate::crepus_toml::DocsHookConfig;
+
+#[derive(Deserialize)]
+struct Manifest {
+    package: Package,
+}
+
+#[derive(Deserialize)]
+struct Package {
+    name: String,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct DocsHookInvocation {
@@ -123,18 +134,9 @@ fn cargo_run_manifest_binary(site_dir: &Path, hook: &DocsHookConfig) -> Option<P
 
 fn package_name_from_manifest(manifest_path: &Path) -> Option<String> {
     let contents = std::fs::read_to_string(manifest_path).ok()?;
-    for line in contents.lines() {
-        let trimmed = line.trim();
-        if trimmed.starts_with('#') {
-            continue;
-        }
-        if let Some((key, value)) = trimmed.split_once('=') {
-            if key.trim() == "name" {
-                return Some(value.trim().trim_matches('"').to_string());
-            }
-        }
-    }
-    None
+    toml::from_str::<Manifest>(&contents)
+        .ok()
+        .map(|m| m.package.name)
 }
 
 fn absolutize(base: &Path, raw: &str) -> PathBuf {
