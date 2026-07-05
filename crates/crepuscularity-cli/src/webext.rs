@@ -561,63 +561,84 @@ fn build_wasm_runtime(
     vendor_dir: &Path,
     options: BuildOptions,
 ) {
-    {
-        let sp = ui::spinner("compiling WASM runtime");
-        match cargo_build_wasm32(runtime_dir, options) {
-            Ok(()) => {
-                ui::spinner_ok(&sp, "WASM compiled");
-            }
-            Err(stderr) => {
-                sp.finish_and_clear();
-                eprintln!("  {} WASM compile failed", ui::err());
-                for line in stderr.lines().take(15) {
-                    eprintln!("    {}", style(line).dim());
-                }
-                if stderr.lines().count() > 15 {
-                    eprintln!(
-                        "    {}",
-                        style("... (run cargo build manually for full output)").dim()
-                    );
-                }
-                return;
-            }
-        }
+    if !compile_wasm_runtime_step(runtime_dir, options) {
+        return;
     }
 
+    let Some(wasm_path) = find_built_wasm_step(app_path, runtime_dir, options) else {
+        return;
+    };
+
+    run_wasm_bindgen_step(&wasm_path, vendor_dir);
+    optimize_wasm_step(vendor_dir, options);
+}
+
+fn compile_wasm_runtime_step(runtime_dir: &Path, options: BuildOptions) -> bool {
+    let sp = ui::spinner("compiling WASM runtime");
+    match cargo_build_wasm32(runtime_dir, options) {
+        Ok(()) => {
+            ui::spinner_ok(&sp, "WASM compiled");
+            true
+        }
+        Err(stderr) => {
+            sp.finish_and_clear();
+            eprintln!("  {} WASM compile failed", ui::err());
+            for line in stderr.lines().take(15) {
+                eprintln!("    {}", style(line).dim());
+            }
+            if stderr.lines().count() > 15 {
+                eprintln!(
+                    "    {}",
+                    style("... (run cargo build manually for full output)").dim()
+                );
+            }
+            false
+        }
+    }
+}
+
+fn find_built_wasm_step(
+    app_path: &Path,
+    runtime_dir: &Path,
+    options: BuildOptions,
+) -> Option<PathBuf> {
     let (workspace_target, local_target) = wasm_profile_dirs(app_path, runtime_dir, options);
     let wasm_file = find_wasm_file(&workspace_target).or_else(|| find_wasm_file(&local_target));
 
-    let Some(wasm_path) = wasm_file else {
+    if wasm_file.is_none() {
         ui::warning(&format!(
             "built .wasm not found in target/wasm32-unknown-unknown/{}/",
             options.cargo_profile()
         ));
-        return;
-    };
+    }
 
-    {
-        let sp = ui::spinner("running wasm-bindgen");
-        match run_wasm_bindgen(&wasm_path, vendor_dir, "runtime") {
-            Ok(()) => {
-                ui::spinner_ok(&sp, "wasm-bindgen — vendor/runtime.js + runtime_bg.wasm");
-            }
-            Err(err) => {
-                sp.finish_and_clear();
-                if err.starts_with("wasm-bindgen:") {
-                    let _ = std::fs::copy(&wasm_path, vendor_dir.join("runtime_bg.wasm"));
-                    ui::warning("wasm-bindgen not found — copied raw .wasm");
-                    ui::warning("install: cargo install wasm-bindgen-cli");
-                } else {
-                    eprintln!("  {} wasm-bindgen failed", ui::err());
-                    for line in err.lines().take(10) {
-                        eprintln!("    {}", style(line).dim());
-                    }
-                    ui::warning("install wasm-bindgen-cli: cargo install wasm-bindgen-cli");
+    wasm_file
+}
+
+fn run_wasm_bindgen_step(wasm_path: &Path, vendor_dir: &Path) {
+    let sp = ui::spinner("running wasm-bindgen");
+    match run_wasm_bindgen(wasm_path, vendor_dir, "runtime") {
+        Ok(()) => {
+            ui::spinner_ok(&sp, "wasm-bindgen — vendor/runtime.js + runtime_bg.wasm");
+        }
+        Err(err) => {
+            sp.finish_and_clear();
+            if err.starts_with("wasm-bindgen:") {
+                let _ = std::fs::copy(wasm_path, vendor_dir.join("runtime_bg.wasm"));
+                ui::warning("wasm-bindgen not found — copied raw .wasm");
+                ui::warning("install: cargo install wasm-bindgen-cli");
+            } else {
+                eprintln!("  {} wasm-bindgen failed", ui::err());
+                for line in err.lines().take(10) {
+                    eprintln!("    {}", style(line).dim());
                 }
+                ui::warning("install wasm-bindgen-cli: cargo install wasm-bindgen-cli");
             }
         }
     }
+}
 
+fn optimize_wasm_step(vendor_dir: &Path, options: BuildOptions) {
     if options.optimize_artifacts() {
         let wasm = vendor_dir.join("runtime_bg.wasm");
         if wasm.is_file() {
