@@ -31,7 +31,7 @@ pub fn gpui_window_options(
 }
 
 #[cfg(feature = "symbols")]
-pub use gpui_symbols::Icon;
+pub use gpui_symbols::{Icon, SymbolWeight};
 
 pub mod prelude {
     pub use crate::animation;
@@ -45,7 +45,7 @@ pub mod prelude {
         WindowOptions,
     };
     #[cfg(feature = "symbols")]
-    pub use gpui_symbols::Icon;
+    pub use gpui_symbols::{Icon, SymbolWeight};
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
