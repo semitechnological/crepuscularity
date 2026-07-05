@@ -1901,6 +1901,15 @@ fn parse_dynamic_class(class: &str) -> Option<TokenStream2> {
         ("border-", "border_color"),
     ] {
         if let Some(rest) = class.strip_prefix(prefix) {
+            // Dynamic color: bg-{theme.bg}, text-{theme.text}, border-{theme.border}
+            if let Some(expr_str) = extract_braced_expr_str(rest) {
+                let expr: syn::Expr = syn::parse_str(&expr_str)
+                    .map_err(|error| format!("Invalid color expression `{expr_str}`: {error}"))
+                    .ok()?;
+                let method_ident = syn::Ident::new(method, Span::call_site());
+                return Some(quote! { .#method_ident(::gpui::rgb(#expr)) });
+            }
+
             // Arbitrary color: bg-[#rrggbb]
             if rest.starts_with('[') && rest.ends_with(']') {
                 let inner = &rest[1..rest.len() - 1];
