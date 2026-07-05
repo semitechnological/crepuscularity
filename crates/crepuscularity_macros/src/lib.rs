@@ -78,17 +78,36 @@ static ELEM_ID_COUNTER: AtomicU64 = AtomicU64::new(0);
 #[proc_macro]
 pub fn view(input: TokenStream) -> TokenStream {
     let lit = parse_macro_input!(input as LitStr);
-    let template = lit.value();
-    let span = lit.span();
+    generate_view(&lit.value(), lit.span()).into()
+}
 
-    let dec = crepuscularity_core::preprocess::strip_indent_decorators(&template);
+/// Compile a `.crepus` template file into a GPUI view at build time.
+///
+/// Usage:
+///
+/// ```ignore
+/// view_file!("ui/sidebar.crepus")
+/// ```
+#[proc_macro]
+pub fn view_file(input: TokenStream) -> TokenStream {
+    let path = parse_macro_input!(input as LitStr);
+    let path_value = path.value();
+    let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".into());
+    let full = std::path::Path::new(&manifest_dir).join(&path_value);
+    let template = std::fs::read_to_string(&full)
+        .unwrap_or_else(|e| panic!("Failed to read template file `{}`: {}", full.display(), e));
+    generate_view(&template, path.span()).into()
+}
+
+fn generate_view(template: &str, span: Span) -> TokenStream2 {
+    let dec = crepuscularity_core::preprocess::strip_indent_decorators(template);
     let lines = collect_lines(&dec.body);
     let (mut nodes, _) = parse_nodes(&lines, 0, 0);
     expand_view_class_aliases(&mut nodes, &dec.class_aliases);
 
     match generate_root(&nodes) {
-        Ok(tokens) => tokens.into(),
-        Err(message) => syn::Error::new(span, message).to_compile_error().into(),
+        Ok(tokens) => tokens,
+        Err(message) => syn::Error::new(span, message).to_compile_error(),
     }
 }
 

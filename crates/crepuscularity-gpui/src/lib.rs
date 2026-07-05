@@ -3,7 +3,7 @@
 /// Re-exports the upstream GPUI API plus Crepuscularity's GPUI-oriented `view!` macro and build
 /// helpers so existing GPUI consumers can migrate incrementally.
 pub use crepuscularity_core::build;
-pub use crepuscularity_macros::view;
+pub use crepuscularity_macros::{view, view_file};
 pub use crepuscularity_runtime;
 pub use gpui::*;
 pub use pollster::block_on;
@@ -36,7 +36,7 @@ pub use gpui_symbols::Icon;
 pub mod prelude {
     pub use crate::animation;
     pub use crate::gpui_window_options;
-    pub use crepuscularity_macros::view;
+    pub use crepuscularity_macros::{view, view_file};
     pub use crepuscularity_runtime;
     pub use gpui::prelude::*;
     pub use gpui::{
