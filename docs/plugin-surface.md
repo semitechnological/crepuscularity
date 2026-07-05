@@ -40,7 +40,7 @@ In-tree references live under [`plugins/`](../plugins/). Manifest: [`plugins/cre
 | Rust | `plugins/rust` | CLI | — |
 | Swift | `plugins/swift` | CLI | — |
 | C# | `plugins/csharp` | CLI | Optional |
-| C / C++ | `plugins/c`, `plugins/cpp` | CLI | C smoke via ABI |
+| C / C++ | `plugins/c`, `plugins/cpp` | CLI | C optional ABI |
 | Ruby, PHP, Java, Kotlin | respective dirs | CLI | PHP optional ABI |
 
 Run local smoke: `scripts/plugin-smoke.sh` (after `cargo build -p crepuscularity-cli` and `cargo build -p crepuscularity-abi`).

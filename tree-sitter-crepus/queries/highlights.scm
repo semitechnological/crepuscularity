@@ -10,8 +10,6 @@
 
 (element_line (element_tag) @tag)
 
-; Classify current grammar segments directly, then fall back to regex for plain classes.
-; Keep attr-like tokens distinct from quoted text (`quoted` is @string above).
 (braced_expression) @keyword
 
 (hash_id) @label

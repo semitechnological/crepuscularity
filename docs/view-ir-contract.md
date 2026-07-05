@@ -7,7 +7,7 @@ This document is the stable cross-language boundary for Crepuscularity. Rust (`c
 ## Version
 
 - Field: `ViewIr.version` (camelCase in JSON).
-- Must equal [`IR_VERSION`](https://docs.rs/crepuscularity-native/latest/crepuscularity_native/constant.IR_VERSION.html) from `crepuscularity-native` (currently **3**).
+- Must equal [`IR_VERSION`](https://docs.rs/crepuscularity-native/latest/crepuscularity_native/constant.IR_VERSION.html) from `crepuscularity-native` (currently **4**).
 - Breaking IR shape changes bump `IR_VERSION` and require plugin type updates.
 
 ## Document shape
@@ -16,7 +16,7 @@ Root object:
 
 ```json
 {
-  "version": 3,
+  "version": 4,
   "root": [ /* ViewNode[] */ ]
 }
 ```

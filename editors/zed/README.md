@@ -6,7 +6,7 @@
 
 Zed builds the WASM grammar from **`extension.toml` → `[grammars.crepus]`** (`repository`, `path`, **`rev`**), not from your unchecked-out working tree. The extension’s **`languages/crepus/*.scm` queries ship with the extension** and must match that **`rev`**.
 
-If `rev` still points at an **old** grammar (for example one that only had `element_class`) but `highlights.scm` expects **`class_segment`, `hash_id`, `attr_binding_braced`, …**, query compilation fails and **highlighting is off entirely**.
+If `rev` still points at an **old** grammar (for example one that only had `element_class`) but `highlights.scm` expects **`hash_id`, `attr_binding_braced`, `tailwind_pair`, …**, query compilation fails and **highlighting is off entirely**.
 
 **Fix:** Bump `rev` to a **full Git SHA** on `repository` that includes the matching `tree-sitter-crepus/grammar.js`, **push** that commit (Zed fetches from GitHub), then **Install dev extension** again. To clear a bad WASM build:
 

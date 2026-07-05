@@ -119,7 +119,7 @@ This produces JSON that native shells can parse:
 
 ```json
 {
-  "version": 3,
+  "version": 4,
   "root": [
     {
       "kind": "stack",
