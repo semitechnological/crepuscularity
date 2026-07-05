@@ -9,6 +9,8 @@ import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
+import android.provider.MediaStore
+import android.webkit.MimeTypeMap
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.getValue
@@ -19,7 +21,10 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.jsonArray
+import org.json.JSONArray
 import org.json.JSONObject
+import java.io.File
+import java.time.Instant
 
 object CrepusStateStore {
     private val json = Json { ignoreUnknownKeys = true }
@@ -130,6 +135,8 @@ object CrepusRustActions {
             "clipboard" -> clipboardValue(method, payload)
             "haptics" -> hapticsValue(method, payload)
             "browser", "linking" -> openUrlValue(capability, method, payload)
+            "imagePicker" -> imagePickerValue(method)
+            "photoLibrary" -> photoLibraryValue(method)
             "share" -> shareValue(method, payload)
             else -> error("unsupported host capability: $capability")
         }
@@ -238,6 +245,27 @@ object CrepusRustActions {
         return JSONObject().put("shared", true).put("text", text).put("url", url).put("title", title)
     }
 
+    private fun imagePickerValue(method: String): JSONObject {
+        if (method != "pick") error("unsupported imagePicker method: $method")
+        pendingPickerAction = "imagePicker.pick"
+        openMedia?.invoke() ?: emit(errorJson("imagePicker.pick", "media picker unavailable"))
+        return JSONObject().put("opening", true)
+    }
+
+    private fun photoLibraryValue(method: String): JSONObject {
+        if (method != "scan") error("unsupported photoLibrary method: $method")
+        Thread {
+            runCatching {
+                for (uri in listOf(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, MediaStore.Video.Media.EXTERNAL_CONTENT_URI)) {
+                    scanMediaUri(uri)
+                }
+            }.onFailure {
+                emit(errorJson("photoLibrary.scan", "photo library scan failed"))
+            }
+        }.start()
+        return JSONObject().put("opening", true)
+    }
+
     private fun emit(result: String) {
         CrepusActions.resultSink(result)
     }
@@ -275,6 +303,56 @@ object CrepusRustActions {
             .put("action", action)
             .put("value", JSONObject().put("files", files))
             .toString()
+    }
+
+    private fun scanMediaUri(uri: Uri) {
+        val projection = arrayOf(
+            MediaStore.MediaColumns._ID,
+            MediaStore.MediaColumns.DISPLAY_NAME,
+            MediaStore.MediaColumns.MIME_TYPE,
+            MediaStore.MediaColumns.SIZE,
+            MediaStore.MediaColumns.DATE_ADDED,
+        )
+        appContext.contentResolver.query(uri, projection, null, null, "${MediaStore.MediaColumns.DATE_ADDED} ASC")?.use { cursor ->
+            val idColumn = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns._ID)
+            val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.DISPLAY_NAME)
+            val mimeColumn = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.MIME_TYPE)
+            val sizeColumn = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.SIZE)
+            val createdColumn = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.DATE_ADDED)
+            while (cursor.moveToNext()) {
+                val id = cursor.getLong(idColumn)
+                val itemUri = android.content.ContentUris.withAppendedId(uri, id)
+                val mime = cursor.getString(mimeColumn) ?: "application/octet-stream"
+                val file = copyToCache(itemUri, cursor.getString(nameColumn) ?: "Media", mime)
+                val item = JSONObject()
+                    .put("name", cursor.getString(nameColumn) ?: "Media")
+                    .put("mimeType", mime)
+                    .put("bytes", cursor.getLong(sizeColumn))
+                    .put("filePath", file.absolutePath)
+                    .put("importSource", "android-photo-library")
+                    .put("mediaKind", if (mime.startsWith("video/")) "video" else "photo")
+                    .put("createdTime", cursor.getLong(createdColumn).takeIf { it > 0 }?.let { Instant.ofEpochSecond(it).toString() })
+                    .put("localIdentifier", id.toString())
+                emit(mediaResultJson("photoLibrary.scan", listOf(item)))
+            }
+        }
+    }
+
+    private fun mediaResultJson(action: String, files: List<JSONObject>): String =
+        JSONObject()
+            .put("ok", true)
+            .put("action", action)
+            .put("value", JSONObject().put("files", JSONArray(files)))
+            .toString()
+
+    private fun copyToCache(uri: Uri, name: String, mime: String): File {
+        val ext = MimeTypeMap.getSingleton().getExtensionFromMimeType(mime)
+            ?: name.substringAfterLast('.', "bin")
+        val file = File.createTempFile("crepus-media-", ".$ext", appContext.cacheDir)
+        appContext.contentResolver.openInputStream(uri)?.use { input ->
+            file.outputStream().use { output -> input.copyTo(output) }
+        } ?: error("media item unavailable")
+        return file
     }
 
     private fun queryDisplayName(uri: Uri): String {

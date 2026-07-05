@@ -2,6 +2,8 @@ import Darwin
 import Foundation
 import SwiftUI
 #if canImport(UIKit)
+import Photos
+import PhotosUI
 import UIKit
 import UniformTypeIdentifiers
 #elseif canImport(AppKit)
@@ -208,6 +210,10 @@ public enum CrepusRustActions {
             return try hapticsValue(method: method, payload: payload)
         case "browser", "linking":
             return try openUrlValue(capability: capability, method: method, payload: payload)
+        case "imagePicker":
+            return try imagePickerValue(method: method)
+        case "photoLibrary":
+            return try photoLibraryValue(method: method)
         case "share":
             return try shareValue(method: method, payload: payload)
         default:
@@ -334,6 +340,22 @@ public enum CrepusRustActions {
             value["title"] = title
         }
         return value
+    }
+
+    private static func imagePickerValue(method: String) throws -> Any {
+        guard method == "pick" else {
+            throw HostActionError("unsupported imagePicker method: \(method)")
+        }
+        presentMediaPicker(action: "imagePicker.pick")
+        return ["opening": true]
+    }
+
+    private static func photoLibraryValue(method: String) throws -> Any {
+        guard method == "scan" else {
+            throw HostActionError("unsupported photoLibrary method: \(method)")
+        }
+        scanPhotoLibrary(action: "photoLibrary.scan")
+        return ["opening": true]
     }
 
     private static func successJson(action: String, capability: String, method: String, value: Any) -> String {
@@ -627,6 +649,35 @@ private struct HostActionError: LocalizedError {
 }
 
 #if canImport(UIKit)
+private final class MediaPickerDelegate: NSObject, PHPickerViewControllerDelegate {
+    let action: String
+
+    init(action: String) {
+        self.action = action
+    }
+
+    func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
+        picker.dismiss(animated: true)
+        guard !results.isEmpty else {
+            CrepusRustActions.emit(mediaResultJson(action: action, files: []))
+            CrepusMediaPicker.shared.clear(delegate: self)
+            return
+        }
+        Task.detached {
+            var files: [[String: Any]] = []
+            for result in results {
+                if let file = await mediaPayload(result) {
+                    files.append(file)
+                }
+            }
+            CrepusRustActions.emit(mediaResultJson(action: self.action, files: files))
+            await MainActor.run {
+                CrepusMediaPicker.shared.clear(delegate: self)
+            }
+        }
+    }
+}
+
 private final class FilePickerDelegate: NSObject, UIDocumentPickerDelegate {
     let action: String
 
@@ -656,6 +707,57 @@ private final class CrepusHostPicker {
 
     func clear(delegate: FilePickerDelegate) {
         delegates.removeAll { $0 === delegate }
+    }
+}
+
+private final class CrepusMediaPicker {
+    static let shared = CrepusMediaPicker()
+    private var delegates: [MediaPickerDelegate] = []
+
+    func retain(delegate: MediaPickerDelegate) {
+        delegates.append(delegate)
+    }
+
+    func clear(delegate: MediaPickerDelegate) {
+        delegates.removeAll { $0 === delegate }
+    }
+}
+
+private func presentMediaPicker(action: String) {
+    Task { @MainActor in
+        guard let root = topViewController() else {
+            CrepusRustActions.emit("{\"ok\":false,\"action\":\"\(action)\",\"error\":\"missing root view controller\"}")
+            return
+        }
+        var configuration = PHPickerConfiguration(photoLibrary: .shared())
+        configuration.filter = .any(of: [.images, .videos])
+        configuration.selectionLimit = 0
+        let picker = PHPickerViewController(configuration: configuration)
+        let delegate = MediaPickerDelegate(action: action)
+        picker.delegate = delegate
+        CrepusMediaPicker.shared.retain(delegate: delegate)
+        root.present(picker, animated: true)
+    }
+}
+
+private func scanPhotoLibrary(action: String) {
+    Task.detached {
+        let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+        let allowed = status == .authorized || status == .limited
+            || await PHPhotoLibrary.requestAuthorization(for: .readWrite) == .authorized
+            || PHPhotoLibrary.authorizationStatus(for: .readWrite) == .limited
+        guard allowed else {
+            CrepusRustActions.emit("{\"ok\":false,\"action\":\"\(action)\",\"error\":\"photo access denied\"}")
+            return
+        }
+        let options = PHFetchOptions()
+        options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: true)]
+        let assets = PHAsset.fetchAssets(with: options)
+        for index in 0..<assets.count {
+            if let file = await assetPayload(assets.object(at: index)) {
+                CrepusRustActions.emit(mediaResultJson(action: action, files: [file]))
+            }
+        }
     }
 }
 
@@ -698,6 +800,65 @@ private func pickedFileJson(url: URL) -> [String: Any]? {
     ]
 }
 
+private func mediaPayload(_ result: PHPickerResult) async -> [String: Any]? {
+    let provider = result.itemProvider
+    let type = provider.registeredTypeIdentifiers.first ?? "public.data"
+    guard let data = try? await provider.loadDataRepresentation(forTypeIdentifier: type) else {
+        return nil
+    }
+    let name = provider.suggestedName ?? "Media"
+    let path = FileManager.default.temporaryDirectory
+        .appendingPathComponent(UUID().uuidString)
+        .appendingPathExtension(fileExtension(type))
+    try? data.write(to: path, options: .atomic)
+    return [
+        "name": name,
+        "mimeType": mimeType(type),
+        "bytes": data.count,
+        "filePath": path.path,
+        "importSource": "ios-photo-picker",
+    ]
+}
+
+private func assetPayload(_ asset: PHAsset) async -> [String: Any]? {
+    guard let resource = PHAssetResource.assetResources(for: asset).first else {
+        return nil
+    }
+    let name = resource.originalFilename
+    let ext = (name as NSString).pathExtension
+    let path = FileManager.default.temporaryDirectory
+        .appendingPathComponent(UUID().uuidString)
+        .appendingPathExtension(ext.isEmpty ? "jpg" : ext)
+    do {
+        try await writeResource(resource, to: path)
+        let attributes = try FileManager.default.attributesOfItem(atPath: path.path)
+        return [
+            "name": name,
+            "mimeType": mimeType(path.pathExtension),
+            "bytes": (attributes[.size] as? NSNumber)?.intValue ?? 0,
+            "filePath": path.path,
+            "importSource": "ios-photo-library",
+            "mediaKind": asset.mediaType == .video ? "video" : "photo",
+            "createdTime": asset.creationDate.map { ISO8601DateFormatter().string(from: $0) } ?? "",
+            "localIdentifier": asset.localIdentifier,
+        ]
+    } catch {
+        return nil
+    }
+}
+
+private func writeResource(_ resource: PHAssetResource, to path: URL) async throws {
+    try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+        PHAssetResourceManager.default().writeData(for: resource, toFile: path, options: nil) { error in
+            if let error {
+                continuation.resume(throwing: error)
+            } else {
+                continuation.resume()
+            }
+        }
+    }
+}
+
 private func filePickerResultJson(action: String, files: [[String: Any]]) -> String {
     if let data = try? JSONSerialization.data(withJSONObject: [
         "ok": true,
@@ -710,6 +871,36 @@ private func filePickerResultJson(action: String, files: [[String: Any]]) -> Str
         return json
     }
     return "{\"ok\":false,\"action\":\"\(action)\",\"error\":\"json encode failure\"}"
+}
+
+private func mediaResultJson(action: String, files: [[String: Any]]) -> String {
+    if let data = try? JSONSerialization.data(withJSONObject: [
+        "ok": true,
+        "action": action,
+        "value": [
+            "files": files,
+        ],
+    ]),
+       let json = String(data: data, encoding: .utf8) {
+        return json
+    }
+    return "{\"ok\":false,\"action\":\"\(action)\",\"error\":\"json encode failure\"}"
+}
+
+private func fileExtension(_ type: String) -> String {
+    let type = type.lowercased()
+    if type.contains("png") { return "png" }
+    if type.contains("heic") || type.contains("heif") { return "heic" }
+    if type.contains("movie") || type.contains("video") || type.contains("mpeg-4") { return "mp4" }
+    return "jpg"
+}
+
+private func mimeType(_ type: String) -> String {
+    let type = type.lowercased()
+    if type.contains("png") { return "image/png" }
+    if type.contains("heic") || type.contains("heif") { return "image/heic" }
+    if type.contains("movie") || type.contains("video") || type.contains("mp4") || type.contains("mpeg-4") { return "video/mp4" }
+    return "image/jpeg"
 }
 
 private func currentClipboardText() -> String? {
