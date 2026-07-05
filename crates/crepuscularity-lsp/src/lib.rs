@@ -20,19 +20,21 @@ pub fn crepus_diagnostics_to_lsp(source: &str) -> Vec<Diagnostic> {
 
 pub fn crepus_diagnostic_to_lsp(d: CrepusDiagnostic) -> Diagnostic {
     Diagnostic {
-        range: Range {
-            start: Position {
-                line: d.start_line,
-                character: d.start_character,
-            },
-            end: Position {
-                line: d.end_line,
-                character: d.end_character,
-            },
-        },
+        range: build_range(&d),
         severity: Some(DiagnosticSeverity::ERROR),
         message: d.message,
         ..Diagnostic::default()
+    }
+}
+
+fn build_position(line: u32, character: u32) -> Position {
+    Position { line, character }
+}
+
+fn build_range(d: &CrepusDiagnostic) -> Range {
+    Range {
+        start: build_position(d.start_line, d.start_character),
+        end: build_position(d.end_line, d.end_character),
     }
 }
 
