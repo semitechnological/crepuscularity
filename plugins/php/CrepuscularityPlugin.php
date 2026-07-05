@@ -2,15 +2,39 @@
 
 final class CrepuscularityPlugin
 {
-    private const BIND_BLOCKLIST = ['baseDir', '_']; // ponytail: block security-sensitive keys only
+    public const BIND_BLOCKLIST = ['baseDir', '_']; // ponytail: block security-sensitive keys only
+
+    public static ?string $allowedDirectory = null;
 
     private static function crepusBin(): string
     {
-        return getenv('CREPUS_BIN') ?: 'crepus';
+        $bin = getenv('CREPUS_BIN');
+        if ($bin === false || $bin === '') {
+            return 'crepus';
+        }
+
+        if (preg_match('/[\x00-\x1F\x7F"\'<>|&;$]/', $bin)) {
+            throw new RuntimeException('Invalid characters in CREPUS_BIN');
+        }
+
+        if (preg_match('#[/\\]#', $bin)) {
+            throw new RuntimeException('CREPUS_BIN must be a binary name, not a path');
+        }
+        return $bin;
     }
 
     public static function renderIr(string $path, ?array $context = null): array
     {
+        $realPath = realpath($path);
+        if ($realPath === false) {
+            throw new RuntimeException('Invalid path: ' . $path);
+        }
+        $allowedDir = self::$allowedDirectory ?? getcwd();
+        $realAllowed = realpath($allowedDir);
+        if ($realAllowed === false || !str_starts_with($realPath, $realAllowed . DIRECTORY_SEPARATOR)) {
+            throw new RuntimeException('Path traversal detected');
+        }
+
         $bin = self::crepusBin();
         if ($context !== null) {
             $payload = json_encode([

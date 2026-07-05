@@ -60,3 +60,28 @@ pub(crate) fn run_effect(id: NodeId) {
         }
     });
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::runtime::NODES;
+
+    #[test]
+    fn test_effect_dispose() {
+        let effect = Effect::new(|| {});
+        let id = effect.id;
+
+        // Verify it was added to NODES
+        let exists_before = NODES.with(|nodes| nodes.borrow().contains_key(&id));
+        assert!(exists_before, "Effect should exist in NODES after creation");
+
+        effect.dispose();
+
+        // Verify it was removed from NODES
+        let exists_after = NODES.with(|nodes| nodes.borrow().contains_key(&id));
+        assert!(
+            !exists_after,
+            "Effect should be removed from NODES after dispose"
+        );
+    }
+}

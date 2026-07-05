@@ -20,7 +20,7 @@ impl<T: Clone + PartialEq + 'static> Signal<T> {
             n.borrow_mut().insert(
                 id,
                 AnyNode::Signal(SignalNode {
-                    subscribers: vec![],
+                    subscribers: std::collections::HashSet::new(),
                 }),
             )
         });

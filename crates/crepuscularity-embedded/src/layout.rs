@@ -116,41 +116,19 @@ fn compute_offsets(
     let free_main = inner_main(inner, row).saturating_sub(total_main);
 
     let mut offsets: Vec<u16> = vec![0; n];
-    match justify {
-        Justify::Center if free_main > 0 => {
-            let lead = free_main / 2;
-            offsets[0] = lead;
-            let mut pos = lead;
-            for i in 0..n {
-                offsets[i] = pos;
-                pos = pos.saturating_add(main_sizes[i]).saturating_add(gap);
-            }
-        }
-        Justify::Between if n > 1 && free_main > 0 => {
-            let between = free_main / (n - 1) as u16;
-            let mut pos = 0u16;
-            for i in 0..n {
-                offsets[i] = pos;
-                pos = pos
-                    .saturating_add(main_sizes[i])
-                    .saturating_add(gap)
-                    .saturating_add(between);
-            }
-        }
-        Justify::End if free_main > 0 => {
-            let mut pos = free_main;
-            for i in 0..n {
-                offsets[i] = pos;
-                pos = pos.saturating_add(main_sizes[i]).saturating_add(gap);
-            }
-        }
-        _ => {
-            let mut pos = 0u16;
-            for i in 0..n {
-                offsets[i] = pos;
-                pos = pos.saturating_add(main_sizes[i]).saturating_add(gap);
-            }
-        }
+    let (mut pos, extra_gap) = match justify {
+        Justify::Center if free_main > 0 => (free_main / 2, 0),
+        Justify::Between if n > 1 && free_main > 0 => (0, free_main / (n - 1) as u16),
+        Justify::End if free_main > 0 => (free_main, 0),
+        _ => (0, 0),
+    };
+
+    for (i, &size) in main_sizes.iter().enumerate() {
+        offsets[i] = pos;
+        pos = pos
+            .saturating_add(size)
+            .saturating_add(gap)
+            .saturating_add(extra_gap);
     }
 
     offsets
