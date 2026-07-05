@@ -7,6 +7,7 @@ import (
 	"html"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 )
 
@@ -38,6 +39,34 @@ func crepusBin() string {
 var bindBlocklist = map[string]bool{"baseDir": true, "_": true} // ponytail: block security-sensitive keys only
 
 func RenderIR(path string, context map[string]any) (ViewIr, error) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return ViewIr{}, err
+	}
+
+	allowedDir := cwd
+	if override := os.Getenv("CREPUS_ALLOWED_DIR"); override != "" {
+		allowedDir = override
+	}
+
+	absAllowed, err := filepath.Abs(allowedDir)
+	if err != nil {
+		return ViewIr{}, err
+	}
+
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return ViewIr{}, err
+	}
+
+	rel, err := filepath.Rel(absAllowed, absPath)
+	if err != nil {
+		return ViewIr{}, err
+	}
+	if rel == ".." || strings.HasPrefix(rel, "../") || strings.HasPrefix(rel, "..\\") {
+		return ViewIr{}, fmt.Errorf("path traversal denied")
+	}
+
 	payload, err := json.Marshal(map[string]any{
 		"template": mustRead(path),
 		"context":  context,
