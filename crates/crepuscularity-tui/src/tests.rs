@@ -718,6 +718,28 @@ fn template_reload_without_path_fails() {
 }
 
 #[test]
+fn template_reload_with_missing_file_fails_and_keeps_old_source() {
+    let dir = temp_case("reload_missing");
+    let path = dir.join("ui.crepus");
+    fs::write(&path, "div\n  \"initial content\"").unwrap();
+
+    let mut tpl = template(&path).unwrap();
+    assert_eq!(tpl.source(), "div\n  \"initial content\"");
+
+    fs::remove_file(&path).unwrap();
+
+    let err = tpl
+        .reload()
+        .expect_err("reload should fail if file is missing");
+    assert!(err.contains("template error"), "{err}");
+    assert_eq!(
+        tpl.source(),
+        "div\n  \"initial content\"",
+        "source should be unchanged on error"
+    );
+}
+
+#[test]
 fn hot_template_initial_render_uses_disk_source() {
     let dir = temp_case("hot-initial");
     let path = dir.join("ui.crepus");
