@@ -92,10 +92,18 @@ pub fn view(input: TokenStream) -> TokenStream {
 pub fn view_file(input: TokenStream) -> TokenStream {
     let path = parse_macro_input!(input as LitStr);
     let path_value = path.value();
+    let (file_str, component_name) = match path_value.split_once('#') {
+        Some((file, comp)) => (file, Some(comp.to_string())),
+        None => (path_value.as_str(), None),
+    };
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".into());
-    let full = std::path::Path::new(&manifest_dir).join(&path_value);
+    let full = std::path::Path::new(&manifest_dir).join(file_str);
     let template = std::fs::read_to_string(&full)
         .unwrap_or_else(|e| panic!("Failed to read template file `{}`: {}", full.display(), e));
+    let template = match component_name {
+        Some(name) => extract_component_section(&template, &name),
+        None => template,
+    };
     let base_dir = full.parent().map(|p| p.to_path_buf()).unwrap_or_default();
     let expanded = expand_includes_text(&template, &base_dir, &full);
     generate_view(&expanded, path.span()).into()
@@ -129,7 +137,11 @@ fn expand_includes_text(
                 output.push('\n');
                 continue;
             }
-            let include_path = base_dir.join(path_str);
+            let (file_str, component_name) = match path_str.split_once('#') {
+                Some((file, comp)) => (file, Some(comp)),
+                None => (path_str, None),
+            };
+            let include_path = base_dir.join(file_str);
             let include_dir = include_path.parent().unwrap_or(base_dir).to_path_buf();
             let included = std::fs::read_to_string(&include_path).unwrap_or_else(|e| {
                 panic!(
@@ -138,7 +150,11 @@ fn expand_includes_text(
                     e
                 )
             });
-            let expanded = expand_includes_text(&included, &include_dir, &include_path);
+            let section = match component_name {
+                Some(name) => extract_component_section(&included, name),
+                None => included,
+            };
+            let expanded = expand_includes_text(&section, &include_dir, &include_path);
             let indent = &line[..line.len() - line.trim_start().len()];
             for included_line in expanded.lines() {
                 if included_line.is_empty() {
@@ -155,6 +171,52 @@ fn expand_includes_text(
         }
     }
     output
+}
+
+fn extract_component_section(content: &str, name: &str) -> String {
+    let body = strip_frontmatter(content);
+    let sections = split_component_sections(body);
+    sections
+        .into_iter()
+        .find(|(n, _)| n == name)
+        .map(|(_, text)| text)
+        .unwrap_or_else(|| panic!("Component `{name}` not found in multi-component file"))
+}
+
+fn strip_frontmatter(content: &str) -> &str {
+    let trimmed = content.trim_start();
+    if !trimmed.starts_with("+++") {
+        return content;
+    }
+    let after_open = &trimmed[3..];
+    if let Some(end) = after_open.find("+++") {
+        &trimmed[end + 6..]
+    } else {
+        content
+    }
+}
+
+fn split_component_sections(content: &str) -> Vec<(String, String)> {
+    let mut sections = Vec::new();
+    let mut current_name: Option<String> = None;
+    let mut current_lines: Vec<String> = Vec::new();
+    for line in content.lines() {
+        if let Some(rest) = line.strip_prefix("--- ") {
+            if let Some(n) = current_name.take() {
+                let text = current_lines.join("\n");
+                sections.push((n, text));
+                current_lines.clear();
+            }
+            current_name = Some(rest.trim().to_string());
+        } else if current_name.is_some() {
+            current_lines.push(line.to_string());
+        }
+    }
+    if let Some(n) = current_name.take() {
+        let text = current_lines.join("\n");
+        sections.push((n, text));
+    }
+    sections
 }
 
 /// Generate typed DOM accessors for all `#id` shorthand IDs reachable from a `.crepus` entry file.
