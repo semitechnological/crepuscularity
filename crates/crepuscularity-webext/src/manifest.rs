@@ -404,173 +404,21 @@ impl ManifestV3 {
     }
 
     pub fn from_manifest_for_browser(manifest: &ExtensionManifest, browser: BrowserTarget) -> Self {
-        let caps = manifest.to_capability_set();
         let opts = &manifest.options;
 
-        // Build permissions list
-        let mut permissions: Vec<String> = caps.to_permissions();
-        // Deduplicate
-        permissions.sort();
-        permissions.dedup();
-
-        // Build host permissions
+        let permissions = Self::build_permissions(manifest);
         let host_permissions = manifest.capabilities.host_permissions.clone();
-
-        // Content scripts — use explicit [[content_scripts]] entries when present;
-        // fall back to a default entry when content-script = true is declared but
-        // no explicit entries exist.
-        let content_scripts: Vec<ContentScriptSpec> = if !manifest.content_scripts.is_empty() {
-            manifest
-                .content_scripts
-                .iter()
-                .map(|cs| {
-                    let mut css = Vec::with_capacity(cs.css.len() + opts.content_css.len());
-                    css.extend(cs.css.iter().cloned());
-                    for extra in &opts.content_css {
-                        if !css.contains(extra) {
-                            css.push(extra.clone());
-                        }
-                    }
-                    ContentScriptSpec {
-                        matches: cs.matches.clone(),
-                        js: cs.js.clone(),
-                        css,
-                        run_at: cs
-                            .run_at
-                            .clone()
-                            .unwrap_or_else(|| "document_idle".to_string()),
-                        all_frames: cs.all_frames,
-                        match_about_blank: cs.match_about_blank,
-                    }
-                })
-                .collect()
-        } else if manifest.capabilities.content_script
-            && !manifest.capabilities.host_permissions.is_empty()
-        {
-            // Default: inject src/content.js (+ content.css if no custom css list).
-            let mut css = opts.content_css.clone();
-            if css.is_empty() {
-                css.push("src/content.css".to_string());
-            }
-            vec![ContentScriptSpec {
-                matches: manifest.capabilities.host_permissions.clone(),
-                js: vec!["src/content.js".to_string()],
-                css,
-                run_at: "document_idle".to_string(),
-                all_frames: None,
-                match_about_blank: None,
-            }]
-        } else {
-            vec![]
-        };
-
-        // Web accessible resources
-        let mut resources = vec![
-            "vendor/*".to_string(),
-            "src/*".to_string(),
-            "views/*".to_string(),
-        ];
-        resources.extend(opts.extra_resources.iter().cloned());
-        resources.extend(manifest.web_accessible_resources.resources.iter().cloned());
-        resources.sort();
-        resources.dedup();
-
-        let mut resource_matches = manifest.web_accessible_resources.matches.clone();
-        if resource_matches.is_empty() {
-            resource_matches = host_permissions.clone();
-            for content_script in &content_scripts {
-                for pattern in &content_script.matches {
-                    if !resource_matches.contains(pattern) {
-                        resource_matches.push(pattern.clone());
-                    }
-                }
-            }
-        }
-
-        let web_accessible_resources = if !resources.is_empty() && !resource_matches.is_empty() {
-            vec![WebAccessibleResources {
-                resources,
-                matches: resource_matches,
-            }]
-        } else {
-            vec![]
-        };
-
-        // Background
-        let background_script = opts
-            .background_script
-            .clone()
-            .unwrap_or_else(|| "src/background.js".to_string());
-        let background = if manifest.capabilities.background_script {
-            match browser {
-                BrowserTarget::Chromium => Some(BackgroundSpec {
-                    service_worker: Some(background_script),
-                    scripts: Vec::new(),
-                    kind: Some("module".to_string()),
-                }),
-                BrowserTarget::Firefox => Some(BackgroundSpec {
-                    service_worker: None,
-                    scripts: vec![background_script],
-                    kind: None,
-                }),
-            }
-        } else {
-            None
-        };
-
-        // Action (popup)
-        let resolve_page = |p: String| -> String {
-            if p.ends_with(".crepus") {
-                p.trim_end_matches(".crepus").to_string() + ".html"
-            } else {
-                p
-            }
-        };
-        let action = Some(ActionSpec {
-            default_popup: opts
-                .action_popup
-                .clone()
-                .or_else(|| opts.popup_html.clone())
-                .map(resolve_page)
-                .unwrap_or_else(|| "src/popup.html".to_string()),
-            default_title: manifest.extension.name.clone(),
-            default_icon: if opts.action_icons.is_empty() {
-                opts.icons.clone()
-            } else {
-                opts.action_icons.clone()
-            },
-        });
-
-        let chrome_url_overrides: BTreeMap<String, String> = manifest
-            .chrome_url_overrides
-            .iter()
-            .map(|(key, page)| (key.clone(), resolve_page(page.clone())))
-            .collect();
-
-        let commands: BTreeMap<String, ManifestCommandJson> = manifest
-            .commands
-            .iter()
-            .map(|(name, cmd)| {
-                let suggested_key = cmd
-                    .suggested_key
-                    .as_ref()
-                    .map(|k| ManifestSuggestedKeyJson {
-                        default: k.default.clone(),
-                        mac: k.mac.clone(),
-                        windows: k.windows.clone(),
-                        linux: k.linux.clone(),
-                        chromeos: k.chromeos.clone(),
-                    });
-                (
-                    name.clone(),
-                    ManifestCommandJson {
-                        description: cmd.description.clone(),
-                        suggested_key,
-                        global: cmd.global,
-                    },
-                )
-            })
-            .collect();
+        let content_scripts = Self::build_content_scripts(manifest, opts);
+        let web_accessible_resources = Self::build_web_accessible_resources(
+            manifest,
+            opts,
+            &host_permissions,
+            &content_scripts,
+        );
+        let background = Self::build_background(manifest, opts, browser);
+        let action = Self::build_action(manifest, opts);
+        let chrome_url_overrides = Self::build_chrome_url_overrides(manifest);
+        let commands = Self::build_commands(manifest);
 
         ManifestV3 {
             manifest_version: 3,
@@ -601,10 +449,10 @@ impl ManifestV3 {
             options_page: if opts.options_ui.is_some() {
                 None
             } else {
-                opts.options_page.clone().map(resolve_page)
+                opts.options_page.clone().map(Self::resolve_page)
             },
             options_ui: opts.options_ui.as_ref().map(|options_ui| OptionsUiJson {
-                page: resolve_page(options_ui.page.clone()),
+                page: Self::resolve_page(options_ui.page.clone()),
                 browser_style: options_ui.browser_style,
                 open_in_tab: options_ui.open_in_tab,
             }),
@@ -613,6 +461,187 @@ impl ManifestV3 {
             commands,
             chrome_url_overrides,
         }
+    }
+
+    fn build_permissions(manifest: &ExtensionManifest) -> Vec<String> {
+        let caps = manifest.to_capability_set();
+        let mut permissions: Vec<String> = caps.to_permissions();
+        permissions.sort();
+        permissions.dedup();
+        permissions
+    }
+
+    fn build_content_scripts(
+        manifest: &ExtensionManifest,
+        opts: &ManifestOptions,
+    ) -> Vec<ContentScriptSpec> {
+        if !manifest.content_scripts.is_empty() {
+            manifest
+                .content_scripts
+                .iter()
+                .map(|cs| {
+                    let mut css = cs.css.clone();
+                    for extra in &opts.content_css {
+                        if !css.contains(extra) {
+                            css.push(extra.clone());
+                        }
+                    }
+                    ContentScriptSpec {
+                        matches: cs.matches.clone(),
+                        js: cs.js.clone(),
+                        css,
+                        run_at: cs
+                            .run_at
+                            .clone()
+                            .unwrap_or_else(|| "document_idle".to_string()),
+                        all_frames: cs.all_frames,
+                        match_about_blank: cs.match_about_blank,
+                    }
+                })
+                .collect()
+        } else if manifest.capabilities.content_script
+            && !manifest.capabilities.host_permissions.is_empty()
+        {
+            let mut css = opts.content_css.clone();
+            if css.is_empty() {
+                css.push("src/content.css".to_string());
+            }
+            vec![ContentScriptSpec {
+                matches: manifest.capabilities.host_permissions.clone(),
+                js: vec!["src/content.js".to_string()],
+                css,
+                run_at: "document_idle".to_string(),
+                all_frames: None,
+                match_about_blank: None,
+            }]
+        } else {
+            vec![]
+        }
+    }
+
+    fn build_web_accessible_resources(
+        manifest: &ExtensionManifest,
+        opts: &ManifestOptions,
+        host_permissions: &[String],
+        content_scripts: &[ContentScriptSpec],
+    ) -> Vec<WebAccessibleResources> {
+        let mut resources = vec![
+            "vendor/*".to_string(),
+            "src/*".to_string(),
+            "views/*".to_string(),
+        ];
+        resources.extend(opts.extra_resources.iter().cloned());
+        resources.extend(manifest.web_accessible_resources.resources.iter().cloned());
+        resources.sort();
+        resources.dedup();
+
+        let mut resource_matches = manifest.web_accessible_resources.matches.clone();
+        if resource_matches.is_empty() {
+            resource_matches = host_permissions.to_vec();
+            for content_script in content_scripts {
+                for pattern in &content_script.matches {
+                    if !resource_matches.contains(pattern) {
+                        resource_matches.push(pattern.clone());
+                    }
+                }
+            }
+        }
+
+        if !resources.is_empty() && !resource_matches.is_empty() {
+            vec![WebAccessibleResources {
+                resources,
+                matches: resource_matches,
+            }]
+        } else {
+            vec![]
+        }
+    }
+
+    fn build_background(
+        manifest: &ExtensionManifest,
+        opts: &ManifestOptions,
+        browser: BrowserTarget,
+    ) -> Option<BackgroundSpec> {
+        let background_script = opts
+            .background_script
+            .clone()
+            .unwrap_or_else(|| "src/background.js".to_string());
+        if manifest.capabilities.background_script {
+            match browser {
+                BrowserTarget::Chromium => Some(BackgroundSpec {
+                    service_worker: Some(background_script),
+                    scripts: Vec::new(),
+                    kind: Some("module".to_string()),
+                }),
+                BrowserTarget::Firefox => Some(BackgroundSpec {
+                    service_worker: None,
+                    scripts: vec![background_script],
+                    kind: None,
+                }),
+            }
+        } else {
+            None
+        }
+    }
+
+    fn build_action(manifest: &ExtensionManifest, opts: &ManifestOptions) -> Option<ActionSpec> {
+        Some(ActionSpec {
+            default_popup: opts
+                .action_popup
+                .clone()
+                .or_else(|| opts.popup_html.clone())
+                .map(Self::resolve_page)
+                .unwrap_or_else(|| "src/popup.html".to_string()),
+            default_title: manifest.extension.name.clone(),
+            default_icon: if opts.action_icons.is_empty() {
+                opts.icons.clone()
+            } else {
+                opts.action_icons.clone()
+            },
+        })
+    }
+
+    fn resolve_page(p: String) -> String {
+        if p.ends_with(".crepus") {
+            p.trim_end_matches(".crepus").to_string() + ".html"
+        } else {
+            p
+        }
+    }
+
+    fn build_chrome_url_overrides(manifest: &ExtensionManifest) -> BTreeMap<String, String> {
+        manifest
+            .chrome_url_overrides
+            .iter()
+            .map(|(key, page)| (key.clone(), Self::resolve_page(page.clone())))
+            .collect()
+    }
+
+    fn build_commands(manifest: &ExtensionManifest) -> BTreeMap<String, ManifestCommandJson> {
+        manifest
+            .commands
+            .iter()
+            .map(|(name, cmd)| {
+                let suggested_key = cmd
+                    .suggested_key
+                    .as_ref()
+                    .map(|k| ManifestSuggestedKeyJson {
+                        default: k.default.clone(),
+                        mac: k.mac.clone(),
+                        windows: k.windows.clone(),
+                        linux: k.linux.clone(),
+                        chromeos: k.chromeos.clone(),
+                    });
+                (
+                    name.clone(),
+                    ManifestCommandJson {
+                        description: cmd.description.clone(),
+                        suggested_key,
+                        global: cmd.global,
+                    },
+                )
+            })
+            .collect()
     }
 
     /// Serialize to pretty-printed JSON.
