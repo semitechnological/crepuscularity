@@ -73,3 +73,39 @@ pub fn eval_guest_from_config_file(base: &Path, config_path: &Path) -> Result<St
     let config = CrepusLiteConfig::load_from_path(config_path)?;
     eval_guest_from_config(base, &config)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use tempfile::tempdir;
+
+    #[test]
+    fn eval_guest_from_config_file_missing() {
+        let dir = tempdir().unwrap();
+        let base = dir.path();
+        let config_path = base.join("missing.toml");
+
+        let result = eval_guest_from_config_file(base, &config_path);
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err();
+        assert!(
+            err_msg.contains("No such file or directory")
+                || err_msg.contains("The system cannot find the file specified")
+        );
+    }
+
+    #[test]
+    fn eval_guest_from_config_file_invalid_toml() {
+        let dir = tempdir().unwrap();
+        let base = dir.path();
+        let config_path = base.join("invalid.toml");
+
+        fs::write(&config_path, "invalid toml syntax = [[").unwrap();
+
+        let result = eval_guest_from_config_file(base, &config_path);
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err();
+        assert!(err_msg.contains("parse error") || err_msg.contains("expected a boolean"));
+    }
+}
