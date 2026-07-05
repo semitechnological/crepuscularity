@@ -845,6 +845,18 @@ fn render_seo_head(head: &SiteHead) -> String {
             "summary"
         }
     });
+
+    format_seo_tags(seo, title, description, og_type, image, twitter_card)
+}
+
+fn format_seo_tags(
+    seo: &crate::crepus_toml::SeoConfig,
+    title: &str,
+    description: &str,
+    og_type: &str,
+    image: Option<&String>,
+    twitter_card: &str,
+) -> String {
     let mut lines = Vec::new();
 
     if let Some(canonical) = &seo.canonical {
