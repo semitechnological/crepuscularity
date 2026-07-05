@@ -15,14 +15,9 @@ final class CrepuscularityPlugin
             throw new RuntimeException('Invalid characters in CREPUS_BIN');
         }
 
-        $isBinaryName = preg_match('/^[a-zA-Z0-9_.-]+$/', $bin) === 1;
-        $isAbsolutePath = (str_starts_with($bin, '/') || preg_match('/^[a-zA-Z]:[\\\\\/]/', $bin)) && preg_match('/^[a-zA-Z0-9_.\/\\\\:-]+$/', $bin) === 1;
-        $isAbsolutePathWithSpacesValid = (str_starts_with($bin, '/') || preg_match('/^[a-zA-Z]:[\\\\\/]/', $bin)) && preg_match('/^[a-zA-Z0-9_.\/\\\\: -]+$/', $bin) === 1 && strpos($bin, ' -') === false;
-
-        if (!$isBinaryName && !$isAbsolutePath && !$isAbsolutePathWithSpacesValid) {
-            throw new RuntimeException('CREPUS_BIN must be a strict binary name or an absolute path');
+        if (preg_match('#[/\\]#', $bin)) {
+            throw new RuntimeException('CREPUS_BIN must be a binary name, not a path');
         }
-
         return $bin;
     }
 
