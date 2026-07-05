@@ -934,4 +934,41 @@ mod template_error_tests {
             Ok(_) => panic!("expected err"),
         }
     }
+
+    #[test]
+    fn template_draw_full_returns_error_on_invalid_template() {
+        let tpl = crate::Template::from_source("<< invalid");
+        let backend = TestBackend::new(40, 3);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let mut err = None;
+        terminal
+            .draw(|frame| {
+                if let Err(e) = tpl.draw_full(frame) {
+                    err = Some(e);
+                }
+            })
+            .unwrap();
+        let e = err.expect("draw_full should return an error for invalid template");
+        assert!(
+            e.contains("parse error"),
+            "error should mention parse error: {e}"
+        );
+    }
+
+    #[test]
+    fn draw_helper_returns_error_on_invalid_template() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("ui.crepus");
+        std::fs::write(&path, "<< invalid syntax").unwrap();
+
+        let backend = TestBackend::new(40, 4);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let res = crate::draw(&mut terminal, &path, |_ui| {});
+
+        let e = res.expect_err("draw should return an error for invalid template");
+        assert!(
+            e.contains("parse error"),
+            "error should mention parse error: {e}"
+        );
+    }
 }
