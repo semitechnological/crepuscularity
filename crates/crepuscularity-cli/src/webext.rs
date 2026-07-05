@@ -905,19 +905,32 @@ fn render_crepus_pages(
     let cache = DriverCache::open(app_path);
 
     for entry in &entries {
-        let source = files
-            .get(entry)
-            .ok_or_else(|| format!("missing page source: {entry}"))?;
-        let stem = Path::new(entry)
-            .file_stem()
-            .and_then(|s| s.to_str())
-            .unwrap_or("page");
-        // WASM exports use underscore, not hyphen
-        let fn_name = stem.replace('-', "_");
+        render_crepus_page(entry, &files, &src_dir, &out_dir, manifest, &cache)?;
+    }
+    Ok(())
+}
 
-        let js_vendor_prefix = page_script_prefix(entry);
-        let js = format!(
-            r#"import init, * as runtime from "{prefix}vendor/runtime.js";
+fn render_crepus_page(
+    entry: &str,
+    files: &HashMap<String, String>,
+    src_dir: &Path,
+    out_dir: &Path,
+    manifest: &crepuscularity_webext::ExtensionManifest,
+    cache: &DriverCache,
+) -> Result<(), String> {
+    let source = files
+        .get(entry)
+        .ok_or_else(|| format!("missing page source: {entry}"))?;
+    let stem = Path::new(entry)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("page");
+    // WASM exports use underscore, not hyphen
+    let fn_name = stem.replace('-', "_");
+
+    let js_vendor_prefix = page_script_prefix(entry);
+    let js = format!(
+        r#"import init, * as runtime from "{prefix}vendor/runtime.js";
 try {{
   const wasmBytes = await fetch("{prefix}vendor/runtime_bg.wasm").then(r => r.arrayBuffer());
   await init({{ module_or_path: wasmBytes }});
@@ -992,33 +1005,31 @@ try {{
     throw error;
   }}
 }}"#,
-            prefix = js_vendor_prefix,
-            fn = fn_name
-        );
-        let js_output = src_dir.join(page_script_relative_path(entry));
-        if let Some(parent) = js_output.parent() {
-            std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-        }
-        std::fs::write(&js_output, &js)
-            .map_err(|e| format!("write {}: {e}", js_output.display()))?;
-
-        let html = render_crepus_page_html(source, &files, entry, manifest)?;
-        let output = out_dir
-            .join(entry.trim_end_matches(".crepus"))
-            .with_extension("html");
-
-        // Cache skip: avoid re-rendering unchanged page templates.
-        let fp = Fingerprint::new(source, Some(entry), "webext-page");
-        if output.is_file() && cache.is_up_to_date(&fp, &html) {
-            continue;
-        }
-
-        if let Some(parent) = output.parent() {
-            std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-        }
-        std::fs::write(output, &html).map_err(|e| e.to_string())?;
-        cache.record(&fp, &html);
+        prefix = js_vendor_prefix,
+        fn = fn_name
+    );
+    let js_output = src_dir.join(page_script_relative_path(entry));
+    if let Some(parent) = js_output.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
+    std::fs::write(&js_output, &js).map_err(|e| format!("write {}: {e}", js_output.display()))?;
+
+    let html = render_crepus_page_html(source, files, entry, manifest)?;
+    let output = out_dir
+        .join(entry.trim_end_matches(".crepus"))
+        .with_extension("html");
+
+    // Cache skip: avoid re-rendering unchanged page templates.
+    let fp = Fingerprint::new(source, Some(entry), "webext-page");
+    if output.is_file() && cache.is_up_to_date(&fp, &html) {
+        return Ok(());
+    }
+
+    if let Some(parent) = output.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    std::fs::write(output, &html).map_err(|e| e.to_string())?;
+    cache.record(&fp, &html);
     Ok(())
 }
 
