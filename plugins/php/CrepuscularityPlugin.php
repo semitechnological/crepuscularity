@@ -8,7 +8,19 @@ final class CrepuscularityPlugin
 
     private static function crepusBin(): string
     {
-        return getenv('CREPUS_BIN') ?: 'crepus';
+        $bin = getenv('CREPUS_BIN');
+        if ($bin === false || $bin === '') {
+            return 'crepus';
+        }
+
+        if (preg_match('/[\x00-\x1F\x7F"\'<>|&;$]/', $bin)) {
+            throw new RuntimeException('Invalid characters in CREPUS_BIN');
+        }
+
+        if (preg_match('#[/\\]#', $bin)) {
+            throw new RuntimeException('CREPUS_BIN must be a binary name, not a path');
+        }
+        return $bin;
     }
 
     public static function renderIr(string $path, ?array $context = null): array
