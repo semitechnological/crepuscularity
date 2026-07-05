@@ -168,14 +168,46 @@ pub(crate) fn remove_node(id: NodeId) {
             rt.current_observer = None;
         }
     });
+    let (old_sources, old_subscribers) = NODES.with(|nodes| {
+        let nodes = nodes.borrow();
+        let sources = nodes
+            .get(&id)
+            .and_then(|n| n.sources())
+            .map(|s| s.to_vec())
+            .unwrap_or_default();
+        let subscribers = nodes
+            .get(&id)
+            .and_then(|n| n.subscribers())
+            .map(|s| s.to_vec())
+            .unwrap_or_default();
+        (sources, subscribers)
+    });
+
+    for source_id in &old_sources {
+        NODES.with(|nodes| {
+            let mut nodes = nodes.borrow_mut();
+            if let Some(node) = nodes.get_mut(source_id) {
+                if let Some(subs) = node.subscribers_mut() {
+                    subs.remove(&id);
+                }
+            }
+        });
+    }
+
+    for sub_id in &old_subscribers {
+        NODES.with(|nodes| {
+            let mut nodes = nodes.borrow_mut();
+            if let Some(node) = nodes.get_mut(sub_id) {
+                if let Some(sources) = node.sources_mut() {
+                    sources.retain(|&x| x != id);
+                }
+            }
+        });
+    }
+
     NODES.with(|nodes| {
         let mut nodes = nodes.borrow_mut();
         nodes.remove(&id);
-        for node in nodes.values_mut() {
-            if let Some(subs) = node.subscribers_mut() {
-                subs.remove(&id);
-            }
-        }
     });
 }
 
