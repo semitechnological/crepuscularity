@@ -60,23 +60,7 @@ fn elide(s: &str, max_chars: usize) -> String {
 }
 
 #[cfg(feature = "tui")]
-fn draw_frame(
-    f: &mut Frame,
-    outcomes: &[TargetOutcomeSummary],
-    top_completed: &[(String, f64, u128)],
-    dry_run: bool,
-    scroll: usize,
-) {
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(3),
-            Constraint::Min(8),
-            Constraint::Length(6),
-            Constraint::Length(1),
-        ])
-        .split(f.area());
-
+fn draw_title(f: &mut Frame, area: Rect, dry_run: bool) {
     let title = if dry_run {
         Line::from(" crepus benchmark — dry-run plan ")
     } else {
@@ -84,9 +68,12 @@ fn draw_frame(
     };
     f.render_widget(
         Paragraph::new(title).block(Block::default().borders(Borders::ALL)),
-        chunks[0],
+        area,
     );
+}
 
+#[cfg(feature = "tui")]
+fn draw_table(f: &mut Frame, area: Rect, outcomes: &[TargetOutcomeSummary], scroll: usize) {
     let header = Row::new(vec![
         Cell::from("Suite"),
         Cell::from("Target"),
@@ -96,7 +83,7 @@ fn draw_frame(
     ])
     .style(Style::default().add_modifier(Modifier::BOLD));
 
-    let inner_h = chunks[1].height.saturating_sub(2).max(3);
+    let inner_h = area.height.saturating_sub(2).max(3);
     let visible = inner_h as usize;
     let max_scroll = outcomes.len().saturating_sub(1);
     let scroll = scroll.min(max_scroll);
@@ -144,8 +131,11 @@ fn draw_frame(
             .title(" Targets (↑↓ scroll) "),
     );
 
-    f.render_widget(table, chunks[1]);
+    f.render_widget(table, area);
+}
 
+#[cfg(feature = "tui")]
+fn draw_insights(f: &mut Frame, area: Rect, top_completed: &[(String, f64, u128)], dry_run: bool) {
     let mut insight = String::new();
     if dry_run {
         insight.push_str("Dry-run — no wall times recorded.\n");
@@ -168,15 +158,42 @@ fn draw_frame(
                 .borders(Borders::ALL)
                 .title(" Share of completed wall time "),
         ),
-        chunks[2],
+        area,
     );
+}
 
+#[cfg(feature = "tui")]
+fn draw_footer(f: &mut Frame, area: Rect) {
     f.render_widget(
         Paragraph::new(Line::from(
             " q / Esc — quit   ↑↓ j/k — scroll   PgUp/PgDn — page ",
         )),
-        chunks[3],
+        area,
     );
+}
+
+#[cfg(feature = "tui")]
+fn draw_frame(
+    f: &mut Frame,
+    outcomes: &[TargetOutcomeSummary],
+    top_completed: &[(String, f64, u128)],
+    dry_run: bool,
+    scroll: usize,
+) {
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(3),
+            Constraint::Min(8),
+            Constraint::Length(6),
+            Constraint::Length(1),
+        ])
+        .split(f.area());
+
+    draw_title(f, chunks[0], dry_run);
+    draw_table(f, chunks[1], outcomes, scroll);
+    draw_insights(f, chunks[2], top_completed, dry_run);
+    draw_footer(f, chunks[3]);
 }
 
 /// `Ok(true)` if an interactive screen was shown; `Ok(false)` if skipped (no TTY).

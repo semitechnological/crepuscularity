@@ -184,7 +184,8 @@ impl EmbeddedDocument {
     pub fn new(root: Vec<EmbeddedNode>, screen: ScreenSize) -> Self {
         let mut by_id = BTreeMap::new();
         for (i, node) in root.iter().enumerate() {
-            index_node(node, &mut by_id, vec![i]);
+            let mut path = vec![i];
+            index_node(node, &mut by_id, &mut path);
         }
         Self {
             root,
@@ -196,7 +197,8 @@ impl EmbeddedDocument {
     pub fn reindex_by_id(&mut self) {
         self.by_id.clear();
         for (i, node) in self.root.iter().enumerate() {
-            index_node(node, &mut self.by_id, vec![i]);
+            let mut path = vec![i];
+            index_node(node, &mut self.by_id, &mut path);
         }
     }
 
@@ -222,14 +224,14 @@ impl EmbeddedDocument {
     }
 }
 
-fn index_node(node: &EmbeddedNode, map: &mut BTreeMap<String, Vec<usize>>, path: Vec<usize>) {
+fn index_node(node: &EmbeddedNode, map: &mut BTreeMap<String, Vec<usize>>, path: &mut Vec<usize>) {
     if let Some(id) = &node.id {
         map.insert(id.clone(), path.clone());
     }
     for (i, child) in node.children.iter().enumerate() {
-        let mut p = path.clone();
-        p.push(i);
-        index_node(child, map, p);
+        path.push(i);
+        index_node(child, map, path);
+        path.pop();
     }
 }
 

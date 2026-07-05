@@ -193,6 +193,17 @@ fn framebuffer_writes_ppm() {
 }
 
 #[test]
+fn framebuffer_writes_ppm_error() {
+    let tpl = r#"motionless bg-zinc-900 w-full h-full
+  "x""#;
+    let (fb, _) = render(tpl, &TemplateContext::new());
+    let temp = tempfile::tempdir().unwrap();
+    let path = temp.path().join("non_existent_dir/snap.ppm");
+    let err = crate::write_ppm(&path, &fb).unwrap_err();
+    assert!(err.starts_with("create "));
+}
+
+#[test]
 fn ui_one_shot_render() {
     let mut ui = Ui::new(
         64,
@@ -292,5 +303,14 @@ fn template_reload_error_paths() {
     let path = PathBuf::from("does_not_exist_xyz.crepus");
     let mut tpl_bad_path = Template::from_source_with_path("div", &path, screen());
     let err = tpl_bad_path.reload().unwrap_err();
+    assert!(err.starts_with(&format!("template error: {:?}", path)));
+}
+
+#[test]
+fn template_function_error_path() {
+    let path = PathBuf::from("does_not_exist_abc.crepus");
+    let res = crate::template(&path, screen());
+    assert!(res.is_err());
+    let err = res.err().unwrap();
     assert!(err.starts_with(&format!("template error: {:?}", path)));
 }

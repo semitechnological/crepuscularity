@@ -118,7 +118,8 @@ fn apply_static(d: Div, class: &str) -> Result<Div, Div> {
     apply_layout(d, class)
         .or_else(|d| apply_colors(d, class))
         .or_else(|d| apply_typography(d, class))
-        .or_else(|d| apply_borders_shadows(d, class))
+        .or_else(|d| apply_borders(d, class))
+        .or_else(|d| apply_shadows(d, class))
         .or_else(|d| apply_misc(d, class))
 }
 
@@ -397,7 +398,7 @@ fn apply_typography(d: Div, class: &str) -> Result<Div, Div> {
 }
 
 #[allow(clippy::result_large_err)]
-fn apply_borders_shadows(d: Div, class: &str) -> Result<Div, Div> {
+fn apply_borders(d: Div, class: &str) -> Result<Div, Div> {
     Ok(match class {
         // ── Border style ──
         "border-dashed" => d.border_dashed(),
@@ -506,6 +507,13 @@ fn apply_borders_shadows(d: Div, class: &str) -> Result<Div, Div> {
         "rounded-br-3xl" => d.rounded_br_3xl(),
         "rounded-br-full" => d.rounded_br_full(),
 
+        _ => return Err(d),
+    })
+}
+
+#[allow(clippy::result_large_err)]
+fn apply_shadows(d: Div, class: &str) -> Result<Div, Div> {
+    Ok(match class {
         // ── Shadow ──
         "shadow-2xs" => d.shadow_2xs(),
         "shadow-xs" => d.shadow_xs(),
