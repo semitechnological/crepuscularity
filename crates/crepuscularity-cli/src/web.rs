@@ -337,12 +337,40 @@ pub(crate) fn build_site_wasm(cli: &WebBuildArgs) {
     );
     eprintln!();
 
-    let mut files: HashMap<String, String> = HashMap::new();
+    let mut files = load_and_validate_files(&b);
+    let template_head_html = extract_and_render_head(&b.entry, &mut files);
+    let llms_site_text = files
+        .get(&b.entry)
+        .map(|source| render_crepus_readable_text(source));
+    let bundle_str = write_bundle_and_cache(&b, &files);
+
+    let head = load_site_head(&b.site_dir);
+    let head = merge_site_head_meta(head, b.meta.as_ref());
+    let head = merge_llms_alternates(head, b.meta.as_ref());
+
+    generate_index_and_assets(&b, &files, &bundle_str, &head, &template_head_html);
+    process_docs_and_static(&b, &files, &head, llms_site_text.as_deref());
+    compile_and_optimize_wasm(&b, &runtime_dir);
+
+    eprintln!(
+        "\n{} wrote {}",
+        ui::ok(),
+        style(b.out_dir.display().to_string()).cyan()
+    );
+    eprintln!(
+        "  {} open {}/index.html via a static server (fetch + WASM modules need HTTP)",
+        ui::dim("→"),
+        b.out_dir.display()
+    );
+    ui::done_in(t0.elapsed());
+}
+
+fn load_and_validate_files(b: &WasmBuildArgs) -> HashMap<String, String> {
+    let mut files = HashMap::new();
     load_all_crepus(&b.site_dir, &b.site_dir, &mut files);
     if files.is_empty() {
         ui::error(&format!("no .crepus files under {}", b.site_dir.display()));
     }
-
     if !files.contains_key(&b.entry) {
         ui::error(&format!(
             "entry {:?} not found in virtual file map (keys: {:?})",
@@ -350,41 +378,28 @@ pub(crate) fn build_site_wasm(cli: &WebBuildArgs) {
             files.keys().take(5).collect::<Vec<_>>()
         ));
     }
+    files
+}
 
-    // ── head block extraction ──────────────────────────────────────────────
+fn extract_and_render_head(entry: &str, files: &mut HashMap<String, String>) -> String {
     let mut template_head_html = String::new();
-    if let Some(entry_content) = files.get(&b.entry).cloned() {
+    if let Some(entry_content) = files.get(entry).cloned() {
         let (head_raw, body_raw) = extract_head_block(&entry_content);
         if let Some(head_src) = head_raw {
             template_head_html = render_head_raw(&head_src);
-            files.insert(b.entry.clone(), body_raw);
+            files.insert(entry.to_string(), body_raw);
         }
     }
+    template_head_html
+}
 
-    let llms_site_text = files
-        .get(&b.entry)
-        .map(|source| render_crepus_readable_text(source));
-
+fn write_bundle_and_cache(b: &WasmBuildArgs, files: &HashMap<String, String>) -> String {
     let bundle = json!({
         "entry": b.entry,
         "files": files,
     });
     let bundle_str = serde_json::to_string(&bundle).unwrap_or_else(|e| {
         ui::error(&format!("serialize bundle: {e}"));
-    });
-
-    let head = load_site_head(&b.site_dir);
-    let head = merge_site_head_meta(head, b.meta.as_ref());
-    let head = merge_llms_alternates(head, b.meta.as_ref());
-    let google_fonts = merged_site_google_fonts(&b.site_dir, &files, b.meta.as_ref());
-    let inline_css = merged_site_inline_css(&files);
-    let vendor_dir = b.out_dir.join("vendor");
-    let pkg_dir = b.out_dir.join("pkg");
-    std::fs::create_dir_all(&vendor_dir).unwrap_or_else(|e| {
-        ui::error(&format!("mkdir vendor: {e}"));
-    });
-    std::fs::create_dir_all(&pkg_dir).unwrap_or_else(|e| {
-        ui::error(&format!("mkdir pkg: {e}"));
     });
 
     let _ = std::fs::create_dir_all(b.site_dir.join(".crepus-cache"));
@@ -398,14 +413,29 @@ pub(crate) fn build_site_wasm(cli: &WebBuildArgs) {
         });
         cache.record(&fp, &bundle_str);
     }
+    bundle_str
+}
 
+fn generate_index_and_assets(
+    b: &WasmBuildArgs,
+    files: &HashMap<String, String>,
+    bundle_str: &str,
+    head: &SiteHead,
+    template_head_html: &str,
+) {
+    let google_fonts = merged_site_google_fonts(&b.site_dir, files, b.meta.as_ref());
+    let inline_css = merged_site_inline_css(files);
+    let vendor_dir = b.out_dir.join("vendor");
+
+    std::fs::create_dir_all(&vendor_dir)
+        .unwrap_or_else(|e| ui::error(&format!("mkdir vendor: {e}")));
     copy_unocss(&vendor_dir);
-    let mut index_html = render_index_html(&head, &google_fonts, &inline_css, &template_head_html);
-    // SSR + inline bundle: pre-render entry, embed bundle JSON to eliminate HTTP fetch
-    if let Ok(ssr_html) = render_bundle_with_ssr(&bundle_str, true) {
+
+    let mut index_html = render_index_html(head, &google_fonts, &inline_css, template_head_html);
+    if let Ok(ssr_html) = render_bundle_with_ssr(bundle_str, true) {
         let needle = r#"<div id="crepus-root"></div>"#;
         if let Some(pos) = index_html.find(needle) {
-            let bundle_escaped = ssr_escape_json(&bundle_str);
+            let bundle_escaped = ssr_escape_json(bundle_str);
             let replacement = format!(
                 r#"<div id="crepus-root">{}</div><script id="__crepus_bundle__" type="application/json">{}</script>"#,
                 ssr_html, bundle_escaped
@@ -415,13 +445,18 @@ pub(crate) fn build_site_wasm(cli: &WebBuildArgs) {
     }
     std::fs::write(b.out_dir.join(".nojekyll"), b"")
         .unwrap_or_else(|e| ui::error(&format!("write .nojekyll: {e}")));
-    std::fs::write(b.out_dir.join("index.html"), index_html).unwrap_or_else(|e| {
-        ui::error(&format!("write index.html: {e}"));
-    });
-    std::fs::write(b.out_dir.join("app.js"), WEB_APP_JS).unwrap_or_else(|e| {
-        ui::error(&format!("write app.js: {e}"));
-    });
+    std::fs::write(b.out_dir.join("index.html"), index_html)
+        .unwrap_or_else(|e| ui::error(&format!("write index.html: {e}")));
+    std::fs::write(b.out_dir.join("app.js"), WEB_APP_JS)
+        .unwrap_or_else(|e| ui::error(&format!("write app.js: {e}")));
+}
 
+fn process_docs_and_static(
+    b: &WasmBuildArgs,
+    files: &HashMap<String, String>,
+    head: &SiteHead,
+    llms_site_text: Option<&str>,
+) {
     if let Some(docs) = b.meta.as_ref().and_then(|meta| meta.docs.as_ref()) {
         let theme = crate::web_docs_hook::DocsHookTheme {
             accent: head.theme.accent.clone(),
@@ -444,12 +479,10 @@ pub(crate) fn build_site_wasm(cli: &WebBuildArgs) {
 
     let static_src = b.site_dir.join("static");
     if static_src.is_dir() {
-        copy_dir_recursive(&static_src, &b.out_dir.join("static")).unwrap_or_else(|e| {
-            ui::error(&format!("copy static/: {e}"));
-        });
+        copy_dir_recursive(&static_src, &b.out_dir.join("static"))
+            .unwrap_or_else(|e| ui::error(&format!("copy static/: {e}")));
     }
 
-    // Auto-detect docs/ directory (like Svelte/Next.js — just works)
     if let Some(src) = docs_src_candidate(&b.site_dir) {
         let has_md = std::fs::read_dir(&src).is_ok_and(|mut d| {
             d.any(|e| {
@@ -469,55 +502,56 @@ pub(crate) fn build_site_wasm(cli: &WebBuildArgs) {
         }
     }
 
-    if let Err(e) = crate::web_islands::build_web_islands(&b.site_dir, &b.out_dir, &files) {
+    if let Err(e) = crate::web_islands::build_web_islands(&b.site_dir, &b.out_dir, files) {
         ui::error(&e);
     }
 
-    write_seo_files(&b.out_dir, &head);
+    write_seo_files(&b.out_dir, head);
     write_llms_files(
         &b.site_dir,
         &b.out_dir,
-        &head,
+        head,
         b.meta.as_ref(),
-        llms_site_text.as_deref(),
+        llms_site_text,
     );
+}
 
-    {
-        let sp = ui::spinner("compiling site WASM (wasm32-unknown-unknown)");
-        match cargo_build_wasm32(&runtime_dir, b.options) {
-            Ok(()) => ui::spinner_ok(&sp, "WASM compiled"),
-            Err(stderr) => {
-                sp.finish_and_clear();
-                eprintln!("  {} WASM compile failed", ui::err());
-                for line in stderr.lines().take(20) {
-                    eprintln!("    {}", style(line).dim());
-                }
-                ui::error("fix runtime compile errors (see above)");
+fn compile_and_optimize_wasm(b: &WasmBuildArgs, runtime_dir: &Path) {
+    let pkg_dir = b.out_dir.join("pkg");
+    std::fs::create_dir_all(&pkg_dir).unwrap_or_else(|e| ui::error(&format!("mkdir pkg: {e}")));
+
+    let sp = ui::spinner("compiling site WASM (wasm32-unknown-unknown)");
+    match cargo_build_wasm32(runtime_dir, b.options) {
+        Ok(()) => ui::spinner_ok(&sp, "WASM compiled"),
+        Err(stderr) => {
+            sp.finish_and_clear();
+            eprintln!("  {} WASM compile failed", ui::err());
+            for line in stderr.lines().take(20) {
+                eprintln!("    {}", style(line).dim());
             }
+            ui::error("fix runtime compile errors (see above)");
         }
     }
 
-    let (workspace_target, local_target) = wasm_profile_dirs(&b.site_dir, &runtime_dir, b.options);
+    let (workspace_target, local_target) = wasm_profile_dirs(&b.site_dir, runtime_dir, b.options);
     let wasm_path = find_wasm_file(&workspace_target)
         .or_else(|| find_wasm_file(&local_target))
         .unwrap_or_else(|| {
             ui::error(&format!(
                 "built .wasm not found under target/wasm32-unknown-unknown/{}/",
                 b.options.cargo_profile()
-            ));
+            ))
         });
 
-    {
-        let sp = ui::spinner("wasm-bindgen");
-        match run_wasm_bindgen(&wasm_path, &pkg_dir, "runtime") {
-            Ok(()) => ui::spinner_ok(&sp, "pkg/runtime.js + runtime_bg.wasm"),
-            Err(err) => {
-                sp.finish_and_clear();
-                if err.starts_with("wasm-bindgen:") {
-                    ui::error("wasm-bindgen not found — install: cargo install wasm-bindgen-cli");
-                }
-                ui::error(&format!("wasm-bindgen: {err}"));
+    let sp = ui::spinner("wasm-bindgen");
+    match run_wasm_bindgen(&wasm_path, &pkg_dir, "runtime") {
+        Ok(()) => ui::spinner_ok(&sp, "pkg/runtime.js + runtime_bg.wasm"),
+        Err(err) => {
+            sp.finish_and_clear();
+            if err.starts_with("wasm-bindgen:") {
+                ui::error("wasm-bindgen not found — install: cargo install wasm-bindgen-cli");
             }
+            ui::error(&format!("wasm-bindgen: {err}"));
         }
     }
 
@@ -538,18 +572,6 @@ pub(crate) fn build_site_wasm(cli: &WebBuildArgs) {
             }
         }
     }
-
-    eprintln!(
-        "\n{} wrote {}",
-        ui::ok(),
-        style(b.out_dir.display().to_string()).cyan()
-    );
-    eprintln!(
-        "  {} open {}/index.html via a static server (fetch + WASM modules need HTTP)",
-        ui::dim("→"),
-        b.out_dir.display()
-    );
-    ui::done_in(t0.elapsed());
 }
 
 fn load_all_crepus(root: &Path, dir: &Path, map: &mut HashMap<String, String>) {
@@ -833,6 +855,10 @@ fn ssr_escape_json(json: &str) -> String {
 }
 
 fn render_seo_head(head: &SiteHead) -> String {
+    format_seo_tags(head)
+}
+
+fn format_seo_tags(head: &SiteHead) -> String {
     let seo = &head.seo;
     let title = seo.title.as_deref().unwrap_or(&head.page_title);
     let description = seo.description.as_deref().unwrap_or(&head.description);

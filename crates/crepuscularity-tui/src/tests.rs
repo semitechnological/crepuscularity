@@ -718,6 +718,21 @@ fn template_reload_without_path_fails() {
 }
 
 #[test]
+fn template_from_path_missing_file_fails() {
+    let dir = temp_case("missing-file");
+    let path = dir.join("does_not_exist.crepus");
+
+    let res = crate::Template::from_path(&path);
+    assert!(res.is_err(), "from_path should fail for missing file");
+    if let Err(err) = res {
+        assert!(
+            err.contains("template error"),
+            "Expected error to contain 'template error', got: {err}"
+        );
+    }
+}
+
+#[test]
 fn hot_template_initial_render_uses_disk_source() {
     let dir = temp_case("hot-initial");
     let path = dir.join("ui.crepus");
@@ -895,39 +910,65 @@ mod watcher_filter {
     }
 }
 
-#[test]
-fn template_draw_full_returns_error_on_invalid_template() {
-    let tpl = crate::Template::from_source("<< invalid");
-    let backend = ratatui::backend::TestBackend::new(40, 3);
-    let mut terminal = ratatui::Terminal::new(backend).unwrap();
-    let mut err = None;
-    terminal
-        .draw(|frame| {
-            if let Err(e) = tpl.draw_full(frame) {
-                err = Some(e);
-            }
-        })
-        .unwrap();
-    let e = err.expect("draw_full should return an error for invalid template");
-    assert!(
-        e.contains("parse error"),
-        "error should mention parse error: {e}"
-    );
-}
+mod template_error_tests {
+    use crate::{draw, template};
+    use ratatui::{backend::TestBackend, Terminal};
 
-#[test]
-fn draw_helper_returns_error_on_invalid_template() {
-    let dir = tempfile::tempdir().unwrap();
-    let path = dir.path().join("ui.crepus");
-    std::fs::write(&path, "<< invalid syntax").unwrap();
+    #[test]
+    fn template_missing_file_returns_error() {
+        let res = template("non_existent_file.crepus");
+        match res {
+            Err(e) => assert!(e.contains("template error")),
+            Ok(_) => panic!("expected err"),
+        }
+    }
 
-    let backend = ratatui::backend::TestBackend::new(40, 4);
-    let mut terminal = ratatui::Terminal::new(backend).unwrap();
-    let res = crate::draw(&mut terminal, &path, |_ui| {});
+    #[test]
+    fn draw_missing_file_returns_error() {
+        let backend = TestBackend::new(80, 24);
+        let mut terminal = Terminal::new(backend).unwrap();
 
-    let e = res.expect_err("draw should return an error for invalid template");
-    assert!(
-        e.contains("parse error"),
-        "error should mention parse error: {e}"
-    );
+        let res = draw(&mut terminal, "non_existent_file.crepus", |_| {});
+        match res {
+            Err(e) => assert!(e.contains("template error")),
+            Ok(_) => panic!("expected err"),
+        }
+    }
+
+    #[test]
+    fn template_draw_full_returns_error_on_invalid_template() {
+        let tpl = crate::Template::from_source("<< invalid");
+        let backend = TestBackend::new(40, 3);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let mut err = None;
+        terminal
+            .draw(|frame| {
+                if let Err(e) = tpl.draw_full(frame) {
+                    err = Some(e);
+                }
+            })
+            .unwrap();
+        let e = err.expect("draw_full should return an error for invalid template");
+        assert!(
+            e.contains("parse error"),
+            "error should mention parse error: {e}"
+        );
+    }
+
+    #[test]
+    fn draw_helper_returns_error_on_invalid_template() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("ui.crepus");
+        std::fs::write(&path, "<< invalid syntax").unwrap();
+
+        let backend = TestBackend::new(40, 4);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let res = crate::draw(&mut terminal, &path, |_ui| {});
+
+        let e = res.expect_err("draw should return an error for invalid template");
+        assert!(
+            e.contains("parse error"),
+            "error should mention parse error: {e}"
+        );
+    }
 }
