@@ -1,12 +1,17 @@
 import { spawnSync } from "node:child_process"
+import { isAbsolute, basename } from "node:path"
 
 export interface ViewIr {
   version: number
   root: Array<Record<string, unknown>>
 }
 
-function crepusBin(): string {
-  return process.env.CREPUS_BIN ?? "crepus"
+export function crepusBin(): string {
+  const bin = process.env.CREPUS_BIN ?? "crepus"
+  if (!isAbsolute(bin) && basename(bin) !== bin) {
+    throw new Error(`Security Error: CREPUS_BIN path must be absolute or a valid binary name, got: ${bin}`)
+  }
+  return bin
 }
 
 const BIND_BLOCKLIST = new Set<string>(["baseDir", "_"]) // ponytail: block security-sensitive keys only
