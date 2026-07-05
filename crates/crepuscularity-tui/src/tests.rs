@@ -711,6 +711,16 @@ fn template_reload_picks_up_new_source() {
 }
 
 #[test]
+fn template_from_source_happy_path() {
+    let tpl = crate::Template::from_source("div\n  \"hello\"");
+    assert_eq!(tpl.source(), "div\n  \"hello\"");
+    assert!(tpl.path().as_os_str().is_empty());
+
+    let rows = render(20, 3, tpl.source(), tpl.context());
+    assert!(all_text(&rows).contains("hello"), "{}", all_text(&rows));
+}
+
+#[test]
 fn template_reload_without_path_fails() {
     let mut tpl = crate::Template::from_source("div\n  \"x\"");
     let err = tpl.reload().expect_err("from_source has no path");
