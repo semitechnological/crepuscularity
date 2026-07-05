@@ -13,6 +13,34 @@ fn signal_read_write() {
 }
 
 #[test]
+fn signal_update_behavior() {
+    // 1. Happy path: modifies the signal's value correctly based on its previous value.
+    let s = Signal::new(10i32);
+    assert_eq!(s.get(), 10);
+    s.update(|v| v * 2);
+    assert_eq!(s.get(), 20);
+
+    // 2. Effect triggering: notifies and re-runs any dependent Effects.
+    let count = Rc::new(RefCell::new(0u32));
+    let count2 = Rc::clone(&count);
+    let s2 = s.clone();
+    let _e = Effect::new(move || {
+        let _ = s2.get();
+        *count2.borrow_mut() += 1;
+    });
+
+    assert_eq!(*count.borrow(), 1, "Effect ran once on init");
+    s.update(|v| v + 5);
+    assert_eq!(s.get(), 25);
+    assert_eq!(*count.borrow(), 2, "Effect re-ran after update");
+
+    // 3. No-op update: function returning same value does not trigger dependent effects
+    s.update(|v| v);
+    assert_eq!(s.get(), 25);
+    assert_eq!(*count.borrow(), 2, "Effect did not re-run on no-op update");
+}
+
+#[test]
 fn effect_runs_immediately() {
     let ran = Rc::new(RefCell::new(false));
     let ran2 = Rc::clone(&ran);
