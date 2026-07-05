@@ -1,6 +1,6 @@
 (comment) @comment
 
-(quoted) @string
+(quoted) @string.special
 
 (jsx_fragment) @tag
 

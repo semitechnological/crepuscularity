@@ -74,9 +74,9 @@
             }
           },
           {
-            "scope": "source.crepus string.quoted.double.crepus, source.crepus string.quoted.single.crepus",
+            "scope": "source.crepus string.quoted.double.text.crepus, source.crepus string.quoted.single.text.crepus",
             "settings": {
-              "foreground": "#61AFEF"
+              "foreground": "#E5C07B"
             }
           }
         ]

@@ -70,7 +70,7 @@
     "string": {
       "patterns": [
         {
-          "name": "string.quoted.double.crepus",
+          "name": "string.quoted.double.text.crepus",
           "begin": "\"",
           "end": "\"",
           "patterns": [
