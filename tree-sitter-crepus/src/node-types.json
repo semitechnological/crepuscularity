@@ -26,6 +26,32 @@
     }
   },
   {
+    "type": "attr_binding_quoted",
+    "named": true,
+    "fields": {
+      "attr": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "attr_name_eq",
+            "named": true
+          }
+        ]
+      },
+      "value": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "quoted",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
     "type": "attr_name_only",
     "named": true,
     "fields": {},
@@ -66,6 +92,10 @@
       "types": [
         {
           "type": "attr_binding_braced",
+          "named": true
+        },
+        {
+          "type": "attr_binding_quoted",
           "named": true
         },
         {

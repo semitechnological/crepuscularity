@@ -1,7 +1,5 @@
 (comment) @comment
 
-(quoted) @string.special
-
 (jsx_fragment) @tag
 
 (fragment_section) @keyword
@@ -20,7 +18,14 @@
   (attr_name_eq) @function
   (braced_expression) @keyword)
 
+(attr_binding_quoted
+  (attr_name_eq) @function
+  (quoted) @string)
+
 (attr_name_only) @function
+
+(class_segment
+  (quoted) @string.special)
 
 (tailwind_pair) @type
 

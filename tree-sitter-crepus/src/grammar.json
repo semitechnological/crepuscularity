@@ -249,6 +249,10 @@
         },
         {
           "type": "SYMBOL",
+          "name": "attr_binding_quoted"
+        },
+        {
+          "type": "SYMBOL",
           "name": "attr_binding_braced"
         },
         {
@@ -338,6 +342,31 @@
         ]
       }
     },
+    "attr_binding_quoted": {
+      "type": "PREC",
+      "value": 2,
+      "content": {
+        "type": "SEQ",
+        "members": [
+          {
+            "type": "FIELD",
+            "name": "attr",
+            "content": {
+              "type": "SYMBOL",
+              "name": "attr_name_eq"
+            }
+          },
+          {
+            "type": "FIELD",
+            "name": "value",
+            "content": {
+              "type": "SYMBOL",
+              "name": "quoted"
+            }
+          }
+        ]
+      }
+    },
     "attr_name_only": {
       "type": "PREC",
       "value": 1,
@@ -403,5 +432,6 @@
   "precedences": [],
   "externals": [],
   "inline": [],
-  "supertypes": []
+  "supertypes": [],
+  "reserved": {}
 }

@@ -56,6 +56,7 @@ module.exports = grammar({
       choice(
         $.braced_expression,
         $.hash_id,
+        $.attr_binding_quoted,
         $.attr_binding_braced,
         $.attr_name_only,
         $.quoted,
@@ -80,6 +81,15 @@ module.exports = grammar({
         seq(
           field('attr', $.attr_name_eq),
           field('value', $.braced_expression),
+        ),
+      ),
+
+    attr_binding_quoted: ($) =>
+      prec(
+        2,
+        seq(
+          field('attr', $.attr_name_eq),
+          field('value', $.quoted),
         ),
       ),
 
