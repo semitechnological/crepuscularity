@@ -130,6 +130,58 @@ fn draw_helper_owns_terminal_draw_pass() {
 }
 
 #[test]
+fn draw_helper_returns_error_on_missing_file() {
+    let backend = TestBackend::new(40, 4);
+    let mut terminal = Terminal::new(backend).unwrap();
+    let res = draw_template(&mut terminal, "definitely_does_not_exist.crepus", |_| {});
+
+    assert!(res.is_err());
+    let err = res.unwrap_err();
+    assert!(
+        err.contains("No such file or directory"),
+        "unexpected err: {err}"
+    );
+}
+
+#[test]
+fn draw_helper_returns_error_on_render_failure() {
+    let dir = temp_case("draw-helper-err");
+    let path = dir.join("ui.crepus");
+    // Invalid JSX syntax to force a parser/render error inside the frame drawing loop
+    fs::write(&path, "<div").unwrap();
+
+    let backend = TestBackend::new(40, 4);
+    let mut terminal = Terminal::new(backend).unwrap();
+
+    let res = draw_template(&mut terminal, &path, |_| {});
+    assert!(res.is_err());
+    let err = res.unwrap_err();
+    assert!(err.contains("unclosed JSX tag"), "unexpected err: {err}");
+}
+
+#[test]
+fn template_draw_returns_error_on_render_failure() {
+    let tpl = crate::Template::from_source("<div");
+    let backend = TestBackend::new(40, 4);
+    let mut terminal = Terminal::new(backend).unwrap();
+
+    let mut caught_err = None;
+    terminal
+        .draw(|frame| {
+            if let Err(e) = tpl.draw_full(frame) {
+                caught_err = Some(e);
+            }
+        })
+        .unwrap();
+
+    assert!(
+        caught_err.is_some(),
+        "expected an error to be returned from draw_full"
+    );
+    assert!(caught_err.unwrap().contains("unclosed JSX tag"));
+}
+
+#[test]
 fn raw_expression_renders() {
     let mut ctx = TemplateContext::new();
     ctx.set("score", 42i64);
