@@ -363,60 +363,7 @@ fn build_extension_inner(
     }
 
     // ── Step 2: runtime assets ───────────────────────────────────────────────
-    {
-        let sp = ui::spinner("writing runtime assets");
-        use crepuscularity_webext::extension_assets as a;
-
-        macro_rules! w {
-            ($name:expr, $path:expr, $content:expr) => {
-                std::fs::write($path, $content).unwrap_or_else(|e| {
-                    ui::error(&format!("write {}: {e}", $name));
-                });
-            };
-        }
-
-        w!("popup.html", src_dir.join("popup.html"), a::POPUP_HTML);
-        w!("popup.css", src_dir.join("popup.css"), a::POPUP_CSS);
-        w!("popup.js", src_dir.join("popup.js"), a::POPUP_JS);
-        w!("options.js", src_dir.join("options.js"), a::OPTIONS_JS);
-        w!(
-            "background.js",
-            src_dir.join("background.js"),
-            a::BACKGROUND_JS
-        );
-        let custom_bg = app_path.join("src/background.js");
-        if custom_bg.exists() {
-            std::fs::copy(&custom_bg, src_dir.join("background.js")).unwrap_or_else(|e| {
-                ui::error(&format!("copy custom background.js: {e}"));
-            });
-        }
-        w!("content.js", src_dir.join("content.js"), a::CONTENT_JS);
-        w!("content.css", src_dir.join("content.css"), a::CONTENT_CSS);
-        w!(
-            "browser-shim.js",
-            src_dir.join("browser-shim.js"),
-            a::BROWSER_SHIM
-        );
-        w!(
-            "runtime-as-adapter.js",
-            src_dir.join("runtime-as-adapter.js"),
-            a::RUNTIME_ADAPTER
-        );
-        if dev {
-            w!("dev.js", src_dir.join("dev.js"), a::DEV_JS);
-        }
-        w!("unocss.js", vendor_dir.join("unocss.js"), a::UNOCSS_JS);
-        copy_app_assets(app_path, &dist).unwrap_or_else(|e| {
-            ui::error(&format!("copy app assets: {e}"));
-        });
-        render_crepus_css_assets(app_path, &dist).unwrap_or_else(|e| {
-            ui::error(&format!("render extension .css.crepus assets: {e}"));
-        });
-        render_crepus_pages(app_path, &dist, manifest).unwrap_or_else(|e| {
-            ui::error(&format!("render extension .crepus pages: {e}"));
-        });
-        ui::spinner_ok(&sp, "runtime assets");
-    }
+    write_runtime_assets(app_path, &dist, &src_dir, &vendor_dir, dev, manifest);
 
     // ── Step 3: WASM runtime ─────────────────────────────────────────────────
     let runtime_dir = app_path.join("runtime");
@@ -486,6 +433,68 @@ fn build_extension_inner(
         ),
     }
     ui::done_in(t0.elapsed());
+}
+
+fn write_runtime_assets(
+    app_path: &Path,
+    dist: &Path,
+    src_dir: &Path,
+    vendor_dir: &Path,
+    dev: bool,
+    manifest: &crepuscularity_webext::ExtensionManifest,
+) {
+    let sp = ui::spinner("writing runtime assets");
+    use crepuscularity_webext::extension_assets as a;
+
+    macro_rules! w {
+        ($name:expr, $path:expr, $content:expr) => {
+            std::fs::write($path, $content).unwrap_or_else(|e| {
+                ui::error(&format!("write {}: {e}", $name));
+            });
+        };
+    }
+
+    w!("popup.html", src_dir.join("popup.html"), a::POPUP_HTML);
+    w!("popup.css", src_dir.join("popup.css"), a::POPUP_CSS);
+    w!("popup.js", src_dir.join("popup.js"), a::POPUP_JS);
+    w!("options.js", src_dir.join("options.js"), a::OPTIONS_JS);
+    w!(
+        "background.js",
+        src_dir.join("background.js"),
+        a::BACKGROUND_JS
+    );
+    let custom_bg = app_path.join("src/background.js");
+    if custom_bg.exists() {
+        std::fs::copy(&custom_bg, src_dir.join("background.js")).unwrap_or_else(|e| {
+            ui::error(&format!("copy custom background.js: {e}"));
+        });
+    }
+    w!("content.js", src_dir.join("content.js"), a::CONTENT_JS);
+    w!("content.css", src_dir.join("content.css"), a::CONTENT_CSS);
+    w!(
+        "browser-shim.js",
+        src_dir.join("browser-shim.js"),
+        a::BROWSER_SHIM
+    );
+    w!(
+        "runtime-as-adapter.js",
+        src_dir.join("runtime-as-adapter.js"),
+        a::RUNTIME_ADAPTER
+    );
+    if dev {
+        w!("dev.js", src_dir.join("dev.js"), a::DEV_JS);
+    }
+    w!("unocss.js", vendor_dir.join("unocss.js"), a::UNOCSS_JS);
+    copy_app_assets(app_path, dist).unwrap_or_else(|e| {
+        ui::error(&format!("copy app assets: {e}"));
+    });
+    render_crepus_css_assets(app_path, dist).unwrap_or_else(|e| {
+        ui::error(&format!("render extension .css.crepus assets: {e}"));
+    });
+    render_crepus_pages(app_path, dist, manifest).unwrap_or_else(|e| {
+        ui::error(&format!("render extension .crepus pages: {e}"));
+    });
+    ui::spinner_ok(&sp, "runtime assets");
 }
 
 fn load_extension_manifest(

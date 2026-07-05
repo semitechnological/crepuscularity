@@ -28,7 +28,7 @@ impl<T: Clone + PartialEq + 'static> Memo<T> {
                 AnyNode::Memo(MemoNode {
                     state: State::Dirty,
                     sources: vec![],
-                    subscribers: vec![],
+                    subscribers: std::collections::HashSet::new(),
                     run,
                     cached: None,
                     eq_fn,
