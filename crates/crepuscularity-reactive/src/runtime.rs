@@ -178,7 +178,7 @@ pub(crate) fn remove_node(id: NodeId) {
         let subscribers = nodes
             .get(&id)
             .and_then(|n| n.subscribers())
-            .map(|s| s.to_vec())
+            .map(|s| s.iter().copied().collect::<Vec<_>>())
             .unwrap_or_default();
         (sources, subscribers)
     });
