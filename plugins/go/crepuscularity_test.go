@@ -2,11 +2,13 @@ package crepuscularity
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 )
 
 func TestRenderIR(t *testing.T) {
+	os.Setenv("CREPUS_ALLOWED_DIR", "..")
 	ir, err := RenderIR("../fixtures/hello.crepus", map[string]any{"name": "Ada"})
 	if err != nil {
 		t.Fatal(err)
@@ -27,6 +29,7 @@ func TestRenderIR(t *testing.T) {
 }
 
 func TestViewSessionDispatch(t *testing.T) {
+	os.Setenv("CREPUS_ALLOWED_DIR", "..")
 	session := NewViewSession("../fixtures/interactive.crepus", map[string]any{"count": "1"})
 	html, err := session.RenderHTML()
 	if err != nil {
@@ -42,5 +45,16 @@ func TestViewSessionDispatch(t *testing.T) {
 	raw := fmt.Sprint(ir.Root)
 	if !strings.Contains(raw, "Count 2") {
 		t.Fatalf("ir = %s", raw)
+	}
+}
+
+func TestRenderIRTraversalDenied(t *testing.T) {
+	os.Setenv("CREPUS_ALLOWED_DIR", ".")
+	_, err := RenderIR("../fixtures/hello.crepus", map[string]any{"name": "Ada"})
+	if err == nil {
+		t.Fatal("expected traversal denied error")
+	}
+	if !strings.Contains(err.Error(), "path traversal denied") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
