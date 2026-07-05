@@ -31,19 +31,32 @@ class CrepuscularityPluginTests(unittest.TestCase):
                     _crepus_bin()
     def test_render_ir(self):
         fixture = pathlib.Path(__file__).parents[1] / "fixtures" / "hello.crepus"
-        ir = render_ir(fixture, {"name": "Ada"})
+        allowed_dir = pathlib.Path(__file__).parents[1] / "fixtures"
+        ir = render_ir(fixture, {"name": "Ada"}, allowed_dir)
         self.assertEqual(ir.version, 4)
         self.assertEqual(ir.root[0]["children"][0]["content"], "Hello Ada")
-        self.assertEqual(render_html(fixture, {"name": "Ada"}), '<div data-crepus-kind="stack" data-axis="column">Hello Ada</div>')
+        self.assertEqual(render_html(fixture, {"name": "Ada"}, allowed_dir), '<div data-crepus-kind="stack" data-axis="column">Hello Ada</div>')
 
     def test_view_session_dispatches_bind_and_rerenders(self):
         fixture = pathlib.Path(__file__).parents[1] / "fixtures" / "interactive.crepus"
-        session = ViewSession(fixture, {"count": "1"})
+        allowed_dir = pathlib.Path(__file__).parents[1] / "fixtures"
+        session = ViewSession(fixture, {"count": "1"}, allowed_dir)
         self.assertIn("Count 1", session.render_html())
         ir = session.dispatch("bind:count:2")
         self.assertEqual(session.context["count"], "2")
         self.assertIn("Count 2", str(ir.root))
         self.assertIn("Count 2", session.render_html())
+
+    def test_path_traversal_validation(self):
+        fixture = pathlib.Path(__file__).parents[1] / "fixtures" / "hello.crepus"
+        # Provide a dummy allowed directory that does not contain the fixture
+        dummy_dir = pathlib.Path(__file__).parent
+        with self.assertRaises(ValueError):
+            render_ir(fixture, {"name": "Ada"}, dummy_dir)
+
+        with self.assertRaises(ValueError):
+            # Also test relative path traversal out of allowed_dir
+            render_ir(dummy_dir / ".." / "fixtures" / "hello.crepus", {"name": "Ada"}, dummy_dir)
 
 
 if __name__ == "__main__":
