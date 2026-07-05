@@ -62,3 +62,6 @@ required-features = ["bench-tui"]
 name = "cl"
 path = "src/bin/cl.rs"
 required-features = ["cli"]
+
+[dev-dependencies]
+tempfile = { workspace = true }
