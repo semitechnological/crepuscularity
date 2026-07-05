@@ -37,3 +37,5 @@ crates/crepuscularity-cli/templates/native/ios/.build/
 crates/crepuscularity-cli/templates/native/android/**/build/
 crates/crepuscularity-cli/templates/native/android/.gradle/
 .poolside/
+.pi-subagents/
+PR-REVIEW-*.md
