@@ -305,3 +305,12 @@ fn template_reload_error_paths() {
     let err = tpl_bad_path.reload().unwrap_err();
     assert!(err.starts_with(&format!("template error: {:?}", path)));
 }
+
+#[test]
+fn template_function_error_path() {
+    let path = PathBuf::from("does_not_exist_abc.crepus");
+    let res = crate::template(&path, screen());
+    assert!(res.is_err());
+    let err = res.err().unwrap();
+    assert!(err.starts_with(&format!("template error: {:?}", path)));
+}
