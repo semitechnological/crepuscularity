@@ -528,6 +528,11 @@ fn render_element_ssr(
         if inject_root {
             out.push_str(r#" data-crepus-root="1""#);
         }
+        if let Some(dom_id) = &el.id {
+            out.push_str(" id=\"");
+            out.push_str(&crate::escape_html(dom_id));
+            out.push('"');
+        }
         out.push_str(&format!(r#" data-crepus-id="c{id}""#));
         out.push_str(" data-crepus-kind=\"slot-rotate\"");
         if let Some(class_attr) =
@@ -604,6 +609,11 @@ fn render_element_ssr(
     let mut out = String::new();
     out.push('<');
     out.push_str(&el.tag);
+    if let Some(dom_id) = &el.id {
+        out.push_str(" id=\"");
+        out.push_str(&crate::escape_html(dom_id));
+        out.push('"');
+    }
     if inject_root {
         out.push_str(r#" data-crepus-root="1""#);
     }

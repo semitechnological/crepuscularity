@@ -53,6 +53,17 @@ fn root_element_gets_data_crepus_root() {
 }
 
 #[test]
+fn crepus_hash_id_emits_dom_id_on_static_element() {
+    let ctx = TemplateContext::new();
+    let tpl = "div #tsc-heading\n  \"ok\"";
+    let html = render_template_to_html_with_ssr(tpl, &ctx, true).unwrap();
+    assert!(
+        html.contains(r#"id="tsc-heading""#),
+        "SSR must emit el.id like client render: {html}"
+    );
+}
+
+#[test]
 fn static_tree_has_minimal_bind() {
     let ctx = TemplateContext::new();
     let tpl = "div\n  span\n    \"ok\"";
