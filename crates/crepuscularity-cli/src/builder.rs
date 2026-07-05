@@ -60,9 +60,7 @@ pub fn cargo_build(
         .stderr(Stdio::null()) // diagnostics come through JSON stdout
         .env("CARGO_BUILD_INCREMENTAL", "true");
 
-    if options.release() {
-        cmd.arg("--release");
-    }
+    options.apply_profile_to_command(&mut cmd);
 
     let mut child = match cmd.spawn() {
         Ok(c) => c,

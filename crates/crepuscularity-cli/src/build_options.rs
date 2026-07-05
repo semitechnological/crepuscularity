@@ -1,3 +1,5 @@
+use std::process::Command;
+
 use clap::Args;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -95,6 +97,12 @@ impl BuildOptions {
 
     pub(crate) fn optimize_artifacts(self) -> bool {
         self.optimization != OptimizationLevel::None
+    }
+
+    pub(crate) fn apply_profile_to_command(&self, cmd: &mut Command) {
+        if self.release() {
+            cmd.arg("--release");
+        }
     }
 }
 

@@ -25,6 +25,7 @@ mod new;
 mod preview;
 mod render;
 mod target_build;
+mod target_builder;
 mod tui;
 pub mod ui;
 mod wasm_bundle;

@@ -5,8 +5,6 @@
 
 use std::fs;
 use std::path::Path;
-#[cfg(feature = "tui")]
-use std::path::PathBuf;
 use std::process::Command;
 
 #[cfg(feature = "tui")]
@@ -149,9 +147,7 @@ fn build_tui_app(options: BuildOptions, extra: &[String]) {
     ensure_cargo_project_for_tui();
     let mut cmd = Command::new("cargo");
     cmd.arg("build");
-    if options.release() {
-        cmd.arg("--release");
-    }
+    options.apply_profile_to_command(&mut cmd);
     cmd.args(extra);
     delegate_to_cargo(cmd, "build");
 }
@@ -160,9 +156,7 @@ fn run_tui_app(options: BuildOptions, extra: &[String]) {
     ensure_cargo_project_for_tui();
     let mut cmd = Command::new("cargo");
     cmd.arg("run");
-    if options.release() {
-        cmd.arg("--release");
-    }
+    options.apply_profile_to_command(&mut cmd);
     if !extra.is_empty() {
         cmd.arg("--").args(extra);
     }

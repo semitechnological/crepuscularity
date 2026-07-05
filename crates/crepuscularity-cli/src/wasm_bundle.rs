@@ -118,9 +118,7 @@ pub fn cargo_build_wasm32(runtime_dir: &Path, options: BuildOptions) -> Result<(
     }
 
     cmd.args(["build", "--target", "wasm32-unknown-unknown"]);
-    if options.release() {
-        cmd.arg("--release");
-    }
+    options.apply_profile_to_command(&mut cmd);
     let out = cmd
         .arg("--quiet")
         .current_dir(runtime_dir)

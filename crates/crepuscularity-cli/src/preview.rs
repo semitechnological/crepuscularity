@@ -92,9 +92,7 @@ pub(crate) fn cargo_build_fallback(
 ) -> CargoBuildOutcome {
     let mut cmd = std::process::Command::new("cargo");
     cmd.arg("build").current_dir(cwd);
-    if options.release() {
-        cmd.arg("--release");
-    }
+    options.apply_profile_to_command(&mut cmd);
     let success = cmd.status().map(|status| status.success()).unwrap_or(false);
     CargoBuildOutcome { success }
 }
