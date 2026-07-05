@@ -1220,6 +1220,21 @@ pub extern "system" fn Java_dev_crepuscularity_nativeshell_CrepusRustActions_sto
 }
 
 #[cfg(target_os = "android")]
+fn get_jni_string(env: &mut JNIEnv<'_>, j_str: &JString<'_>) -> String {
+    env.get_string(j_str)
+        .map(|value| value.to_string_lossy().into_owned())
+        .unwrap_or_default()
+}
+
+#[cfg(target_os = "android")]
+fn get_jni_string_opt(env: &mut JNIEnv<'_>, j_str: &JString<'_>) -> Option<String> {
+    env.get_string(j_str)
+        .ok()
+        .map(|value| value.to_string_lossy().into_owned())
+        .filter(|value| !value.is_empty())
+}
+
+#[cfg(target_os = "android")]
 #[no_mangle]
 pub extern "system" fn Java_dev_crepuscularity_nativeshell_CrepusRustActions_evalText<'a>(
     mut env: JNIEnv<'a>,
@@ -1228,20 +1243,9 @@ pub extern "system" fn Java_dev_crepuscularity_nativeshell_CrepusRustActions_eva
     scope_name: JString<'a>,
     scope: JString<'a>,
 ) -> JString<'a> {
-    let expr = env
-        .get_string(&expr)
-        .map(|value| value.to_string_lossy().into_owned())
-        .unwrap_or_default();
-    let scope_name = env
-        .get_string(&scope_name)
-        .ok()
-        .map(|value| value.to_string_lossy().into_owned())
-        .filter(|value| !value.is_empty());
-    let scope = env
-        .get_string(&scope)
-        .ok()
-        .map(|value| value.to_string_lossy().into_owned())
-        .filter(|value| !value.is_empty());
+    let expr = get_jni_string(&mut env, &expr);
+    let scope_name = get_jni_string_opt(&mut env, &scope_name);
+    let scope = get_jni_string_opt(&mut env, &scope);
     env.new_string(eval_text(&expr, scope_name.as_deref(), scope.as_deref()))
         .unwrap()
 }
@@ -1255,20 +1259,9 @@ pub extern "system" fn Java_dev_crepuscularity_nativeshell_CrepusRustActions_eva
     scope_name: JString<'_>,
     scope: JString<'_>,
 ) -> bool {
-    let expr = env
-        .get_string(&expr)
-        .map(|value| value.to_string_lossy().into_owned())
-        .unwrap_or_default();
-    let scope_name = env
-        .get_string(&scope_name)
-        .ok()
-        .map(|value| value.to_string_lossy().into_owned())
-        .filter(|value| !value.is_empty());
-    let scope = env
-        .get_string(&scope)
-        .ok()
-        .map(|value| value.to_string_lossy().into_owned())
-        .filter(|value| !value.is_empty());
+    let expr = get_jni_string(&mut env, &expr);
+    let scope_name = get_jni_string_opt(&mut env, &scope_name);
+    let scope = get_jni_string_opt(&mut env, &scope);
     eval_bool(&expr, scope_name.as_deref(), scope.as_deref())
 }
 
@@ -1281,20 +1274,9 @@ pub extern "system" fn Java_dev_crepuscularity_nativeshell_CrepusRustActions_eva
     scope_name: JString<'_>,
     scope: JString<'_>,
 ) -> f64 {
-    let expr = env
-        .get_string(&expr)
-        .map(|value| value.to_string_lossy().into_owned())
-        .unwrap_or_default();
-    let scope_name = env
-        .get_string(&scope_name)
-        .ok()
-        .map(|value| value.to_string_lossy().into_owned())
-        .filter(|value| !value.is_empty());
-    let scope = env
-        .get_string(&scope)
-        .ok()
-        .map(|value| value.to_string_lossy().into_owned())
-        .filter(|value| !value.is_empty());
+    let expr = get_jni_string(&mut env, &expr);
+    let scope_name = get_jni_string_opt(&mut env, &scope_name);
+    let scope = get_jni_string_opt(&mut env, &scope);
     eval_number(&expr, scope_name.as_deref(), scope.as_deref())
 }
 
@@ -1307,20 +1289,9 @@ pub extern "system" fn Java_dev_crepuscularity_nativeshell_CrepusRustActions_eva
     scope_name: JString<'a>,
     scope: JString<'a>,
 ) -> JString<'a> {
-    let expr = env
-        .get_string(&expr)
-        .map(|value| value.to_string_lossy().into_owned())
-        .unwrap_or_default();
-    let scope_name = env
-        .get_string(&scope_name)
-        .ok()
-        .map(|value| value.to_string_lossy().into_owned())
-        .filter(|value| !value.is_empty());
-    let scope = env
-        .get_string(&scope)
-        .ok()
-        .map(|value| value.to_string_lossy().into_owned())
-        .filter(|value| !value.is_empty());
+    let expr = get_jni_string(&mut env, &expr);
+    let scope_name = get_jni_string_opt(&mut env, &scope_name);
+    let scope = get_jni_string_opt(&mut env, &scope);
     env.new_string(eval_items_json(
         &expr,
         scope_name.as_deref(),
