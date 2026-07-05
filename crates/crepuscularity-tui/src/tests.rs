@@ -894,3 +894,58 @@ mod watcher_filter {
         assert!(!event_touches_relevant_path(&e, &target, dir.path()));
     }
 }
+
+mod element_ref_tests {
+    use crate::template::ElementRef;
+
+    #[test]
+    fn test_set_content_and_equivalent_methods() {
+        let mut el = ElementRef::new("test-id");
+
+        // Test set_content
+        el.set_content("hello");
+        assert_eq!(el.content, "hello");
+
+        // Test content
+        el.content("world");
+        assert_eq!(el.content, "world");
+
+        // Test text
+        el.text("foo");
+        assert_eq!(el.content, "foo");
+
+        // Test val
+        el.val("bar");
+        assert_eq!(el.content, "bar");
+    }
+
+    #[test]
+    fn test_empty_input() {
+        let mut el = ElementRef::new("test-id");
+        el.set_content("initial");
+
+        el.content("");
+        assert_eq!(el.content, "");
+    }
+
+    #[test]
+    fn test_clear() {
+        let mut el = ElementRef::new("test-id");
+        el.set_content("something");
+
+        el.clear();
+        assert_eq!(el.content, "");
+    }
+
+    #[test]
+    fn test_method_chaining() {
+        let mut el = ElementRef::new("test-id");
+        el.set_content("foo")
+            .content("bar")
+            .text("baz")
+            .val("qux")
+            .clear()
+            .content("final");
+        assert_eq!(el.content, "final");
+    }
+}
