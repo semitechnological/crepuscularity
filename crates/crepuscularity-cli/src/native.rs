@@ -43,14 +43,7 @@ pub(crate) enum IosBuildTarget {
 pub fn execute(cmd: NativeCommands) {
     match cmd {
         NativeCommands::New { name } => scaffold_native_app(&name),
-        NativeCommands::Extension { extension } => match extension {
-            NativeExtensionCommands::IosShare { dir, name } => {
-                scaffold_share_extension(&dir, &name, ShareExtensionPlatform::Ios)
-            }
-            NativeExtensionCommands::MacosShare { dir, name } => {
-                scaffold_share_extension(&dir, &name, ShareExtensionPlatform::Macos)
-            }
-        },
+        NativeCommands::Extension { extension } => handle_extension(extension),
         NativeCommands::Ir { args } => run_ir_from(args),
         NativeCommands::Sync { args } => {
             if let Err(e) = sync_from_cli(args) {
@@ -62,28 +55,47 @@ pub fn execute(cmd: NativeCommands) {
                 ui::error(&e);
             }
         }
-        NativeCommands::Build { platform } => match platform {
-            NativeBuildCommands::Ios {
-                dir,
-                target,
-                configuration,
-            } => build_ios(
-                &dir.unwrap_or_else(default_native_dir),
-                native_ios_target(target),
-                &configuration,
-            ),
-            NativeBuildCommands::Android { dir, flavor } => {
-                build_android(&dir.unwrap_or_else(default_native_dir), &flavor)
-            }
-        },
-        NativeCommands::Run { platform } => match platform {
-            NativeRunCommands::Ios { dir } => {
-                run_ios_help(&dir.unwrap_or_else(default_native_dir));
-            }
-            NativeRunCommands::Android { dir, flavor } => {
-                run_android(&dir.unwrap_or_else(default_native_dir), &flavor);
-            }
-        },
+        NativeCommands::Build { platform } => handle_build(platform),
+        NativeCommands::Run { platform } => handle_run(platform),
+    }
+}
+
+fn handle_extension(extension: NativeExtensionCommands) {
+    match extension {
+        NativeExtensionCommands::IosShare { dir, name } => {
+            scaffold_share_extension(&dir, &name, ShareExtensionPlatform::Ios)
+        }
+        NativeExtensionCommands::MacosShare { dir, name } => {
+            scaffold_share_extension(&dir, &name, ShareExtensionPlatform::Macos)
+        }
+    }
+}
+
+fn handle_build(platform: NativeBuildCommands) {
+    match platform {
+        NativeBuildCommands::Ios {
+            dir,
+            target,
+            configuration,
+        } => build_ios(
+            &dir.unwrap_or_else(default_native_dir),
+            native_ios_target(target),
+            &configuration,
+        ),
+        NativeBuildCommands::Android { dir, flavor } => {
+            build_android(&dir.unwrap_or_else(default_native_dir), &flavor)
+        }
+    }
+}
+
+fn handle_run(platform: NativeRunCommands) {
+    match platform {
+        NativeRunCommands::Ios { dir } => {
+            run_ios_help(&dir.unwrap_or_else(default_native_dir));
+        }
+        NativeRunCommands::Android { dir, flavor } => {
+            run_android(&dir.unwrap_or_else(default_native_dir), &flavor);
+        }
     }
 }
 
