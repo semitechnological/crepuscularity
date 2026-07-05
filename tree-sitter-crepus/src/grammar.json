@@ -257,6 +257,10 @@
         },
         {
           "type": "SYMBOL",
+          "name": "quoted"
+        },
+        {
+          "type": "SYMBOL",
           "name": "tailwind_pair"
         },
         {

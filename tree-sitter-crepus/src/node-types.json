@@ -85,6 +85,10 @@
           "named": true
         },
         {
+          "type": "quoted",
+          "named": true
+        },
+        {
           "type": "tailwind_pair",
           "named": true
         }

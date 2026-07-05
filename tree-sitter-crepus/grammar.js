@@ -58,6 +58,7 @@ module.exports = grammar({
         $.hash_id,
         $.attr_binding_braced,
         $.attr_name_only,
+        $.quoted,
         $.tailwind_pair,
         $.plain_class,
       ),

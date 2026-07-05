@@ -28,10 +28,6 @@ jobs:
             os: ubuntu-latest
             artifact: crepus-aarch64-linux
             cross: true
-          - target: x86_64-apple-darwin
-            os: macos-13
-            artifact: crepus-x86_64-macos
-            optional: true
           - target: aarch64-apple-darwin
             os: macos-latest
             artifact: crepus-aarch64-macos
@@ -90,10 +86,42 @@ jobs:
           path: ${{ matrix.artifact }}
           if-no-files-found: error
 
+  vscode-extension:
+    name: Build VS Code extension
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        working-directory: editors/vscode
+        run: bun install --frozen-lockfile
+
+      - name: Compile extension
+        working-directory: editors/vscode
+        run: bun run compile
+
+      - name: Package VSIX
+        working-directory: editors/vscode
+        run: bunx --bun @vscode/vsce package --out crepuscularity-vscode.vsix
+
+      - name: Upload VSIX artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: crepuscularity-vscode-vsix
+          path: editors/vscode/crepuscularity-vscode.vsix
+          if-no-files-found: error
+
   # ── Create GitHub release with all binaries ───────────────────────────────
   release:
     name: Create Release
-    needs: build
+    needs:
+      - build
+      - vscode-extension
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
@@ -107,7 +135,7 @@ jobs:
       - name: Generate checksums
         run: |
           cd artifacts
-          sha256sum crepus-* > SHA256SUMS.txt
+          sha256sum * > SHA256SUMS.txt
           cat SHA256SUMS.txt
 
       - name: Create GitHub Release
@@ -116,4 +144,5 @@ jobs:
           generate_release_notes: true
           files: |
             artifacts/crepus-*
+            artifacts/*.vsix
             artifacts/SHA256SUMS.txt

@@ -2,10 +2,15 @@
   "name": "crepuscularity-vscode",
   "displayName": "Crepuscularity",
   "description": "Syntax highlighting, snippets, and crepus-lsp diagnostics for .crepus templates.",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "publisher": "crepuscularity",
   "author": "Max Carter <max@undivisible.dev>",
   "license": "MPL-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tschk/crepuscularity.git",
+    "directory": "editors/vscode"
+  },
   "engines": {
     "vscode": "^1.85.0"
   },

@@ -57,4 +57,16 @@ mod tests {
         tree_sitter::Query::new(&super::language(), super::HIGHLIGHTS_QUERY)
             .expect("Error loading Crepus highlights query");
     }
+
+    #[test]
+    fn test_inline_quoted_attribute_keeps_following_classes_parseable() {
+        let mut parser = tree_sitter::Parser::new();
+        parser
+            .set_language(&super::language())
+            .expect("Error loading Crepus grammar");
+        let tree = parser
+            .parse(r#"button @click="" px-4 py-2 bg-blue-500 text-white"#, None)
+            .unwrap();
+        assert!(!tree.root_node().has_error());
+    }
 }
