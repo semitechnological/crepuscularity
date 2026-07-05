@@ -27,6 +27,9 @@ pub struct CrepusLiteCapabilities {
     /// Developer-only benchmark plugin (`"bench"`).  Off by default — opt in with `[capabilities] bench = true`.
     #[serde(default)]
     pub bench: bool,
+    /// `in` toolchain bridge (`"inauguration"`). Off by default.
+    #[serde(default)]
+    pub inauguration: bool,
 }
 
 /// Project-oriented settings for guest scripts. Parsed from TOML; safe defaults if the file is missing.
@@ -102,6 +105,9 @@ impl CrepusLiteConfig {
         }
         if self.capabilities.bench {
             s.insert(Capability::Bench);
+        }
+        if self.capabilities.inauguration {
+            s.insert(Capability::Inauguration);
         }
         s
     }

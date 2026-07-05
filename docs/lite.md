@@ -49,7 +49,29 @@ let mut host = V8Host::new(bridge)?;
 let result = host.eval(r#"Crepus.invoke("core.echo", { "message": "hello" })"#)?;
 ```
 
-Use the capability system for file, clipboard, download, window, host, and app operations. Lite reads `crepus.toml` by default, falls back to legacy `crepus-lite.toml`, and grants only `core` plus `app` unless optional native capabilities are explicitly enabled.
+Use the capability system for file, clipboard, download, window, host, app, bench, and inauguration operations. Lite reads `crepus.toml` by default, falls back to legacy `crepus-lite.toml`, and grants only `core` plus `app` unless optional native capabilities are explicitly enabled.
+
+### `inauguration` plugin (opt-in)
+
+Plugin id **`inauguration`** bridges guest JS to the **`in`** CLI on `PATH` (no link to the `inauguration` Rust crate). Enable it for docs-site / polyglot workflows that shell out to `in execute`, `in build`, or patch files from guest code.
+
+```toml
+[capabilities]
+inauguration = true
+```
+
+```js
+const raw = JSON.parse(
+  Crepus.invoke(
+    "inauguration",
+    "processRun",
+    JSON.stringify({ command: "in test" })
+  )
+);
+// raw.data: { exitCode, stdout, stderr, success }
+```
+
+Methods: `ping`, `whichIn`, `processRun`, `readFile`, `writeFile`. The [inauguration](https://github.com/tschk/inauguration) repo also ships `in plugin run crepuscularity` for `docs-site/build.in` when building its public site.
 
 ## Guest Code
 

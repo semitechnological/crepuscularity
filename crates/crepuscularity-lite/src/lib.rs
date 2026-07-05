@@ -19,6 +19,7 @@
 #![allow(rustdoc::broken_intra_doc_links)]
 pub mod bench_plugin;
 pub mod bridge;
+pub mod inauguration_plugin;
 pub mod clipboard;
 pub mod download_plugin;
 mod fs_paths;
@@ -47,6 +48,7 @@ pub use bench_eval::{
 };
 pub use bench_plugin::BenchPlugin;
 pub use bridge::{Bridge, BridgeError, Capability, NativePlugin};
+pub use inauguration_plugin::InaugurationPlugin;
 pub use download_plugin::DownloadPlugin;
 #[cfg(feature = "oxc")]
 pub use guest_compiler::prepare_guest_source;

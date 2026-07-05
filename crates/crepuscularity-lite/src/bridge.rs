@@ -11,6 +11,7 @@ use serde_json::{json, Value};
 
 use crate::bench_plugin::BenchPlugin;
 use crate::download_plugin::DownloadPlugin;
+use crate::inauguration_plugin::InaugurationPlugin;
 use crate::host::{HostSnapshot, HostState};
 use crate::host_queue::{HostCommandQueue, HostDeferred};
 use crate::plugins::{AppPlugin, ClipboardPlugin, CorePlugin, FsPlugin, HostPlugin, WindowPlugin};
@@ -29,6 +30,9 @@ pub enum Capability {
     /// Developer-only benchmark plugin (`"bench"`).  Off by default; opt in via
     /// `[capabilities] bench = true` in `crepus-lite.toml`.
     Bench,
+    /// `in` toolchain helpers (`"inauguration"`). Off by default; opt in via
+    /// `[capabilities] inauguration = true`.
+    Inauguration,
 }
 
 /// Structured error returned inside the invoke envelope (`ok: false`).
@@ -169,6 +173,10 @@ impl Bridge {
         }
         if allowed.contains(&Capability::Bench) {
             let p: Arc<dyn NativePlugin> = Arc::new(BenchPlugin::new());
+            plugins.insert(p.id().to_string(), p);
+        }
+        if allowed.contains(&Capability::Inauguration) {
+            let p: Arc<dyn NativePlugin> = Arc::new(InaugurationPlugin::new());
             plugins.insert(p.id().to_string(), p);
         }
         Arc::new(Self {
