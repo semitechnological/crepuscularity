@@ -718,6 +718,21 @@ fn template_reload_without_path_fails() {
 }
 
 #[test]
+fn template_from_path_missing_file_fails() {
+    let dir = temp_case("missing-file");
+    let path = dir.join("does_not_exist.crepus");
+
+    let res = crate::Template::from_path(&path);
+    assert!(res.is_err(), "from_path should fail for missing file");
+    if let Err(err) = res {
+        assert!(
+            err.contains("template error"),
+            "Expected error to contain 'template error', got: {err}"
+        );
+    }
+}
+
+#[test]
 fn hot_template_initial_render_uses_disk_source() {
     let dir = temp_case("hot-initial");
     let path = dir.join("ui.crepus");
@@ -892,5 +907,31 @@ mod watcher_filter {
         let other = other.canonicalize().unwrap();
         let e = ev(EventKind::Modify(ModifyKind::Any), vec![other]);
         assert!(!event_touches_relevant_path(&e, &target, dir.path()));
+    }
+}
+
+mod template_error_tests {
+    use crate::{draw, template};
+    use ratatui::{backend::TestBackend, Terminal};
+
+    #[test]
+    fn template_missing_file_returns_error() {
+        let res = template("non_existent_file.crepus");
+        match res {
+            Err(e) => assert!(e.contains("template error")),
+            Ok(_) => panic!("expected err"),
+        }
+    }
+
+    #[test]
+    fn draw_missing_file_returns_error() {
+        let backend = TestBackend::new(80, 24);
+        let mut terminal = Terminal::new(backend).unwrap();
+
+        let res = draw(&mut terminal, "non_existent_file.crepus", |_| {});
+        match res {
+            Err(e) => assert!(e.contains("template error")),
+            Ok(_) => panic!("expected err"),
+        }
     }
 }
