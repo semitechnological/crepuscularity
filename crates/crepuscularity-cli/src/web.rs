@@ -1558,16 +1558,11 @@ struct BuildFullArgs {
     server: bool,
 }
 
-fn run_build_full(args: &BuildFullArgs) {
-    let t0 = Instant::now();
-    eprintln!("{}", style("crepus web build-full").dim());
-    eprintln!();
-
-    // L1 Rayon: collect all .crepus files in the site dir.
+fn collect_crepus_files(site_dir: &Path) -> (HashMap<String, String>, Vec<String>) {
     let mut crepus_files: HashMap<String, String> = HashMap::new();
     let mut entries: Vec<String> = Vec::new();
 
-    match std::fs::read_dir(&args.site_dir) {
+    match std::fs::read_dir(site_dir) {
         Ok(dir) => {
             for entry in dir.flatten() {
                 let path = entry.path();
@@ -1585,9 +1580,20 @@ fn run_build_full(args: &BuildFullArgs) {
             }
         }
         Err(e) => {
-            ui::error(&format!("read dir {}: {e}", args.site_dir.display()));
+            ui::error(&format!("read dir {}: {e}", site_dir.display()));
         }
     }
+
+    (crepus_files, entries)
+}
+
+fn run_build_full(args: &BuildFullArgs) {
+    let t0 = Instant::now();
+    eprintln!("{}", style("crepus web build-full").dim());
+    eprintln!();
+
+    // L1 Rayon: collect all .crepus files in the site dir.
+    let (crepus_files, entries) = collect_crepus_files(&args.site_dir);
 
     let ctx = crepuscularity_core::TemplateContext::new();
     let entry_refs: Vec<&str> = entries.iter().map(|s| s.as_str()).collect();
