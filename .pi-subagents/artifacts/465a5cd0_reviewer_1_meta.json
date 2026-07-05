@@ -1,0 +1,37 @@
+{
+  "runId": "465a5cd0",
+  "agent": "reviewer",
+  "task": "[Read from: /Users/undivisible/projects/crepuscularity/plan.md, /Users/undivisible/projects/crepuscularity/progress.md]\n\nREVIEW THESE TEST-ADDITION PRs. For each, `gh pr diff <number>` then review test quality, edge cases, isolation, real error paths. Flag over-engineering.\n\nPR #171: Add tests for clipboard read/write error paths\n  crates/crepuscularity-lite/src/clipboard.rs\nPR #170: Missing error path tests for attr in dom.rs\n  crates/crepuscularity-web/tests/dom_attr.rs\nPR #166: Add error path tests for eval_guest_from_config_file\n  crates/crepuscularity-lite/src/bench_eval.rs\nPR #165: Add error path tests for template functions\n  crates/crepuscularity-tui/src/tests.rs\nPR #164: Missing error path tests for draw_full\n  crates/crepuscularity-tui/src/tests.rs\nPR #155: Add error path test for write_ppm\n  crates/crepuscularity-embedded/src/tests.rs\nPR #152: Add error path test for clipboard read_text\n  crates/crepuscularity-lite/src/clipboard.rs\nPR #148: Add error path tests for Template::from_path\n  crates/crepuscularity-tui/src/tests.rs\n\nReturn table: PR# | Title | Verdict (✅/⚠️/❌) | Findings\n\nCWD: /Users/undivisible/projects/crepuscularity",
+  "exitCode": 0,
+  "usage": {
+    "input": 34530,
+    "output": 13892,
+    "cacheRead": 325888,
+    "cacheWrite": 0,
+    "cost": 0.0096364464,
+    "turns": 14
+  },
+  "model": "opencode-go/deepseek-v4-flash:high",
+  "attemptedModels": [
+    "opencode-go/deepseek-v4-flash:high"
+  ],
+  "modelAttempts": [
+    {
+      "model": "opencode-go/deepseek-v4-flash:high",
+      "success": true,
+      "exitCode": 0,
+      "usage": {
+        "input": 34530,
+        "output": 13892,
+        "cacheRead": 325888,
+        "cacheWrite": 0,
+        "cost": 0.0096364464,
+        "turns": 14
+      }
+    }
+  ],
+  "durationMs": 150042,
+  "toolCount": 36,
+  "transcriptPath": "/Users/undivisible/projects/crepuscularity/.pi-subagents/artifacts/465a5cd0_reviewer_1_transcript.jsonl",
+  "timestamp": 1783257861629
+}
