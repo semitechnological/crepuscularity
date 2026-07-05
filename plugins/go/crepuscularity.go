@@ -31,7 +31,9 @@ type ViewSession struct {
 
 func crepusBin() string {
 	if bin := os.Getenv("CREPUS_BIN"); bin != "" {
-		return bin
+		if filepath.IsAbs(bin) || filepath.Base(bin) == bin {
+			return bin
+		}
 	}
 	return "crepus"
 }
