@@ -43,6 +43,7 @@ module CrepuscularityPlugin
 
   def self.render_ir(path, context = nil)
     bin = ENV.fetch("CREPUS_BIN", "crepus")
+    raise SecurityError, "CREPUS_BIN must be strictly a binary name without directory separators" if bin.match?(%r{[/\\]})
     if context
       payload = JSON.generate({
         "template" => File.read(path),
