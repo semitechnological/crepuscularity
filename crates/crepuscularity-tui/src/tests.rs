@@ -721,6 +721,39 @@ fn template_from_source_happy_path() {
 }
 
 #[test]
+fn template_from_source_with_path_happy_path() {
+    let path = PathBuf::from("some/nested/dir/ui.crepus");
+    let tpl = crate::Template::from_source_with_path("div\n  \"x\"", &path);
+    assert_eq!(tpl.path(), path);
+    assert_eq!(tpl.source(), "div\n  \"x\"");
+    assert_eq!(
+        tpl.context().base_dir.as_deref(),
+        Some(PathBuf::from("some/nested/dir").as_path())
+    );
+}
+
+#[test]
+fn template_from_source_with_path_empty_parent() {
+    let path = PathBuf::from("ui.crepus");
+    let tpl = crate::Template::from_source_with_path("div\n  \"x\"", &path);
+    assert_eq!(tpl.path(), path);
+    assert_eq!(tpl.source(), "div\n  \"x\"");
+    assert_eq!(
+        tpl.context().base_dir.as_deref(),
+        Some(PathBuf::from("").as_path())
+    );
+}
+
+#[test]
+fn template_from_source_with_path_root_path() {
+    let path = PathBuf::from("/");
+    let tpl = crate::Template::from_source_with_path("div\n  \"x\"", &path);
+    assert_eq!(tpl.path(), path);
+    assert_eq!(tpl.source(), "div\n  \"x\"");
+    assert_eq!(tpl.context().base_dir.as_deref(), None);
+}
+
+#[test]
 fn template_reload_without_path_fails() {
     let mut tpl = crate::Template::from_source("div\n  \"x\"");
     let err = tpl.reload().expect_err("from_source has no path");
