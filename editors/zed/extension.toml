@@ -1,6 +1,6 @@
 id = "crepuscularity"
 name = "Crepuscularity"
-version = "0.2.1"
+version = "0.2.2"
 schema_version = 1
 authors = ["Max Carter <max@undivisible.dev>"]
 description = "Crepus templates (.crepus): tree-sitter highlighting, snippets, and crepus-lsp."
@@ -17,7 +17,7 @@ args = ["**"]
 repository = "https://github.com/tschk/crepuscularity"
 path = "tree-sitter-crepus"
 # Must match a commit on `repository` whose `tree-sitter-crepus/grammar.js` includes every node used by `languages/crepus/*.scm`.
-rev = "67f6af3a6efaf0c49ec1d9c41bad96eaa64cae37"
+rev = "a8d07c4a3530556d3c784ab3a1ace4ae0759e6f7"
 
 [language_servers.crepus-lsp]
 name = "crepus-lsp"
