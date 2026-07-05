@@ -1,4 +1,3 @@
-use crepuscularity_core::parser::unescape_crepus_text_literal;
 use proc_macro::TokenStream;
 use proc_macro2::{Span, TokenStream as TokenStream2};
 use quote::quote;
@@ -110,10 +109,18 @@ pub fn view_file(input: TokenStream) -> TokenStream {
 }
 
 fn generate_view(template: &str, span: Span) -> TokenStream2 {
-    let dec = crepuscularity_core::preprocess::strip_indent_decorators(template);
-    let lines = collect_lines(&dec.body);
-    let (mut nodes, _) = parse_nodes(&lines, 0, 0);
-    expand_view_class_aliases(&mut nodes, &dec.class_aliases);
+    let core_nodes = match crepuscularity_core::parser::parse_template(template) {
+        Ok(nodes) => nodes,
+        Err(e) => return syn::Error::new(span, e.to_string()).to_compile_error(),
+    };
+    let nodes = match core_nodes
+        .iter()
+        .map(core_node_to_macro)
+        .collect::<Result<Vec<_>, _>>()
+    {
+        Ok(nodes) => nodes,
+        Err(message) => return syn::Error::new(span, message).to_compile_error(),
+    };
 
     match generate_root(&nodes) {
         Ok(tokens) => tokens,
@@ -174,49 +181,13 @@ fn expand_includes_text(
 }
 
 fn extract_component_section(content: &str, name: &str) -> String {
-    let body = strip_frontmatter(content);
-    let sections = split_component_sections(body);
+    let (_, body, _) = crepuscularity_core::parser::split_frontmatter_parts(content);
+    let sections = crepuscularity_core::parser::split_component_body_sections(body);
     sections
         .into_iter()
-        .find(|(n, _)| n == name)
-        .map(|(_, text)| text)
+        .find(|(n, _, _)| n == name)
+        .map(|(_, text, _)| text)
         .unwrap_or_else(|| panic!("Component `{name}` not found in multi-component file"))
-}
-
-fn strip_frontmatter(content: &str) -> &str {
-    let trimmed = content.trim_start();
-    if !trimmed.starts_with("+++") {
-        return content;
-    }
-    let after_open = &trimmed[3..];
-    if let Some(end) = after_open.find("+++") {
-        &trimmed[end + 6..]
-    } else {
-        content
-    }
-}
-
-fn split_component_sections(content: &str) -> Vec<(String, String)> {
-    let mut sections = Vec::new();
-    let mut current_name: Option<String> = None;
-    let mut current_lines: Vec<String> = Vec::new();
-    for line in content.lines() {
-        if let Some(rest) = line.strip_prefix("--- ") {
-            if let Some(n) = current_name.take() {
-                let text = current_lines.join("\n");
-                sections.push((n, text));
-                current_lines.clear();
-            }
-            current_name = Some(rest.trim().to_string());
-        } else if current_name.is_some() {
-            current_lines.push(line.to_string());
-        }
-    }
-    if let Some(n) = current_name.take() {
-        let text = current_lines.join("\n");
-        sections.push((n, text));
-    }
-    sections
 }
 
 /// Generate typed DOM accessors for all `#id` shorthand IDs reachable from a `.crepus` entry file.
@@ -515,49 +486,6 @@ fn make_rust_ident(id: &str) -> Option<syn::Ident> {
     }
 }
 
-fn expand_view_class_aliases(
-    nodes: &mut [Node],
-    aliases: &std::collections::HashMap<String, String>,
-) {
-    use crepuscularity_core::preprocess::expand_class_list_in_place;
-
-    if aliases.is_empty() {
-        return;
-    }
-    for n in nodes.iter_mut() {
-        match n {
-            Node::Element(el) => {
-                expand_class_list_in_place(&mut el.classes, aliases);
-                let mut out_cc = Vec::new();
-                for cc in std::mem::take(&mut el.conditional_classes) {
-                    for c in crepuscularity_core::preprocess::expand_class_token(&cc.class, aliases)
-                    {
-                        out_cc.push(ConditionalClass {
-                            class: c,
-                            condition: cc.condition.clone(),
-                        });
-                    }
-                }
-                el.conditional_classes = out_cc;
-                expand_view_class_aliases(&mut el.children, aliases);
-            }
-            Node::If(b) => {
-                expand_view_class_aliases(&mut b.then_children, aliases);
-                if let Some(e) = &mut b.else_children {
-                    expand_view_class_aliases(e, aliases);
-                }
-            }
-            Node::For(b) => expand_view_class_aliases(&mut b.body, aliases),
-            Node::Match(b) => {
-                for arm in &mut b.arms {
-                    expand_view_class_aliases(&mut arm.body, aliases);
-                }
-            }
-            Node::Text(_) | Node::RawExpr(_) | Node::LetDecl(_) => {}
-        }
-    }
-}
-
 // ============================================================
 // AST
 // ============================================================
@@ -642,257 +570,107 @@ struct LetDecl {
 }
 
 // ============================================================
-// Parser
+// Core AST → macro AST conversion
 // ============================================================
 
-fn collect_lines(template: &str) -> Vec<(usize, String)> {
-    let lines: Vec<(usize, String)> = template
-        .lines()
-        .map(|line| {
-            let trimmed = line.trim_start();
-            let indent = line.len() - trimmed.len();
-            (indent, trimmed.to_string())
-        })
-        .filter(|(_, line)| !line.is_empty() && !line.starts_with('#'))
-        .collect();
-
-    // Normalize indentation so root elements always start at column 0.
-    // This allows templates embedded in indented code to work correctly.
-    let min_indent = lines.iter().map(|(i, _)| *i).min().unwrap_or(0);
-    if min_indent == 0 {
-        return lines;
-    }
-    lines
-        .into_iter()
-        .map(|(i, l)| (i - min_indent, l))
-        .collect()
-}
-
-fn parse_nodes(
-    lines: &[(usize, String)],
-    start: usize,
-    expected_indent: usize,
-) -> (Vec<Node>, usize) {
-    let mut nodes = Vec::new();
-    let mut i = start;
-
-    while i < lines.len() {
-        let (indent, line) = &lines[i];
-
-        if *indent < expected_indent {
-            break;
+fn core_node_to_macro(node: &crepuscularity_core::ast::Node) -> Result<Node, String> {
+    use crepuscularity_core::ast;
+    match node {
+        ast::Node::Element(el) => Ok(Node::Element(Element {
+            tag: el.tag.clone(),
+            id: el.id.clone(),
+            classes: el.classes.clone(),
+            conditional_classes: el
+                .conditional_classes
+                .iter()
+                .map(|cc| ConditionalClass {
+                    class: cc.class.clone(),
+                    condition: cc.condition.clone(),
+                })
+                .collect(),
+            event_handlers: el
+                .event_handlers
+                .iter()
+                .map(|eh| EventHandler {
+                    event: eh.event.clone(),
+                    modifiers: eh.modifiers.clone(),
+                    handler: eh.handler.clone(),
+                })
+                .collect(),
+            bindings: el
+                .bindings
+                .iter()
+                .map(|b| Binding {
+                    prop: b.prop.clone(),
+                    value: b.value.clone(),
+                })
+                .collect(),
+            children: el
+                .children
+                .iter()
+                .map(core_node_to_macro)
+                .collect::<Result<Vec<_>, _>>()?,
+        })),
+        ast::Node::Text(parts) => Ok(Node::Text(
+            parts
+                .iter()
+                .map(|p| match p {
+                    ast::TextPart::Literal(s) => TextPart::Literal(s.clone()),
+                    ast::TextPart::Expr(s) => TextPart::Expr(s.clone()),
+                })
+                .collect(),
+        )),
+        ast::Node::RawText(expr) => Ok(Node::RawExpr(expr.clone())),
+        ast::Node::If(block) => Ok(Node::If(IfBlock {
+            condition: block.condition.clone(),
+            then_children: block
+                .then_children
+                .iter()
+                .map(core_node_to_macro)
+                .collect::<Result<Vec<_>, _>>()?,
+            else_children: block
+                .else_children
+                .as_ref()
+                .map(|cs| {
+                    cs.iter()
+                        .map(core_node_to_macro)
+                        .collect::<Result<Vec<_>, _>>()
+                })
+                .transpose()?,
+        })),
+        ast::Node::For(block) => Ok(Node::For(ForBlock {
+            pattern: block.pattern.clone(),
+            iterator: block.iterator.clone(),
+            body: block
+                .body
+                .iter()
+                .map(core_node_to_macro)
+                .collect::<Result<Vec<_>, _>>()?,
+        })),
+        ast::Node::Match(block) => Ok(Node::Match(MatchBlock {
+            expr: block.expr.clone(),
+            arms: block
+                .arms
+                .iter()
+                .map(|arm| -> Result<MatchArm, String> {
+                    Ok(MatchArm {
+                        pattern: arm.pattern.clone(),
+                        body: arm
+                            .body
+                            .iter()
+                            .map(core_node_to_macro)
+                            .collect::<Result<Vec<_>, _>>()?,
+                    })
+                })
+                .collect::<Result<Vec<_>, _>>()?,
+        })),
+        ast::Node::LetDecl(decl) => Ok(Node::LetDecl(LetDecl {
+            name: decl.name.clone(),
+            expr: decl.expr.clone(),
+        })),
+        ast::Node::RawHtml(_) | ast::Node::Include(_) | ast::Node::Embed(_) => {
+            Err("node type not supported in view! macro".to_string())
         }
-
-        if *indent > expected_indent {
-            i += 1;
-            continue;
-        }
-
-        // `else` at our level belongs to the caller's `if`
-        if line == "else" || line.starts_with("else if ") {
-            break;
-        }
-
-        // Match arm terminators: handled by parse_match_arms
-        if line.ends_with(" =>") || line == "_ =>" {
-            break;
-        }
-
-        // $: let declaration
-        if let Some(decl) = try_parse_let_decl(line) {
-            nodes.push(Node::LetDecl(decl));
-            i += 1;
-            continue;
-        }
-
-        // match block
-        if let Some(expr) = try_parse_match(line) {
-            i += 1;
-            let (arms, next_i) = parse_match_arms(lines, i, expected_indent);
-            i = next_i;
-            nodes.push(Node::Match(MatchBlock { expr, arms }));
-            continue;
-        }
-
-        // if block — use dedicated parser for else-if chains
-        if try_parse_if(line).is_some() {
-            let (node, next_i) = parse_if_node(lines, i, expected_indent);
-            i = next_i;
-            nodes.push(node);
-            continue;
-        }
-
-        i += 1;
-
-        // Collect children: lines with strictly greater indent
-        let (children, next_i) = if i < lines.len() && lines[i].0 > expected_indent {
-            let child_indent = lines[i].0;
-            parse_nodes(lines, i, child_indent)
-        } else {
-            (vec![], i)
-        };
-        i = next_i;
-
-        if let Some((pattern, iterator)) = try_parse_for(line) {
-            nodes.push(Node::For(ForBlock {
-                pattern,
-                iterator,
-                body: children,
-            }));
-        } else if line.starts_with('"') {
-            let parts = parse_text_template(line);
-            nodes.push(Node::Text(parts));
-        } else if is_raw_expr(line) {
-            let expr = line[1..line.len() - 1].trim().to_string();
-            nodes.push(Node::RawExpr(expr));
-        } else {
-            let element = parse_element_line(line, children);
-            nodes.push(Node::Element(element));
-        }
-    }
-
-    (nodes, i)
-}
-
-/// Parse a single `if` node, handling `else if` chains recursively.
-fn parse_if_node(lines: &[(usize, String)], i: usize, expected_indent: usize) -> (Node, usize) {
-    let line = &lines[i].1;
-    let condition = try_parse_if(line).unwrap_or_default();
-    let mut i = i + 1;
-
-    // Parse then-children (deeper indent)
-    let (then_children, next_i) = if i < lines.len() && lines[i].0 > expected_indent {
-        let child_indent = lines[i].0;
-        parse_nodes(lines, i, child_indent)
-    } else {
-        (vec![], i)
-    };
-    i = next_i;
-
-    // Look for `else` or `else if` at same indent
-    let else_children = if i < lines.len() && lines[i].0 == expected_indent {
-        let else_line = &lines[i].1;
-        if else_line == "else" {
-            i += 1; // consume `else`
-            if i < lines.len() && lines[i].0 > expected_indent {
-                let else_indent = lines[i].0;
-                let (else_nodes, next_i) = parse_nodes(lines, i, else_indent);
-                i = next_i;
-                Some(else_nodes)
-            } else {
-                Some(vec![])
-            }
-        } else if else_line.starts_with("else if ") {
-            // Rewrite `else if {cond}` as `if {cond}` and recurse
-            let rewritten = else_line
-                .strip_prefix("else ")
-                .unwrap_or(else_line)
-                .to_string();
-            let mut patched_lines = lines.to_vec();
-            patched_lines[i].1 = rewritten;
-            let (else_if_node, next_i) = parse_if_node(&patched_lines, i, expected_indent);
-            i = next_i;
-            Some(vec![else_if_node])
-        } else {
-            None
-        }
-    } else {
-        None
-    };
-
-    (
-        Node::If(IfBlock {
-            condition,
-            then_children,
-            else_children,
-        }),
-        i,
-    )
-}
-
-/// Parse match arms at the given indent level.
-/// Arms look like: `{Pattern} =>` or `_ =>` (with body at deeper indent)
-fn parse_match_arms(
-    lines: &[(usize, String)],
-    start: usize,
-    expected_indent: usize,
-) -> (Vec<MatchArm>, usize) {
-    let mut arms = Vec::new();
-    let mut i = start;
-
-    while i < lines.len() {
-        let (indent, line) = &lines[i];
-        if *indent < expected_indent {
-            break;
-        }
-        if *indent > expected_indent {
-            i += 1;
-            continue;
-        }
-
-        // Arm lines end with ` =>`
-        if let Some(pattern) = try_parse_match_arm(line) {
-            i += 1;
-            let (body, next_i) = if i < lines.len() && lines[i].0 > expected_indent {
-                let body_indent = lines[i].0;
-                parse_nodes(lines, i, body_indent)
-            } else {
-                (vec![], i)
-            };
-            i = next_i;
-            arms.push(MatchArm { pattern, body });
-        } else {
-            // Not an arm, stop
-            break;
-        }
-    }
-
-    (arms, i)
-}
-
-fn try_parse_if(line: &str) -> Option<String> {
-    let rest = line.strip_prefix("if ")?;
-    Some(extract_braced_expr_str(rest.trim()).unwrap_or_else(|| rest.trim().to_string()))
-}
-
-fn try_parse_for(line: &str) -> Option<(String, String)> {
-    let rest = line.strip_prefix("for ")?;
-    let in_pos = rest.find(" in ")?;
-    let pattern = rest[..in_pos].trim().to_string();
-    let after_in = rest[in_pos + 4..].trim();
-    let iterator = extract_braced_expr_str(after_in).unwrap_or_else(|| after_in.to_string());
-    Some((pattern, iterator))
-}
-
-fn try_parse_match(line: &str) -> Option<String> {
-    let rest = line.strip_prefix("match ")?;
-    Some(extract_braced_expr_str(rest.trim()).unwrap_or_else(|| rest.trim().to_string()))
-}
-
-fn try_parse_match_arm(line: &str) -> Option<String> {
-    let pattern_part = line.strip_suffix(" =>")?;
-    let pattern = pattern_part.trim();
-    // Strip braces if present: `{Variant::A}` → `Variant::A`
-    if pattern.starts_with('{') && pattern.ends_with('}') {
-        Some(pattern[1..pattern.len() - 1].trim().to_string())
-    } else {
-        Some(pattern.to_string())
-    }
-}
-
-fn try_parse_let_decl(line: &str) -> Option<LetDecl> {
-    let rest = line.strip_prefix("$: let ")?;
-    let eq_pos = rest.find('=')?;
-    let name = rest[..eq_pos].trim().to_string();
-    let expr_str = rest[eq_pos + 1..].trim();
-    let expr = extract_braced_expr_str(expr_str).unwrap_or_else(|| expr_str.to_string());
-    Some(LetDecl { name, expr })
-}
-
-fn is_raw_expr(line: &str) -> bool {
-    line.starts_with('{') && line.ends_with('}') && {
-        let inner = &line[1..line.len() - 1];
-        !inner.contains('"')
     }
 }
 
@@ -914,230 +692,6 @@ fn extract_braced_expr_str(s: &str) -> Option<String> {
         }
     }
     None
-}
-
-fn parse_element_line(line: &str, children: Vec<Node>) -> Element {
-    let tokens = tokenize_line(line);
-    if tokens.is_empty() {
-        return Element {
-            tag: "div".to_string(),
-            id: None,
-            classes: vec![],
-            conditional_classes: vec![],
-            event_handlers: vec![],
-            bindings: vec![],
-            children,
-        };
-    }
-
-    let tag = tokens[0].clone();
-    let mut children = children;
-    let inline_text = tokens
-        .last()
-        .filter(|token| is_inline_text_token(token))
-        .cloned();
-    let parse_limit = if inline_text.is_some() {
-        tokens.len().saturating_sub(1)
-    } else {
-        tokens.len()
-    };
-    if let Some(text) = inline_text {
-        children.insert(0, Node::Text(parse_text_template(&text)));
-    }
-
-    let mut id = None;
-    let mut classes = Vec::new();
-    let mut conditional_classes = Vec::new();
-    let mut event_handlers = Vec::new();
-    let mut bindings = Vec::new();
-
-    for token in &tokens[1..parse_limit] {
-        if let Some(rest) = token.strip_prefix('@') {
-            // Event: @event|mod1|mod2=handler
-            if let Some(eq_pos) = rest.find('=') {
-                let event_part = &rest[..eq_pos];
-                let handler = strip_optional_quotes(&rest[eq_pos + 1..]).to_string();
-                let mut parts = event_part.splitn(2, '|');
-                let event = parts.next().unwrap_or("").to_string();
-                let modifiers: Vec<String> = rest[..eq_pos]
-                    .split('|')
-                    .skip(1)
-                    .map(|s| s.to_string())
-                    .collect();
-                event_handlers.push(EventHandler {
-                    event,
-                    modifiers,
-                    handler,
-                });
-            }
-        } else if let Some(rest) = token.strip_prefix("when:") {
-            if let Some((condition, raw_classes)) =
-                crepuscularity_core::parser::parse_when_attribute_suffix(rest)
-            {
-                let classes_src = strip_optional_quotes(raw_classes.trim());
-                for class in classes_src.split_whitespace() {
-                    if class.is_empty() {
-                        continue;
-                    }
-                    conditional_classes.push(ConditionalClass {
-                        class: class.to_string(),
-                        condition: condition.clone(),
-                    });
-                }
-            }
-        } else if let Some(rest) = token.strip_prefix("class:") {
-            // Conditional class: class:hidden={condition}
-            if let Some(eq_pos) = rest.find('=') {
-                let class = rest[..eq_pos].to_string();
-                let cond_str = rest[eq_pos + 1..].trim();
-                let condition = if cond_str.starts_with('{') && cond_str.ends_with('}') {
-                    cond_str[1..cond_str.len() - 1].trim().to_string()
-                } else {
-                    cond_str.to_string()
-                };
-                conditional_classes.push(ConditionalClass { class, condition });
-            }
-        } else if let Some(rest) = token.strip_prefix("bind:") {
-            if let Some(eq_pos) = rest.find('=') {
-                let prop = rest[..eq_pos].to_string();
-                let value = rest[eq_pos + 1..]
-                    .trim_matches(|c| c == '{' || c == '}')
-                    .to_string();
-                bindings.push(Binding { prop, value });
-            }
-        } else if let Some(rest) = token.strip_prefix('#') {
-            if !rest.is_empty() {
-                id = Some(rest.to_string());
-            }
-        } else {
-            classes.push(token.clone());
-        }
-    }
-
-    Element {
-        tag,
-        id,
-        classes,
-        conditional_classes,
-        event_handlers,
-        bindings,
-        children,
-    }
-}
-
-/// Splits a template line into tokens, treating bracket content as a single token.
-fn tokenize_line(line: &str) -> Vec<String> {
-    let mut tokens = Vec::new();
-    let mut current = String::new();
-    let mut bracket_depth: usize = 0;
-    let mut brace_depth: usize = 0;
-    let mut in_string = false;
-    let mut string_char = ' ';
-
-    for ch in line.chars() {
-        match ch {
-            '[' if !in_string && brace_depth == 0 => {
-                bracket_depth += 1;
-                current.push(ch);
-            }
-            ']' if !in_string && brace_depth == 0 => {
-                bracket_depth = bracket_depth.saturating_sub(1);
-                current.push(ch);
-            }
-            '{' if !in_string && bracket_depth == 0 => {
-                brace_depth += 1;
-                current.push(ch);
-            }
-            '}' if !in_string && bracket_depth == 0 => {
-                brace_depth = brace_depth.saturating_sub(1);
-                current.push(ch);
-            }
-            '\'' | '"' if bracket_depth > 0 || brace_depth > 0 => {
-                if in_string && ch == string_char {
-                    in_string = false;
-                } else if !in_string {
-                    in_string = true;
-                    string_char = ch;
-                }
-                current.push(ch);
-            }
-            ' ' | '\t' if bracket_depth == 0 && brace_depth == 0 && !in_string => {
-                if !current.is_empty() {
-                    tokens.push(current.clone());
-                    current.clear();
-                }
-            }
-            _ => current.push(ch),
-        }
-    }
-
-    if !current.is_empty() {
-        tokens.push(current);
-    }
-
-    tokens
-}
-
-fn is_inline_text_token(token: &str) -> bool {
-    token.len() >= 2 && token.starts_with('"') && token.ends_with('"')
-}
-
-fn strip_optional_quotes(s: &str) -> &str {
-    if s.len() >= 2
-        && ((s.starts_with('"') && s.ends_with('"')) || (s.starts_with('\'') && s.ends_with('\'')))
-    {
-        &s[1..s.len() - 1]
-    } else {
-        s
-    }
-}
-
-fn parse_text_template(line: &str) -> Vec<TextPart> {
-    let content = if line.starts_with('"') && line.ends_with('"') && line.len() >= 2 {
-        &line[1..line.len() - 1]
-    } else {
-        line
-    };
-
-    let mut parts = Vec::new();
-    let mut literal = String::new();
-    let mut chars = content.chars().peekable();
-
-    while let Some(ch) = chars.next() {
-        if ch == '{' {
-            if !literal.is_empty() {
-                parts.push(TextPart::Literal(unescape_crepus_text_literal(&literal)));
-                literal.clear();
-            }
-            let mut expr = String::new();
-            let mut depth = 1usize;
-            for ec in chars.by_ref() {
-                match ec {
-                    '{' => {
-                        depth += 1;
-                        expr.push(ec);
-                    }
-                    '}' => {
-                        depth -= 1;
-                        if depth == 0 {
-                            break;
-                        }
-                        expr.push(ec);
-                    }
-                    _ => expr.push(ec),
-                }
-            }
-            parts.push(TextPart::Expr(expr.trim().to_string()));
-        } else {
-            literal.push(ch);
-        }
-    }
-
-    if !literal.is_empty() {
-        parts.push(TextPart::Literal(unescape_crepus_text_literal(&literal)));
-    }
-
-    parts
 }
 
 // ============================================================

@@ -144,7 +144,7 @@ pub(crate) fn parse_component_file_inner(content: &str) -> Result<ComponentFile,
     Ok(ComponentFile { components })
 }
 
-pub(crate) fn split_frontmatter_parts(content: &str) -> (Option<&str>, &str, usize) {
+pub fn split_frontmatter_parts(content: &str) -> (Option<&str>, &str, usize) {
     let trimmed = content.trim_start();
     if !trimmed.starts_with("+++") {
         return (None, content, 0);
@@ -160,7 +160,7 @@ pub(crate) fn split_frontmatter_parts(content: &str) -> (Option<&str>, &str, usi
     }
 }
 
-pub(crate) fn split_component_body_sections(body: &str) -> Vec<(String, String, usize)> {
+pub fn split_component_body_sections(body: &str) -> Vec<(String, String, usize)> {
     let mut sections: Vec<(String, String, usize)> = Vec::new();
     let mut current_name: Option<String> = None;
     let mut current_lines: Vec<&str> = Vec::new();
