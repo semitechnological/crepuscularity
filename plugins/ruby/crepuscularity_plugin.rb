@@ -42,6 +42,14 @@ module CrepuscularityPlugin
   end
 
   def self.render_ir(path, context = nil)
+    # resolve symlinks and absolute paths securely
+    resolved_path = File.realpath(path)
+    # ensure it strictly resides within the current working directory boundary
+    base_dir = File.realpath(Dir.pwd)
+    unless resolved_path.start_with?(base_dir + File::SEPARATOR) || resolved_path == base_dir
+      raise ArgumentError, "Invalid path: must be within current directory"
+    end
+
     bin = ENV.fetch("CREPUS_BIN", "crepus")
     raise SecurityError, "CREPUS_BIN must be strictly a binary name without directory separators" if bin.match?(%r{[/\\]})
     if context
