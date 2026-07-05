@@ -170,3 +170,25 @@ where
     }
     Ok(frame)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_element_ref_val() {
+        let mut element = ElementRef::new("test-id");
+
+        // Happy path
+        element.val("hello world");
+        assert_eq!(element.content, "hello world");
+
+        // Method chaining
+        element.val("chained").clear().val("final");
+        assert_eq!(element.content, "final");
+
+        // Empty input
+        element.val("");
+        assert_eq!(element.content, "");
+    }
+}
