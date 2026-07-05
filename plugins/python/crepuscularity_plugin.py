@@ -20,9 +20,10 @@ EventHandler = Callable[[EventPayload, "ViewSession"], None]
 
 
 class ViewSession:
-    def __init__(self, path: str | Path, context: dict[str, Any] | None = None) -> None:
+    def __init__(self, path: str | Path, context: dict[str, Any] | None = None, allowed_dir: str | Path | None = None) -> None:
         self.path = Path(path)
         self.context = dict(context or {})
+        self.allowed_dir = allowed_dir
         self._handlers: dict[str, EventHandler] = {}
 
     def on(self, handler: str, callback: EventHandler) -> "ViewSession":
@@ -30,7 +31,7 @@ class ViewSession:
         return self
 
     def render_ir(self) -> ViewIr:
-        return render_ir(self.path, self.context)
+        return render_ir(self.path, self.context, self.allowed_dir)
 
     def render_html(self) -> str:
         return "".join(_render_node(node) for node in self.render_ir().root)
@@ -56,11 +57,15 @@ def _crepus_bin() -> str:
 _BIND_BLOCKLIST = frozenset({"baseDir", "_"})  # ponytail: block security-sensitive keys only
 
 
-def render_ir(path: str | Path, context: dict[str, Any] | None = None) -> ViewIr:
+def render_ir(path: str | Path, context: dict[str, Any] | None = None, allowed_dir: str | Path | None = None) -> ViewIr:
     args = [_crepus_bin(), "native", "ir", str(path)]
     input_data = None
     if context is not None:
-        source = Path(path).read_text()
+        resolved_path = Path(path).resolve()
+        resolved_allowed = Path(allowed_dir).resolve() if allowed_dir is not None else Path.cwd().resolve()
+        if not resolved_path.is_relative_to(resolved_allowed):
+            raise ValueError("Path traversal detected")
+        source = resolved_path.read_text()
         payload = {"template": source, "context": context, "baseDir": str(Path(path).parent)}
         args = [_crepus_bin(), "native", "ir", "--stdin-json"]
         input_data = json.dumps(payload)
@@ -71,8 +76,8 @@ def render_ir(path: str | Path, context: dict[str, Any] | None = None) -> ViewIr
     return ViewIr(version=data["version"], root=data["root"])
 
 
-def render_html(path: str | Path, context: dict[str, Any] | None = None) -> str:
-    return "".join(_render_node(node) for node in render_ir(path, context).root)
+def render_html(path: str | Path, context: dict[str, Any] | None = None, allowed_dir: str | Path | None = None) -> str:
+    return "".join(_render_node(node) for node in render_ir(path, context, allowed_dir).root)
 
 
 def _render_node(node: dict[str, Any]) -> str:
