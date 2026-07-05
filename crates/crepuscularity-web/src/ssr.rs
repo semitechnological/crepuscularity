@@ -659,6 +659,11 @@ fn render_element_ssr(
         out.push('"');
     }
 
+    if crate::void_html::is_void_html_tag(&el.tag) {
+        out.push_str(" />");
+        return Ok(out);
+    }
+
     out.push('>');
 
     for child in &el.children {

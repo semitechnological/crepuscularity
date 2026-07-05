@@ -21,6 +21,15 @@ fn decode_hydration(html: &str) -> Value {
 }
 
 #[test]
+fn void_br_has_no_closing_tag() {
+    let ctx = TemplateContext::new();
+    let tpl = "pre\n  span text-zinc-500\n    \"# install\"\n  br\n  \"$ cargo install\"";
+    let html = render_template_to_html_with_ssr(tpl, &ctx, false).unwrap();
+    assert!(!html.contains("<br></br>"), "{html}");
+    assert!(html.contains("<br />") || html.contains("<br>"), "{html}");
+}
+
+#[test]
 fn markers_false_matches_plain() {
     let mut ctx = TemplateContext::new();
     ctx.set("name", "Ada");

@@ -17,6 +17,7 @@ use crepuscularity_core::virtual_files::lookup_virtual_file;
 mod bundle;
 #[cfg(all(target_arch = "wasm32", feature = "dom"))]
 pub mod dom;
+mod void_html;
 
 /// Reactive DOM bindings re-exported from `crepuscularity-reactive`.
 /// Enable the `reactive` feature to use signals, memos, and effects in WASM.
@@ -425,6 +426,11 @@ fn render_element(
         out.push('"');
     }
 
+    if void_html::is_void_html_tag(&el.tag) {
+        out.push_str(" />");
+        return Ok(out);
+    }
+
     out.push('>');
 
     for child in &el.children {
@@ -799,6 +805,11 @@ fn render_element_with_hydration(
             animation.duration_expr, animation.easing
         )));
         out.push('"');
+    }
+
+    if void_html::is_void_html_tag(&el.tag) {
+        out.push_str(" />");
+        return Ok(out);
     }
 
     out.push('>');
