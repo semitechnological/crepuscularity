@@ -170,3 +170,66 @@ where
     }
     Ok(frame)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn element_ref_new_initialization() {
+        let el = ElementRef::new("test-id");
+        assert_eq!(el.id, "test-id");
+        assert_eq!(el.content, "");
+    }
+
+    #[test]
+    fn element_ref_set_content() {
+        let mut el = ElementRef::new("test-id");
+        el.set_content("Hello");
+        assert_eq!(el.content, "Hello");
+    }
+
+    #[test]
+    fn element_ref_content_alias() {
+        let mut el = ElementRef::new("test-id");
+        el.content("World");
+        assert_eq!(el.content, "World");
+    }
+
+    #[test]
+    fn element_ref_text_alias() {
+        let mut el = ElementRef::new("test-id");
+        el.text("TextContent");
+        assert_eq!(el.content, "TextContent");
+    }
+
+    #[test]
+    fn element_ref_val_alias() {
+        let mut el = ElementRef::new("test-id");
+        el.val("ValContent");
+        assert_eq!(el.content, "ValContent");
+    }
+
+    #[test]
+    fn element_ref_clear() {
+        let mut el = ElementRef::new("test-id");
+        el.set_content("Should be cleared");
+        assert_eq!(el.content, "Should be cleared");
+
+        el.clear();
+        assert_eq!(el.content, "");
+    }
+
+    #[test]
+    fn element_ref_chaining() {
+        let mut el = ElementRef::new("test-id");
+        el.set_content("A")
+            .content("B")
+            .text("C")
+            .val("D")
+            .clear()
+            .text("Final");
+
+        assert_eq!(el.content, "Final");
+    }
+}

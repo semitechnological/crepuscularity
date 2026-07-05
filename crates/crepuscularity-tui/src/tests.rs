@@ -711,10 +711,90 @@ fn template_reload_picks_up_new_source() {
 }
 
 #[test]
+fn template_from_source_happy_path() {
+    let tpl = crate::Template::from_source("div\n  \"hello\"");
+    assert_eq!(tpl.source(), "div\n  \"hello\"");
+    assert!(tpl.path().as_os_str().is_empty());
+
+    let rows = render(20, 3, tpl.source(), tpl.context());
+    assert!(all_text(&rows).contains("hello"), "{}", all_text(&rows));
+}
+
+#[test]
+fn template_from_source_with_path_happy_path() {
+    let path = PathBuf::from("some/nested/dir/ui.crepus");
+    let tpl = crate::Template::from_source_with_path("div\n  \"x\"", &path);
+    assert_eq!(tpl.path(), path);
+    assert_eq!(tpl.source(), "div\n  \"x\"");
+    assert_eq!(
+        tpl.context().base_dir.as_deref(),
+        Some(PathBuf::from("some/nested/dir").as_path())
+    );
+}
+
+#[test]
+fn template_from_source_with_path_empty_parent() {
+    let path = PathBuf::from("ui.crepus");
+    let tpl = crate::Template::from_source_with_path("div\n  \"x\"", &path);
+    assert_eq!(tpl.path(), path);
+    assert_eq!(tpl.source(), "div\n  \"x\"");
+    assert_eq!(
+        tpl.context().base_dir.as_deref(),
+        Some(PathBuf::from("").as_path())
+    );
+}
+
+#[test]
+fn template_from_source_with_path_root_path() {
+    let path = PathBuf::from("/");
+    let tpl = crate::Template::from_source_with_path("div\n  \"x\"", &path);
+    assert_eq!(tpl.path(), path);
+    assert_eq!(tpl.source(), "div\n  \"x\"");
+    assert_eq!(tpl.context().base_dir.as_deref(), None);
+}
+
+#[test]
 fn template_reload_without_path_fails() {
     let mut tpl = crate::Template::from_source("div\n  \"x\"");
     let err = tpl.reload().expect_err("from_source has no path");
     assert!(err.contains("no path"), "{err}");
+}
+
+#[test]
+fn template_from_path_missing_file_fails() {
+    let dir = temp_case("missing-file");
+    let path = dir.join("does_not_exist.crepus");
+
+    let res = crate::Template::from_path(&path);
+    assert!(res.is_err(), "from_path should fail for missing file");
+    if let Err(err) = res {
+        assert!(
+            err.contains("template error"),
+            "Expected error to contain 'template error', got: {err}"
+        );
+    }
+}
+
+#[test]
+fn template_reload_with_missing_file_fails_and_keeps_old_source() {
+    let dir = temp_case("reload_missing");
+    let path = dir.join("ui.crepus");
+    fs::write(&path, "div\n  \"initial content\"").unwrap();
+
+    let mut tpl = template(&path).unwrap();
+    assert_eq!(tpl.source(), "div\n  \"initial content\"");
+
+    fs::remove_file(&path).unwrap();
+
+    let err = tpl
+        .reload()
+        .expect_err("reload should fail if file is missing");
+    assert!(err.contains("template error"), "{err}");
+    assert_eq!(
+        tpl.source(),
+        "div\n  \"initial content\"",
+        "source should be unchanged on error"
+    );
 }
 
 #[test]
@@ -892,5 +972,68 @@ mod watcher_filter {
         let other = other.canonicalize().unwrap();
         let e = ev(EventKind::Modify(ModifyKind::Any), vec![other]);
         assert!(!event_touches_relevant_path(&e, &target, dir.path()));
+    }
+}
+
+mod template_error_tests {
+    use crate::{draw, template};
+    use ratatui::{backend::TestBackend, Terminal};
+
+    #[test]
+    fn template_missing_file_returns_error() {
+        let res = template("non_existent_file.crepus");
+        match res {
+            Err(e) => assert!(e.contains("template error")),
+            Ok(_) => panic!("expected err"),
+        }
+    }
+
+    #[test]
+    fn draw_missing_file_returns_error() {
+        let backend = TestBackend::new(80, 24);
+        let mut terminal = Terminal::new(backend).unwrap();
+
+        let res = draw(&mut terminal, "non_existent_file.crepus", |_| {});
+        match res {
+            Err(e) => assert!(e.contains("template error")),
+            Ok(_) => panic!("expected err"),
+        }
+    }
+
+    #[test]
+    fn template_draw_full_returns_error_on_invalid_template() {
+        let tpl = crate::Template::from_source("<< invalid");
+        let backend = TestBackend::new(40, 3);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let mut err = None;
+        terminal
+            .draw(|frame| {
+                if let Err(e) = tpl.draw_full(frame) {
+                    err = Some(e);
+                }
+            })
+            .unwrap();
+        let e = err.expect("draw_full should return an error for invalid template");
+        assert!(
+            e.contains("parse error"),
+            "error should mention parse error: {e}"
+        );
+    }
+
+    #[test]
+    fn draw_helper_returns_error_on_invalid_template() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("ui.crepus");
+        std::fs::write(&path, "<< invalid syntax").unwrap();
+
+        let backend = TestBackend::new(40, 4);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let res = crate::draw(&mut terminal, &path, |_ui| {});
+
+        let e = res.expect_err("draw should return an error for invalid template");
+        assert!(
+            e.contains("parse error"),
+            "error should mention parse error: {e}"
+        );
     }
 }

@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 pub(crate) type NodeId = u32;
 
@@ -28,7 +28,7 @@ impl ReactiveRuntime {
 }
 
 pub(crate) struct SignalNode {
-    pub subscribers: Vec<NodeId>,
+    pub subscribers: HashSet<NodeId>,
 }
 
 pub(crate) type MemoRunFn = std::rc::Rc<dyn Fn() -> Box<dyn std::any::Any>>;
@@ -37,7 +37,7 @@ pub(crate) type MemoEqFn = std::rc::Rc<dyn Fn(&dyn std::any::Any, &dyn std::any:
 pub(crate) struct MemoNode {
     pub state: State,
     pub sources: Vec<NodeId>,
-    pub subscribers: Vec<NodeId>,
+    pub subscribers: HashSet<NodeId>,
     /// Returns new value as Box<dyn Any>
     pub run: MemoRunFn,
     pub cached: Option<Box<dyn std::any::Any>>,
@@ -58,7 +58,7 @@ pub(crate) enum AnyNode {
 }
 
 impl AnyNode {
-    pub(crate) fn subscribers(&self) -> Option<&[NodeId]> {
+    pub(crate) fn subscribers(&self) -> Option<&HashSet<NodeId>> {
         match self {
             AnyNode::Signal(s) => Some(&s.subscribers),
             AnyNode::Memo(m) => Some(&m.subscribers),
@@ -66,7 +66,7 @@ impl AnyNode {
         }
     }
 
-    pub(crate) fn subscribers_mut(&mut self) -> Option<&mut Vec<NodeId>> {
+    pub(crate) fn subscribers_mut(&mut self) -> Option<&mut HashSet<NodeId>> {
         match self {
             AnyNode::Signal(s) => Some(&mut s.subscribers),
             AnyNode::Memo(m) => Some(&mut m.subscribers),
@@ -143,7 +143,7 @@ pub(crate) fn clear_observer_sources(id: NodeId) {
             let mut nodes = nodes.borrow_mut();
             if let Some(node) = nodes.get_mut(source_id) {
                 if let Some(subs) = node.subscribers_mut() {
-                    subs.retain(|&x| x != id);
+                    subs.remove(&id);
                 }
             }
         });
@@ -168,14 +168,46 @@ pub(crate) fn remove_node(id: NodeId) {
             rt.current_observer = None;
         }
     });
+    let (old_sources, old_subscribers) = NODES.with(|nodes| {
+        let nodes = nodes.borrow();
+        let sources = nodes
+            .get(&id)
+            .and_then(|n| n.sources())
+            .map(|s| s.to_vec())
+            .unwrap_or_default();
+        let subscribers = nodes
+            .get(&id)
+            .and_then(|n| n.subscribers())
+            .map(|s| s.iter().copied().collect::<Vec<_>>())
+            .unwrap_or_default();
+        (sources, subscribers)
+    });
+
+    for source_id in &old_sources {
+        NODES.with(|nodes| {
+            let mut nodes = nodes.borrow_mut();
+            if let Some(node) = nodes.get_mut(source_id) {
+                if let Some(subs) = node.subscribers_mut() {
+                    subs.remove(&id);
+                }
+            }
+        });
+    }
+
+    for sub_id in &old_subscribers {
+        NODES.with(|nodes| {
+            let mut nodes = nodes.borrow_mut();
+            if let Some(node) = nodes.get_mut(sub_id) {
+                if let Some(sources) = node.sources_mut() {
+                    sources.retain(|&x| x != id);
+                }
+            }
+        });
+    }
+
     NODES.with(|nodes| {
         let mut nodes = nodes.borrow_mut();
         nodes.remove(&id);
-        for node in nodes.values_mut() {
-            if let Some(subs) = node.subscribers_mut() {
-                subs.retain(|&x| x != id);
-            }
-        }
     });
 }
 
@@ -200,9 +232,7 @@ pub(crate) fn track_read(source_id: NodeId) {
         // Add observer_id to source's subscribers list
         if let Some(node) = nodes.get_mut(&source_id) {
             if let Some(subs) = node.subscribers_mut() {
-                if !subs.contains(&observer_id) {
-                    subs.push(observer_id);
-                }
+                subs.insert(observer_id);
             }
         }
     });
@@ -215,7 +245,7 @@ pub(crate) fn mark_subscribers_dirty(source_id: NodeId) {
         nodes
             .get(&source_id)
             .and_then(|n| n.subscribers())
-            .map(|s| s.to_vec())
+            .map(|s| s.iter().copied().collect::<Vec<_>>())
             .unwrap_or_default()
     });
 

@@ -74,22 +74,26 @@ fn suite_score(work_units: u64, ms_raw: f64) -> u64 {
 
 // ── main runner ───────────────────────────────────────────────────────────────
 
-fn run_all_suites() -> Value {
-    let mut suites: Vec<Value> = Vec::new();
-    let mut total_work_units: u64 = 0;
-    let mut total_ms_raw: f64 = 0.0;
-    let mut acc: u64 = 0;
+struct RunnerState {
+    suites: Vec<Value>,
+    total_work_units: u64,
+    total_ms_raw: f64,
+    acc: u64,
+}
 
-    let mut add_suite = |suites: &mut Vec<Value>,
-                         id: &str,
-                         title: &str,
-                         track: &str,
-                         work: u64,
-                         elapsed: f64,
-                         acc_val: u64| {
-        total_work_units += work;
-        total_ms_raw += elapsed;
-        suites.push(json!({
+impl RunnerState {
+    fn add_suite(
+        &mut self,
+        id: &str,
+        title: &str,
+        track: &str,
+        work: u64,
+        elapsed: f64,
+        acc_val: u64,
+    ) {
+        self.total_work_units += work;
+        self.total_ms_raw += elapsed;
+        self.suites.push(json!({
             "id": id,
             "title": title,
             "ms": round_ms(elapsed),
@@ -98,35 +102,40 @@ fn run_all_suites() -> Value {
             "acc": acc_val % 1_000_003,
             "track": track,
         }));
+    }
+}
+
+fn run_all_suites() -> Value {
+    let mut state = RunnerState {
+        suites: Vec::new(),
+        total_work_units: 0,
+        total_ms_raw: 0.0,
+        acc: 0,
     };
 
-    run_suite_struct_alloc(&mut acc, &mut suites, &mut add_suite);
-    run_suite_hashmap_ops(&mut acc, &mut suites, &mut add_suite);
-    run_suite_vec_math(&mut acc, &mut suites, &mut add_suite);
-    run_suite_string_hash(&mut acc, &mut suites, &mut add_suite);
-    run_suite_cx_entity_lifecycle(&mut acc, &mut suites, &mut add_suite);
-    run_suite_render_tree(&mut acc, &mut suites, &mut add_suite);
+    run_suite_struct_alloc(&mut state);
+    run_suite_hashmap_ops(&mut state);
+    run_suite_vec_math(&mut state);
+    run_suite_string_hash(&mut state);
+    run_suite_cx_entity_lifecycle(&mut state);
+    run_suite_render_tree(&mut state);
 
-    let ms_total = round_ms(total_ms_raw);
-    let score = suite_score(total_work_units, total_ms_raw);
+    let ms_total = round_ms(state.total_ms_raw);
+    let score = suite_score(state.total_work_units, state.total_ms_raw);
 
     json!({
         "benchSuiteVersion": 2,
-        "workUnits": total_work_units,
+        "workUnits": state.total_work_units,
         "ms": ms_total,
         "score": score,
-        "acc": acc % 1_000_003,
-        "suites": suites,
+        "acc": state.acc % 1_000_003,
+        "suites": state.suites,
     })
 }
 
 // ── Suite 1: struct-alloc ─────────────────────────────────────────────────
 // Parity with JS `object-alloc`: allocate and drop many small structs.
-fn run_suite_struct_alloc<F: FnMut(&mut Vec<Value>, &str, &str, &str, u64, f64, u64)>(
-    acc: &mut u64,
-    suites: &mut Vec<Value>,
-    add_suite: &mut F,
-) {
+fn run_suite_struct_alloc(state: &mut RunnerState) {
     struct Item {
         a: u32,
         b: f64,
@@ -144,29 +153,27 @@ fn run_suite_struct_alloc<F: FnMut(&mut Vec<Value>, &str, &str, &str, u64, f64, 
         });
     }
     for item in &v {
-        *acc = acc.wrapping_add(item.a as u64 ^ item.c ^ item.b.to_bits());
+        state.acc = state
+            .acc
+            .wrapping_add(item.a as u64 ^ item.c ^ item.b.to_bits());
     }
     drop(v);
     let elapsed = t0.elapsed().as_secs_f64() * 1000.0;
     let work = ROUNDS as u64;
-    add_suite(
-        suites,
+    let acc_val = state.acc;
+    state.add_suite(
         "struct-alloc",
         "Vec<struct> alloc + traverse + drop (Rust parity: JS object-alloc)",
         "rust",
         work,
         elapsed,
-        *acc,
+        acc_val,
     );
 }
 
 // ── Suite 2: hashmap-ops ──────────────────────────────────────────────────
 // Parity with JS `map-set-ops`: insert / lookup / remove on HashMap<u32, u64>.
-fn run_suite_hashmap_ops<F: FnMut(&mut Vec<Value>, &str, &str, &str, u64, f64, u64)>(
-    acc: &mut u64,
-    suites: &mut Vec<Value>,
-    add_suite: &mut F,
-) {
+fn run_suite_hashmap_ops(state: &mut RunnerState) {
     const ROUNDS: usize = 100_000;
     let t0 = Instant::now();
     let mut map: HashMap<u32, u64> = HashMap::with_capacity(ROUNDS);
@@ -175,34 +182,30 @@ fn run_suite_hashmap_ops<F: FnMut(&mut Vec<Value>, &str, &str, &str, u64, f64, u
     }
     for i in 0..ROUNDS {
         if let Some(&v) = map.get(&(i as u32)) {
-            *acc = acc.wrapping_add(v);
+            state.acc = state.acc.wrapping_add(v);
         }
     }
     for i in (0..ROUNDS).step_by(3) {
         map.remove(&(i as u32));
     }
-    *acc = acc.wrapping_add(map.len() as u64);
+    state.acc = state.acc.wrapping_add(map.len() as u64);
     drop(map);
     let elapsed = t0.elapsed().as_secs_f64() * 1000.0;
     let work = (ROUNDS * 3) as u64;
-    add_suite(
-        suites,
+    let acc_val = state.acc;
+    state.add_suite(
         "hashmap-ops",
         "HashMap insert / lookup / remove (Rust parity: JS map-set-ops)",
         "rust",
         work,
         elapsed,
-        *acc,
+        acc_val,
     );
 }
 
 // ── Suite 3: vec-math ─────────────────────────────────────────────────────
 // Parity with JS `typed-array-math`: elementwise f32 multiply + sum.
-fn run_suite_vec_math<F: FnMut(&mut Vec<Value>, &str, &str, &str, u64, f64, u64)>(
-    acc: &mut u64,
-    suites: &mut Vec<Value>,
-    add_suite: &mut F,
-) {
+fn run_suite_vec_math(state: &mut RunnerState) {
     const N: usize = 64_000;
     const PASSES: usize = 20;
     let t0 = Instant::now();
@@ -213,29 +216,25 @@ fn run_suite_vec_math<F: FnMut(&mut Vec<Value>, &str, &str, &str, u64, f64, u64)
             *x = (*x * 1.000_01_f32).min(1e9_f32);
             s += *x;
         }
-        *acc = acc.wrapping_add(s.to_bits() as u64);
+        state.acc = state.acc.wrapping_add(s.to_bits() as u64);
     }
     drop(data);
     let elapsed = t0.elapsed().as_secs_f64() * 1000.0;
     let work = (N * PASSES * 2) as u64;
-    add_suite(
-        suites,
+    let acc_val = state.acc;
+    state.add_suite(
         "vec-math",
         "Vec<f32> elementwise multiply + sum (Rust parity: JS typed-array-math)",
         "rust",
         work,
         elapsed,
-        *acc,
+        acc_val,
     );
 }
 
 // ── Suite 4: string-hash ──────────────────────────────────────────────────
 // Parity with JS `string-ops`: FNV-1a rolling hash on growing byte strings.
-fn run_suite_string_hash<F: FnMut(&mut Vec<Value>, &str, &str, &str, u64, f64, u64)>(
-    acc: &mut u64,
-    suites: &mut Vec<Value>,
-    add_suite: &mut F,
-) {
+fn run_suite_string_hash(state: &mut RunnerState) {
     const ROUNDS: usize = 25_000;
     const CHUNK: &[u8] = b"abcdefghijklmnopqrstuvwxyz0123456789";
 
@@ -248,18 +247,18 @@ fn run_suite_string_hash<F: FnMut(&mut Vec<Value>, &str, &str, &str, u64, f64, u
             h ^= CHUNK[k % CHUNK.len()] as u64;
             h = h.wrapping_mul(0x0000_0100_0000_01b3);
         }
-        *acc = acc.wrapping_add(h);
+        state.acc = state.acc.wrapping_add(h);
     }
     let elapsed = t0.elapsed().as_secs_f64() * 1000.0;
     let work = (ROUNDS * 40) as u64;
-    add_suite(
-        suites,
+    let acc_val = state.acc;
+    state.add_suite(
         "string-hash",
         "FNV-1a hash on growing byte strings (Rust parity: JS string-ops)",
         "rust",
         work,
         elapsed,
-        *acc,
+        acc_val,
     );
 }
 
@@ -267,11 +266,7 @@ fn run_suite_string_hash<F: FnMut(&mut Vec<Value>, &str, &str, &str, u64, f64, u
 // GPUI-simulated: repeated alloc / traverse / evict of entity-like heap boxes.
 // Models a context that manages a pool of live entities with periodic eviction,
 // approximating GPUI's `cx.new(…)` / entity drop lifecycle under churn.
-fn run_suite_cx_entity_lifecycle<F: FnMut(&mut Vec<Value>, &str, &str, &str, u64, f64, u64)>(
-    acc: &mut u64,
-    suites: &mut Vec<Value>,
-    add_suite: &mut F,
-) {
+fn run_suite_cx_entity_lifecycle(state: &mut RunnerState) {
     const ROUNDS: usize = 50_000;
     let t0 = Instant::now();
     let mut entities: HashMap<u64, Box<[u8; 64]>> = HashMap::with_capacity(512);
@@ -285,29 +280,27 @@ fn run_suite_cx_entity_lifecycle<F: FnMut(&mut Vec<Value>, &str, &str, &str, u64
             entities.remove(&id.saturating_sub(2));
         }
     }
-    *acc = acc.wrapping_add(entities.values().map(|b| b[0] as u64).sum::<u64>());
+    state.acc = state
+        .acc
+        .wrapping_add(entities.values().map(|b| b[0] as u64).sum::<u64>());
     drop(entities);
     let elapsed = t0.elapsed().as_secs_f64() * 1000.0;
     let work = (ROUNDS * 2) as u64;
-    add_suite(
-        suites,
+    let acc_val = state.acc;
+    state.add_suite(
         "cx-entity-lifecycle",
         "GPUI-style entity alloc / evict / drop lifecycle (simulated)",
         "gpui",
         work,
         elapsed,
-        *acc,
+        acc_val,
     );
 }
 
 // ── Suite 6: render-tree ──────────────────────────────────────────────────
 // GPUI-simulated: build + DFS-traverse + drop a 5-deep 4-ary render tree.
 // Models one frame's worth of GPUI element tree construction and traversal.
-fn run_suite_render_tree<F: FnMut(&mut Vec<Value>, &str, &str, &str, u64, f64, u64)>(
-    acc: &mut u64,
-    suites: &mut Vec<Value>,
-    add_suite: &mut F,
-) {
+fn run_suite_render_tree(state: &mut RunnerState) {
     struct Node {
         value: u32,
         children: Vec<Node>,
@@ -351,19 +344,19 @@ fn run_suite_render_tree<F: FnMut(&mut Vec<Value>, &str, &str, &str, u64, f64, u
     let t0 = Instant::now();
     for r in 0..ROUNDS {
         let tree = build(DEPTH, FANOUT, r as u32);
-        traverse(&tree, acc);
+        traverse(&tree, &mut state.acc);
         drop(tree);
     }
     let elapsed = t0.elapsed().as_secs_f64() * 1000.0;
     let work = (ROUNDS * node_count) as u64;
-    add_suite(
-        suites,
+    let acc_val = state.acc;
+    state.add_suite(
         "render-tree",
         "GPUI-style render tree build + DFS traverse + drop (simulated)",
         "gpui",
         work,
         elapsed,
-        *acc,
+        acc_val,
     );
 }
 

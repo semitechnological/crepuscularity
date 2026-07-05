@@ -24,6 +24,7 @@ editors/zed/target/
 editors/zed/extension.wasm
 # Zed dev extension: grammar checkouts live here (nested .git); do not commit
 editors/zed/grammars/
+*.orig
 plugins/**/__pycache__/
 plugins/**/.zig-cache/
 plugins/**/zig-out/
@@ -36,3 +37,5 @@ crates/crepuscularity-cli/templates/native/ios/.build/
 crates/crepuscularity-cli/templates/native/android/**/build/
 crates/crepuscularity-cli/templates/native/android/.gradle/
 .poolside/
+.pi-subagents/
+PR-REVIEW-*.md
