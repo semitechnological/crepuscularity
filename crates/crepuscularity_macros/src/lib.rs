@@ -96,7 +96,9 @@ pub fn view_file(input: TokenStream) -> TokenStream {
     let full = std::path::Path::new(&manifest_dir).join(&path_value);
     let template = std::fs::read_to_string(&full)
         .unwrap_or_else(|e| panic!("Failed to read template file `{}`: {}", full.display(), e));
-    generate_view(&template, path.span()).into()
+    let base_dir = full.parent().map(|p| p.to_path_buf()).unwrap_or_default();
+    let expanded = expand_includes_text(&template, &base_dir, &full);
+    generate_view(&expanded, path.span()).into()
 }
 
 fn generate_view(template: &str, span: Span) -> TokenStream2 {
@@ -109,6 +111,50 @@ fn generate_view(template: &str, span: Span) -> TokenStream2 {
         Ok(tokens) => tokens,
         Err(message) => syn::Error::new(span, message).to_compile_error(),
     }
+}
+
+fn expand_includes_text(
+    template: &str,
+    base_dir: &std::path::Path,
+    _source_path: &std::path::Path,
+) -> String {
+    let mut output = String::new();
+    for line in template.lines() {
+        let trimmed = line.trim_start();
+        if let Some(rest) = trimmed.strip_prefix("include ") {
+            let (path_str, _props) = rest.split_once(' ').unwrap_or((rest, ""));
+            let path_str = path_str.trim().trim_matches('"');
+            if path_str.is_empty() {
+                output.push_str(line);
+                output.push('\n');
+                continue;
+            }
+            let include_path = base_dir.join(path_str);
+            let include_dir = include_path.parent().unwrap_or(base_dir).to_path_buf();
+            let included = std::fs::read_to_string(&include_path).unwrap_or_else(|e| {
+                panic!(
+                    "Failed to read included template file `{}`: {}",
+                    include_path.display(),
+                    e
+                )
+            });
+            let expanded = expand_includes_text(&included, &include_dir, &include_path);
+            let indent = &line[..line.len() - line.trim_start().len()];
+            for included_line in expanded.lines() {
+                if included_line.is_empty() {
+                    output.push('\n');
+                } else {
+                    output.push_str(indent);
+                    output.push_str(included_line);
+                    output.push('\n');
+                }
+            }
+        } else {
+            output.push_str(line);
+            output.push('\n');
+        }
+    }
+    output
 }
 
 /// Generate typed DOM accessors for all `#id` shorthand IDs reachable from a `.crepus` entry file.
