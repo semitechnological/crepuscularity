@@ -5,7 +5,6 @@ use std::path::Path;
 use crepuscularity_core::ast::*;
 use crepuscularity_core::context::{value_to_str, TemplateContext, TemplateValue};
 use crepuscularity_core::eval::eval_expr;
-use crepuscularity_core::parser::{parse_component_file, parse_template};
 use crepuscularity_core::CrepusError;
 
 use crate::document::{EmbeddedDocument, EmbeddedNode, EmbeddedStyle};
@@ -46,8 +45,9 @@ pub fn render_template_to_framebuffer(
     screen: ScreenSize,
     fb: &mut impl Framebuffer,
 ) -> Result<EmbeddedDocument, CrepusError> {
-    let nodes = parse_template(template)?;
-    render_parsed_nodes_to_framebuffer(&nodes, ctx, screen, fb)
+    crepuscularity_core::render_entry::render_template(template, ctx, |nodes, ctx| {
+        render_parsed_nodes_to_framebuffer(nodes, ctx, screen, fb)
+    })
 }
 
 /// Lower parsed AST → layout → paint (skips parse; use with a cached [`Vec<Node>`]).
@@ -71,23 +71,18 @@ pub fn render_component_file_to_framebuffer(
     screen: ScreenSize,
     fb: &mut impl Framebuffer,
 ) -> Result<EmbeddedDocument, CrepusError> {
-    let file = parse_component_file(content)?;
-    let component = file
-        .components
-        .get(component_name)
-        .ok_or_else(|| CrepusError::render(format!("component not found: {component_name}")))?;
-    let mut child_ctx = with_embedded_target(ctx, screen);
-    for (key, expr) in &component.meta.defaults {
-        if !child_ctx.vars.contains_key(key) {
-            child_ctx
-                .vars
-                .insert(key.clone(), eval_expr(expr, &TemplateContext::new())?);
-        }
-    }
-    let mut doc = render_nodes_to_document(&component.nodes, &child_ctx, screen)?;
-    layout_document(&mut doc);
-    paint_document(fb, &doc);
-    Ok(doc)
+    let ctx = with_embedded_target(ctx, screen);
+    crepuscularity_core::render_entry::render_component_file(
+        content,
+        component_name,
+        &ctx,
+        |nodes, ctx| {
+            let mut doc = render_nodes_to_document(nodes, ctx, screen)?;
+            layout_document(&mut doc);
+            paint_document(fb, &doc);
+            Ok(doc)
+        },
+    )
 }
 
 pub fn render_file_to_framebuffer(

@@ -5,7 +5,6 @@ use std::collections::HashMap;
 use crepuscularity_core::ast::*;
 use crepuscularity_core::context::{value_to_str, TemplateContext};
 use crepuscularity_core::eval::eval_expr;
-use crepuscularity_core::parser::{parse_component_file, parse_template};
 use crepuscularity_core::preprocess::slot_rotate_child_phrases;
 use crepuscularity_core::CrepusError;
 
@@ -37,8 +36,7 @@ pub fn render_from_files(
 
 /// Parse and lower a template string to IR.
 pub fn render_template_to_ir(template: &str, ctx: &TemplateContext) -> Result<ViewIr, CrepusError> {
-    let nodes = parse_template(template)?;
-    render_nodes_to_ir(&nodes, ctx)
+    crepuscularity_core::render_entry::render_template(template, ctx, render_nodes_to_ir)
 }
 
 /// Lower a named component from a multi-component `.crepus` file.
@@ -47,21 +45,12 @@ pub fn render_component_file_to_ir(
     component_name: &str,
     ctx: &TemplateContext,
 ) -> Result<ViewIr, CrepusError> {
-    let file = parse_component_file(content)?;
-    let component = file
-        .components
-        .get(component_name)
-        .ok_or_else(|| CrepusError::render(format!("component not found: {component_name}")))?;
-
-    let mut child_ctx = ctx.clone();
-    for (key, expr) in &component.meta.defaults {
-        if !child_ctx.vars.contains_key(key) {
-            let val = eval_expr(expr, &TemplateContext::new())?;
-            child_ctx.vars.insert(key.clone(), val);
-        }
-    }
-
-    render_nodes_to_ir(&component.nodes, &child_ctx)
+    crepuscularity_core::render_entry::render_component_file(
+        content,
+        component_name,
+        ctx,
+        render_nodes_to_ir,
+    )
 }
 
 /// Lower already-parsed nodes into a [`ViewIr`].

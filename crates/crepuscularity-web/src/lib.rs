@@ -158,8 +158,12 @@ pub fn render_template_to_html(
     template: &str,
     ctx: &TemplateContext,
 ) -> Result<String, CrepusError> {
-    let nodes = crepuscularity_core::ast_cache::parse_content(template)?;
-    render_nodes_to_html(&nodes, ctx)
+    crepuscularity_core::render_entry::render_template_with(
+        template,
+        ctx,
+        |t| Ok(crepuscularity_core::ast_cache::parse_content(t)?.to_vec()),
+        render_nodes_to_html,
+    )
 }
 
 /// Render one named component from a multi-component `.crepus` source string.
@@ -171,22 +175,12 @@ pub fn render_component_file_to_html(
     component_name: &str,
     ctx: &TemplateContext,
 ) -> Result<String, CrepusError> {
-    let file = parse_component_file(content)?;
-    let component = file
-        .components
-        .get(component_name)
-        .ok_or_else(|| CrepusError::render(format!("component not found: {component_name}")))?;
-
-    let mut child_ctx = ctx.clone();
-    for (key, expr) in &component.meta.defaults {
-        if !child_ctx.vars.contains_key(key) {
-            child_ctx
-                .vars
-                .insert(key.clone(), eval_expr(expr, &TemplateContext::new())?);
-        }
-    }
-
-    render_nodes_to_html(&component.nodes, &child_ctx)
+    crepuscularity_core::render_entry::render_component_file(
+        content,
+        component_name,
+        ctx,
+        render_nodes_to_html,
+    )
 }
 
 /// Render an already parsed AST node list to escaped HTML.

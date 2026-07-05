@@ -16,8 +16,8 @@ pub mod include_paths;
 pub mod incremental;
 pub mod parser;
 pub mod preprocess;
+pub mod render_entry;
 pub mod tailwind;
-mod util;
 pub mod virtual_files;
 pub mod watch;
 
