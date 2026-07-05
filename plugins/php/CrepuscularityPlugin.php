@@ -2,11 +2,28 @@
 
 final class CrepuscularityPlugin
 {
-    private const BIND_BLOCKLIST = ['baseDir', '_']; // ponytail: block security-sensitive keys only
+    public const BIND_BLOCKLIST = ['baseDir', '_']; // ponytail: block security-sensitive keys only
 
     private static function crepusBin(): string
     {
-        return getenv('CREPUS_BIN') ?: 'crepus';
+        $bin = getenv('CREPUS_BIN');
+        if ($bin === false || $bin === '') {
+            return 'crepus';
+        }
+
+        if (preg_match('/[\x00-\x1F\x7F"\'<>|&;$]/', $bin)) {
+            throw new RuntimeException('Invalid characters in CREPUS_BIN');
+        }
+
+        $isBinaryName = preg_match('/^[a-zA-Z0-9_.-]+$/', $bin) === 1;
+        $isAbsolutePath = (str_starts_with($bin, '/') || preg_match('/^[a-zA-Z]:[\\\\\/]/', $bin)) && preg_match('/^[a-zA-Z0-9_.\/\\\\:-]+$/', $bin) === 1;
+        $isAbsolutePathWithSpacesValid = (str_starts_with($bin, '/') || preg_match('/^[a-zA-Z]:[\\\\\/]/', $bin)) && preg_match('/^[a-zA-Z0-9_.\/\\\\: -]+$/', $bin) === 1 && strpos($bin, ' -') === false;
+
+        if (!$isBinaryName && !$isAbsolutePath && !$isAbsolutePathWithSpacesValid) {
+            throw new RuntimeException('CREPUS_BIN must be a strict binary name or an absolute path');
+        }
+
+        return $bin;
     }
 
     public static function renderIr(string $path, ?array $context = null): array
