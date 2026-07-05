@@ -17,7 +17,7 @@ args = ["**"]
 repository = "https://github.com/tschk/crepuscularity"
 path = "tree-sitter-crepus"
 # Must match a commit on `repository` whose `tree-sitter-crepus/grammar.js` includes every node used by `languages/crepus/*.scm`.
-rev = "23d128da7c24a96f7cc4711742542cd3436e4971"
+rev = "090b04488e61208566a30f3e7e0b92a5665cecf2"
 
 [language_servers.crepus-lsp]
 name = "crepus-lsp"
