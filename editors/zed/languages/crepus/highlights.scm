@@ -24,9 +24,6 @@
 
 (attr_name_only) @function
 
-(class_segment
-  (quoted) @string.special)
-
 (tailwind_pair) @type
 
 ((plain_class) @keyword

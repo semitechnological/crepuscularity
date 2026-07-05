@@ -1,6 +1,6 @@
 id = "crepuscularity"
 name = "Crepuscularity"
-version = "0.2.2"
+version = "0.2.3"
 schema_version = 1
 authors = ["Max Carter <max@undivisible.dev>"]
 description = "Crepus templates (.crepus): tree-sitter highlighting, snippets, and crepus-lsp."
