@@ -1168,11 +1168,32 @@ fn build_ios_app(ios_dir: &Path, target: IosBuildTarget, configuration: &str) {
     delegate(build, "xcodebuild");
 }
 
+fn gradle_command(android_dir: &Path, task: &str) -> Command {
+    let gradlew = android_dir.join("gradlew");
+    let mut cmd = if gradlew.exists() {
+        let mut c = Command::new("./gradlew");
+        c.current_dir(android_dir);
+        c.arg(task);
+        c
+    } else {
+        eprintln!(
+            "{} no ./gradlew at {}; using system `gradle` (run `gradle wrapper --gradle-version 8.10` to generate the wrapper)",
+            style("note:").yellow(),
+            gradlew.display()
+        );
+        let mut c = Command::new("gradle");
+        c.current_dir(android_dir);
+        c.arg(task);
+        c
+    };
+    configure_gradle_java(&mut cmd);
+    cmd
+}
+
 fn build_android(dir: &Path, flavor: &str) {
     sync_default_mobile_artifacts(dir, false, true);
     let android_dir = dir.join("android");
     apply_android_config(&android_dir, &load_mobile_android_config(dir));
-    let gradlew = android_dir.join("gradlew");
     if !android_dir.join("settings.gradle.kts").exists() {
         ui::error(&format!(
             "no settings.gradle.kts at '{}'. Pass --dir <path-to-scaffold-root> if the project lives elsewhere.",
@@ -1181,25 +1202,7 @@ fn build_android(dir: &Path, flavor: &str) {
     }
 
     let task = format!(":app:assemble{}", capitalize_ascii(flavor));
-    let mut cmd = if gradlew.exists() {
-        let mut c = Command::new("./gradlew");
-        c.current_dir(&android_dir);
-        c.arg(&task);
-        c
-    } else {
-        // Fall back to system `gradle`. Print a hint either way so users know
-        // why we're not invoking ./gradlew.
-        eprintln!(
-            "{} no ./gradlew at {}; using system `gradle` (run `gradle wrapper --gradle-version 8.10` to generate the wrapper)",
-            style("note:").yellow(),
-            gradlew.display()
-        );
-        let mut c = Command::new("gradle");
-        c.current_dir(&android_dir);
-        c.arg(&task);
-        c
-    };
-    configure_gradle_java(&mut cmd);
+    let mut cmd = gradle_command(&android_dir, &task);
     cmd.arg("--quiet"); // don't drown the user in gradle log spam
     delegate(cmd, "gradle build");
 }
@@ -1476,23 +1479,11 @@ fn simulator_id_from_line(line: &str) -> Option<String> {
 fn run_android(dir: &Path, flavor: &str) {
     sync_default_mobile_artifacts(dir, false, true);
     let android_dir = dir.join("android");
-    let gradlew = android_dir.join("gradlew");
     let task = format!(":app:install{}", capitalize_ascii(flavor));
     let application_id = load_android_application_id(&android_dir)
         .unwrap_or_else(|| "dev.crepuscularity.nativeshell".to_string());
 
-    let mut cmd = if gradlew.exists() {
-        let mut c = Command::new("./gradlew");
-        c.current_dir(&android_dir);
-        c.arg(&task);
-        c
-    } else {
-        let mut c = Command::new("gradle");
-        c.current_dir(&android_dir);
-        c.arg(&task);
-        c
-    };
-    configure_gradle_java(&mut cmd);
+    let mut cmd = gradle_command(&android_dir, &task);
     cmd.arg("--quiet");
     delegate(cmd, "gradle install");
 
