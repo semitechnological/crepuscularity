@@ -204,6 +204,28 @@ mod tests {
     }
 
     #[test]
+    fn element_ref_text_with_string_type() {
+        let mut el = ElementRef::new("test-id");
+        el.text(String::from("owned string"));
+        assert_eq!(el.content, "owned string");
+    }
+
+    #[test]
+    fn element_ref_text_with_empty_string() {
+        let mut el = ElementRef::new("test-id");
+        el.text("");
+        assert_eq!(el.content, "");
+    }
+
+    #[test]
+    fn element_ref_text_overwrites_previous() {
+        let mut el = ElementRef::new("test-id");
+        el.text("first");
+        el.text("second");
+        assert_eq!(el.content, "second");
+    }
+
+    #[test]
     fn element_ref_val_alias() {
         let mut el = ElementRef::new("test-id");
         el.val("ValContent");
