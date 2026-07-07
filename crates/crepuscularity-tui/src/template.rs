@@ -232,4 +232,26 @@ mod tests {
 
         assert_eq!(el.content, "Final");
     }
+
+    #[test]
+    fn template_reload_empty_path_returns_error() {
+        let mut tpl = Template::from_source("test source");
+        let res = tpl.reload();
+        assert!(res.is_err());
+        assert_eq!(
+            res.unwrap_err(),
+            "template has no path; reload requires `from_path`"
+        );
+    }
+
+    #[test]
+    fn template_reload_read_failure_returns_error() {
+        let non_existent_path = std::path::PathBuf::from("does_not_exist.crepus");
+        let mut tpl = Template::from_source_with_path("old source", &non_existent_path);
+        let res = tpl.reload();
+        assert!(res.is_err());
+        let err_msg = res.unwrap_err();
+        assert!(err_msg.starts_with("template error:"));
+        assert_eq!(tpl.source(), "old source");
+    }
 }
