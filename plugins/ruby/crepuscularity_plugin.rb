@@ -54,13 +54,13 @@ module CrepuscularityPlugin
     raise SecurityError, "CREPUS_BIN must be strictly a binary name without directory separators" if bin.match?(%r{[/\\]})
     if context
       payload = JSON.generate({
-        "template" => File.read(path),
+        "template" => File.read(resolved_path),
         "context" => context,
-        "baseDir" => File.dirname(path)
+        "baseDir" => File.dirname(resolved_path)
       })
       stdout, stderr, status = Open3.capture3(bin, "native", "ir", "--stdin-json", stdin_data: payload)
     else
-      stdout, stderr, status = Open3.capture3(bin, "native", "ir", path)
+      stdout, stderr, status = Open3.capture3(bin, "native", "ir", resolved_path)
     end
     raise stderr unless status.success?
     data = JSON.parse(stdout)
