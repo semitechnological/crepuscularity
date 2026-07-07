@@ -11,9 +11,9 @@ use serde_json::{json, Value};
 
 use crate::bench_plugin::BenchPlugin;
 use crate::download_plugin::DownloadPlugin;
-use crate::inauguration_plugin::InaugurationPlugin;
 use crate::host::{HostSnapshot, HostState};
 use crate::host_queue::{HostCommandQueue, HostDeferred};
+use crate::inauguration_plugin::InaugurationPlugin;
 use crate::plugins::{AppPlugin, ClipboardPlugin, CorePlugin, FsPlugin, HostPlugin, WindowPlugin};
 
 /// Coarse sandbox knob: which plugin families are linked into this build / allowed at runtime.
