@@ -30,12 +30,18 @@ type ViewSession struct {
 }
 
 func crepusBin() string {
-	if bin := os.Getenv("CREPUS_BIN"); bin != "" {
-		if filepath.IsAbs(bin) || filepath.Base(bin) == bin {
-			return bin
-		}
+	bin := os.Getenv("CREPUS_BIN")
+	if bin == "" {
+		return "crepus"
 	}
-	return "crepus"
+	base := filepath.Base(bin)
+	if base != "crepus" && base != "crepus.exe" {
+		panic(fmt.Sprintf("Security Error: CREPUS_BIN binary name must be 'crepus' or 'crepus.exe', got %q", base))
+	}
+	if bin != base && !filepath.IsAbs(bin) {
+		panic(fmt.Sprintf("Security Error: CREPUS_BIN path must be absolute or a valid binary name, got: %s", bin))
+	}
+	return bin
 }
 
 var bindBlocklist = map[string]bool{"baseDir": true, "_": true} // ponytail: block security-sensitive keys only

@@ -22,19 +22,29 @@ func TestCrepusBinValidation(t *testing.T) {
 		t.Fatalf("expected %s, got %s", absPath, crepusBin())
 	}
 
-	// test simple binary name
-	simple := "mycrepus"
+	// test simple binary name valid
+	simple := "crepus"
 	os.Setenv("CREPUS_BIN", simple)
 	if crepusBin() != simple {
 		t.Fatalf("expected %s, got %s", simple, crepusBin())
 	}
 
-	// test relative path
-	relPath := "./crepus"
-	os.Setenv("CREPUS_BIN", relPath)
-	if crepusBin() != "crepus" { // falls back to default
-		t.Fatalf("expected crepus, got %s", crepusBin())
-	}
+	// test invalid binary name panics
+	os.Setenv("CREPUS_BIN", "mycrepus")
+	assertPanic(t, func() { crepusBin() })
+
+	// test relative path panics
+	os.Setenv("CREPUS_BIN", "./crepus")
+	assertPanic(t, func() { crepusBin() })
+}
+
+func assertPanic(t *testing.T, f func()) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Errorf("The code did not panic")
+		}
+	}()
+	f()
 }
 
 func TestRenderIR(t *testing.T) {
