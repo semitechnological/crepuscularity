@@ -60,6 +60,9 @@ func RenderIR(path string, context map[string]any) (ViewIr, error) {
 	if err != nil {
 		return ViewIr{}, err
 	}
+	if resolved, err := filepath.EvalSymlinks(absPath); err == nil {
+		absPath = resolved
+	}
 
 	rel, err := filepath.Rel(absAllowed, absPath)
 	if err != nil {
@@ -70,7 +73,7 @@ func RenderIR(path string, context map[string]any) (ViewIr, error) {
 	}
 
 	payload, err := json.Marshal(map[string]any{
-		"template": mustRead(path),
+		"template": mustRead(absPath),
 		"context":  context,
 	})
 	if err != nil {
