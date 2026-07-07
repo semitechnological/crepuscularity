@@ -108,4 +108,50 @@ mod tests {
         let err_msg = result.unwrap_err();
         assert!(err_msg.contains("parse error") || err_msg.contains("expected a boolean"));
     }
+
+    #[test]
+    fn eval_guest_from_config_file_missing_entry() {
+        let dir = tempdir().unwrap();
+        let base = dir.path();
+        let config_path = base.join("missing_entry.toml");
+
+        fs::write(&config_path, "guest_entry = \"nonexistent.js\"").unwrap();
+
+        let result = eval_guest_from_config_file(base, &config_path);
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err();
+        assert!(err_msg.contains("guest_entry, prelude, or file read failed"));
+    }
+
+    #[test]
+    fn eval_guest_from_config_file_parse_error() {
+        let dir = tempdir().unwrap();
+        let base = dir.path();
+        let config_path = base.join("parse_error.toml");
+        let entry_path = base.join("entry.ts"); // Must be .ts to trigger oxc
+
+        fs::write(&config_path, "guest_entry = \"entry.ts\"").unwrap();
+        fs::write(&entry_path, "const x: = 1;").unwrap(); // Invalid TypeScript
+
+        let result = eval_guest_from_config_file(base, &config_path);
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err();
+        assert!(err_msg.contains("Oxc parse failed") || err_msg.contains("Expected"));
+    }
+
+    #[test]
+    fn eval_guest_from_config_file_eval_error() {
+        let dir = tempdir().unwrap();
+        let base = dir.path();
+        let config_path = base.join("eval_error.toml");
+        let entry_path = base.join("entry.js");
+
+        fs::write(&config_path, "guest_entry = \"entry.js\"").unwrap();
+        fs::write(&entry_path, "throw new Error('test error');").unwrap();
+
+        let result = eval_guest_from_config_file(base, &config_path);
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err();
+        assert!(err_msg.contains("test error") || err_msg.contains("Error:"));
+    }
 }
