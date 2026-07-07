@@ -51,13 +51,10 @@ class ViewSession:
 
 
 def _crepus_bin() -> str:
-    bin_path = os.environ.get("CREPUS_BIN", "crepus")
-    name = os.path.basename(bin_path)
-    if name not in ("crepus", "crepus.exe"):
-        raise ValueError(f"Invalid CREPUS_BIN: binary name must be 'crepus' or 'crepus.exe', got {name!r}")
-    if bin_path != name and not os.path.isabs(bin_path):
-        raise ValueError("Invalid CREPUS_BIN: must be an absolute path or a simple binary name")
-    return bin_path
+    bin_name = os.environ.get("CREPUS_BIN", "crepus")
+    if bin_name not in ("crepus", "crepus.exe"):
+        raise ValueError(f"Invalid CREPUS_BIN: binary name must be 'crepus' or 'crepus.exe', got {bin_name!r}")
+    return bin_name
 
 
 _BIND_BLOCKLIST = frozenset({"baseDir", "_"})  # ponytail: block security-sensitive keys only
