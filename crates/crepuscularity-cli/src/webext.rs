@@ -925,10 +925,9 @@ fn render_crepus_pages(
 
     let cache = DriverCache::open(app_path);
 
-    for entry in &entries {
-        render_crepus_page(entry, &files, &src_dir, &out_dir, manifest, &cache)?;
-    }
-    Ok(())
+    entries.iter().try_for_each(|entry| {
+        render_crepus_page(entry, &files, &src_dir, &out_dir, manifest, &cache)
+    })
 }
 
 fn render_crepus_page(
