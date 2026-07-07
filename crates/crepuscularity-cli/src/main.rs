@@ -2,6 +2,8 @@
 
 #[cfg(feature = "aurora")]
 mod aurora;
+#[cfg(feature = "aurora")]
+mod aurora_usage;
 mod benchmark;
 mod benchmark_tui;
 mod build_options;
