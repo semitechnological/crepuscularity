@@ -18,6 +18,11 @@ describe("crepusBin", () => {
     expect(crepusBin()).toBe("/usr/local/bin/crepus")
   })
 
+  test("rejects invalid characters", () => {
+    process.env.CREPUS_BIN = "crepus\"&ls"
+    expect(() => crepusBin()).toThrow("Security Error")
+  })
+
   test("accepts simple binary name", () => {
     process.env.CREPUS_BIN = "crepus"
     expect(crepusBin()).toBe("crepus")

@@ -8,7 +8,11 @@ export interface ViewIr {
 
 export function crepusBin(): string {
   const bin = process.env.CREPUS_BIN ?? "crepus"
-  if (!isAbsolute(bin) && basename(bin) !== bin) {
+  const name = basename(bin)
+  if (name !== "crepus" && name !== "crepus.exe") {
+    throw new Error(`Security Error: CREPUS_BIN binary name must be 'crepus' or 'crepus.exe', got: ${name}`)
+  }
+  if (!isAbsolute(bin) && name !== bin) {
     throw new Error(`Security Error: CREPUS_BIN path must be absolute or a valid binary name, got: ${bin}`)
   }
   return bin
