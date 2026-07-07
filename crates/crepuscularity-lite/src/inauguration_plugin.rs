@@ -44,7 +44,10 @@ impl NativePlugin for InaugurationPlugin {
             "processRun" => process_run(payload),
             "readFile" => read_file(payload),
             "writeFile" => write_file(payload),
-            _ => Err(BridgeError::new("internal", "method routed but not handled")),
+            _ => Err(BridgeError::new(
+                "internal",
+                "method routed but not handled",
+            )),
         }
     }
 }
@@ -54,7 +57,9 @@ fn require_str(payload: &Value, key: &str) -> Result<String, BridgeError> {
         .get(key)
         .and_then(|v| v.as_str())
         .map(str::to_string)
-        .ok_or_else(|| BridgeError::new("invalid_argument", format!("missing or non-string `{key}`")))
+        .ok_or_else(|| {
+            BridgeError::new("invalid_argument", format!("missing or non-string `{key}`"))
+        })
 }
 
 fn which_in() -> Result<Value, BridgeError> {
@@ -105,6 +110,9 @@ mod tests {
     fn ping_returns_plugin_id() {
         let p = InaugurationPlugin::new();
         let out = p.invoke("ping", &json!({})).expect("ping");
-        assert_eq!(out.get("plugin").and_then(|v| v.as_str()), Some("inauguration"));
+        assert_eq!(
+            out.get("plugin").and_then(|v| v.as_str()),
+            Some("inauguration")
+        );
     }
 }

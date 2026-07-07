@@ -120,7 +120,10 @@ mod tests {
                 false
             }
         });
-        assert!(!is_subscribed_after, "Effect should be removed from signal's subscribers after dispose");
+        assert!(
+            !is_subscribed_after,
+            "Effect should be removed from signal's subscribers after dispose"
+        );
     }
 
     #[test]
@@ -135,17 +138,19 @@ mod tests {
         batch_begin();
         signal.set(20);
 
-        let is_pending = RUNTIME.with(|rt| {
-            rt.borrow().pending_effects.contains(&effect_id)
-        });
-        assert!(is_pending, "Effect should be in pending_effects before dispose");
+        let is_pending = RUNTIME.with(|rt| rt.borrow().pending_effects.contains(&effect_id));
+        assert!(
+            is_pending,
+            "Effect should be in pending_effects before dispose"
+        );
 
         effect.dispose();
 
-        let is_pending_after = RUNTIME.with(|rt| {
-            rt.borrow().pending_effects.contains(&effect_id)
-        });
-        assert!(!is_pending_after, "Effect should be removed from pending_effects after dispose");
+        let is_pending_after = RUNTIME.with(|rt| rt.borrow().pending_effects.contains(&effect_id));
+        assert!(
+            !is_pending_after,
+            "Effect should be removed from pending_effects after dispose"
+        );
 
         batch_end();
     }
