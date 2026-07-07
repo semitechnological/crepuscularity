@@ -264,6 +264,24 @@ pub struct PickedFile {
     pub data_base64: String,
 }
 
+/// Photo asset returned by `photoLibrary.getRecentMedia` method.
+/// The platform layer (iOS PHAsset / Android MediaStore) populates this.
+/// `data_base64` and `thumbnail_base64` are large — prefer thumbnail for lists.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PhotoMedia {
+    pub id: String,
+    pub filename: String,
+    pub mime_type: String,
+    pub width: u32,
+    pub height: u32,
+    pub bytes: u64,
+    pub taken_at: Option<String>,
+    pub data_base64: Option<String>,
+    pub thumbnail_base64: Option<String>,
+    pub location: Option<String>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NativePluginResponse {
