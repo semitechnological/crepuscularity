@@ -126,6 +126,7 @@ fn stack_column_raw(children: Vec<ViewNode>) -> ViewNode {
         spacing: None,
         align_items: None,
         justify_content: None,
+        on_long_press: None,
         style: None,
         children,
     }
@@ -177,6 +178,7 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<ViewNode, Crepu
         return Ok(ViewNode::Button {
             label,
             on_click,
+            on_long_press: None,
             style: hints.style.opt(),
         });
     }
@@ -189,6 +191,7 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<ViewNode, Crepu
             bind: binding_raw(el, "bind"),
             checked: binding_bool(el, "checked", ctx).unwrap_or(false),
             on_change: event_handler(el, "change"),
+            on_long_press: None,
             style: hints.style.opt(),
         });
     }
@@ -428,6 +431,7 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<ViewNode, Crepu
             src,
             alt,
             placeholder,
+            on_long_press: None,
             style: hints.style.opt(),
         });
     }
@@ -444,6 +448,7 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<ViewNode, Crepu
     if tag == "li" || tag == "list-item" {
         let hints = style::extract_stack_hints(&classes, Some(ctx));
         return Ok(ViewNode::ListItem {
+            on_long_press: None,
             style: hints.style.opt(),
             children: render_nodes_list(&el.children, ctx)?,
         });
@@ -491,6 +496,7 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<ViewNode, Crepu
                 spacing,
                 align_items: hints.align_items,
                 justify_content: hints.justify_content,
+                on_long_press: None,
                 style: None,
                 children,
             }],
@@ -502,6 +508,7 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<ViewNode, Crepu
         spacing,
         align_items: hints.align_items,
         justify_content: hints.justify_content,
+        on_long_press: None,
         style: hints.style.opt(),
         children,
     })

@@ -158,6 +158,7 @@ fn swiftui_node(
             label,
             on_click,
             style,
+            ..
         } => {
             let action = swiftui_action(on_click.as_deref());
             let mut out = format!(
@@ -356,6 +357,7 @@ fn swiftui_node(
                     spacing: Some(8.0),
                     align_items: None,
                     justify_content: None,
+                    on_long_press: None,
                     style: None,
                     children: children.clone(),
                 },
@@ -395,7 +397,9 @@ fn swiftui_node(
             swiftui_style(&mut out, style.as_ref(), false, indent);
             out
         }
-        ViewNode::ListItem { style, children } => {
+        ViewNode::ListItem {
+            style, children, ..
+        } => {
             let inner = swiftui_children(children, indent + 1, scope_name, scope_var);
             let mut out =
                 format!("{pad}VStack(alignment: .leading, spacing: 4.0) {{\n{inner}\n{pad}}}");
@@ -1017,6 +1021,7 @@ fn compose_node_with_base(
             label,
             on_click,
             style,
+            ..
         } => {
             let modifier = compose_button_args(style.as_ref());
             let action = compose_action(on_click.as_deref());

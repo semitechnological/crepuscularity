@@ -5,7 +5,8 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// Bumped when the JSON schema gains incompatible fields; shells should check `version`.
-pub const IR_VERSION: u32 = 4;
+/// Bumped for onLongPress field added to ViewNode variants.
+pub const IR_VERSION: u32 = 5;
 
 /// Root document from parsing + lowering (see `crepuscularity_native::render_template_to_ir`).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -337,6 +338,8 @@ pub enum ViewNode {
         #[serde(skip_serializing_if = "Option::is_none")]
         justify_content: Option<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
+        on_long_press: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
         style: Option<ViewStyle>,
         children: Vec<ViewNode>,
     },
@@ -345,6 +348,8 @@ pub enum ViewNode {
         label: String,
         #[serde(skip_serializing_if = "Option::is_none")]
         on_click: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        on_long_press: Option<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
         style: Option<ViewStyle>,
     },
@@ -356,6 +361,8 @@ pub enum ViewNode {
         checked: bool,
         #[serde(skip_serializing_if = "Option::is_none")]
         on_change: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        on_long_press: Option<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
         style: Option<ViewStyle>,
     },
@@ -457,6 +464,8 @@ pub enum ViewNode {
         #[serde(skip_serializing_if = "Option::is_none")]
         placeholder: Option<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
+        on_long_press: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
         style: Option<ViewStyle>,
     },
     #[serde(rename = "scroll")]
@@ -475,6 +484,8 @@ pub enum ViewNode {
     },
     #[serde(rename = "listItem")]
     ListItem {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        on_long_press: Option<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
         style: Option<ViewStyle>,
         children: Vec<ViewNode>,

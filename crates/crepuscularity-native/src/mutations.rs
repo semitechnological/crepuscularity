@@ -176,6 +176,7 @@ fn diff_node(old: &ViewNode, new: &ViewNode, path: &[usize], out: &mut Vec<IrMut
                 justify_content: ojc,
                 style: os,
                 children: och,
+                ..
             },
             ViewNode::Stack {
                 axis: na,
@@ -184,6 +185,7 @@ fn diff_node(old: &ViewNode, new: &ViewNode, path: &[usize], out: &mut Vec<IrMut
                 justify_content: njc,
                 style: ns,
                 children: nch,
+                ..
             },
         ) => {
             if oa != na || og != ng || oai != nai || ojc != njc {
@@ -233,11 +235,13 @@ fn diff_node(old: &ViewNode, new: &ViewNode, path: &[usize], out: &mut Vec<IrMut
                 label: ol,
                 on_click: oo,
                 style: os,
+                ..
             },
             ViewNode::Button {
                 label: nl,
                 on_click: no,
                 style: ns,
+                ..
             },
         ) => {
             if ol != nl || oo != no {
@@ -260,12 +264,14 @@ fn diff_node(old: &ViewNode, new: &ViewNode, path: &[usize], out: &mut Vec<IrMut
                 alt: oalt,
                 placeholder: oph,
                 style: os,
+                ..
             },
             ViewNode::Image {
                 src: nsrc,
                 alt: nalt,
                 placeholder: nph,
                 style: ns,
+                ..
             },
         ) => {
             if osrc != nsrc || oalt != nalt || oph != nph {
