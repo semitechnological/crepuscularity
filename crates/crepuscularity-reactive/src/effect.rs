@@ -64,7 +64,11 @@ pub(crate) fn run_effect(id: NodeId) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::runtime::NODES;
+    use crate::batch::{batch_begin, batch_end};
+    use crate::runtime::{AnyNode, NODES, RUNTIME};
+    use crate::signal::Signal;
+    use std::cell::RefCell;
+    use std::rc::Rc;
 
     #[test]
     fn test_effect_dispose() {
@@ -83,5 +87,89 @@ mod tests {
             !exists_after,
             "Effect should be removed from NODES after dispose"
         );
+    }
+
+    #[test]
+    fn test_effect_dispose_clears_subscriptions() {
+        let signal = Signal::new(10);
+        let signal_id = signal.id;
+        let signal_clone = signal.clone();
+
+        let effect = Effect::new(move || {
+            let _ = signal_clone.get();
+        });
+        let effect_id = effect.id;
+
+        let is_subscribed = NODES.with(|nodes| {
+            let nodes = nodes.borrow();
+            if let Some(AnyNode::Signal(s)) = nodes.get(&signal_id) {
+                s.subscribers.contains(&effect_id)
+            } else {
+                false
+            }
+        });
+        assert!(is_subscribed, "Effect should be subscribed to signal");
+
+        effect.dispose();
+
+        let is_subscribed_after = NODES.with(|nodes| {
+            let nodes = nodes.borrow();
+            if let Some(AnyNode::Signal(s)) = nodes.get(&signal_id) {
+                s.subscribers.contains(&effect_id)
+            } else {
+                false
+            }
+        });
+        assert!(!is_subscribed_after, "Effect should be removed from signal's subscribers after dispose");
+    }
+
+    #[test]
+    fn test_effect_dispose_removes_from_pending_effects() {
+        let signal = Signal::new(10);
+        let signal_clone = signal.clone();
+        let effect = Effect::new(move || {
+            let _ = signal_clone.get();
+        });
+        let effect_id = effect.id;
+
+        batch_begin();
+        signal.set(20);
+
+        let is_pending = RUNTIME.with(|rt| {
+            rt.borrow().pending_effects.contains(&effect_id)
+        });
+        assert!(is_pending, "Effect should be in pending_effects before dispose");
+
+        effect.dispose();
+
+        let is_pending_after = RUNTIME.with(|rt| {
+            rt.borrow().pending_effects.contains(&effect_id)
+        });
+        assert!(!is_pending_after, "Effect should be removed from pending_effects after dispose");
+
+        batch_end();
+    }
+
+    #[test]
+    fn test_effect_dispose_during_execution() {
+        let effect_handle: Rc<RefCell<Option<Effect>>> = Rc::new(RefCell::new(None));
+        let handle_clone = Rc::clone(&effect_handle);
+        let signal = Signal::new(10);
+        let signal_clone = signal.clone();
+        let runs = Rc::new(RefCell::new(0));
+        let runs_clone = Rc::clone(&runs);
+
+        let effect = Effect::new(move || {
+            let _ = signal_clone.get();
+            *runs_clone.borrow_mut() += 1;
+
+            if let Some(e) = handle_clone.borrow_mut().take() {
+                e.dispose();
+            }
+        });
+
+        *effect_handle.borrow_mut() = Some(effect);
+        signal.set(20);
+        assert_eq!(*runs.borrow(), 2);
     }
 }
