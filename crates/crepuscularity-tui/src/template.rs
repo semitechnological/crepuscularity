@@ -232,4 +232,16 @@ mod tests {
 
         assert_eq!(el.content, "Final");
     }
+
+    #[test]
+    fn from_path_error_formatting() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("non_existent.crepus");
+        let res = Template::from_path(&path);
+        assert!(res.is_err());
+
+        let err = res.err().unwrap();
+        assert!(err.starts_with(&format!("template error: {:?}", path)));
+        assert!(err.contains("No such file or directory") || err.contains("The system cannot find the file specified"));
+    }
 }
