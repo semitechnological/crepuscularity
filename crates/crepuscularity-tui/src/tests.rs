@@ -1000,6 +1000,7 @@ mod template_error_tests {
         }
     }
 
+
     #[test]
     fn template_draw_full_returns_error_on_invalid_template() {
         let tpl = crate::Template::from_source("<< invalid");
@@ -1014,6 +1015,27 @@ mod template_error_tests {
             })
             .unwrap();
         let e = err.expect("draw_full should return an error for invalid template");
+        assert!(
+            e.contains("parse error"),
+            "error should mention parse error: {e}"
+        );
+    }
+
+    #[test]
+    fn template_draw_returns_error_on_invalid_template() {
+        let tpl = crate::Template::from_source("<< invalid");
+        let backend = TestBackend::new(40, 3);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let mut err = None;
+        terminal
+            .draw(|frame| {
+                let area = frame.area();
+                if let Err(e) = tpl.draw(frame, area) {
+                    err = Some(e);
+                }
+            })
+            .unwrap();
+        let e = err.expect("draw should return an error for invalid template");
         assert!(
             e.contains("parse error"),
             "error should mention parse error: {e}"
