@@ -35,7 +35,7 @@ mod web_islands;
 mod web_serve;
 mod webext;
 
-fn main() {
+fn init_tracing() {
     let mut filter = tracing_subscriber::EnvFilter::from_default_env();
     match "crepuscularity=info".parse() {
         Ok(dir) => {
@@ -50,7 +50,10 @@ fn main() {
         .with_env_filter(filter)
         .with_target(false)
         .init();
+}
 
+fn main() {
+    init_tracing();
     let cli = cli::parse();
     dispatch::run(cli);
 }
