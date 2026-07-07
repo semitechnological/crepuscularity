@@ -314,3 +314,12 @@ fn template_function_error_path() {
     let err = res.err().unwrap();
     assert!(err.starts_with(&format!("template error: {:?}", path)));
 }
+
+#[test]
+fn template_function_directory_error_path() {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let res = crate::template(&path, screen());
+    assert!(res.is_err());
+    let err = res.err().unwrap();
+    assert!(err.starts_with(&format!("template error: {:?}", path)));
+}
