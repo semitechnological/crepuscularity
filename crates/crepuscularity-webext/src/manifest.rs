@@ -434,33 +434,48 @@ impl ManifestV3 {
                     .to_string(),
             }),
             background,
-            browser_specific_settings: match browser {
-                BrowserTarget::Chromium => None,
-                BrowserTarget::Firefox => Some(BrowserSpecificSettings {
-                    gecko: GeckoSettings {
-                        id: format!(
-                            "{}@crepuscularity.dev",
-                            gecko_slug(&manifest.extension.name)
-                        ),
-                    },
-                }),
-            },
+            browser_specific_settings: Self::build_browser_specific_settings(manifest, browser),
             action,
-            options_page: if opts.options_ui.is_some() {
-                None
-            } else {
-                opts.options_page.clone().map(Self::resolve_page)
-            },
-            options_ui: opts.options_ui.as_ref().map(|options_ui| OptionsUiJson {
-                page: Self::resolve_page(options_ui.page.clone()),
-                browser_style: options_ui.browser_style,
-                open_in_tab: options_ui.open_in_tab,
-            }),
+            options_page: Self::build_options_page(opts),
+            options_ui: Self::build_options_ui(opts),
             content_scripts,
             web_accessible_resources,
             commands,
             chrome_url_overrides,
         }
+    }
+
+    fn build_browser_specific_settings(
+        manifest: &ExtensionManifest,
+        browser: BrowserTarget,
+    ) -> Option<BrowserSpecificSettings> {
+        match browser {
+            BrowserTarget::Chromium => None,
+            BrowserTarget::Firefox => Some(BrowserSpecificSettings {
+                gecko: GeckoSettings {
+                    id: format!(
+                        "{}@crepuscularity.dev",
+                        gecko_slug(&manifest.extension.name)
+                    ),
+                },
+            }),
+        }
+    }
+
+    fn build_options_page(opts: &ManifestOptions) -> Option<String> {
+        if opts.options_ui.is_some() {
+            None
+        } else {
+            opts.options_page.clone().map(Self::resolve_page)
+        }
+    }
+
+    fn build_options_ui(opts: &ManifestOptions) -> Option<OptionsUiJson> {
+        opts.options_ui.as_ref().map(|options_ui| OptionsUiJson {
+            page: Self::resolve_page(options_ui.page.clone()),
+            browser_style: options_ui.browser_style,
+            open_in_tab: options_ui.open_in_tab,
+        })
     }
 
     fn build_permissions(manifest: &ExtensionManifest) -> Vec<String> {
