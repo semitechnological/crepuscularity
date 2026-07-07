@@ -43,3 +43,26 @@ pub async fn execute_script_value(injection: JsValue) -> Result<JsValue> {
 pub async fn execute_script(injection: &ScriptInjection) -> Result<JsValue> {
     execute_script_value(core::to_js(injection)?).await
 }
+
+#[cfg(all(test, target_arch = "wasm32", feature = "wasm"))]
+mod tests {
+    use super::*;
+    use wasm_bindgen_test::*;
+
+    #[wasm_bindgen_test]
+    async fn test_execute_script_api_unavailable() {
+        let injection = ScriptInjection {
+            target: InjectionTarget {
+                tab_id: 1,
+                ..Default::default()
+            },
+            files: Some(vec!["test.js".to_string()]),
+            ..Default::default()
+        };
+
+        let result = execute_script(&injection).await;
+        assert!(result.is_err());
+        let err = result.err().unwrap();
+        assert!(matches!(err, super::super::core::BrowserError::ApiUnavailable(_)));
+    }
+}
