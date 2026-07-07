@@ -134,7 +134,12 @@ fn draw_table(area: Rect, buf: &mut Buffer, outcomes: &[TargetOutcomeSummary], s
 }
 
 #[cfg(feature = "tui")]
-fn draw_insights(area: Rect, buf: &mut Buffer, top_completed: &[(String, f64, u128)], dry_run: bool) {
+fn draw_insights(
+    area: Rect,
+    buf: &mut Buffer,
+    top_completed: &[(String, f64, u128)],
+    dry_run: bool,
+) {
     let mut insight = String::new();
     if dry_run {
         insight.push_str("Dry-run — no wall times recorded.\n");
