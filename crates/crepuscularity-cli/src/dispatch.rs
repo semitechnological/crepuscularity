@@ -16,6 +16,10 @@ pub fn run(cli: Cli) {
         print_top_level_help();
         std::process::exit(0);
     };
+    run_command(command);
+}
+
+fn run_command(command: Commands) {
     match command {
         Commands::New { name } => crate::new::run(&name),
         Commands::Init { kind, name } => run_init(&kind, &name),
