@@ -204,6 +204,19 @@ fn framebuffer_writes_ppm_error() {
 }
 
 #[test]
+fn framebuffer_writes_ppm_io_error() {
+    let tpl = r#"motionless bg-zinc-900 w-full h-full
+  "x""#;
+    let (fb, _) = render(tpl, &TemplateContext::new());
+    let temp = tempfile::tempdir().unwrap();
+    let path = temp.path().join("snap.ppm");
+    std::fs::create_dir(&path).unwrap();
+
+    let err = crate::write_ppm(&path, &fb).unwrap_err();
+    assert!(err.starts_with("create "));
+}
+
+#[test]
 fn ui_one_shot_render() {
     let mut ui = Ui::new(
         64,
