@@ -66,11 +66,11 @@ _BIND_BLOCKLIST = frozenset({"baseDir", "_"})  # ponytail: block security-sensit
 def render_ir(path: str | Path, context: dict[str, Any] | None = None, allowed_dir: str | Path | None = None) -> ViewIr:
     args = [_crepus_bin(), "native", "ir", str(path)]
     input_data = None
+    resolved_path = Path(path).resolve()
+    resolved_allowed = Path(allowed_dir).resolve() if allowed_dir is not None else Path.cwd().resolve()
+    if not resolved_path.is_relative_to(resolved_allowed):
+        raise ValueError("Path traversal detected")
     if context is not None:
-        resolved_path = Path(path).resolve()
-        resolved_allowed = Path(allowed_dir).resolve() if allowed_dir is not None else Path.cwd().resolve()
-        if not resolved_path.is_relative_to(resolved_allowed):
-            raise ValueError("Path traversal detected")
         source = resolved_path.read_text()
         payload = {"template": source, "context": context, "baseDir": str(Path(path).parent)}
         args = [_crepus_bin(), "native", "ir", "--stdin-json"]
