@@ -221,6 +221,15 @@ mod tests {
     }
 
     #[test]
+    fn element_ref_content_replaces_existing() {
+        let mut el = ElementRef::new("test-id");
+        el.content("Initial");
+        assert_eq!(el.content, "Initial");
+        el.content("Replaced");
+        assert_eq!(el.content, "Replaced");
+    }
+
+    #[test]
     fn element_ref_chaining() {
         let mut el = ElementRef::new("test-id");
         el.set_content("A")
