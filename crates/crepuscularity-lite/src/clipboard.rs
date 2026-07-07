@@ -26,6 +26,26 @@ mod tests {
         }
     }
 
+    #[test]
+    fn test_read_text_error_path_empty_clipboard() {
+        if let Ok(mut clipboard) = arboard::Clipboard::new() {
+            let clear_res = clipboard.clear();
+            if clear_res.is_ok() {
+                let read_res = read_text();
+                assert!(
+                    read_res.is_err(),
+                    "read_text should fail when clipboard is empty"
+                );
+                let err = read_res.err().unwrap();
+                assert!(!err.is_empty(), "Error message should not be empty");
+            } else {
+                println!("Skipping empty clipboard test as clipboard clear failed");
+            }
+        } else {
+            println!("Skipping empty clipboard test as clipboard init failed");
+        }
+    }
+
     #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     #[test]
     fn test_read_write_text_error_path() {
