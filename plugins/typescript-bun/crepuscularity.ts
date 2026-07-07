@@ -23,7 +23,7 @@ export async function renderIr(path: string, context: Record<string, unknown> = 
     encoding: "utf8"
   })
   if (proc.status !== 0) {
-    throw new Error(proc.stderr)
+    throw new Error(proc.stderr || proc.error?.message || "Unknown error")
   }
   return JSON.parse(proc.stdout) as ViewIr
 }
