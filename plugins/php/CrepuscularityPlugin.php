@@ -38,9 +38,9 @@ final class CrepuscularityPlugin
         $bin = self::crepusBin();
         if ($context !== null) {
             $payload = json_encode([
-                'template' => file_get_contents($path),
+                'template' => file_get_contents($realPath),
                 'context' => $context,
-                'baseDir' => dirname($path),
+                'baseDir' => dirname($realPath),
             ], JSON_THROW_ON_ERROR);
             $descriptor = [
                 0 => ['pipe', 'r'],
@@ -63,7 +63,7 @@ final class CrepuscularityPlugin
             }
             return json_decode($stdout, true, 512, JSON_THROW_ON_ERROR);
         }
-        $cmd = escapeshellcmd($bin) . ' native ir ' . escapeshellarg($path);
+        $cmd = escapeshellcmd($bin) . ' native ir ' . escapeshellarg($realPath);
         // ponytail: path validated below for context path, bare path goes via escapeshellarg
         $out = [];
         $code = 0;
