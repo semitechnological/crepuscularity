@@ -17,7 +17,7 @@ final class CrepuscularityPlugin
             throw new RuntimeException('Invalid characters in CREPUS_BIN');
         }
 
-        if (preg_match('#[/\\]#', $bin)) {
+        if (preg_match('#[/\\\\]#', $bin)) {
             throw new RuntimeException('CREPUS_BIN must be a binary name, not a path');
         }
         return $bin;
@@ -31,16 +31,16 @@ final class CrepuscularityPlugin
         }
         $allowedDir = self::$allowedDirectory ?? getcwd();
         $realAllowed = realpath($allowedDir);
-        if ($realAllowed === false || !str_starts_with($realPath, $realAllowed . DIRECTORY_SEPARATOR)) {
+        if ($realAllowed === false || ($realPath !== $realAllowed && !str_starts_with($realPath, $realAllowed . DIRECTORY_SEPARATOR))) {
             throw new RuntimeException('Path traversal detected');
         }
 
         $bin = self::crepusBin();
         if ($context !== null) {
             $payload = json_encode([
-                'template' => file_get_contents($path),
+                'template' => file_get_contents($realPath),
                 'context' => $context,
-                'baseDir' => dirname($path),
+                'baseDir' => dirname($realPath),
             ], JSON_THROW_ON_ERROR);
             $descriptor = [
                 0 => ['pipe', 'r'],
@@ -63,7 +63,7 @@ final class CrepuscularityPlugin
             }
             return json_decode($stdout, true, 512, JSON_THROW_ON_ERROR);
         }
-        $cmd = escapeshellcmd($bin) . ' native ir ' . escapeshellarg($path);
+        $cmd = escapeshellcmd($bin) . ' native ir ' . escapeshellarg($realPath);
         // ponytail: path validated below for context path, bare path goes via escapeshellarg
         $out = [];
         $code = 0;
