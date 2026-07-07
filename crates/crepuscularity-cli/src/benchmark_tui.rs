@@ -60,20 +60,19 @@ fn elide(s: &str, max_chars: usize) -> String {
 }
 
 #[cfg(feature = "tui")]
-fn draw_title(f: &mut Frame, area: Rect, dry_run: bool) {
+fn draw_title(area: Rect, buf: &mut Buffer, dry_run: bool) {
     let title = if dry_run {
         Line::from(" crepus benchmark — dry-run plan ")
     } else {
         Line::from(" crepus benchmark — results ")
     };
-    f.render_widget(
-        Paragraph::new(title).block(Block::default().borders(Borders::ALL)),
-        area,
-    );
+    Paragraph::new(title)
+        .block(Block::default().borders(Borders::ALL))
+        .render(area, buf);
 }
 
 #[cfg(feature = "tui")]
-fn draw_table(f: &mut Frame, area: Rect, outcomes: &[TargetOutcomeSummary], scroll: usize) {
+fn draw_table(area: Rect, buf: &mut Buffer, outcomes: &[TargetOutcomeSummary], scroll: usize) {
     let header = Row::new(vec![
         Cell::from("Suite"),
         Cell::from("Target"),
@@ -131,11 +130,11 @@ fn draw_table(f: &mut Frame, area: Rect, outcomes: &[TargetOutcomeSummary], scro
             .title(" Targets (↑↓ scroll) "),
     );
 
-    f.render_widget(table, area);
+    Widget::render(table, area, buf);
 }
 
 #[cfg(feature = "tui")]
-fn draw_insights(f: &mut Frame, area: Rect, top_completed: &[(String, f64, u128)], dry_run: bool) {
+fn draw_insights(area: Rect, buf: &mut Buffer, top_completed: &[(String, f64, u128)], dry_run: bool) {
     let mut insight = String::new();
     if dry_run {
         insight.push_str("Dry-run — no wall times recorded.\n");
@@ -152,48 +151,49 @@ fn draw_insights(f: &mut Frame, area: Rect, top_completed: &[(String, f64, u128)
         }
     }
 
-    f.render_widget(
-        Paragraph::new(insight).block(
+    Paragraph::new(insight)
+        .block(
             Block::default()
                 .borders(Borders::ALL)
                 .title(" Share of completed wall time "),
-        ),
-        area,
-    );
+        )
+        .render(area, buf);
 }
 
 #[cfg(feature = "tui")]
-fn draw_footer(f: &mut Frame, area: Rect) {
-    f.render_widget(
-        Paragraph::new(Line::from(
-            " q / Esc — quit   ↑↓ j/k — scroll   PgUp/PgDn — page ",
-        )),
-        area,
-    );
+fn draw_footer(area: Rect, buf: &mut Buffer) {
+    Paragraph::new(Line::from(
+        " q / Esc — quit   ↑↓ j/k — scroll   PgUp/PgDn — page ",
+    ))
+    .render(area, buf);
 }
 
 #[cfg(feature = "tui")]
-fn draw_frame(
-    f: &mut Frame,
-    outcomes: &[TargetOutcomeSummary],
-    top_completed: &[(String, f64, u128)],
+struct BenchmarkDashboard<'a> {
+    outcomes: &'a [TargetOutcomeSummary],
+    top_completed: &'a [(String, f64, u128)],
     dry_run: bool,
     scroll: usize,
-) {
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(3),
-            Constraint::Min(8),
-            Constraint::Length(6),
-            Constraint::Length(1),
-        ])
-        .split(f.area());
+}
 
-    draw_title(f, chunks[0], dry_run);
-    draw_table(f, chunks[1], outcomes, scroll);
-    draw_insights(f, chunks[2], top_completed, dry_run);
-    draw_footer(f, chunks[3]);
+#[cfg(feature = "tui")]
+impl<'a> Widget for BenchmarkDashboard<'a> {
+    fn render(self, area: Rect, buf: &mut Buffer) {
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(3),
+                Constraint::Min(8),
+                Constraint::Length(6),
+                Constraint::Length(1),
+            ])
+            .split(area);
+
+        draw_title(chunks[0], buf, self.dry_run);
+        draw_table(chunks[1], buf, self.outcomes, self.scroll);
+        draw_insights(chunks[2], buf, self.top_completed, self.dry_run);
+        draw_footer(chunks[3], buf);
+    }
 }
 
 /// `Ok(true)` if an interactive screen was shown; `Ok(false)` if skipped (no TTY).
@@ -225,7 +225,13 @@ pub(crate) fn try_show_dashboard(
         }
 
         terminal.draw(|f| {
-            draw_frame(f, outcomes, top_completed, dry_run, scroll);
+            let dashboard = BenchmarkDashboard {
+                outcomes,
+                top_completed,
+                dry_run,
+                scroll,
+            };
+            f.render_widget(dashboard, f.area());
         })?;
 
         loop {
@@ -251,7 +257,13 @@ pub(crate) fn try_show_dashboard(
                 _ => continue,
             }
             terminal.draw(|f| {
-                draw_frame(f, outcomes, top_completed, dry_run, scroll);
+                let dashboard = BenchmarkDashboard {
+                    outcomes,
+                    top_completed,
+                    dry_run,
+                    scroll,
+                };
+                f.render_widget(dashboard, f.area());
             })?;
         }
         Ok(())
