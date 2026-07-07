@@ -77,4 +77,18 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn test_read_text_error_path_empty_clipboard() {
+        if let Ok(mut clipboard) = arboard::Clipboard::new() {
+            let _ = clipboard.clear(); // Ensure the clipboard is empty
+            let read_res = read_text();
+            assert!(
+                read_res.is_err(),
+                "read_text should fail when the clipboard is empty"
+            );
+        } else {
+            println!("Skipping empty clipboard test as clipboard initialization failed");
+        }
+    }
 }
