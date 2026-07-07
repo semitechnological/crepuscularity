@@ -24,10 +24,7 @@ pub fn run(cli: Cli) {
             bin,
             emit_events,
             build,
-        } => {
-            let options = build.into_options_or_exit();
-            crate::dev::run(bin, options, emit_events);
-        }
+        } => run_dev(bin, emit_events, build),
         Commands::Build {
             build,
             target_id,
@@ -56,15 +53,25 @@ pub fn run(cli: Cli) {
             ui::error("Aurora not compiled in. Rebuild crepus with --features aurora.");
         }
         Commands::Embedded { command } => crate::embedded::execute(command),
-        Commands::Benchmark { command, flat } => match command {
-            Some(BenchmarkCommands::Check { args }) => {
-                crate::benchmark::execute_check(benchmark_check_options(args));
-            }
-            Some(BenchmarkCommands::All { args }) | Some(BenchmarkCommands::Run { args }) => {
-                crate::benchmark::execute_run(benchmark_run_options(args));
-            }
-            None => crate::benchmark::execute_run(benchmark_run_options(flat)),
-        },
+        Commands::Benchmark { command, flat } => run_benchmark(command, flat),
+    }
+}
+
+#[cfg(feature = "desktop")]
+fn run_dev(bin: Option<String>, emit_events: bool, build: crate::build_options::BuildOptionsArgs) {
+    let options = build.into_options_or_exit();
+    crate::dev::run(bin, options, emit_events);
+}
+
+fn run_benchmark(command: Option<BenchmarkCommands>, flat: BenchmarkRunArgs) {
+    match command {
+        Some(BenchmarkCommands::Check { args }) => {
+            crate::benchmark::execute_check(benchmark_check_options(args));
+        }
+        Some(BenchmarkCommands::All { args }) | Some(BenchmarkCommands::Run { args }) => {
+            crate::benchmark::execute_run(benchmark_run_options(args));
+        }
+        None => crate::benchmark::execute_run(benchmark_run_options(flat)),
     }
 }
 

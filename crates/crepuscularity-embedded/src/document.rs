@@ -228,11 +228,16 @@ fn index_node(node: &EmbeddedNode, map: &mut BTreeMap<String, Vec<usize>>, path:
     if let Some(id) = &node.id {
         map.insert(id.clone(), path.clone());
     }
-    for (i, child) in node.children.iter().enumerate() {
-        path.push(i);
-        index_node(child, map, path);
-        path.pop();
+    if node.children.is_empty() {
+        return;
     }
+    let old_len = path.len();
+    path.push(0);
+    for (i, child) in node.children.iter().enumerate() {
+        path[old_len] = i;
+        index_node(child, map, path);
+    }
+    path.truncate(old_len);
 }
 
 fn resolve_path<'a>(roots: &'a [EmbeddedNode], path: &[usize]) -> Option<&'a EmbeddedNode> {

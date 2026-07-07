@@ -55,22 +55,27 @@ func RenderIR(path string, context map[string]any) (ViewIr, error) {
 	if err != nil {
 		return ViewIr{}, err
 	}
+	evalAllowed, err := filepath.EvalSymlinks(absAllowed)
+	if err != nil {
+		evalAllowed = absAllowed
+	}
 
 	absPath, err := filepath.Abs(path)
 	if err != nil {
 		return ViewIr{}, err
 	}
-
-	rel, err := filepath.Rel(absAllowed, absPath)
+	evalPath, err := filepath.EvalSymlinks(absPath)
 	if err != nil {
-		return ViewIr{}, err
+		evalPath = absPath
 	}
-	if rel == ".." || strings.HasPrefix(rel, "../") || strings.HasPrefix(rel, "..\\") {
+	evalAllowed = filepath.Clean(evalAllowed)
+	evalPath = filepath.Clean(evalPath)
+	if !strings.HasPrefix(evalPath, evalAllowed+string(filepath.Separator)) && evalPath != evalAllowed {
 		return ViewIr{}, fmt.Errorf("path traversal denied")
 	}
 
 	payload, err := json.Marshal(map[string]any{
-		"template": mustRead(path),
+		"template": mustRead(absPath),
 		"context":  context,
 	})
 	if err != nil {
