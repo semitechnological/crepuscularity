@@ -15,6 +15,28 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_read_text_empty_clipboard_error() {
+        let mut clipboard = match arboard::Clipboard::new() {
+            Ok(c) => c,
+            Err(_) => {
+                println!("Skipping due to missing clipboard");
+                return;
+            }
+        };
+        // Ensure clipboard is empty to reliably trigger get_text() error
+        if clipboard.clear().is_err() {
+            println!("Skipping due to inability to clear clipboard");
+            return;
+        }
+
+        let read_res = read_text();
+        assert!(
+            read_res.is_err(),
+            "read_text should fail when clipboard is empty"
+        );
+    }
+
+    #[test]
     fn test_read_write_text_happy_path() {
         let res = write_text("test_clipboard_content");
         if res.is_ok() {
