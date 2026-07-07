@@ -51,12 +51,20 @@ func RenderIR(path string, context map[string]any) (ViewIr, error) {
 		allowedDir = override
 	}
 
-	absAllowed, err := filepath.Abs(allowedDir)
+	evalAllowed, err := filepath.EvalSymlinks(allowedDir)
+	if err != nil {
+		return ViewIr{}, err
+	}
+	absAllowed, err := filepath.Abs(evalAllowed)
 	if err != nil {
 		return ViewIr{}, err
 	}
 
-	absPath, err := filepath.Abs(path)
+	evalPath, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		return ViewIr{}, err
+	}
+	absPath, err := filepath.Abs(evalPath)
 	if err != nil {
 		return ViewIr{}, err
 	}
