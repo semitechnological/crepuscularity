@@ -51,7 +51,13 @@ module CrepuscularityPlugin
     end
 
     bin = ENV.fetch("CREPUS_BIN", "crepus")
-    raise SecurityError, "CREPUS_BIN must be strictly a binary name without directory separators" if bin.match?(%r{[/\\]})
+    name = File.basename(bin)
+    unless ["crepus", "crepus.exe"].include?(name)
+      raise SecurityError, "Invalid CREPUS_BIN: binary name must be 'crepus' or 'crepus.exe', got #{name.inspect}"
+    end
+    if bin != name && !File.absolute_path?(bin)
+      raise SecurityError, "Invalid CREPUS_BIN: must be an absolute path or a simple binary name"
+    end
     if context
       payload = JSON.generate({
         "template" => File.read(path),
