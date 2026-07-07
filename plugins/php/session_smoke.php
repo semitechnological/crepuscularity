@@ -22,3 +22,28 @@ if (!str_contains(json_encode($ir, JSON_THROW_ON_ERROR), 'Count 2')) {
 if (!str_contains($session->renderHtml(), 'Count 2')) {
     throw new RuntimeException('html rerender did not include Count 2');
 }
+
+$reflection = new ReflectionClass(CrepuscularityPlugin::class);
+$method = $reflection->getMethod('crepusBin');
+$method->setAccessible(true);
+
+putenv('CREPUS_BIN=crepus');
+if ($method->invoke(null) !== 'crepus') {
+    throw new RuntimeException('failed to allow simple binary name');
+}
+
+putenv('CREPUS_BIN=/usr/local/bin/crepus');
+if ($method->invoke(null) !== '/usr/local/bin/crepus') {
+    throw new RuntimeException('failed to allow absolute path');
+}
+
+putenv('CREPUS_BIN=../../evil');
+$threw = false;
+try {
+    $method->invoke(null);
+} catch (RuntimeException $e) {
+    $threw = true;
+}
+if (!$threw) {
+    throw new RuntimeException('failed to reject relative path traversal');
+}
