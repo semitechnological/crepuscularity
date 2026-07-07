@@ -318,24 +318,9 @@ pub(crate) fn build_site_wasm(cli: &WebBuildArgs) {
     let t0 = Instant::now();
     let b = resolve_wasm_build_args(cli);
     let runtime_dir = b.site_dir.join("runtime");
-    if !runtime_dir.join("Cargo.toml").is_file() {
-        ui::error(&format!(
-            "no runtime/Cargo.toml under {} — run `crepus web new <name>` or copy examples/web-site",
-            b.site_dir.display()
-        ));
-    }
 
-    let label = if b.options.release() {
-        "crepus web release"
-    } else {
-        "crepus web debug"
-    };
-    eprintln!(
-        "{} building WASM site → {}",
-        style(label).dim(),
-        style(b.out_dir.display().to_string()).cyan()
-    );
-    eprintln!();
+    ensure_runtime_cargo_toml_exists(&b, &runtime_dir);
+    log_build_start(&b);
 
     let mut files = load_and_validate_files(&b);
     let template_head_html = extract_and_render_head(&b.entry, &mut files);
@@ -352,6 +337,33 @@ pub(crate) fn build_site_wasm(cli: &WebBuildArgs) {
     process_docs_and_static(&b, &files, &head, llms_site_text.as_deref());
     compile_and_optimize_wasm(&b, &runtime_dir);
 
+    log_build_success(&b, t0);
+}
+
+fn ensure_runtime_cargo_toml_exists(b: &WasmBuildArgs, runtime_dir: &Path) {
+    if !runtime_dir.join("Cargo.toml").is_file() {
+        ui::error(&format!(
+            "no runtime/Cargo.toml under {} — run `crepus web new <name>` or copy examples/web-site",
+            b.site_dir.display()
+        ));
+    }
+}
+
+fn log_build_start(b: &WasmBuildArgs) {
+    let label = if b.options.release() {
+        "crepus web release"
+    } else {
+        "crepus web debug"
+    };
+    eprintln!(
+        "{} building WASM site → {}",
+        style(label).dim(),
+        style(b.out_dir.display().to_string()).cyan()
+    );
+    eprintln!();
+}
+
+fn log_build_success(b: &WasmBuildArgs, t0: Instant) {
     eprintln!(
         "\n{} wrote {}",
         ui::ok(),
