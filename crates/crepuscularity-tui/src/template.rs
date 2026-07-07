@@ -232,4 +232,12 @@ mod tests {
 
         assert_eq!(el.content, "Final");
     }
+
+    #[test]
+    fn template_from_source() {
+        let tpl = Template::from_source("hello world");
+        assert_eq!(tpl.source(), "hello world");
+        assert_eq!(tpl.path(), Path::new(""));
+        assert!(tpl.path().as_os_str().is_empty());
+    }
 }
