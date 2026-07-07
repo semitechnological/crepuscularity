@@ -58,6 +58,10 @@ class CrepuscularityPluginTests(unittest.TestCase):
             # Also test relative path traversal out of allowed_dir
             render_ir(dummy_dir / ".." / "fixtures" / "hello.crepus", {"name": "Ada"}, dummy_dir)
 
+        with self.assertRaises(ValueError):
+            # Also test path traversal out of allowed_dir when context is None
+            render_ir(dummy_dir / ".." / "fixtures" / "hello.crepus", None, dummy_dir)
+
 
 if __name__ == "__main__":
     unittest.main()
