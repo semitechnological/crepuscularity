@@ -480,7 +480,8 @@ impl ManifestV3 {
                 .content_scripts
                 .iter()
                 .map(|cs| {
-                    let mut css = cs.css.clone();
+                    let mut css = Vec::with_capacity(cs.css.len() + opts.content_css.len());
+                    css.extend_from_slice(&cs.css);
                     for extra in &opts.content_css {
                         if !css.contains(extra) {
                             css.push(extra.clone());
