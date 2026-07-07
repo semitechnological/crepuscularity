@@ -211,6 +211,35 @@ mod tests {
     }
 
     #[test]
+    fn element_ref_val_empty() {
+        let mut el = ElementRef::new("test-id");
+        el.val("");
+        assert_eq!(el.content, "");
+    }
+
+    #[test]
+    fn element_ref_val_special_chars() {
+        let mut el = ElementRef::new("test-id");
+        el.val("!@#$%^");
+        assert_eq!(el.content, "!@#$%^");
+    }
+
+    #[test]
+    fn element_ref_val_chaining() {
+        let mut el = ElementRef::new("test-id");
+        el.val("first").val("second");
+        assert_eq!(el.content, "second");
+    }
+
+    #[test]
+    fn element_ref_val_overwrite() {
+        let mut el = ElementRef::new("test-id");
+        el.set_content("Initial");
+        el.val("Replaced");
+        assert_eq!(el.content, "Replaced");
+    }
+
+    #[test]
     fn element_ref_clear() {
         let mut el = ElementRef::new("test-id");
         el.set_content("Should be cleared");
