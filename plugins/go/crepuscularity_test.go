@@ -88,3 +88,29 @@ func TestRenderIRTraversalDenied(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
+
+func TestRenderIRSymlinkTraversal(t *testing.T) {
+	tmp, err := os.MkdirTemp("", "crepus_test_symlink")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmp)
+
+	allowedDir := filepath.Join(tmp, "allowed")
+	os.MkdirAll(allowedDir, 0755)
+
+	secretFile := filepath.Join(tmp, "secret.txt")
+	os.WriteFile(secretFile, []byte("SECRET"), 0644)
+
+	symlinkPath := filepath.Join(allowedDir, "link")
+	if err := os.Symlink(secretFile, symlinkPath); err != nil {
+		t.Skip("symlinks not supported")
+	}
+
+	os.Setenv("CREPUS_ALLOWED_DIR", allowedDir)
+
+	_, err = RenderIR(symlinkPath, nil)
+	if err == nil {
+		t.Fatal("Expected error due to symlink traversal, but got none")
+	}
+}
