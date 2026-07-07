@@ -11,10 +11,10 @@ class CrepuscularityPluginTests(unittest.TestCase):
         valid_paths = [
             "crepus",
             "crepus.exe",
-            "/usr/bin/crepus",
-            "/opt/crepuscularity/crepus.exe",
         ]
         invalid_paths = [
+            "/usr/bin/crepus",
+            "/opt/crepuscularity/crepus.exe",
             "sh",
             "/bin/sh",
             "../crepus",
