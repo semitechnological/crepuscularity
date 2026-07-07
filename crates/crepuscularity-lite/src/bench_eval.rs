@@ -108,4 +108,34 @@ mod tests {
         let err_msg = result.unwrap_err();
         assert!(err_msg.contains("parse error") || err_msg.contains("expected a boolean"));
     }
+
+    #[test]
+    fn eval_guest_from_config_file_missing_guest_entry_file() {
+        let dir = tempdir().unwrap();
+        let base = dir.path();
+        let config_path = base.join("valid_missing_guest.toml");
+
+        fs::write(&config_path, "guest_entry = \"nonexistent.js\"").unwrap();
+
+        let result = eval_guest_from_config_file(base, &config_path);
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err();
+        assert_eq!(err_msg, "guest_entry, prelude, or file read failed");
+    }
+
+    #[test]
+    fn eval_guest_from_config_file_script_evaluation_error() {
+        let dir = tempdir().unwrap();
+        let base = dir.path();
+        let config_path = base.join("valid_invalid_js.toml");
+        let script_path = base.join("invalid.js");
+
+        fs::write(&config_path, "guest_entry = \"invalid.js\"").unwrap();
+        fs::write(&script_path, "throw new Error(\"JS failed\");").unwrap();
+
+        let result = eval_guest_from_config_file(base, &config_path);
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err();
+        assert!(err_msg.contains("JS failed") || err_msg.contains("Error: JS failed"));
+    }
 }
