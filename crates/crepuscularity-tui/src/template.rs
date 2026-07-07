@@ -232,4 +232,40 @@ mod tests {
 
         assert_eq!(el.content, "Final");
     }
+
+    #[test]
+    fn draw_error_path() {
+        use ratatui::backend::TestBackend;
+        use ratatui::Terminal;
+        let tpl = Template::from_source("<div");
+        let mut terminal = Terminal::new(TestBackend::new(40, 3)).unwrap();
+        let mut err = None;
+        terminal
+            .draw(|frame| {
+                if let Err(e) = tpl.draw(frame, frame.area()) {
+                    err = Some(e);
+                }
+            })
+            .unwrap();
+        let e = err.expect("draw should return an error for invalid template");
+        assert!(e.contains("parse error"), "error should mention parse error: {e}");
+    }
+
+    #[test]
+    fn draw_full_error_path() {
+        use ratatui::backend::TestBackend;
+        use ratatui::Terminal;
+        let tpl = Template::from_source("<div");
+        let mut terminal = Terminal::new(TestBackend::new(40, 3)).unwrap();
+        let mut err = None;
+        terminal
+            .draw(|frame| {
+                if let Err(e) = tpl.draw_full(frame) {
+                    err = Some(e);
+                }
+            })
+            .unwrap();
+        let e = err.expect("draw_full should return an error for invalid template");
+        assert!(e.contains("parse error"), "error should mention parse error: {e}");
+    }
 }
