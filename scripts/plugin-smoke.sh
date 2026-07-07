@@ -14,7 +14,8 @@ case "$(uname -s)" in
   *) ABI_LIB="$ROOT/target/debug/libcrepuscularity_abi.so" ;;
 esac
 
-export CREPUS_BIN="$ROOT/target/debug/crepus"
+export PATH="$ROOT/target/debug:$PATH"
+export CREPUS_BIN="crepus"
 export CREPUS_ABI_LIB="$ABI_LIB"
 
 python3 -m unittest discover plugins/python

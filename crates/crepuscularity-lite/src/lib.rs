@@ -19,12 +19,12 @@
 #![allow(rustdoc::broken_intra_doc_links)]
 pub mod bench_plugin;
 pub mod bridge;
-pub mod inauguration_plugin;
 pub mod clipboard;
 pub mod download_plugin;
 mod fs_paths;
 pub mod host;
 pub mod host_queue;
+pub mod inauguration_plugin;
 pub mod integration;
 pub mod plugins;
 
@@ -48,12 +48,12 @@ pub use bench_eval::{
 };
 pub use bench_plugin::BenchPlugin;
 pub use bridge::{Bridge, BridgeError, Capability, NativePlugin};
-pub use inauguration_plugin::InaugurationPlugin;
 pub use download_plugin::DownloadPlugin;
 #[cfg(feature = "oxc")]
 pub use guest_compiler::prepare_guest_source;
 pub use host::{HostEventRecord, HostNode, HostRoute, HostSnapshot, HostState, HostStyle};
 pub use host_queue::{DeferredWindowDecorations, HostCommandQueue, HostDeferred};
+pub use inauguration_plugin::InaugurationPlugin;
 pub use plugins::{AppPlugin, ClipboardPlugin, CorePlugin, FsPlugin, HostPlugin, WindowPlugin};
 #[cfg(feature = "v8")]
 pub use v8_host::V8Host;
