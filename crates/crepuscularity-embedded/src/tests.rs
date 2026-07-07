@@ -314,3 +314,12 @@ fn template_function_error_path() {
     let err = res.err().unwrap();
     assert!(err.starts_with(&format!("template error: {:?}", path)));
 }
+
+#[test]
+fn template_function_error_path_directory() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let res = crate::template(temp_dir.path(), screen());
+    assert!(res.is_err());
+    let err = res.err().unwrap();
+    assert!(err.starts_with(&format!("template error: {:?}", temp_dir.path())));
+}
