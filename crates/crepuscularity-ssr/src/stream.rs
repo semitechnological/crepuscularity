@@ -48,34 +48,34 @@ pub async fn stream_ssr_response_with_nodes(
 ) -> Response {
     let (tx, rx) = mpsc::channel::<Result<Vec<u8>, std::io::Error>>(8);
 
-    // Send head shell immediately (no render needed, pure string construction)
+    // Build head shell string (moved into the closure for sending)
     let head_html = render_document_head(&doc);
-    let head_bytes = head_html.into_bytes();
 
     // Spawn body rendering on blocking thread
     tokio::task::spawn_blocking(move || {
         // ponytail: flush head first so browser starts loading resources early.
         // If the channel is full, body render will wait — head is already in flight.
-        let _ = tx.blocking_send(Result::<Vec<u8>, std::io::Error>::Ok(head_bytes));
+        let _ = tx.blocking_send(Result::<Vec<u8>, std::io::Error>::Ok(
+            head_html.as_bytes().to_vec(),
+        ));
 
         let counter = Cell::new(0u32);
         let mut bind = BindMap::new();
-        match render_nodes_ssr(&nodes, &ctx, &counter, &mut bind, true) {
-            Ok(body_html) => {
-                let bytes: Vec<u8> = body_html.into_bytes();
-                let _ = tx.blocking_send(Result::<Vec<u8>, std::io::Error>::Ok(bytes));
-                let close: Vec<u8> = "</body>\n</html>\n".to_string().into_bytes();
-                let _ = tx.blocking_send(Result::<Vec<u8>, std::io::Error>::Ok(close));
-            }
+        let render_result = render_nodes_ssr(&nodes, &ctx, &counter, &mut bind, true);
+        let body: String = match render_result {
+            Ok(h) => h,
             Err(e) => {
-                let err_str = format!(
-                    "<pre style='color:red'>Render error: {}</pre>\n</body>\n</html>\n",
-                    e
+                let err = format!(
+                    "<pre style='color:red'>Render error: {}</pre>\n</body>\n</html>\n", e
                 );
-                let err_bytes: Vec<u8> = err_str.into_bytes();
-                let _ = tx.blocking_send(Result::<Vec<u8>, std::io::Error>::Ok(err_bytes));
+                let _ = tx.blocking_send(Result::<Vec<u8>, std::io::Error>::Ok(err.into_bytes()));
+                return;
             }
-        }
+        };
+        let _ = tx.blocking_send(Result::<Vec<u8>, std::io::Error>::Ok(body.into_bytes()));
+        let _ = tx.blocking_send(Result::<Vec<u8>, std::io::Error>::Ok(
+            Vec::from("</body>\n</html>\n"),
+        ));
     });
 
     let stream = ReceiverStream::new(rx);

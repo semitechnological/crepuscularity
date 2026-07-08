@@ -1977,7 +1977,7 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-web"
-version = "0.4.11"
+version = "0.4.12"
 dependencies = [
  "ammonia",
  "base64 0.22.1",
