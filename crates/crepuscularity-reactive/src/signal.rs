@@ -64,3 +64,61 @@ impl<T: Clone + PartialEq + 'static> Clone for Signal<T> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::runtime::{alloc_id, enter_observer, AnyNode, EffectNode, State, NODES};
+
+    #[test]
+    fn test_signal_get() {
+        let signal = Signal::new(42);
+        assert_eq!(signal.get(), 42);
+    }
+
+    #[test]
+    fn test_signal_get_tracks_read() {
+        let signal = Signal::new("hello".to_string());
+
+        // Create a mock observer
+        let observer_id = alloc_id();
+        NODES.with(|n| {
+            n.borrow_mut().insert(
+                observer_id,
+                AnyNode::Effect(EffectNode {
+                    state: State::Clean,
+                    sources: vec![],
+                    run: std::rc::Rc::new(|| {}),
+                }),
+            )
+        });
+
+        // Call get within the observer context
+        {
+            let _guard = enter_observer(observer_id);
+            assert_eq!(signal.get(), "hello");
+        }
+
+        // Verify observer is in signal's subscribers
+        let has_subscriber = NODES.with(|nodes| {
+            let nodes = nodes.borrow();
+            if let Some(AnyNode::Signal(s)) = nodes.get(&signal.id) {
+                s.subscribers.contains(&observer_id)
+            } else {
+                false
+            }
+        });
+        assert!(has_subscriber, "Signal should have tracked the observer");
+
+        // Verify signal is in observer's sources
+        let has_source = NODES.with(|nodes| {
+            let nodes = nodes.borrow();
+            if let Some(AnyNode::Effect(e)) = nodes.get(&observer_id) {
+                e.sources.contains(&signal.id)
+            } else {
+                false
+            }
+        });
+        assert!(has_source, "Observer should have tracked the signal");
+    }
+}
