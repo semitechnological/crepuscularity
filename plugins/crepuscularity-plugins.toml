@@ -2,6 +2,7 @@
 ir_version = 5
 cli = "crepus native ir"
 abi_header = "crates/crepuscularity-abi/include/crepuscularity_abi.h"
+bindgen = "cargo run -p crepuscularity-cli -- plugins bindgen"
 
 [[package]]
 language = "go"

@@ -54,6 +54,7 @@ pub fn run(cli: Cli) {
         }
         Commands::Embedded { command } => crate::embedded::execute(command),
         Commands::Benchmark { command, flat } => run_benchmark(command, flat),
+        Commands::Plugins { command } => crate::plugins::execute(command),
     }
 }
 

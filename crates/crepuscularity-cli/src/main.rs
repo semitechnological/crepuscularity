@@ -22,6 +22,7 @@ mod ios;
 mod mobile;
 mod native;
 mod new;
+mod plugins;
 mod preview;
 mod render;
 mod target_build;

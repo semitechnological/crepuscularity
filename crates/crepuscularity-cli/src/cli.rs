@@ -99,6 +99,11 @@ pub enum Commands {
         #[command(flatten)]
         flat: BenchmarkRunArgs,
     },
+    /// Plugin packages and ABI bindgen (`equilibrium-ffi`, like `eq generate`)
+    Plugins {
+        #[command(subcommand)]
+        command: PluginsCommands,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -549,6 +554,24 @@ pub struct BenchmarkCheckArgs {
     pub common: BenchmarkCommonArgs,
     #[arg(long)]
     pub json: bool,
+}
+
+#[derive(Subcommand, Debug)]
+pub enum PluginsCommands {
+    /// Generate ABI bindings for every package in crepuscularity-plugins.toml (equilibrium-ffi)
+    Bindgen {
+        #[arg(long, help = "Path to crepuscularity-plugins.toml")]
+        manifest: Option<PathBuf>,
+        #[arg(long, help = "Override ABI header (default: contract.abi_header)")]
+        abi_header: Option<PathBuf>,
+        #[arg(long, help = "Base output dir (default: <repo>/plugins)")]
+        out_dir: Option<PathBuf>,
+    },
+    /// Run each package `test` command from the manifest
+    Test {
+        #[arg(long)]
+        manifest: Option<PathBuf>,
+    },
 }
 
 pub fn parse() -> Cli {
