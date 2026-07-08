@@ -13,19 +13,13 @@ use crepuscularity_core::ast::Node;
 use crepuscularity_core::TemplateContext;
 use crepuscularity_web::{render_ssr_document_with_nodes, SsrDocument};
 
-/// Escape HTML special characters in error messages before injecting into HTML.
-fn escape_html_error(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-}
+use crate::escape_html_error;
 
-/// A single route entry pairing a template source with a page title.
+/// A single route entry pointing to a pre-parsed template.
 ///
 /// The `nodes` field holds the pre-parsed AST so templates are not re-parsed on every request.
 pub struct RouteEntry {
-    pub template: String,
+    /// Page title for the HTML document.
     pub title: String,
     /// Pre-parsed template AST, cached at startup to avoid re-parsing on every request.
     pub nodes: Arc<Vec<Node>>,
@@ -70,21 +64,17 @@ impl SsrRouter {
     pub fn route(
         mut self,
         path: &str,
-        template: impl Into<String>,
+        template: impl AsRef<str>,
         title: impl Into<String>,
     ) -> Self {
-        let template = template.into();
+        let template = template.as_ref();
         let title = title.into();
-        let nodes = crepuscularity_core::ast_cache::parse_content(&template).unwrap_or_else(|e| {
+        let nodes = crepuscularity_core::ast_cache::parse_content(template).unwrap_or_else(|e| {
             panic!("SsrRouter::route: failed to parse template for {path}: {e}")
         });
         self.routes.insert(
             path.to_string(),
-            RouteEntry {
-                template,
-                title,
-                nodes,
-            },
+            RouteEntry { title, nodes },
         );
         self
     }

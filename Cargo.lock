@@ -1952,14 +1952,12 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-ssr"
-version = "0.2.4"
+version = "0.3.0"
 dependencies = [
  "axum",
  "crepuscularity-core",
  "crepuscularity-web",
- "futures-util",
  "http",
- "serde_json",
  "tokio",
  "tokio-stream",
  "tracing",

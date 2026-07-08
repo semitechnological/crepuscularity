@@ -1,16 +1,9 @@
 use axum::{extract::State, response::Html};
-use crepuscularity_core::ast::Node;
 use crepuscularity_core::{TemplateContext, TemplateValue};
 use crepuscularity_web::{render_ssr_document_with_nodes, SsrDocument};
 use std::{cell::Cell, collections::HashMap, sync::Arc};
 
-/// Escape HTML special characters in error messages before injecting into HTML.
-fn escape_html_error(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-}
+use crate::escape_html_error;
 
 /// Configuration for [`SsrHandler`].
 ///
@@ -20,13 +13,14 @@ fn escape_html_error(s: &str) -> String {
 #[derive(Clone)]
 pub struct SsrOptions {
     /// Template source string (content of a .crepus file).
-    pub template: &'static str,
+    /// Stored for debugging/reload, but rendering uses the pre-parsed `nodes`.
+    pub template: String,
     /// Default context variables injected on every request.
     pub defaults: HashMap<String, TemplateValue>,
     /// HTML `<title>` for the rendered document.
     pub title: String,
     /// Pre-parsed template AST, cached at construction time to avoid re-parsing on every request.
-    pub nodes: Arc<Vec<Node>>,
+    pub nodes: Arc<Vec<crepuscularity_core::ast::Node>>,
 }
 
 impl SsrOptions {
@@ -34,8 +28,9 @@ impl SsrOptions {
     ///
     /// Panics if the template fails to parse — this is intentional so invalid templates
     /// are caught at startup rather than at request time.
-    pub fn new(template: &'static str, title: impl Into<String>) -> Self {
-        let nodes = crepuscularity_core::ast_cache::parse_content(template)
+    pub fn new(template: impl Into<String>, title: impl Into<String>) -> Self {
+        let template = template.into();
+        let nodes = crepuscularity_core::ast_cache::parse_content(&template)
             .expect("SsrOptions::new: failed to parse template");
         Self {
             template,
@@ -111,15 +106,8 @@ impl SsrHandler {
                 title: &title,
                 ..Default::default()
             };
-            render_ssr_document_with_nodes(
-                &nodes,
-                &counter,
-                &mut bind,
-                &ctx,
-                &doc,
-                true,
-            )
-            .map_err(|e| e.to_string())
+            render_ssr_document_with_nodes(&nodes, &counter, &mut bind, &ctx, &doc, true)
+                .map_err(|e| e.to_string())
         })
         .await
         .unwrap_or_else(|e| Err(format!("spawn_blocking panicked: {e}")));

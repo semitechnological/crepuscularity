@@ -1,24 +1,44 @@
-//! Streaming SSR: renders head synchronously, flushes, then sends body chunks.
+//! Streaming SSR: renders head shell synchronously, flushes, then sends body chunks.
 //!
-//! The HTML5 document shell (doctype + `<head>`) is rendered first and flushed
+//! The HTML5 document shell (`<!DOCTYPE html>` + `<head>` section) is rendered and flushed
 //! immediately so the browser can start loading external resources (fonts, CSS, etc.)
-//! while the body is still rendering. The body is then sent as a second chunk.
+//! while the body is still rendering. The rendered body content follows as a second chunk.
 use axum::body::Body;
 use axum::response::{IntoResponse, Response};
 use crepuscularity_core::ast::Node;
 use crepuscularity_core::TemplateContext;
-use crepuscularity_web::{render_nodes_ssr, wrap_ssr_document, BindMap, SsrDocument};
+use crepuscularity_web::{render_nodes_ssr, BindMap, SsrDocument};
 use http::StatusCode;
 use std::cell::Cell;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 
+/// Render the HTML5 document head synchronously and return it as bytes.
+/// The head includes `<!DOCTYPE html>` + `<html>` + `<head>... </head>`.
+/// Caller must append `<body>` + body content + `</body></html>`.
+fn render_document_head(doc: &SsrDocument<'_>) -> String {
+    let body_class = doc
+        .body_class
+        .map(|c| format!(r#" class="{}""#, c))
+        .unwrap_or_default();
+    let title_esc = doc.title.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;");
+    format!(
+        "<!DOCTYPE html>\n<html lang=\"{}\">\n<head>\n  <meta charset=\"utf-8\">\n  \
+         <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n  \
+         <title>{}</title>\n</head>\n<body{}>\n",
+        doc.lang, title_esc, body_class
+    )
+}
+
 /// Stream an SSR response with true head-first streaming.
 ///
-/// Renders the template body through [`render_nodes_ssr`] and sends the HTML5 document
-/// shell + rendered content as a stream. Currently sends in 2+ chunks (head shell
-/// first, then body) so the browser can begin processing `<head>` resources early.
+/// Renders the HTML5 document head and sends it immediately as the first chunk.
+/// The body is rendered via [`render_nodes_ssr`] and sent as subsequent chunks.
+/// The closing `</body></html>` is appended as the final chunk.
 ///
 /// `doc` must use `'static` lifetime because it is moved into the blocking task.
 pub async fn stream_ssr_response_with_nodes(
@@ -28,26 +48,31 @@ pub async fn stream_ssr_response_with_nodes(
 ) -> Response {
     let (tx, rx) = mpsc::channel::<Result<Vec<u8>, std::io::Error>>(8);
 
+    // Send head shell immediately (no render needed, pure string construction)
+    let head_html = render_document_head(&doc);
+    let head_bytes = head_html.into_bytes();
+
+    // Spawn body rendering on blocking thread
     tokio::task::spawn_blocking(move || {
-        // Render body first using pre-parsed AST
+        // ponytail: flush head first so browser starts loading resources early.
+        // If the channel is full, body render will wait — head is already in flight.
+        let _ = tx.blocking_send(Ok(head_bytes));
+
         let counter = Cell::new(0u32);
         let mut bind = BindMap::new();
-        let body_result: Result<String, crepuscularity_web::CrepusError> =
-            render_nodes_ssr(&nodes, &ctx, &counter, &mut bind, true);
-
-        let body_html = match body_result {
-            Ok(h) => h,
-            Err(e) => {
-                let err: std::io::Error = std::io::Error::other(e.to_string());
-                let _ = tx.blocking_send(Err(err));
-                return;
+        match render_nodes_ssr(&nodes, &ctx, &counter, &mut bind, true) {
+            Ok(body_html) => {
+                let _ = tx.blocking_send(Ok(body_html.into_bytes()));
+                let _ = tx.blocking_send(Ok("</body>\n</html>\n".to_string().into_bytes()));
             }
-        };
-
-        // Wrap in document shell
-        let full = wrap_ssr_document(&body_html, &doc);
-        let bytes = full.into_bytes();
-        let _ = tx.blocking_send(Ok(bytes));
+            Err(e) => {
+                let err_bytes = format!(
+                    "<pre style='color:red'>Render error: {}</pre>\n</body>\n</html>\n",
+                    e
+                );
+                let _ = tx.blocking_send(Ok(err_bytes.into_bytes()));
+            }
+        }
     });
 
     let stream = ReceiverStream::new(rx);

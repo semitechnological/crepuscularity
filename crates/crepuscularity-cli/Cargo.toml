@@ -54,7 +54,7 @@ crepuscularity-core = { path = "../crepuscularity-core", version = "0.4.18" }
 crepuscularity-runtime = { path = "../crepuscularity-runtime", version = "0.4.10", optional = true }
 crepuscularity-tui = { path = "../crepuscularity-tui", version = "0.4.10", optional = true }
 crepuscularity-web = { path = "../crepuscularity-web", version = "0.4.11", features = ["parallel", "ssr"] }
-crepuscularity-ssr = { path = "../crepuscularity-ssr", version = "0.2.3" }
+crepuscularity-ssr = { path = "../crepuscularity-ssr", version = "0.3.0" }
 crepuscularity-webext  = { path = "../crepuscularity-webext", version = "0.2.9" }
 crepuscularity-native = { path = "../crepuscularity-native", version = "0.5.6" }
 crepuscularity-embedded = { path = "../crepuscularity-embedded", version = "0.1.14" }
