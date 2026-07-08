@@ -100,12 +100,26 @@ pub fn expand_class_aliases_in_nodes(nodes: &mut [Node], aliases: &HashMap<Strin
                 el.classes = out;
                 let mut out_cc: Vec<ConditionalClass> = Vec::new();
                 for cc in std::mem::take(&mut el.conditional_classes) {
-                    for c in expand_class_token_owned(cc.class, aliases) {
-                        out_cc.push(ConditionalClass {
-                            class: c,
-                            condition: cc.condition.clone(),
-                        });
+                    let expanded = expand_class_token_owned(cc.class, aliases);
+                    if expanded.is_empty() {
+                        continue;
                     }
+                    out_cc.reserve(expanded.len());
+                    let mut iter = expanded.into_iter();
+                    let mut prev = iter.next().unwrap();
+                    let condition = cc.condition;
+
+                    for c in iter {
+                        out_cc.push(ConditionalClass {
+                            class: prev,
+                            condition: condition.clone(),
+                        });
+                        prev = c;
+                    }
+                    out_cc.push(ConditionalClass {
+                        class: prev,
+                        condition,
+                    });
                 }
                 el.conditional_classes = out_cc;
                 expand_class_aliases_in_nodes(&mut el.children, aliases);

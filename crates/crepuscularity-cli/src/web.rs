@@ -405,6 +405,9 @@ fn write_bundle_and_cache(b: &WasmBuildArgs, files: &HashMap<String, String>) ->
     let _ = std::fs::create_dir_all(b.site_dir.join(".crepus-cache"));
     let cache = DriverCache::open(&b.site_dir);
     let fp = Fingerprint::new(&bundle_str, None, "web-wasm-bundle");
+    std::fs::create_dir_all(&b.out_dir).unwrap_or_else(|e| {
+        ui::error(&format!("mkdir {}: {e}", b.out_dir.display()));
+    });
     let bundle_path = b.out_dir.join("crepus-bundle.json");
     let skip_bundle_write = bundle_path.is_file() && cache.is_up_to_date(&fp, &bundle_str);
     if !skip_bundle_write {

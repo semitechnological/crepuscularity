@@ -140,3 +140,35 @@ pub(crate) fn run_memo(id: NodeId) {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::runtime::{AnyNode, State, NODES};
+
+    #[test]
+    fn test_memo_new() {
+        let memo = Memo::new(|| 42);
+        NODES.with(|nodes| {
+            let nodes = nodes.borrow();
+            let node = nodes.get(&memo.id).expect("node");
+            if let AnyNode::Memo(m) = node {
+                assert_eq!(m.state, State::Dirty);
+                assert!(m.cached.is_none());
+                assert!(m.sources.is_empty());
+                assert!(m.subscribers.is_empty());
+            } else {
+                panic!("not a memo");
+            }
+        });
+    }
+
+    #[test]
+    fn test_memo_dispose() {
+        let memo = Memo::new(|| 42);
+        let id = memo.id;
+        NODES.with(|nodes| assert!(nodes.borrow().contains_key(&id)));
+        memo.dispose();
+        NODES.with(|nodes| assert!(!nodes.borrow().contains_key(&id)));
+    }
+}

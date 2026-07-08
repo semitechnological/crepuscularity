@@ -72,3 +72,17 @@ impl ElementRef {
 pub fn by_id(id: impl Into<String>) -> ElementRef {
     ElementRef::new(id)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_element_ref_new() {
+        assert_eq!(ElementRef::new("my-id").id(), "my-id");
+        assert_eq!(
+            ElementRef::new(String::from("another-id")).id(),
+            "another-id"
+        );
+    }
+}
