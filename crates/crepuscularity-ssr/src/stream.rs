@@ -56,21 +56,21 @@ pub async fn stream_ssr_response_with_nodes(
     tokio::task::spawn_blocking(move || {
         // ponytail: flush head first so browser starts loading resources early.
         // If the channel is full, body render will wait — head is already in flight.
-        let _ = tx.blocking_send(Ok(head_bytes));
+        let _ = tx.blocking_send::<Result<Vec<u8>, std::io::Error>>(Ok(head_bytes));
 
         let counter = Cell::new(0u32);
         let mut bind = BindMap::new();
         match render_nodes_ssr(&nodes, &ctx, &counter, &mut bind, true) {
             Ok(body_html) => {
-                let _ = tx.blocking_send(Ok(body_html.into_bytes()));
-                let _ = tx.blocking_send(Ok("</body>\n</html>\n".to_string().into_bytes()));
+                let _ = tx.blocking_send::<Result<Vec<u8>, std::io::Error>>(Ok(body_html.into_bytes()));
+                let _ = tx.blocking_send::<Result<Vec<u8>, std::io::Error>>(Ok("</body>\n</html>\n".to_string().into_bytes()));
             }
             Err(e) => {
                 let err_bytes = format!(
                     "<pre style='color:red'>Render error: {}</pre>\n</body>\n</html>\n",
                     e
                 );
-                let _ = tx.blocking_send(Ok(err_bytes.into_bytes()));
+                let _ = tx.blocking_send::<Result<Vec<u8>, std::io::Error>>(Ok(err_bytes.into_bytes()));
             }
         }
     });
