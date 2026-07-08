@@ -347,71 +347,20 @@ fn build_extension_inner(
     });
 
     // ── Step 1: manifest.json ────────────────────────────────────────────────
-    {
-        let sp = ui::spinner("generating manifest.json");
-        let mut json = match browser {
-            Some(target) => manifest.to_manifest_v3_json_for_browser(target),
-            None => manifest.to_manifest_v3_json(),
-        };
-        if dev {
-            json = inject_dev_content_script(&json);
-        }
-        std::fs::write(dist.join("manifest.json"), &json).unwrap_or_else(|e| {
-            ui::error(&format!("write manifest.json: {e}"));
-        });
-        ui::spinner_ok(&sp, "manifest.json");
-    }
+    let manifest_json = generate_manifest_json(manifest, browser, dev);
+    write_manifest_json(&dist, &manifest_json);
 
     // ── Step 2: runtime assets ───────────────────────────────────────────────
     write_runtime_assets(app_path, &dist, &src_dir, &vendor_dir, dev, manifest);
 
     // ── Step 3: WASM runtime ─────────────────────────────────────────────────
-    let runtime_dir = app_path.join("runtime");
-    if runtime_dir.exists() {
-        build_wasm_runtime(app_path, &runtime_dir, &vendor_dir, options);
-    } else {
-        ui::warning("no runtime/ directory — skipping WASM compile");
-        ui::warning("run `crepus webext new` to scaffold a full project");
-    }
+    build_wasm_runtime_if_exists(app_path, &vendor_dir, options);
 
     // ── Step 4: pre-render popup HTML ────────────────────────────────────────
-    // If views/popup.crepus exists, render it natively and write popup.html so
-    // the popup opens instantly without loading WASM at runtime.
-    let popup_template = app_path.join("views/popup.crepus");
-    if popup_template.exists() {
-        let sp = ui::spinner("pre-rendering popup.html");
-        match prerender_popup_html(app_path, &popup_template, manifest) {
-            Ok(html) => {
-                std::fs::write(src_dir.join("popup.html"), &html).unwrap_or_else(|e| {
-                    ui::error(&format!("write popup.html: {e}"));
-                });
-                ui::spinner_ok(&sp, "popup.html (pre-rendered from popup.crepus)");
-            }
-            Err(e) => {
-                sp.finish_and_clear();
-                ui::warning(&format!("popup pre-render failed: {e}"));
-            }
-        }
-    }
+    prerender_and_write_popup_html(app_path, &src_dir, manifest);
 
     // ── Capability check ────────────────────────────────────────────────────
-    match crepuscularity_webext::check_project_capabilities(app_path) {
-        Ok(missing) if !missing.is_empty() => {
-            eprintln!();
-            ui::warning("missing capabilities detected — add these to crepus.toml:");
-            for cap in &missing {
-                eprintln!(
-                    "  {} {}",
-                    ui::dim("→"),
-                    style(cap.to_permission_string()).yellow()
-                );
-            }
-        }
-        Err(e) => {
-            ui::warning(&format!("capability scan failed: {e}"));
-        }
-        _ => {}
-    }
+    report_missing_capabilities(app_path);
 
     eprintln!(
         "\n{} built to {}",
@@ -433,6 +382,84 @@ fn build_extension_inner(
         ),
     }
     ui::done_in(t0.elapsed());
+}
+
+fn generate_manifest_json(
+    manifest: &crepuscularity_webext::ExtensionManifest,
+    browser: Option<BrowserTarget>,
+    dev: bool,
+) -> String {
+    let mut json = match browser {
+        Some(target) => manifest.to_manifest_v3_json_for_browser(target),
+        None => manifest.to_manifest_v3_json(),
+    };
+    if dev {
+        json = inject_dev_content_script(&json);
+    }
+    json
+}
+
+fn write_manifest_json(dist: &Path, json: &str) {
+    let sp = ui::spinner("generating manifest.json");
+    std::fs::write(dist.join("manifest.json"), json).unwrap_or_else(|e| {
+        ui::error(&format!("write manifest.json: {e}"));
+    });
+    ui::spinner_ok(&sp, "manifest.json");
+}
+
+fn build_wasm_runtime_if_exists(app_path: &Path, vendor_dir: &Path, options: BuildOptions) {
+    let runtime_dir = app_path.join("runtime");
+    if runtime_dir.exists() {
+        build_wasm_runtime(app_path, &runtime_dir, vendor_dir, options);
+    } else {
+        ui::warning("no runtime/ directory — skipping WASM compile");
+        ui::warning("run `crepus webext new` to scaffold a full project");
+    }
+}
+
+fn prerender_and_write_popup_html(
+    app_path: &Path,
+    src_dir: &Path,
+    manifest: &crepuscularity_webext::ExtensionManifest,
+) {
+    // If views/popup.crepus exists, render it natively and write popup.html so
+    // the popup opens instantly without loading WASM at runtime.
+    let popup_template = app_path.join("views/popup.crepus");
+    if popup_template.exists() {
+        let sp = ui::spinner("pre-rendering popup.html");
+        match prerender_popup_html(app_path, &popup_template, manifest) {
+            Ok(html) => {
+                std::fs::write(src_dir.join("popup.html"), &html).unwrap_or_else(|e| {
+                    ui::error(&format!("write popup.html: {e}"));
+                });
+                ui::spinner_ok(&sp, "popup.html (pre-rendered from popup.crepus)");
+            }
+            Err(e) => {
+                sp.finish_and_clear();
+                ui::warning(&format!("popup pre-render failed: {e}"));
+            }
+        }
+    }
+}
+
+fn report_missing_capabilities(app_path: &Path) {
+    match crepuscularity_webext::check_project_capabilities(app_path) {
+        Ok(missing) if !missing.is_empty() => {
+            eprintln!();
+            ui::warning("missing capabilities detected — add these to crepus.toml:");
+            for cap in &missing {
+                eprintln!(
+                    "  {} {}",
+                    ui::dim("→"),
+                    style(cap.to_permission_string()).yellow()
+                );
+            }
+        }
+        Err(e) => {
+            ui::warning(&format!("capability scan failed: {e}"));
+        }
+        _ => {}
+    }
 }
 
 fn write_runtime_assets(
