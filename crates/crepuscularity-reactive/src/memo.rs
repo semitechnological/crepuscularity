@@ -1,5 +1,6 @@
 use std::rc::Rc;
 
+// Import NODES thread-local variable for use in memo logic and tests
 use crate::runtime::{
     alloc_id, clear_observer_sources, enter_observer, mark_subscribers_dirty, remove_node,
     track_read, AnyNode, MemoEqFn, MemoNode, MemoRunFn, NodeId, State, NODES,
@@ -138,5 +139,26 @@ pub(crate) fn run_memo(id: NodeId) {
         if had_cached && changed {
             mark_subscribers_dirty(id);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_memo_dispose() {
+        let memo = Memo::new(|| 42);
+        let id = memo.id;
+
+        NODES.with(|nodes| {
+            assert!(nodes.borrow().contains_key(&id), "Memo should exist in NODES after creation");
+        });
+
+        memo.dispose();
+
+        NODES.with(|nodes| {
+            assert!(!nodes.borrow().contains_key(&id), "Memo should be removed from NODES after disposal");
+        });
     }
 }
