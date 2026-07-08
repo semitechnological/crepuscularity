@@ -35,3 +35,28 @@ pub fn flush() {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::runtime::RUNTIME;
+
+    #[test]
+    fn test_batch_end_decrements_depth() {
+        RUNTIME.with(|rt| rt.borrow_mut().batch_depth = 2);
+
+        batch_end();
+        assert_eq!(RUNTIME.with(|rt| rt.borrow().batch_depth), 1);
+
+        batch_end();
+        assert_eq!(RUNTIME.with(|rt| rt.borrow().batch_depth), 0);
+    }
+
+    #[test]
+    fn test_batch_end_saturating_sub() {
+        RUNTIME.with(|rt| rt.borrow_mut().batch_depth = 0);
+
+        batch_end();
+        assert_eq!(RUNTIME.with(|rt| rt.borrow().batch_depth), 0);
+    }
+}
