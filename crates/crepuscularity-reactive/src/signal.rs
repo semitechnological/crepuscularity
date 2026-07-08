@@ -64,3 +64,39 @@ impl<T: Clone + PartialEq + 'static> Clone for Signal<T> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::effect::Effect;
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    #[test]
+    fn test_signal_set() {
+        let sig = Signal::new(0);
+        let counter = Rc::new(RefCell::new(0));
+
+        let c_clone = counter.clone();
+        let sig_clone = sig.clone();
+
+        let _effect = Effect::new(move || {
+            sig_clone.get();
+            *c_clone.borrow_mut() += 1;
+        });
+
+        // Effect runs once on creation
+        assert_eq!(*counter.borrow(), 1);
+
+        // Setting to same value shouldn't trigger effect
+        sig.set(0);
+        assert_eq!(*counter.borrow(), 1);
+
+        // Setting to new value should trigger effect
+        sig.set(1);
+        assert_eq!(*counter.borrow(), 2);
+
+        // Value should be updated
+        assert_eq!(sig.get(), 1);
+    }
+}
