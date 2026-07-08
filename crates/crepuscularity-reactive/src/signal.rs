@@ -64,3 +64,34 @@ impl<T: Clone + PartialEq + 'static> Clone for Signal<T> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_signal_update() {
+        let signal = Signal::new(5);
+        signal.update(|v| v + 10);
+        assert_eq!(signal.get(), 15);
+    }
+
+    #[test]
+    fn test_signal_update_multiple_times() {
+        let signal = Signal::new(0);
+        signal.update(|v| v + 1);
+        signal.update(|v| v + 2);
+        assert_eq!(signal.get(), 3);
+    }
+
+    #[test]
+    #[should_panic(expected = "already borrowed")]
+    fn test_signal_update_self_referential_panic() {
+        let signal = Signal::new(5);
+        let signal_clone = signal.clone();
+        signal.update(|_| {
+            signal_clone.set(10);
+            10
+        });
+    }
+}
