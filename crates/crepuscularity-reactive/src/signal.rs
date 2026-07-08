@@ -64,3 +64,28 @@ impl<T: Clone + PartialEq + 'static> Clone for Signal<T> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::signal::Signal;
+    use crate::runtime::{NODES, AnyNode};
+
+    #[test]
+    fn test_signal_new() {
+        let sig = Signal::new(42);
+
+        NODES.with(|nodes| {
+            let nodes = nodes.borrow();
+            let node = nodes.get(&sig.id).expect("Node should exist in NODES map");
+
+            match node {
+                AnyNode::Signal(s) => {
+                    assert!(s.subscribers.is_empty(), "Signal should have no subscribers initially");
+                },
+                _ => panic!("Node is not a Signal"),
+            }
+        });
+
+        assert_eq!(*sig.value.borrow(), 42, "Signal value should be initialized correctly");
+    }
+}
