@@ -76,6 +76,31 @@ impl<T: Clone + PartialEq + 'static> Clone for Memo<T> {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::runtime::{AnyNode, State, NODES};
+
+    #[test]
+    fn test_memo_new() {
+        let memo = Memo::new(|| 42);
+
+        NODES.with(|nodes| {
+            let nodes = nodes.borrow();
+            let node = nodes.get(&memo.id).expect("Node should exist");
+
+            if let AnyNode::Memo(m) = node {
+                assert_eq!(m.state, State::Dirty, "Memo should start in Dirty state");
+                assert!(m.cached.is_none(), "Memo should not be computed initially");
+                assert!(m.sources.is_empty(), "Memo should have no sources initially");
+                assert!(m.subscribers.is_empty(), "Memo should have no subscribers initially");
+            } else {
+                panic!("Node is not a Memo");
+            }
+        });
+    }
+}
+
 /// Recompute memo if its state is not Clean.
 pub(crate) fn run_memo_if_needed(id: NodeId) {
     let state = NODES.with(|nodes| {
