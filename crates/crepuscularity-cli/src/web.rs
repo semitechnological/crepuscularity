@@ -857,23 +857,35 @@ fn ssr_escape_json(json: &str) -> String {
         .replace("</SCRIPT>", "<\\/SCRIPT>")
 }
 
-fn render_seo_head(head: &SiteHead) -> String {
-    format_seo_tags(head)
+struct ResolvedSeoTags<'a> {
+    title: &'a str,
+    description: &'a str,
+    og_type: &'a str,
+    image: Option<&'a String>,
+    twitter_card: &'a str,
 }
 
-fn format_seo_tags(head: &SiteHead) -> String {
+fn render_seo_head(head: &SiteHead) -> String {
     let seo = &head.seo;
-    let title = seo.title.as_deref().unwrap_or(&head.page_title);
-    let description = seo.description.as_deref().unwrap_or(&head.description);
-    let og_type = seo.og_type.as_deref().unwrap_or("website");
     let image = seo.image.as_ref().or(head.og_image.as_ref());
-    let twitter_card = seo.twitter_card.as_deref().unwrap_or_else(|| {
-        if image.is_some() {
-            "summary_large_image"
-        } else {
-            "summary"
-        }
-    });
+    let resolved = ResolvedSeoTags {
+        title: seo.title.as_deref().unwrap_or(&head.page_title),
+        description: seo.description.as_deref().unwrap_or(&head.description),
+        og_type: seo.og_type.as_deref().unwrap_or("website"),
+        image,
+        twitter_card: seo.twitter_card.as_deref().unwrap_or_else(|| {
+            if image.is_some() {
+                "summary_large_image"
+            } else {
+                "summary"
+            }
+        }),
+    };
+    format_seo_tags(head, &resolved)
+}
+
+fn format_seo_tags(head: &SiteHead, resolved: &ResolvedSeoTags<'_>) -> String {
+    let seo = &head.seo;
     let mut lines = Vec::new();
 
     if let Some(canonical) = &seo.canonical {
@@ -923,15 +935,15 @@ fn format_seo_tags(head: &SiteHead) -> String {
 
     lines.push(format!(
         r#"  <meta property="og:title" content="{}">"#,
-        escape_html_attr(title)
+        escape_html_attr(resolved.title)
     ));
     lines.push(format!(
         r#"  <meta property="og:description" content="{}">"#,
-        escape_html_attr(description)
+        escape_html_attr(resolved.description)
     ));
     lines.push(format!(
         r#"  <meta property="og:type" content="{}">"#,
-        escape_html_attr(og_type)
+        escape_html_attr(resolved.og_type)
     ));
     if let Some(canonical) = &seo.canonical {
         lines.push(format!(
@@ -951,7 +963,7 @@ fn format_seo_tags(head: &SiteHead) -> String {
             escape_html_attr(locale)
         ));
     }
-    if let Some(image) = image {
+    if let Some(image) = resolved.image {
         lines.push(format!(
             r#"  <meta property="og:image" content="{}">"#,
             escape_html_attr(image)
@@ -966,17 +978,17 @@ fn format_seo_tags(head: &SiteHead) -> String {
 
     lines.push(format!(
         r#"  <meta name="twitter:card" content="{}">"#,
-        escape_html_attr(twitter_card)
+        escape_html_attr(resolved.twitter_card)
     ));
     lines.push(format!(
         r#"  <meta name="twitter:title" content="{}">"#,
-        escape_html_attr(title)
+        escape_html_attr(resolved.title)
     ));
     lines.push(format!(
         r#"  <meta name="twitter:description" content="{}">"#,
-        escape_html_attr(description)
+        escape_html_attr(resolved.description)
     ));
-    if let Some(image) = image {
+    if let Some(image) = resolved.image {
         lines.push(format!(
             r#"  <meta name="twitter:image" content="{}">"#,
             escape_html_attr(image)
