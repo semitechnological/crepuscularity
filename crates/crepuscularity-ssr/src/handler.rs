@@ -1,8 +1,8 @@
 use axum::{extract::State, response::Html};
 use crepuscularity_core::ast::Node;
 use crepuscularity_core::{TemplateContext, TemplateValue};
-use crepuscularity_web::{render_ssr_document, SsrDocument};
-use std::{collections::HashMap, sync::Arc};
+use crepuscularity_web::{render_ssr_document_with_nodes, SsrDocument};
+use std::{cell::Cell, collections::HashMap, sync::Arc};
 
 /// Escape HTML special characters in error messages before injecting into HTML.
 fn escape_html_error(s: &str) -> String {
@@ -94,23 +94,32 @@ impl SsrHandler {
     /// runtime event loop is not blocked. The pre-parsed template AST (`opts.nodes`) is available
     /// in the state and is shared across all requests via `Arc`.
     pub async fn handle(State(opts): State<Arc<SsrOptions>>) -> Html<String> {
-        let ctx = TemplateContext {
-            vars: opts.defaults.clone(),
-            base_dir: None,
-            slot: None,
-            virtual_files: std::sync::Arc::new(HashMap::new()),
-        };
-        let html = tokio::task::spawn_blocking({
-            let template = opts.template;
-            let title = opts.title.clone();
-            let ctx = ctx.clone();
-            move || -> Result<String, String> {
-                let doc = SsrDocument {
-                    title: &title,
-                    ..Default::default()
-                };
-                render_ssr_document(template, &ctx, &doc, true).map_err(|e| e.to_string())
-            }
+        let nodes = Arc::clone(&opts.nodes);
+        let defaults = opts.defaults.clone();
+        let title = opts.title.clone();
+
+        let html = tokio::task::spawn_blocking(move || -> Result<String, String> {
+            let ctx = TemplateContext {
+                vars: defaults,
+                base_dir: None,
+                slot: None,
+                virtual_files: std::sync::Arc::new(HashMap::new()),
+            };
+            let counter = Cell::new(0u32);
+            let mut bind = crepuscularity_web::BindMap::new();
+            let doc = SsrDocument {
+                title: &title,
+                ..Default::default()
+            };
+            render_ssr_document_with_nodes(
+                &nodes,
+                &counter,
+                &mut bind,
+                &ctx,
+                &doc,
+                true,
+            )
+            .map_err(|e| e.to_string())
         })
         .await
         .unwrap_or_else(|e| Err(format!("spawn_blocking panicked: {e}")));

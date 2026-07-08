@@ -19,11 +19,13 @@ use std::cell::Cell;
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use crate::render_nodes_to_html;
+
 use ammonia::Builder;
 use base64::Engine;
 use serde_json::{json, Value};
 
-type BindMap = serde_json::Map<String, Value>;
+pub type BindMap = serde_json::Map<String, Value>;
 
 use crepuscularity_core::analysis::{classify_node, Region};
 use crepuscularity_core::ast::*;
@@ -168,14 +170,8 @@ pub fn render_bundle_with_ssr(bundle_json: &str, markers: bool) -> Result<String
     render_from_files_with_ssr(&files, &entry, &ctx, markers)
 }
 
-/// Full HTML5 document: runs the template through [`render_template_to_html_with_ssr`], then wraps result.
-pub fn render_ssr_document(
-    template: &str,
-    ctx: &TemplateContext,
-    doc: &SsrDocument<'_>,
-    markers: bool,
-) -> Result<String, CrepusError> {
-    let inner = render_template_to_html_with_ssr(template, ctx, markers)?;
+/// Helper: wrap rendered inner HTML in an HTML5 document shell.
+pub fn wrap_ssr_document(inner: &str, doc: &SsrDocument<'_>) -> String {
     let body_class = doc
         .body_class
         .map(|c| format!(r#" class="{}""#, crate::escape_html_attr(c)))
@@ -184,7 +180,7 @@ pub fn render_ssr_document(
     let head_safe = Builder::new()
         .rm_tags(&["base", "meta", "link", "style"])
         .clean(doc.head_extra);
-    Ok(format!(
+    format!(
         r#"<!DOCTYPE html>
 <html lang="{}">
 <head>
@@ -199,7 +195,39 @@ pub fn render_ssr_document(
 </html>
 "#,
         doc.lang, title_esc, head_safe, body_class, inner
-    ))
+    )
+}
+
+/// Full HTML5 document: runs the template through [`render_template_to_html_with_ssr`], then wraps result.
+pub fn render_ssr_document(
+    template: &str,
+    ctx: &TemplateContext,
+    doc: &SsrDocument<'_>,
+    markers: bool,
+) -> Result<String, CrepusError> {
+    let inner = render_template_to_html_with_ssr(template, ctx, markers)?;
+    Ok(wrap_ssr_document(&inner, doc))
+}
+
+/// Like [`render_ssr_document`] but takes pre-parsed AST nodes instead of a template string.
+/// Use this when the caller has already parsed and cached the AST (e.g. [`SsrOptions`](/crates/crepuscularity-ssr)).
+/// The `counter` and `bind` are reused across calls for hydration consistency.
+pub fn render_ssr_document_with_nodes(
+    nodes: &[Node],
+    counter: &Cell<u32>,
+    bind: &mut BindMap,
+    ctx: &TemplateContext,
+    doc: &SsrDocument<'_>,
+    markers: bool,
+) -> Result<String, CrepusError> {
+    let inner = if markers {
+        let mut html = render_nodes_ssr(nodes, ctx, counter, bind, true)?;
+        append_hydration_payload(&mut html, ctx, bind)?;
+        html
+    } else {
+        render_nodes_to_html(nodes, ctx)?
+    };
+    Ok(wrap_ssr_document(&inner, doc))
 }
 
 fn append_hydration_payload(
@@ -265,7 +293,7 @@ fn alloc_binding(counter: &Cell<u32>, bind: &mut BindMap, detail: Value) -> u32 
     id
 }
 
-fn render_nodes_ssr(
+pub fn render_nodes_ssr(
     nodes: &[Node],
     ctx: &TemplateContext,
     counter: &Cell<u32>,

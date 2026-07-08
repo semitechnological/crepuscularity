@@ -1,4 +1,5 @@
 //! Multi-route SSR router: maps URL paths to .crepus templates.
+use std::cell::Cell;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -10,7 +11,7 @@ use axum::{
 };
 use crepuscularity_core::ast::Node;
 use crepuscularity_core::TemplateContext;
-use crepuscularity_web::{render_ssr_document, SsrDocument};
+use crepuscularity_web::{render_ssr_document_with_nodes, SsrDocument};
 
 /// Escape HTML special characters in error messages before injecting into HTML.
 fn escape_html_error(s: &str) -> String {
@@ -92,7 +93,7 @@ impl SsrRouter {
     pub fn into_axum_router(self) -> Router {
         let routes = Arc::new(self.routes);
         Router::new()
-            .route("/*path", get(handle_route))
+            .route("/{*path}", get(handle_route))
             .route("/", get(handle_root))
             .with_state(routes)
     }
@@ -110,25 +111,26 @@ async fn handle_route(
     render_entry(&routes, &path).await
 }
 
-/// Look up the route entry and render the template on a blocking thread so the async
-/// runtime event loop is not stalled by synchronous template parsing/rendering.
+/// Look up the route entry and render the template using pre-parsed AST nodes.
 async fn render_entry(routes: &HashMap<String, RouteEntry>, path: &str) -> Html<String> {
     let entry = match routes.get(path).or_else(|| routes.get("/")) {
         Some(e) => e,
         None => return Html("<h1>404 Not Found</h1>".to_string()),
     };
-    let template = entry.template.clone();
+
+    let nodes = Arc::clone(&entry.nodes);
     let title = entry.title.clone();
 
-    // Wrap the synchronous parsing/rendering work in spawn_blocking so it runs on a
-    // dedicated blocking thread instead of stalling the Tokio async runtime.
+    // Render on a blocking thread using the pre-parsed AST — no re-parsing needed.
     let result = tokio::task::spawn_blocking(move || {
         let ctx = TemplateContext::new();
+        let counter = Cell::new(0u32);
+        let mut bind = crepuscularity_web::BindMap::new();
         let doc = SsrDocument {
             title: &title,
             ..Default::default()
         };
-        render_ssr_document(&template, &ctx, &doc, true)
+        render_ssr_document_with_nodes(&nodes, &counter, &mut bind, &ctx, &doc, true)
     })
     .await;
 

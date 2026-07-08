@@ -41,8 +41,10 @@ mod ssr;
 
 #[cfg(feature = "ssr")]
 pub use ssr::{
-    render_bundle_with_ssr, render_from_files_with_ssr, render_ssr_document,
-    render_template_to_html_with_ssr, serialize_ctx_for_ssr, SsrDocument,
+    render_bundle_with_ssr, render_from_files_with_ssr, render_nodes_ssr,
+    render_ssr_document, render_ssr_document_with_nodes,
+    render_template_to_html_with_ssr, serialize_ctx_for_ssr, wrap_ssr_document,
+    BindMap, SsrDocument,
 };
 
 /// Render an entry point from an in-memory file map — no filesystem access.
