@@ -11,6 +11,9 @@ mobile-app/
   views/
     main.crepus          — app UI (tabs: Tasks, Notes, Settings)
   fixture.json           — generated View IR (version 4)
+  rust/
+    Cargo.toml           — mobile actions crate (staticlib + cdylib + rlib)
+    src/lib.rs           — state, action dispatch, C ABI + JNI exports
   ios/
     Package.swift        — SwiftPM package
     Sources/MobileApp/
@@ -60,6 +63,29 @@ cd android && ./gradlew :app:assembleDebug
 
 Open in Android Studio (JDK 17+). The app reads `fixture.json` from assets
 and renders via Compose.
+
+## Rust backend
+
+The `rust/` crate is the action dispatch layer:
+
+- `initial_view_state()` — initial template variables (tasks, notes, settings)
+- `dispatch_and_store_str(action)` — routes action strings, mutates state, returns JSON
+- `dispatch_change_and_store(action, bind, value_json)` — handles bind changes (toggles, sliders)
+- `eval_text/bool/number/items_json` — reads values for native shells
+
+Exports:
+- **iOS**: `crepus_mobile_dispatch_and_store_nul`, `crepus_mobile_dispatch_change_and_store_nul`, `crepus_mobile_eval_text`, `crepus_mobile_eval_bool`, `crepus_mobile_eval_number`, `crepus_mobile_eval_items_json`, `crepus_mobile_free_string`
+- **Android**: JNI methods under `dev.crepuscularity.mobileapp.CrepusRustActions`
+
+Build for iOS:
+```bash
+cd rust && cargo build --target aarch64-apple-ios --release
+```
+
+Build for Android:
+```bash
+cd rust && cargo build --target aarch64-linux-android --release
+```
 
 ## Template syntax
 
