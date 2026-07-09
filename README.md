@@ -242,6 +242,16 @@ examples/
   quicknote/                Browser extension example (in-repo)
   native-shells/            SwiftUI/XcodeGen and Gradle View IR hosts
 ```
+## Other stable polished examples
+- [herdr-gui](https://github.com/undivisible/herdr-gui) - a gui interface for herdr built with crepuscular gpui
+- [drift-wallpaper](https://github.com/undivisible/drift-wallpaper) - settings menu made with crepuscular gpui
+- [rs_vimium](https://github.com/undivisible/rs_vimium) - name self explanatory built with the crepuscular webextension framework
+- [tsc.hk](https://github.com/tschk/tsc.hk) - the tschk website is built with crepuscularity-web
+- [crepuscularity.tsc.hk](docs-site) - official crepuscularity website made with yours truly
+- [inauguration.tsc.hk](https://github.com/tschk/inauguration/tree/master/docs-site) - inauguration website made with crepuscularity + inauguration
+
+also have a working cross platform mobile app that ill have an example for soon :)
+
 
 ## Building
 
