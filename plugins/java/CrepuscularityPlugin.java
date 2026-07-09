@@ -98,7 +98,7 @@ public final class CrepuscularityPlugin {
         if (code != 0) {
             throw new IllegalStateException(json);
         }
-        int version = json.contains("\"version\":4") || json.contains("\"version\": 4") ? 4 : -1;
+        int version = json.contains("\"version\":5") || json.contains("\"version\": 5") ? 5 : -1;
         return new ViewIr(version, json);
     }
 

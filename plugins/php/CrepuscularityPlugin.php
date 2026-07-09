@@ -17,7 +17,7 @@ final class CrepuscularityPlugin
             throw new RuntimeException('Invalid characters in CREPUS_BIN');
         }
 
-        if (preg_match('#[/\\]#', $bin)) {
+        if (str_contains($bin, '/') || str_contains($bin, '\\')) {
             throw new RuntimeException('CREPUS_BIN must be a binary name, not a path');
         }
         return $bin;

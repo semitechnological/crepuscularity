@@ -72,10 +72,8 @@ impl SsrRouter {
         let nodes = crepuscularity_core::ast_cache::parse_content(template).unwrap_or_else(|e| {
             panic!("SsrRouter::route: failed to parse template for {path}: {e}")
         });
-        self.routes.insert(
-            path.to_string(),
-            RouteEntry { title, nodes },
-        );
+        self.routes
+            .insert(path.to_string(), RouteEntry { title, nodes });
         self
     }
 

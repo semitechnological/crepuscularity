@@ -94,8 +94,7 @@ fn ssr_handle_missing_variable() {
     let mut bind = crepuscularity_web::BindMap::new();
     let doc = SsrDocument::default();
 
-    let html =
-        render_ssr_document_with_nodes(&nodes, &counter, &mut bind, &ctx, &doc, true);
+    let html = render_ssr_document_with_nodes(&nodes, &counter, &mut bind, &ctx, &doc, true);
 
     // Missing variables render as empty string
     assert!(html.is_ok());
@@ -162,7 +161,10 @@ fn ssr_loop_rendering() {
     item_b.set("value", "b");
     let mut item_c = TemplateContext::new();
     item_c.set("value", "c");
-    ctx.set("items", crepuscularity_core::TemplateValue::List(vec![item_a, item_b, item_c]));
+    ctx.set(
+        "items",
+        crepuscularity_core::TemplateValue::List(vec![item_a, item_b, item_c]),
+    );
     let counter = Cell::new(0u32);
     let mut bind = crepuscularity_web::BindMap::new();
     let doc = SsrDocument::default();

@@ -109,7 +109,13 @@ pub fn generate_all(opts: &BindgenOptions) -> Result<Vec<GeneratedFile>, String>
 
         let code = if let Some(lang) = equilibrium_language(&pkg.language) {
             let generated = generate_imports(&header, lang, &import_opts)?;
-            generated.code
+            if pkg.language == "go" {
+                patch_go_cgo(&generated.code)
+            } else if pkg.language == "csharp" {
+                patch_csharp(&generated.code)
+            } else {
+                generated.code
+            }
         } else {
             generate_extra(&pkg.language, &header)?
         };
@@ -141,13 +147,39 @@ pub fn generate_all(opts: &BindgenOptions) -> Result<Vec<GeneratedFile>, String>
     Ok(written)
 }
 
+fn patch_csharp(code: &str) -> String {
+    code.replace("IntPtr *", "IntPtr")
+}
+
+fn patch_go_cgo(code: &str) -> String {
+    let preamble = r#"#cgo CFLAGS: -I${SRCDIR}/../../crates/crepuscularity-abi/include
+#cgo LDFLAGS: -L${SRCDIR}/../../target/debug -lcrepuscularity_abi
+#include "crepuscularity_abi.h""#;
+    if let Some(start) = code.find("/*") {
+        if let Some(end) = code[start..].find("*/") {
+            let before = &code[..start];
+            let after = &code[start + end + 2..];
+            return format!("{before}/*\n{preamble}\n*/{after}");
+        }
+    }
+    format!(
+        r#"package crepuscularity
+
+/*
+{preamble}
+*/
+import "C"
+{code}"#
+    )
+}
+
 fn generate_extra(language: &str, header: &Path) -> Result<String, String> {
     let include_name = header
         .file_name()
         .and_then(|n| n.to_str())
         .unwrap_or("crepuscularity_abi.h");
     match language {
-        "go" => Ok(format!(
+        "go" => Ok(patch_go_cgo(&format!(
             r#"// Package crepuscularity — low-level ABI (generated). Link libcrepuscularity_abi.
 package crepuscularity
 
@@ -157,7 +189,7 @@ package crepuscularity
 */
 import "C"
 "#
-        )),
+        ))),
         "python" => Ok(generate_python_ctypes()),
         "java" => Ok(generate_java_jni(include_name)),
         "kotlin" => Ok(generate_kotlin_ffi(include_name)),

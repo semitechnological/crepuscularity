@@ -22,7 +22,9 @@ fn render_document_head(doc: &SsrDocument<'_>) -> String {
         .body_class
         .map(|c| format!(r#" class="{}""#, c))
         .unwrap_or_default();
-    let title_esc = doc.title.replace('&', "&amp;")
+    let title_esc = doc
+        .title
+        .replace('&', "&amp;")
         .replace('<', "&lt;")
         .replace('>', "&gt;")
         .replace('"', "&quot;");
@@ -66,16 +68,17 @@ pub async fn stream_ssr_response_with_nodes(
             Ok(h) => h,
             Err(e) => {
                 let err = format!(
-                    "<pre style='color:red'>Render error: {}</pre>\n</body>\n</html>\n", e
+                    "<pre style='color:red'>Render error: {}</pre>\n</body>\n</html>\n",
+                    e
                 );
                 let _ = tx.blocking_send(Result::<Vec<u8>, std::io::Error>::Ok(err.into_bytes()));
                 return;
             }
         };
         let _ = tx.blocking_send(Result::<Vec<u8>, std::io::Error>::Ok(body.into_bytes()));
-        let _ = tx.blocking_send(Result::<Vec<u8>, std::io::Error>::Ok(
-            Vec::from("</body>\n</html>\n"),
-        ));
+        let _ = tx.blocking_send(Result::<Vec<u8>, std::io::Error>::Ok(Vec::from(
+            "</body>\n</html>\n",
+        )));
     });
 
     let stream = ReceiverStream::new(rx);

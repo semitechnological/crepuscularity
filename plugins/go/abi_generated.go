@@ -5,7 +5,8 @@
 package crepuscularity
 
 /*
-#cgo LDFLAGS: -lcrepuscularity_abi
+#cgo CFLAGS: -I${SRCDIR}/../../crates/crepuscularity-abi/include
+#cgo LDFLAGS: -L${SRCDIR}/../../target/debug -lcrepuscularity_abi
 #include "crepuscularity_abi.h"
 */
 import "C"
