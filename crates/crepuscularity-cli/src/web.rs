@@ -1042,6 +1042,25 @@ fn format_seo_tags(head: &SiteHead, resolved: &ResolvedSeoTags<'_>) -> String {
         }
     }
 
+    if let Some(favicon) = &seo.favicon {
+        let href = escape_html_attr(favicon);
+        if favicon.ends_with(".svg") {
+            lines.push(format!(r#"  <link rel="icon" type="image/svg+xml" href="{}">"#, href));
+        } else if favicon.ends_with(".ico") {
+            lines.push(format!(r#"  <link rel="icon" type="image/x-icon" href="{}">"#, href));
+        } else if favicon.ends_with(".png") {
+            lines.push(format!(r#"  <link rel="icon" type="image/png" href="{}">"#, href));
+        } else {
+            lines.push(format!(r#"  <link rel="icon" href="{}">"#, href));
+        }
+    }
+    if let Some(touch) = &seo.apple_touch_icon {
+        lines.push(format!(
+            r#"  <link rel="apple-touch-icon" href="{}">"#,
+            escape_html_attr(touch)
+        ));
+    }
+
     lines.join("\n")
 }
 
@@ -1717,6 +1736,8 @@ mod tests {
             json_ld: vec![r#"{"@context":"https://schema.org","@type":"WebSite"}"#.into()],
             robots_txt: None,
             sitemap: None,
+            favicon: None,
+            apple_touch_icon: None,
         };
         head
     }

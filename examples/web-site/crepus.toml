@@ -16,3 +16,4 @@ type = "website"
 keywords = ["crepuscularity", "wasm", "rust ui"]
 robots = "index,follow"
 twitter_card = "summary"
+favicon = "/favicon.svg"

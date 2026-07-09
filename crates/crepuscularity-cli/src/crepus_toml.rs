@@ -232,6 +232,13 @@ pub struct SeoConfig {
     pub robots_txt: Option<RobotsTxtConfig>,
     #[serde(default)]
     pub sitemap: Option<SitemapConfig>,
+    /// Path or URL to favicon (e.g. "/favicon.svg", "/favicon.ico").
+    /// Generates `<link rel="icon">` tags automatically.
+    #[serde(default)]
+    pub favicon: Option<String>,
+    /// Path or URL to apple-touch-icon (e.g. "/apple-touch-icon.png").
+    #[serde(default)]
+    pub apple_touch_icon: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
