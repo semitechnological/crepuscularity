@@ -2,99 +2,60 @@
 
 A cross-platform task tracker built with `.crepus` templates, **codegen'd native views**, and a **Rust action dispatch backend**.
 
-## Architecture
+## How it works
 
 ```
-.crepus template → crepus native codegen → SwiftUI / Compose views
-                     ↕
-              Rust action dispatch (staticlib)
-              state management + FFI eval
-                     ↕
-          iOS: @_silgen_name C ABI
-          Android: JNI external functions
+main.crepus  ──→  crepus native codegen  ──→  SwiftUI / Compose views
+                        ↕
+               Rust action dispatch (staticlib)
+               state management + FFI eval
+                        ↕
+             iOS: @_silgen_name C ABI
+             Android: JNI external functions
 ```
 
-**Flow:** user taps button → `CrepusActions.perform("tasks.add")` → Rust dispatch → JSON result → `CrepusStateStore.applyResult()` → revision bump → UI re-renders via eval FFI.
+**User action → Rust → JSON → state bump → UI re-renders.**
+
+## Developer workflow
+
+```bash
+# 1. Edit the template
+vim views/main.crepus
+
+# 2. Regenerate native views (one command, no patching)
+crepus native codegen views/main.crepus --platform swiftui --out ios/Sources/MobileApp --view-name TaskTrackerView
+crepus native codegen views/main.crepus --platform compose --out android/app/src/main/java/dev/crepuscularity/mobileapp --view-name TaskTrackerView
+
+# 3. Build Rust backend
+cd rust && cargo build --target aarch64-apple-ios --release   # iOS
+cd rust && cargo build --target aarch64-linux-android --release  # Android
+
+# 4. Build native apps
+cd ios && swift build           # or open in Xcode
+cd android && ./gradlew :app:assembleDebug  # or open in Android Studio
+```
 
 ## Structure
 
 ```
 mobile-app/
-  crepus.toml                    — target config (ios + android)
-  views/
-    main.crepus                  — app UI (tabs: Tasks, Notes, Settings)
-  fixture.json                   — View IR for reference
-  rust/
-    Cargo.toml                   — staticlib + cdylib + rlib
-    src/lib.rs                   — state, dispatch, C ABI + JNI exports
+  views/main.crepus          — app UI (3 tabs: Tasks, Notes, Settings)
+  fixture.json               — View IR for reference
+  rust/                      — Rust action dispatch backend
+    src/lib.rs               — state, dispatch, C ABI + JNI exports
   ios/
-    Package.swift                — SwiftPM package
-    App/
-      TaskTrackerApp.swift       — @main entry, calls CrepusRustActions.install()
+    Package.swift            — SwiftPM package
+    App/TaskTrackerApp.swift — @main, calls CrepusRustActions.install()
     Sources/MobileApp/
-      CrepusStateStore.swift     — ObservableObject wrapping Rust eval FFI
-      CrepusRustActions.swift    — @_silgen_name FFI bridge
-      TaskTrackerView.swift      — codegen'd from main.crepus (patched)
+      CrepusStateStore.swift — ObservableObject wrapping Rust eval FFI
+      CrepusRustActions.swift— @_silgen_name FFI bridge
+      TaskTrackerView.swift  — codegen'd from main.crepus
   android/
-    build.gradle.kts             — root Gradle
-    settings.gradle.kts
-    app/
-      build.gradle.kts           — Compose + kotlinx-serialization
-      src/main/
-        AndroidManifest.xml
-        java/dev/crepuscularity/mobileapp/
-          MainActivity.kt        — entry, calls CrepusRustActions.install()
-          CrepusStateStore.kt    — Compose state wrapping Rust JNI evals
-          CrepusRustActions.kt   — JNI external bridge
-          TaskTrackerView.kt     — codegen'd from main.crepus (patched)
-```
-
-## Regenerate codegen views
-
-```bash
-# SwiftUI
-crepus native codegen examples/mobile-app/views/main.crepus \
-  --platform swiftui --out examples/mobile-app/ios/Sources/MobileApp \
-  --view-name TaskTrackerView --pretty
-
-# Compose
-crepus native codegen examples/mobile-app/views/main.crepus \
-  --platform compose --out examples/mobile-app/android/app/src/main/java/dev/crepuscularity/mobileapp \
-  --view-name TaskTrackerView --pretty
-```
-
-After codegen, patch empty `Text()` / `VStack` blocks where `bind=` expressions should render text content (task.title, task.due, note.title, note.preview, app_version).
-
-## Build
-
-### Rust backend
-
-```bash
-cd rust
-
-# iOS (staticlib for Xcode linking)
-cargo build --target aarch64-apple-ios --release
-
-# Android (staticlib for JNI)
-cargo build --target aarch64-linux-android --release
-```
-
-### iOS
-
-Link the Rust staticlib (`libmobile_app_actions.a`) in Xcode build settings, then:
-
-```bash
-cd ios && swift build
-```
-
-Or open `ios/Package.swift` in Xcode, add the staticlib to "Link Binary With Libraries", and run.
-
-### Android
-
-Place `libmobile_app_actions.so` in `app/src/main/jniLibs/arm64-v8a/`, then:
-
-```bash
-cd android && ./gradlew :app:assembleDebug
+    app/build.gradle.kts     — Compose + kotlinx-serialization
+    java/.../MainActivity.kt — entry, calls CrepusRustActions.install()
+    java/.../CrepusStateStore.kt — Compose state wrapping Rust JNI evals
+    java/.../CrepusRustActions.kt— JNI external bridge
+    java/.../TaskTrackerView.kt  — codegen'd from main.crepus
 ```
 
 ## Template syntax
@@ -102,11 +63,28 @@ cd android && ./gradlew :app:assembleDebug
 ```crepus
 div flex flex-col w-full h-full bg-[#0a0a0a]
   tabs bind=current_tab
-    tab value="tasks" label="Tasks" icon="checklist"
+    tab value="tasks" label="Tasks"
       for task in {tasks}
         toggle bind=task.done @change="tasks.toggle"
-        div bind=task.title
+        div bind=task.title          ← renders as Text automatically
+        if {task.due != ""}
+          div bind=task.due          ← renders as Text automatically
+      button @click="tasks.add"      ← dispatches "tasks.add" to Rust
+        "Add"
 ```
 
 Key features: `tabs`/`tab`, `if`/`for` conditionals, `toggle`/`slider` controls,
-`bind=` data binding, `@click`/`@change` event handlers.
+`bind=` data binding (renders as Text on any element), `@click`/`@change` event handlers.
+
+## Adding a new action
+
+1. Add handler in `rust/src/lib.rs` `dispatch_action_inner()`
+2. Add initial state in `initial_view_state()`
+3. Call from template: `button @click="my.action"`
+4. Regenerate codegen views
+
+## Adding a new screen
+
+1. Add a new `tab` in `views/main.crepus`
+2. Regenerate codegen views
+3. Add any new state variables in `initial_view_state()`

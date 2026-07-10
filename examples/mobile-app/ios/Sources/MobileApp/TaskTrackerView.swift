@@ -1,5 +1,11 @@
 import Foundation
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#endif
+#if canImport(AppKit)
+import AppKit
+#endif
 
 @MainActor
 public enum CrepusActions {
@@ -12,11 +18,26 @@ public enum CrepusActions {
     }
 
     public static func perform(_ action: String) {
-        resultSink(dispatch(action))
+        let dispatch = dispatch
+        let resultSink = resultSink
+        DispatchQueue.global(qos: .userInitiated).async {
+            let result = dispatch(action)
+            DispatchQueue.main.async {
+                resultSink(result)
+            }
+        }
     }
 
     public static func performChange(_ action: String?, bind: String, value: Any) {
         resultSink(CrepusRustActions.dispatchChangeStored(action ?? "", bind: bind, value: value))
+    }
+
+    public static func dismissKeyboard() {
+#if canImport(UIKit)
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+#elseif canImport(AppKit)
+        NSApp.keyWindow?.makeFirstResponder(nil)
+#endif
     }
 }
 
@@ -29,16 +50,17 @@ public struct TaskTrackerView: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 8.0) {
             VStack(alignment: .leading, spacing: 8.0) {
-                VStack(alignment: .leading, spacing: 8.0) {
-                    VStack(alignment: .leading, spacing: 8.0) {
-                        ScrollView(.vertical) {
-                            VStack(alignment: .leading, spacing: 8.0) {
+                TabView(selection: Binding(get: { CrepusActions.model.text("current_tab") }, set: { newValue in CrepusActions.performChange(nil, bind: "current_tab", value: newValue) })) {
+                    ScrollView(.vertical) {
+                        VStack(alignment: .leading, spacing: 8.0) {
+                            VStack(alignment: .leading, spacing: 12.0) {
                                 HStack(alignment: .center, spacing: 8.0) {
                                     VStack(alignment: .leading, spacing: 8.0) {
                                         Text("Tasks")
                                     }
                                         .font(.system(size: 20.0))
                                         .fontWeight(.semibold)
+                                    Spacer()
                                     Button(action: { CrepusActions.perform("tasks.add") }) {
                                         Text("Add")
                                     }
@@ -63,14 +85,10 @@ public struct TaskTrackerView: View {
                                     HStack(alignment: .center, spacing: 12.0) {
                                         Toggle("", isOn: Binding(get: { CrepusActions.model.bool("task.done", scopeName: "task", scope: task) }, set: { newValue in CrepusActions.performChange("tasks.toggle", bind: "task.done", value: newValue) }))
                                         VStack(alignment: .leading, spacing: 4.0) {
-                                            VStack(alignment: .leading, spacing: 8.0) {
-                                                Text(CrepusActions.model.text("task.title", scopeName: "task", scope: task))
-                                            }
+                                            Text(CrepusActions.model.text("task.title", scopeName: "task", scope: task))
                                                 .font(.system(size: 16.0))
                                             if CrepusActions.model.bool("task.due != \"\"", scopeName: "task", scope: task) {
-                                                VStack(alignment: .leading, spacing: 8.0) {
-                                                    Text(CrepusActions.model.text("task.due", scopeName: "task", scope: task))
-                                                }
+                                                Text(CrepusActions.model.text("task.due", scopeName: "task", scope: task))
                                                     .font(.system(size: 12.0))
                                                     .foregroundStyle(Color(red: 0.443, green: 0.443, blue: 0.478, opacity: 1.000))
                                             }
@@ -84,19 +102,22 @@ public struct TaskTrackerView: View {
                                 }
                             }
                         }
-                            .frame(maxWidth: .infinity, maxHeight: nil, alignment: .topLeading)
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 16)
                     }
-                    VStack(alignment: .leading, spacing: 8.0) {
-                        ScrollView(.vertical) {
-                            VStack(alignment: .leading, spacing: 8.0) {
+                        .frame(maxWidth: .infinity, maxHeight: nil, alignment: .topLeading)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 16)
+                    .tabItem { Label("Tasks", systemImage: "checklist") }
+                    .tag("tasks")
+                    ScrollView(.vertical) {
+                        VStack(alignment: .leading, spacing: 8.0) {
+                            VStack(alignment: .leading, spacing: 12.0) {
                                 HStack(alignment: .center, spacing: 8.0) {
                                     VStack(alignment: .leading, spacing: 8.0) {
                                         Text("Notes")
                                     }
                                         .font(.system(size: 20.0))
                                         .fontWeight(.semibold)
+                                    Spacer()
                                     Button(action: { CrepusActions.perform("notes.add") }) {
                                         Text("New")
                                     }
@@ -119,14 +140,10 @@ public struct TaskTrackerView: View {
                                 }
                                 ForEach(Array(CrepusActions.model.items("notes").enumerated()), id: \.offset) { _, note in
                                     VStack(alignment: .leading, spacing: 4.0) {
-                                        VStack(alignment: .leading, spacing: 8.0) {
-                                            Text(CrepusActions.model.text("note.title", scopeName: "note", scope: note))
-                                        }
+                                        Text(CrepusActions.model.text("note.title", scopeName: "note", scope: note))
                                             .font(.system(size: 16.0))
                                             .fontWeight(.medium)
-                                        VStack(alignment: .leading, spacing: 8.0) {
-                                            Text(CrepusActions.model.text("note.preview", scopeName: "note", scope: note))
-                                        }
+                                        Text(CrepusActions.model.text("note.preview", scopeName: "note", scope: note))
                                             .font(.system(size: 14.0))
                                             .foregroundStyle(Color(red: 0.631, green: 0.631, blue: 0.667, opacity: 1.000))
                                     }
@@ -138,13 +155,15 @@ public struct TaskTrackerView: View {
                                 }
                             }
                         }
-                            .frame(maxWidth: .infinity, maxHeight: nil, alignment: .topLeading)
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 16)
                     }
-                    VStack(alignment: .leading, spacing: 8.0) {
-                        ScrollView(.vertical) {
-                            VStack(alignment: .leading, spacing: 8.0) {
+                        .frame(maxWidth: .infinity, maxHeight: nil, alignment: .topLeading)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 16)
+                    .tabItem { Label("Notes", systemImage: "doc.text") }
+                    .tag("notes")
+                    ScrollView(.vertical) {
+                        VStack(alignment: .leading, spacing: 8.0) {
+                            VStack(alignment: .leading, spacing: 16.0) {
                                 VStack(alignment: .leading, spacing: 8.0) {
                                     Text("Settings")
                                 }
@@ -156,6 +175,7 @@ public struct TaskTrackerView: View {
                                             Text("Dark mode")
                                         }
                                             .font(.system(size: 16.0))
+                                        Spacer()
                                         Toggle("", isOn: Binding(get: { CrepusActions.model.bool("dark_mode") }, set: { newValue in CrepusActions.performChange("settings.darkMode", bind: "dark_mode", value: newValue) }))
                                     }
                                         .padding(.horizontal, 16)
@@ -167,6 +187,7 @@ public struct TaskTrackerView: View {
                                             Text("Notifications")
                                         }
                                             .font(.system(size: 16.0))
+                                        Spacer()
                                         Toggle("", isOn: Binding(get: { CrepusActions.model.bool("notifications") }, set: { newValue in CrepusActions.performChange("settings.notifications", bind: "notifications", value: newValue) }))
                                     }
                                         .padding(.horizontal, 16)
@@ -178,6 +199,7 @@ public struct TaskTrackerView: View {
                                             Text("Sync")
                                         }
                                             .font(.system(size: 16.0))
+                                        Spacer()
                                         Toggle("", isOn: Binding(get: { CrepusActions.model.bool("sync_enabled") }, set: { newValue in CrepusActions.performChange("settings.sync", bind: "sync_enabled", value: newValue) }))
                                     }
                                         .padding(.horizontal, 16)
@@ -199,9 +221,7 @@ public struct TaskTrackerView: View {
                                 }
                                     .frame(maxWidth: .infinity, maxHeight: nil, alignment: .topLeading)
                                 VStack(alignment: .leading, spacing: 8.0) {
-                                    VStack(alignment: .leading, spacing: 8.0) {
-                                        Text(CrepusActions.model.text("app_version"))
-                                    }
+                                    Text(CrepusActions.model.text("app_version"))
                                         .font(.system(size: 14.0))
                                         .foregroundStyle(Color(red: 0.443, green: 0.443, blue: 0.478, opacity: 1.000))
                                     Button(action: { CrepusActions.perform("settings.reset") }) {
@@ -220,10 +240,12 @@ public struct TaskTrackerView: View {
                                     .padding(.top, 16)
                             }
                         }
-                            .frame(maxWidth: .infinity, maxHeight: nil, alignment: .topLeading)
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 16)
                     }
+                        .frame(maxWidth: .infinity, maxHeight: nil, alignment: .topLeading)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 16)
+                    .tabItem { Label("Settings", systemImage: "gear") }
+                    .tag("settings")
                 }
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
@@ -232,5 +254,7 @@ public struct TaskTrackerView: View {
             .foregroundStyle(Color(red: 0.980, green: 0.980, blue: 0.980, opacity: 1.000))
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .background(Color(red: 0.039, green: 0.039, blue: 0.039, opacity: 1.000))
+        .contentShape(Rectangle())
+        .onTapGesture { CrepusActions.dismissKeyboard() }
     }
 }
