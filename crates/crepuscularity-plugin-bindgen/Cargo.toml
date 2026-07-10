@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 license = "MPL-2.0"
 description = "Generate Crepuscularity ABI bindings for plugin languages (equilibrium-ffi)"
-publish = false
+publish = true
 
 [dependencies]
 equilibrium-ffi = "0.1.3"
