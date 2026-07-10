@@ -1,103 +1,112 @@
 # Mobile App Example
 
-A cross-platform mobile app built with `.crepus` templates and **View IR**.
-Demonstrates tabs, toggles, sliders, conditionals, and list rendering.
+A cross-platform task tracker built with `.crepus` templates, **codegen'd native views**, and a **Rust action dispatch backend**.
+
+## Architecture
+
+```
+.crepus template → crepus native codegen → SwiftUI / Compose views
+                     ↕
+              Rust action dispatch (staticlib)
+              state management + FFI eval
+                     ↕
+          iOS: @_silgen_name C ABI
+          Android: JNI external functions
+```
+
+**Flow:** user taps button → `CrepusActions.perform("tasks.add")` → Rust dispatch → JSON result → `CrepusStateStore.applyResult()` → revision bump → UI re-renders via eval FFI.
 
 ## Structure
 
 ```
 mobile-app/
-  crepus.toml            — target config (ios + android)
+  crepus.toml                    — target config (ios + android)
   views/
-    main.crepus          — app UI (tabs: Tasks, Notes, Settings)
-  fixture.json           — generated View IR (version 4)
+    main.crepus                  — app UI (tabs: Tasks, Notes, Settings)
+  fixture.json                   — View IR for reference
   rust/
-    Cargo.toml           — mobile actions crate (staticlib + cdylib + rlib)
-    src/lib.rs           — state, action dispatch, C ABI + JNI exports
+    Cargo.toml                   — staticlib + cdylib + rlib
+    src/lib.rs                   — state, dispatch, C ABI + JNI exports
   ios/
-    Package.swift        — SwiftPM package
+    Package.swift                — SwiftPM package
+    App/
+      TaskTrackerApp.swift       — @main entry, calls CrepusRustActions.install()
     Sources/MobileApp/
-      ViewIrModels.swift — IR decoder (ViewNode, ViewStyle, etc.)
-      ViewIrTreeView.swift — SwiftUI recursive renderer
-      fixture.json       — bundled IR for iOS
+      CrepusStateStore.swift     — ObservableObject wrapping Rust eval FFI
+      CrepusRustActions.swift    — @_silgen_name FFI bridge
+      TaskTrackerView.swift      — codegen'd from main.crepus (patched)
   android/
-    build.gradle.kts     — root Gradle
+    build.gradle.kts             — root Gradle
     settings.gradle.kts
     app/
-      build.gradle.kts   — app module (Compose)
+      build.gradle.kts           — Compose + kotlinx-serialization
       src/main/
         AndroidManifest.xml
-        assets/fixture.json
         java/dev/crepuscularity/mobileapp/
-          MainActivity.kt
-          ViewIr.kt      — IR decoder
-          ViewIrTree.kt  — Compose recursive renderer
+          MainActivity.kt        — entry, calls CrepusRustActions.install()
+          CrepusStateStore.kt    — Compose state wrapping Rust JNI evals
+          CrepusRustActions.kt   — JNI external bridge
+          TaskTrackerView.kt     — codegen'd from main.crepus (patched)
 ```
 
-## Regenerate fixture
+## Regenerate codegen views
 
 ```bash
-crepus native sync examples/mobile-app/views/main.crepus \
-  --out examples/mobile-app/fixture.json --pretty \
-  --var current_tab=tasks \
-  --var tasks_count=2 --var notes_count=1 \
-  --var dark_mode=true --var notifications=true \
-  --var sync_enabled=false --var font_size=16 \
-  --var app_version="v1.0.0"
+# SwiftUI
+crepus native codegen examples/mobile-app/views/main.crepus \
+  --platform swiftui --out examples/mobile-app/ios/Sources/MobileApp \
+  --view-name TaskTrackerView --pretty
+
+# Compose
+crepus native codegen examples/mobile-app/views/main.crepus \
+  --platform compose --out examples/mobile-app/android/app/src/main/java/dev/crepuscularity/mobileapp \
+  --view-name TaskTrackerView --pretty
 ```
 
-## iOS
+After codegen, patch empty `Text()` / `VStack` blocks where `bind=` expressions should render text content (task.title, task.due, note.title, note.preview, app_version).
+
+## Build
+
+### Rust backend
+
+```bash
+cd rust
+
+# iOS (staticlib for Xcode linking)
+cargo build --target aarch64-apple-ios --release
+
+# Android (staticlib for JNI)
+cargo build --target aarch64-linux-android --release
+```
+
+### iOS
+
+Link the Rust staticlib (`libmobile_app_actions.a`) in Xcode build settings, then:
 
 ```bash
 cd ios && swift build
 ```
 
-Open in Xcode: add `ios/` as a local SwiftPM dependency, import `MobileApp`,
-and use `FixtureRootView()` or `ViewIrRootView(ir:)`.
+Or open `ios/Package.swift` in Xcode, add the staticlib to "Link Binary With Libraries", and run.
 
-## Android
+### Android
+
+Place `libmobile_app_actions.so` in `app/src/main/jniLibs/arm64-v8a/`, then:
 
 ```bash
 cd android && ./gradlew :app:assembleDebug
 ```
 
-Open in Android Studio (JDK 17+). The app reads `fixture.json` from assets
-and renders via Compose.
-
-## Rust backend
-
-The `rust/` crate is the action dispatch layer:
-
-- `initial_view_state()` — initial template variables (tasks, notes, settings)
-- `dispatch_and_store_str(action)` — routes action strings, mutates state, returns JSON
-- `dispatch_change_and_store(action, bind, value_json)` — handles bind changes (toggles, sliders)
-- `eval_text/bool/number/items_json` — reads values for native shells
-
-Exports:
-- **iOS**: `crepus_mobile_dispatch_and_store_nul`, `crepus_mobile_dispatch_change_and_store_nul`, `crepus_mobile_eval_text`, `crepus_mobile_eval_bool`, `crepus_mobile_eval_number`, `crepus_mobile_eval_items_json`, `crepus_mobile_free_string`
-- **Android**: JNI methods under `dev.crepuscularity.mobileapp.CrepusRustActions`
-
-Build for iOS:
-```bash
-cd rust && cargo build --target aarch64-apple-ios --release
-```
-
-Build for Android:
-```bash
-cd rust && cargo build --target aarch64-linux-android --release
-```
-
 ## Template syntax
 
-The `.crepus` template uses indent-based markup with Tailwind-like classes:
-
-```
+```crepus
 div flex flex-col w-full h-full bg-[#0a0a0a]
   tabs bind=current_tab
     tab value="tasks" label="Tasks" icon="checklist"
       for task in {tasks}
         toggle bind=task.done @change="tasks.toggle"
+        div bind=task.title
 ```
 
-Key features used: `tabs`/`tab`, `if`/`for` conditionals, `toggle`/`slider` controls,
+Key features: `tabs`/`tab`, `if`/`for` conditionals, `toggle`/`slider` controls,
 `bind=` data binding, `@click`/`@change` event handlers.

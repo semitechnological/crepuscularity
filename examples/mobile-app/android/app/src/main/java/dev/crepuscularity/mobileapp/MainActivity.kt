@@ -8,10 +8,9 @@ import androidx.compose.material3.MaterialTheme
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val jsonText = assets.open("fixture.json").bufferedReader().use { it.readText() }
-        val ir = decodeViewIr(jsonText)
+        CrepusRustActions.install()
         setContent {
-            MaterialTheme { ViewIrRoot(ir = ir) }
+            MaterialTheme { TaskTrackerView() }
         }
     }
 }

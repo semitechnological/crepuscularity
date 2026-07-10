@@ -10,8 +10,7 @@ let package = Package(
     targets: [
         .target(
             name: "MobileApp",
-            path: "Sources/MobileApp",
-            resources: [.copy("fixture.json")]
+            path: "Sources/MobileApp"
         ),
     ]
 )

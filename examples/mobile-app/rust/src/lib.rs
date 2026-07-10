@@ -163,6 +163,23 @@ fn store_result(json: &str) {
 
 // ── Eval helpers (read from state for native shells) ─────────────────────────
 
+/// Store raw JSON result directly (for JNI storeResultJson).
+fn store_result_json_raw(json: &str) -> bool {
+    let Ok(result) = serde_json::from_str::<serde_json::Value>(json) else {
+        return false;
+    };
+    let Some(obj) = result.as_object() else {
+        return false;
+    };
+    let mut state = view_state().lock().unwrap_or_else(|e| e.into_inner());
+    if let Some(state_obj) = state.as_object_mut() {
+        for (k, v) in obj {
+            state_obj.insert(k.clone(), v.clone());
+        }
+    }
+    true
+}
+
 fn eval_text(expr: &str, scope_name: Option<&str>, scope_json: Option<&str>) -> String {
     let state = view_state().lock().unwrap_or_else(|e| e.into_inner());
     resolve_expr(&state, expr, scope_name, scope_json)
@@ -488,6 +505,21 @@ pub extern "system" fn Java_dev_crepuscularity_mobileapp_CrepusRustActions_evalI
         Err(_) => "[]".to_string(),
     };
     env.new_string(result).unwrap()
+}
+
+#[cfg(target_os = "android")]
+#[no_mangle]
+pub extern "system" fn Java_dev_crepuscularity_mobileapp_CrepusRustActions_storeResultJson<
+    'a,
+>(
+    env: jni::JNIEnv<'a>,
+    _class: jni::objects::JClass<'a>,
+    json: jni::objects::JString<'a>,
+) -> bool {
+    match env.get_string(json) {
+        Ok(s) => store_result_json_raw(s.to_string_lossy().as_ref()),
+        Err(_) => false,
+    }
 }
 
 // ── Tests ────────────────────────────────────────────────────────────────────
