@@ -347,7 +347,7 @@ fn mobile_new_scaffolds_runtime_files() {
     assert!(root.join("ios/project.yml").is_file());
     assert!(root.join("ios/crepus.toml").is_file());
     assert!(root.join("ios/Package.swift").is_file());
-    assert!(root.join("ios/App/CrepusMobileApp.swift").is_file());
+    assert!(root.join("ios/App/PhoneApp.swift").is_file());
     assert!(root.join("ios/App/ContentView.swift").is_file());
     assert!(root.join("rust/Cargo.toml").is_file());
     assert!(root.join("rust/src/lib.rs").is_file());
@@ -368,7 +368,7 @@ fn mobile_new_scaffolds_runtime_files() {
     assert!(!rust_actions.contains("result.contains"));
 
     let android_actions = std::fs::read_to_string(
-        root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusRustActions.kt"),
+        root.join("android/app/src/main/java/dev/crepuscularity/phone/CrepusRustActions.kt"),
     )
     .expect("read CrepusRustActions.kt");
     assert!(android_actions.contains("object CrepusStateStore"));
@@ -383,9 +383,9 @@ fn mobile_new_scaffolds_runtime_files() {
     let project_yml =
         std::fs::read_to_string(root.join("ios/project.yml")).expect("read project.yml");
     assert!(project_yml
-        .contains("$(PROJECT_DIR)/build/rust/aarch64-apple-ios/libcrepus_mobile_actions.a"));
+        .contains("$(PROJECT_DIR)/build/rust/aarch64-apple-ios/libphone_actions.a"));
     assert!(project_yml
-        .contains("$(PROJECT_DIR)/build/rust/aarch64-apple-ios-sim/libcrepus_mobile_actions.a"));
+        .contains("$(PROJECT_DIR)/build/rust/aarch64-apple-ios-sim/libphone_actions.a"));
     assert!(project_yml.contains("-framework CoreBluetooth"));
     assert!(!project_yml
         .contains("$(PROJECT_DIR)/build/rust/$(PLATFORM_NAME)/libcrepus_mobile_actions.a"));
@@ -410,7 +410,7 @@ fn mobile_new_scaffolds_android_runtime_audit_fixes() {
     );
     let root = tmp.path().join("phone");
     let android_actions = std::fs::read_to_string(
-        root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusRustActions.kt"),
+        root.join("android/app/src/main/java/dev/crepuscularity/phone/CrepusRustActions.kt"),
     )
     .expect("read CrepusRustActions.kt");
     assert!(android_actions.contains("mutableLongStateOf(0L)"));
@@ -419,7 +419,7 @@ fn mobile_new_scaffolds_android_runtime_audit_fixes() {
     assert!(!android_actions.contains("contains(\"\\\"ok\\\":false\")"));
 
     let android_generated = std::fs::read_to_string(root.join(
-        "android/app/src/main/java/dev/crepuscularity/nativeshell/generated/CrepusGeneratedView.kt",
+        "android/app/src/main/java/dev/crepuscularity/phone/generated/CrepusGeneratedView.kt",
     ))
     .expect("read generated view");
     assert!(android_generated.contains("object CrepusActions"));
