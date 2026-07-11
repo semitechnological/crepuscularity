@@ -3,6 +3,7 @@
 use console::style;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::time::Instant;
 
 use crate::build_options::BuildOptions;
@@ -37,9 +38,21 @@ pub fn execute(cmd: WebextCommands) {
             browser,
         } => {
             let app_path = app_path_or_cwd(app);
-            let browser = browser_target(browser);
             let options = build.into_options_or_exit();
-            build_extension(&app_path, true, browser, options);
+            let loaded = load_extension_manifest(&app_path, None);
+            let browsers = selected_browsers(&loaded.config, browser_target(browser));
+            if browsers.len() != 1 {
+                ui::error("crepus webext dev needs one browser; pass --browser");
+            }
+            let browser = browsers[0];
+            build_extension_with_manifest(
+                &app_path,
+                loaded.manifest,
+                &loaded.config,
+                true,
+                browser,
+                options,
+            );
             watch_and_reload(&app_path, browser, options);
         }
         WebextCommands::Manifest { app, browser } => {
@@ -184,6 +197,7 @@ fn scaffold_crepus_toml(name: &str) -> String {
 type = "webext"
 id = "extension"
 app = "."
+browsers = ["chromium"]
 
 [targets.extension]
 name = "{name}"
@@ -295,26 +309,35 @@ fn build_extension(
     browser: Option<BrowserTarget>,
     options: BuildOptions,
 ) {
-    let t0 = Instant::now();
-
-    let mut manifest = load_extension_manifest(app_path, None);
-    build_extension_inner(app_path, &mut manifest, dev, t0, browser, options);
+    let loaded = load_extension_manifest(app_path, None);
+    for browser in selected_browsers(&loaded.config, browser) {
+        build_extension_with_manifest(
+            app_path,
+            loaded.manifest.clone(),
+            &loaded.config,
+            dev,
+            browser,
+            options,
+        );
+    }
 }
 
 fn build_extension_with_manifest(
     app_path: &Path,
     mut manifest: crepuscularity_webext::ExtensionManifest,
+    config: &crate::crepus_toml::WebextTargetConfig,
     dev: bool,
     browser: Option<BrowserTarget>,
     options: BuildOptions,
 ) {
     let t0 = Instant::now();
-    build_extension_inner(app_path, &mut manifest, dev, t0, browser, options);
+    build_extension_inner(app_path, &mut manifest, config, dev, t0, browser, options);
 }
 
 fn build_extension_inner(
     app_path: &Path,
     manifest: &mut crepuscularity_webext::ExtensionManifest,
+    config: &crate::crepus_toml::WebextTargetConfig,
     dev: bool,
     t0: Instant,
     browser: Option<BrowserTarget>,
@@ -360,7 +383,11 @@ fn build_extension_inner(
     prerender_and_write_popup_html(app_path, &src_dir, manifest);
 
     // ── Capability check ────────────────────────────────────────────────────
-    report_missing_capabilities(app_path);
+    report_missing_capabilities(app_path, manifest);
+
+    if browser == Some(BrowserTarget::Safari) && !dev {
+        package_safari(app_path, &dist, manifest, config.safari.as_ref());
+    }
 
     eprintln!(
         "\n{} built to {}",
@@ -373,6 +400,18 @@ fn build_extension_inner(
             ui::dim("→"),
             style(dist.join("manifest.json").display().to_string()).underlined(),
             style("about:debugging#/runtime/this-firefox").cyan()
+        ),
+        Some(BrowserTarget::Safari) => eprintln!(
+            "  {} packaged {}",
+            ui::dim("→"),
+            style(
+                config
+                    .safari
+                    .as_ref()
+                    .and_then(|safari| safari.project_location.as_deref())
+                    .unwrap_or("dist/safari-app")
+            )
+            .underlined(),
         ),
         _ => eprintln!(
             "  {} load {} in {}",
@@ -440,8 +479,11 @@ fn prerender_and_write_popup_html(
     }
 }
 
-fn report_missing_capabilities(app_path: &Path) {
-    match crepuscularity_webext::check_project_capabilities(app_path) {
+fn report_missing_capabilities(
+    app_path: &Path,
+    manifest: &crepuscularity_webext::ExtensionManifest,
+) {
+    match crepuscularity_webext::check_project_capabilities_with_manifest(app_path, manifest) {
         Ok(missing) if !missing.is_empty() => {
             eprintln!();
             ui::warning("missing capabilities detected — add these to crepus.toml:");
@@ -458,6 +500,108 @@ fn report_missing_capabilities(app_path: &Path) {
         }
         _ => {}
     }
+}
+
+fn selected_browsers(
+    config: &crate::crepus_toml::WebextTargetConfig,
+    browser: Option<BrowserTarget>,
+) -> Vec<Option<BrowserTarget>> {
+    if let Some(browser) = browser {
+        return vec![Some(browser)];
+    }
+    if config.browsers.is_empty() {
+        return vec![None];
+    }
+    config
+        .browsers
+        .iter()
+        .map(|browser| {
+            BrowserTarget::parse(browser).unwrap_or_else(|| {
+                ui::error(&format!(
+                    "unsupported webext browser {browser:?}; expected chromium, firefox, or safari"
+                ))
+            })
+        })
+        .map(Some)
+        .collect()
+}
+
+fn package_safari(
+    app_path: &Path,
+    dist: &Path,
+    manifest: &crepuscularity_webext::ExtensionManifest,
+    safari: Option<&crate::crepus_toml::SafariTomlSection>,
+) {
+    if !cfg!(target_os = "macos") {
+        ui::error("Safari packaging requires macOS with Xcode");
+    }
+    let safari = safari
+        .unwrap_or_else(|| ui::error("Safari builds need [targets.safari] with bundle_identifier"));
+    let project = safari
+        .project_location
+        .as_deref()
+        .map(|path| app_path.join(path))
+        .unwrap_or_else(|| app_path.join("dist/safari-app"));
+    if project.exists() {
+        ui::error(&format!(
+            "Safari project already exists at {}; remove it or set targets.safari.project_location",
+            project.display()
+        ));
+    }
+    let app_name = safari
+        .app_name
+        .as_deref()
+        .unwrap_or(manifest.extension.name.as_str());
+    let args = safari_packager_args(
+        dist,
+        &project,
+        app_name,
+        &safari.bundle_identifier,
+        &safari.platforms,
+    );
+    let output = Command::new("xcrun")
+        .args(args)
+        .output()
+        .unwrap_or_else(|_| ui::error("Safari packaging requires macOS with Xcode"));
+    if !output.status.success() {
+        ui::error(&format!(
+            "Safari packaging failed: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+}
+
+fn safari_packager_args(
+    dist: &Path,
+    project: &Path,
+    app_name: &str,
+    bundle_identifier: &str,
+    platforms: &[String],
+) -> Vec<String> {
+    let mut args = vec![
+        "safari-web-extension-packager".to_string(),
+        "--project-location".to_string(),
+        project.display().to_string(),
+        "--app-name".to_string(),
+        app_name.to_string(),
+        "--bundle-identifier".to_string(),
+        bundle_identifier.to_string(),
+        "--swift".to_string(),
+        "--copy-resources".to_string(),
+        "--no-open".to_string(),
+        "--no-prompt".to_string(),
+    ];
+    match platforms {
+        [] => {}
+        [macos, ios] if macos == "macos" && ios == "ios" => {}
+        [ios] if ios == "ios" => args.push("--ios-only".to_string()),
+        [macos] if macos == "macos" => args.push("--macos-only".to_string()),
+        _ => ui::error(
+            "targets.safari.platforms must be [\"macos\"], [\"ios\"], or [\"macos\", \"ios\"]",
+        ),
+    }
+    args.push(dist.display().to_string());
+    args
 }
 
 fn write_runtime_assets(
@@ -522,10 +666,12 @@ fn write_runtime_assets(
     ui::spinner_ok(&sp, "runtime assets");
 }
 
-fn load_extension_manifest(
-    app_path: &Path,
-    target_id: Option<&str>,
-) -> crepuscularity_webext::ExtensionManifest {
+struct LoadedExtensionManifest {
+    manifest: crepuscularity_webext::ExtensionManifest,
+    config: crate::crepus_toml::WebextTargetConfig,
+}
+
+fn load_extension_manifest(app_path: &Path, target_id: Option<&str>) -> LoadedExtensionManifest {
     let crepus_toml = app_path.join("crepus.toml");
     if crepus_toml.is_file() {
         let raw = std::fs::read_to_string(&crepus_toml)
@@ -540,13 +686,16 @@ fn load_extension_manifest(
             .collect();
         match webext.as_slice() {
             [target] => {
-                return target.webext.clone().unwrap_or_else(|| {
-                    ui::error(&format!(
-                        "webext target {:?} in {} needs [targets.extension]",
-                        target.id,
-                        crepus_toml.display()
-                    ))
-                });
+                return LoadedExtensionManifest {
+                    manifest: target.webext.clone().unwrap_or_else(|| {
+                        ui::error(&format!(
+                            "webext target {:?} in {} needs [targets.extension]",
+                            target.id,
+                            crepus_toml.display()
+                        ))
+                    }),
+                    config: target.webext_config.clone(),
+                };
             }
             [] if target_id.is_some() => ui::error(&format!(
                 "no webext target {:?} in {}",
@@ -575,9 +724,12 @@ pub(crate) fn build_app_path(app_path: &Path, options: BuildOptions) {
 pub(crate) fn build_app_target(
     app_path: &Path,
     manifest: &crepuscularity_webext::ExtensionManifest,
+    config: &crate::crepus_toml::WebextTargetConfig,
     options: BuildOptions,
 ) {
-    build_extension_with_manifest(app_path, manifest.clone(), false, None, options);
+    for browser in selected_browsers(config, None) {
+        build_extension_with_manifest(app_path, manifest.clone(), config, false, browser, options);
+    }
 }
 
 fn build_wasm_runtime(
@@ -831,7 +983,7 @@ fn prerender_popup_html(
 // ── manifest ──────────────────────────────────────────────────────────────────
 
 fn print_manifest(app_path: &Path, browser: Option<BrowserTarget>) {
-    let manifest = load_extension_manifest(app_path, None);
+    let manifest = load_extension_manifest(app_path, None).manifest;
     match browser {
         Some(target) => println!("{}", manifest.to_manifest_v3_json_for_browser(target)),
         None => println!("{}", manifest.to_manifest_v3_json()),
@@ -1254,6 +1406,40 @@ fn title_case(value: &str) -> String {
         })
         .collect::<Vec<_>>()
         .join(" ")
+}
+
+#[cfg(test)]
+mod safari_tests {
+    use super::*;
+
+    #[test]
+    fn safari_packager_args_include_configured_ios_target() {
+        let args = safari_packager_args(
+            Path::new("dist/safari"),
+            Path::new("dist/safari-app"),
+            "Example",
+            "com.example.extension",
+            &["ios".to_string()],
+        );
+        assert_eq!(
+            args,
+            vec![
+                "safari-web-extension-packager",
+                "--project-location",
+                "dist/safari-app",
+                "--app-name",
+                "Example",
+                "--bundle-identifier",
+                "com.example.extension",
+                "--swift",
+                "--copy-resources",
+                "--no-open",
+                "--no-prompt",
+                "--ios-only",
+                "dist/safari",
+            ]
+        );
+    }
 }
 
 fn page_script_src(entry: &str) -> String {

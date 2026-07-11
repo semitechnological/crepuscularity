@@ -106,6 +106,27 @@ pub struct ManifestTarget {
     pub commands: BTreeMap<String, crepuscularity_webext::ExtensionManifestCommand>,
     #[serde(default)]
     pub chrome_url_overrides: BTreeMap<String, String>,
+    #[serde(default)]
+    pub browsers: Vec<String>,
+    #[serde(default)]
+    pub safari: Option<SafariTomlSection>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct SafariTomlSection {
+    pub bundle_identifier: String,
+    #[serde(default)]
+    pub project_location: Option<String>,
+    #[serde(default)]
+    pub app_name: Option<String>,
+    #[serde(default)]
+    pub platforms: Vec<String>,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct WebextTargetConfig {
+    pub browsers: Vec<String>,
+    pub safari: Option<SafariTomlSection>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -303,6 +324,7 @@ pub struct ResolvedTarget {
     pub height: Option<u16>,
     pub web: WebTargetMeta,
     pub webext: Option<crepuscularity_webext::ExtensionManifest>,
+    pub webext_config: WebextTargetConfig,
 }
 
 type WebTargetRow = (Option<String>, String, Option<String>, Option<String>);
@@ -446,6 +468,10 @@ impl CrepusManifest {
                             chrome_url_overrides: target.chrome_url_overrides.clone(),
                         }
                     }),
+                    webext_config: WebextTargetConfig {
+                        browsers: target.browsers.clone(),
+                        safari: target.safari.clone(),
+                    },
                 }
             })
             .collect()
@@ -557,5 +583,43 @@ pub fn resolve_pick(
         (None, n) => Err(format!(
             "crepus.toml defines {n} web targets {ids:?}; pass --target ID"
         )),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn resolves_webext_browsers_and_safari_packaging() {
+        let manifest = CrepusManifest::parse(
+            r#"
+[[targets]]
+type = "webext"
+id = "extension"
+app = "."
+browsers = ["chromium", "firefox", "safari"]
+
+[targets.extension]
+name = "Example"
+version = "1.0.0"
+
+[targets.safari]
+bundle_identifier = "com.example.extension"
+project_location = "build/safari"
+app_name = "Example Safari"
+platforms = ["macos", "ios"]
+"#,
+        )
+        .expect("parse manifest");
+        let targets = manifest.resolved_targets(Path::new("/tmp/example"));
+        let target = targets.first().expect("target");
+        assert_eq!(
+            target.webext_config.browsers,
+            ["chromium", "firefox", "safari"]
+        );
+        let safari = target.webext_config.safari.as_ref().expect("safari config");
+        assert_eq!(safari.bundle_identifier, "com.example.extension");
+        assert_eq!(safari.project_location.as_deref(), Some("build/safari"));
     }
 }

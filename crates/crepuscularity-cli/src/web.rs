@@ -1045,11 +1045,20 @@ fn format_seo_tags(head: &SiteHead, resolved: &ResolvedSeoTags<'_>) -> String {
     if let Some(favicon) = &seo.favicon {
         let href = escape_html_attr(favicon);
         if favicon.ends_with(".svg") {
-            lines.push(format!(r#"  <link rel="icon" type="image/svg+xml" href="{}">"#, href));
+            lines.push(format!(
+                r#"  <link rel="icon" type="image/svg+xml" href="{}">"#,
+                href
+            ));
         } else if favicon.ends_with(".ico") {
-            lines.push(format!(r#"  <link rel="icon" type="image/x-icon" href="{}">"#, href));
+            lines.push(format!(
+                r#"  <link rel="icon" type="image/x-icon" href="{}">"#,
+                href
+            ));
         } else if favicon.ends_with(".png") {
-            lines.push(format!(r#"  <link rel="icon" type="image/png" href="{}">"#, href));
+            lines.push(format!(
+                r#"  <link rel="icon" type="image/png" href="{}">"#,
+                href
+            ));
         } else {
             lines.push(format!(r#"  <link rel="icon" href="{}">"#, href));
         }

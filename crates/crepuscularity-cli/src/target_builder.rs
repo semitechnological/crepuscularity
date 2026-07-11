@@ -82,7 +82,12 @@ impl TargetBuilder for WebBuilder<'_> {
 impl TargetBuilder for WebextBuilder<'_> {
     fn build(&self, options: &BuildOptions) -> Result<(), String> {
         if let Some(manifest) = &self.target.webext {
-            crate::webext::build_app_target(&self.target.dir, manifest, *options);
+            crate::webext::build_app_target(
+                &self.target.dir,
+                manifest,
+                &self.target.webext_config,
+                *options,
+            );
         } else {
             crate::webext::build_app_path(&self.target.dir, *options);
         }

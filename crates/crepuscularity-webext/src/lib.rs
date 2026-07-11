@@ -44,5 +44,8 @@ pub use manifest::{
     WebAccessibleResourcesOptions,
 };
 pub use scanner::{scan_crepus_for_capabilities, CapabilityUsage};
-pub use watcher::{check_project_capabilities, CapabilityWatcher, WatchEvent};
+pub use watcher::{
+    check_project_capabilities, check_project_capabilities_with_manifest, CapabilityWatcher,
+    WatchEvent,
+};
 pub use widgets::{build_frame_doc, json_to_template};

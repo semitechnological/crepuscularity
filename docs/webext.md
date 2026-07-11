@@ -4,7 +4,7 @@
 
 > **Repository-only detail:** Extended web + webext notes for compiler authors live in [`CREPUS_WEB_IMPLEMENTATION_SPEC.md` on GitHub](https://github.com/tschk/crepuscularity/blob/main/docs/CREPUS_WEB_IMPLEMENTATION_SPEC.md) (see **§9** for MV3). This file is not part of the published docs site.
 
-The `crepuscularity-webext` crate provides support for building Chromium and Firefox extensions with Manifest V3.
+The `crepuscularity-webext` crate provides support for building Chromium, Firefox, and Safari extensions with Manifest V3.
 
 ## Quick Start
 
@@ -16,6 +16,8 @@ crepus build
 
 crepus webext build --browser firefox
 # Load dist/firefox/manifest.json in about:debugging#/runtime/this-firefox
+
+crepus webext build --browser safari
 ```
 
 ## Configuration
@@ -27,6 +29,7 @@ Extensions are configured via `crepus.toml`:
 type = "webext"
 id = "extension"
 app = "."
+browsers = ["chromium", "firefox", "safari"]
 
 [targets.extension]
 name = "My Extension"
@@ -38,6 +41,11 @@ storage = true
 background-script = true
 content-script = true
 host-permissions = ["https://example.com/*"]
+
+[targets.safari]
+bundle_identifier = "com.example.my-extension"
+project_location = "dist/safari-app"
+platforms = ["macos", "ios"]
 ```
 
 `host-permissions` is emitted exactly as configured. Leave it empty for popup-only extensions with no page access, or add the narrow URL patterns your content scripts need. Crepuscularity does not broaden an empty list to `<all_urls>`.
@@ -105,7 +113,7 @@ Output:
 }
 ```
 
-`crepus webext build --browser chromium` writes `dist/chromium/`; `--browser firefox` writes `dist/firefox/`. Without `--browser`, the default remains `dist/unpacked/` for the existing Chromium load flow.
+`crepus webext build --browser chromium` writes `dist/chromium/`; `--browser firefox` writes `dist/firefox/`; `--browser safari` writes `dist/safari/` then generates the configured Xcode project. Without `--browser`, `browsers` builds each configured target; omit `browsers` to retain `dist/unpacked/` for the existing Chromium load flow. Safari packaging requires macOS with Xcode and a `bundle_identifier`; `platforms` accepts `["macos"]`, `["ios"]`, or `["macos", "ios"]`.
 
 ## Positioning
 

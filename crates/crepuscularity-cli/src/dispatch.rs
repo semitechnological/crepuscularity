@@ -179,6 +179,7 @@ pub fn browser_target(b: Option<BrowserArg>) -> Option<crepuscularity_webext::Br
     b.map(|v| match v {
         BrowserArg::Chromium => crepuscularity_webext::BrowserTarget::Chromium,
         BrowserArg::Firefox => crepuscularity_webext::BrowserTarget::Firefox,
+        BrowserArg::Safari => crepuscularity_webext::BrowserTarget::Safari,
     })
 }
 

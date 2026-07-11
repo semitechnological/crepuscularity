@@ -146,6 +146,19 @@ fn check_capabilities(project_dir: &Path, tx: &Sender<WatchEvent>) -> Result<(),
     Ok(())
 }
 
+pub fn check_project_capabilities_with_manifest(
+    project_dir: &Path,
+    manifest: &ExtensionManifest,
+) -> Result<Vec<Capability>, String> {
+    let used_caps =
+        scan_directory_for_capabilities(project_dir).map_err(|e| format!("Scan failed: {e}"))?;
+    Ok(used_caps
+        .missing_from(&manifest.to_capability_set())
+        .into_iter()
+        .cloned()
+        .collect())
+}
+
 /// Check a project for missing capabilities (one-shot, no watching).
 pub fn check_project_capabilities(project_dir: &Path) -> Result<Vec<Capability>, String> {
     let manifest_path = project_dir.join("webext.toml");

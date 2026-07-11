@@ -12,6 +12,7 @@ pub enum BrowserTarget {
     #[default]
     Chromium,
     Firefox,
+    Safari,
 }
 
 impl BrowserTarget {
@@ -19,6 +20,7 @@ impl BrowserTarget {
         match value {
             "chromium" | "chrome" | "edge" | "brave" | "opera" => Some(Self::Chromium),
             "firefox" | "gecko" => Some(Self::Firefox),
+            "safari" => Some(Self::Safari),
             _ => None,
         }
     }
@@ -27,6 +29,7 @@ impl BrowserTarget {
         match self {
             Self::Chromium => "chromium",
             Self::Firefox => "firefox",
+            Self::Safari => "safari",
         }
     }
 
@@ -34,6 +37,7 @@ impl BrowserTarget {
         match self {
             Self::Chromium => "chromium",
             Self::Firefox => "firefox",
+            Self::Safari => "safari",
         }
     }
 }
@@ -429,13 +433,15 @@ impl ManifestV3 {
             icons: opts.icons.clone(),
             permissions,
             host_permissions,
-            content_security_policy: Some(ContentSecurityPolicy {
-                extension_pages: "script-src 'self' 'wasm-unsafe-eval'; object-src 'none';"
-                    .to_string(),
+            content_security_policy: (browser != BrowserTarget::Safari).then(|| {
+                ContentSecurityPolicy {
+                    extension_pages: "script-src 'self' 'wasm-unsafe-eval'; object-src 'none';"
+                        .to_string(),
+                }
             }),
             background,
             browser_specific_settings: match browser {
-                BrowserTarget::Chromium => None,
+                BrowserTarget::Chromium | BrowserTarget::Safari => None,
                 BrowserTarget::Firefox => Some(BrowserSpecificSettings {
                     gecko: GeckoSettings {
                         id: format!(
@@ -568,7 +574,7 @@ impl ManifestV3 {
             .unwrap_or_else(|| "src/background.js".to_string());
         if manifest.capabilities.background_script {
             match browser {
-                BrowserTarget::Chromium => Some(BackgroundSpec {
+                BrowserTarget::Chromium | BrowserTarget::Safari => Some(BackgroundSpec {
                     service_worker: Some(background_script),
                     scripts: Vec::new(),
                     kind: Some("module".to_string()),
@@ -1125,6 +1131,37 @@ alarms = true
         assert!(json.contains("\"browser_specific_settings\""));
         assert!(json.contains("\"test-extension@crepuscularity.dev\""));
         assert!(!json.contains("\"service_worker\""));
+    }
+
+    #[test]
+    fn safari_manifest_uses_service_worker_without_gecko_settings() {
+        let manifest = ExtensionManifest {
+            extension: ExtensionInfo {
+                name: "Test Extension".to_string(),
+                version: "1.0.0".to_string(),
+                description: None,
+                author: None,
+                homepage: None,
+                minimum_chrome_version: None,
+            },
+            capabilities: CapabilitiesSection {
+                background_script: true,
+                ..Default::default()
+            },
+            content_scripts: vec![],
+            plugins: HashMap::new(),
+            options: ManifestOptions::default(),
+            web_accessible_resources: WebAccessibleResourcesOptions::default(),
+            commands: BTreeMap::new(),
+            chrome_url_overrides: BTreeMap::new(),
+        };
+
+        assert_eq!(BrowserTarget::parse("safari"), Some(BrowserTarget::Safari));
+        assert_eq!(BrowserTarget::Safari.dist_dir(), "safari");
+        let json = manifest.to_manifest_v3_json_for_browser(BrowserTarget::Safari);
+        assert!(json.contains("\"service_worker\""));
+        assert!(json.contains("\"type\": \"module\""));
+        assert!(!json.contains("\"browser_specific_settings\""));
     }
 
     #[test]

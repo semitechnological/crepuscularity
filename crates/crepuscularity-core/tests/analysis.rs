@@ -49,7 +49,8 @@ fn classify_node_pure_element_is_static() {
 
 #[test]
 fn for_block_with_braced_iterator() {
-    let nodes = parse_template("for tab in {self.visible_tabs()}\n  div px-2\n    \"{tab}\"").unwrap();
+    let nodes =
+        parse_template("for tab in {self.visible_tabs()}\n  div px-2\n    \"{tab}\"").unwrap();
     assert_eq!(nodes.len(), 1);
     match &nodes[0] {
         Node::For(block) => {
@@ -90,7 +91,10 @@ fn event_handler_with_method_name() {
 
 #[test]
 fn event_handler_with_closure() {
-    let nodes = parse_template("div @mousedown={cx.listener(|this, _, window, cx| this.focus(id.clone(), window, cx))}").unwrap();
+    let nodes = parse_template(
+        "div @mousedown={cx.listener(|this, _, window, cx| this.focus(id.clone(), window, cx))}",
+    )
+    .unwrap();
     assert_eq!(nodes.len(), 1);
     match &nodes[0] {
         Node::Element(el) => {

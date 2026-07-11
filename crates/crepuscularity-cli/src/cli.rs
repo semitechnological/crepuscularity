@@ -186,6 +186,7 @@ pub enum WebextCommands {
 pub enum BrowserArg {
     Chromium,
     Firefox,
+    Safari,
 }
 
 #[derive(Subcommand, Debug)]

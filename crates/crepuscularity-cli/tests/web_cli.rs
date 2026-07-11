@@ -326,6 +326,118 @@ fn init_webext_scaffolds_same_shape_as_webext_new() {
     windows,
     ignore = "default desktop crepus.exe does not spawn reliably on Windows CI"
 )]
+fn webext_manifest_reads_safari_target_from_crepus_toml() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    std::fs::write(
+        tmp.path().join("crepus.toml"),
+        r#"
+[[targets]]
+type = "webext"
+id = "extension"
+app = "."
+browsers = ["safari"]
+
+[targets.extension]
+name = "Example"
+version = "1.0.0"
+description = "Example Safari extension"
+
+[targets.safari]
+bundle_identifier = "com.example.extension"
+"#,
+    )
+    .expect("write manifest");
+
+    let output = crepus()
+        .current_dir(tmp.path())
+        .args(["webext", "manifest", "--browser", "safari"])
+        .output()
+        .expect("spawn manifest");
+    assert!(output.status.success());
+    let manifest = String::from_utf8_lossy(&output.stdout);
+    assert!(manifest.contains("\"manifest_version\": 3"));
+    assert!(!manifest.contains("\"browser_specific_settings\""));
+}
+
+#[test]
+#[cfg_attr(
+    windows,
+    ignore = "default desktop crepus.exe does not spawn reliably on Windows CI"
+)]
+fn root_build_uses_configured_webext_browsers() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    std::fs::write(
+        tmp.path().join("crepus.toml"),
+        r#"
+[[targets]]
+type = "webext"
+id = "extension"
+app = "."
+browsers = ["chromium", "firefox"]
+
+[targets.extension]
+name = "Example"
+version = "1.0.0"
+"#,
+    )
+    .expect("write manifest");
+
+    let status = crepus()
+        .current_dir(tmp.path())
+        .arg("build")
+        .status()
+        .expect("spawn build");
+    assert!(status.success());
+    assert!(tmp.path().join("dist/chromium/manifest.json").is_file());
+    assert!(tmp.path().join("dist/firefox/manifest.json").is_file());
+}
+
+#[test]
+#[cfg(target_os = "macos")]
+fn webext_build_packages_safari_project_from_crepus_toml() {
+    let tmp = tempfile::Builder::new()
+        .prefix("safari-")
+        .tempdir_in(env!("CARGO_MANIFEST_DIR"))
+        .expect("tempdir");
+    std::fs::write(
+        tmp.path().join("crepus.toml"),
+        r#"
+[[targets]]
+type = "webext"
+id = "extension"
+app = "."
+browsers = ["safari"]
+
+[targets.extension]
+name = "Example"
+version = "1.0.0"
+description = "Example Safari extension"
+
+[targets.safari]
+bundle_identifier = "com.example.extension"
+project_location = "safari-app"
+platforms = ["macos"]
+"#,
+    )
+    .expect("write manifest");
+
+    let status = crepus()
+        .current_dir(tmp.path())
+        .args(["webext", "build", "--browser", "safari"])
+        .status()
+        .expect("spawn Safari build");
+    let manifest = std::fs::read_to_string(tmp.path().join("dist/safari/manifest.json"))
+        .expect("read Safari manifest");
+    assert!(status.success(), "manifest: {manifest}");
+    assert!(tmp.path().join("dist/safari/manifest.json").is_file());
+    assert!(tmp.path().join("safari-app").is_dir());
+}
+
+#[test]
+#[cfg_attr(
+    windows,
+    ignore = "default desktop crepus.exe does not spawn reliably on Windows CI"
+)]
 fn web_build_multi_target_manifest_requires_target_flag() {
     let tmp = tempfile::tempdir().expect("tempdir");
     let root = tmp.path();
