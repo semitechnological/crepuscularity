@@ -72,6 +72,10 @@ pub enum Commands {
         #[command(subcommand)]
         command: IosCommands,
     },
+    Apple {
+        #[command(subcommand)]
+        command: AppleCommands,
+    },
     Tui {
         #[command(subcommand)]
         command: TuiCommands,
@@ -212,6 +216,20 @@ pub enum IosCommands {
         scheme: Option<String>,
         #[arg(long)]
         destination: Option<String>,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+pub enum AppleCommands {
+    Generate {
+        #[arg(long)]
+        dir: Option<PathBuf>,
+    },
+    Build {
+        #[command(flatten)]
+        build: BuildOptionsArgs,
+        #[arg(long)]
+        dir: Option<PathBuf>,
     },
 }
 

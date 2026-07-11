@@ -1,5 +1,6 @@
 //! crepus — the Crepuscularity CLI
 
+mod apple_project;
 #[cfg(feature = "aurora")]
 mod aurora;
 mod benchmark;

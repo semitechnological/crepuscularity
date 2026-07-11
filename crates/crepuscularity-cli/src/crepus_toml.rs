@@ -14,6 +14,8 @@ pub struct CrepusManifest {
     #[serde(default)]
     pub android: Option<AndroidTomlSection>,
     #[serde(default)]
+    pub apple: Option<AppleTomlSection>,
+    #[serde(default)]
     pub targets: Vec<ManifestTarget>,
     /// Single-site shorthand when you do not use `[[targets]]`.
     #[serde(default)]
@@ -24,8 +26,6 @@ pub struct CrepusManifest {
 pub struct IosTomlSection {
     #[serde(default = "default_ios_scheme")]
     pub scheme: String,
-    #[serde(default = "default_xcodegen_spec")]
-    pub xcodegen_spec: String,
     #[serde(default = "default_ios_destination")]
     pub destination: String,
     #[serde(default)]
@@ -36,6 +36,20 @@ pub struct IosTomlSection {
     pub code_sign_style: Option<String>,
     #[serde(default)]
     pub allow_provisioning_updates: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct AppleTomlSection {
+    pub name: String,
+    pub platform: String,
+    pub bundle_id: String,
+    pub deployment_target: String,
+    #[serde(default = "default_native_shell")]
+    pub package_path: String,
+    #[serde(default = "default_native_shell")]
+    pub package_product: String,
+    #[serde(default)]
+    pub destination: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -144,8 +158,8 @@ fn default_dot() -> String {
     ".".into()
 }
 
-pub(crate) fn default_xcodegen_spec() -> String {
-    "project.yml".into()
+fn default_native_shell() -> String {
+    "NativeShell".into()
 }
 
 pub(crate) fn default_ios_scheme() -> String {
@@ -520,6 +534,11 @@ pub fn try_load_ios(manifest_path: &Path) -> Option<IosTomlSection> {
     let raw = std::fs::read_to_string(manifest_path).ok()?;
     let m: CrepusManifest = CrepusManifest::parse(&raw).ok()?;
     m.ios
+}
+
+pub fn try_load_apple(manifest_path: &Path) -> Option<AppleTomlSection> {
+    let raw = std::fs::read_to_string(manifest_path).ok()?;
+    CrepusManifest::parse(&raw).ok()?.apple
 }
 
 /// Load web targets from `crepus.toml`, walking up from cwd when `manifest` is `None`.

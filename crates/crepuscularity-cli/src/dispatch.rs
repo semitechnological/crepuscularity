@@ -43,6 +43,7 @@ pub fn run(cli: Cli) {
         Commands::Web { command } => crate::web::execute(command),
         Commands::Webext { command } => crate::webext::execute(command),
         Commands::Ios { command } => crate::ios::execute(command),
+        Commands::Apple { command } => crate::apple_project::execute(command),
         Commands::Tui { command } => crate::tui::execute(command),
         Commands::Native { command } => crate::native::execute(command),
         Commands::Mobile { command } => crate::mobile::execute(command),

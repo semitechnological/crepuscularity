@@ -3,7 +3,7 @@
 //! Requires [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen`) for
 //! `crepus ios generate` / `crepus ios build`.
 //!
-//! **`crepus.toml`** at the app root stores `[ios]` (`scheme`, `xcodegen_spec`, `destination`).
+//! **`crepus.toml`** at the app root stores `[ios]` (`scheme`, `destination`).
 //! `generate` / `build` walk up from the current directory until they find it (or `--dir` pins the root).
 
 use std::fs;
@@ -22,7 +22,6 @@ use crate::ui;
 #[derive(Debug, Clone)]
 struct IosSection {
     scheme: String,
-    xcodegen_spec: String,
     ios_destination: String,
     bundle_id: Option<String>,
     development_team: Option<String>,
@@ -35,8 +34,8 @@ pub fn execute(cmd: IosCommands) {
         IosCommands::New { name } => scaffold_ios_app(&name),
         IosCommands::Generate { dir, spec } => {
             let (root, cfg) = resolve_ios_root_and_config(&dir);
-            let spec = spec.unwrap_or(cfg.xcodegen_spec);
-            run_xcodegen(&root, &spec);
+            let _ = spec;
+            generate_project(&root, &cfg);
         }
         IosCommands::Build {
             build,
@@ -47,10 +46,10 @@ pub fn execute(cmd: IosCommands) {
         } => {
             let options = build.into_options_or_exit();
             let (root, cfg) = resolve_ios_root_and_config(&dir);
-            let spec = spec.unwrap_or(cfg.xcodegen_spec.clone());
+            let _ = spec;
             let scheme = scheme.unwrap_or(cfg.scheme.clone());
             let destination = destination.unwrap_or(cfg.ios_destination.clone());
-            run_xcodegen(&root, &spec);
+            generate_project(&root, &cfg);
             run_xcodebuild(&root, &scheme, &destination, &cfg, options);
         }
     }
@@ -118,7 +117,6 @@ fn load_ios_config(root: &Path) -> Option<IosSection> {
     let i = crepus_toml::try_load_ios(&p)?;
     Some(IosSection {
         scheme: i.scheme,
-        xcodegen_spec: i.xcodegen_spec,
         ios_destination: i.destination,
         bundle_id: i.bundle_id,
         development_team: i.development_team,
@@ -138,7 +136,6 @@ fn legacy_config_from_project_yml(root: &Path) -> Option<IosSection> {
     let scheme = rest.split_whitespace().next()?.to_string();
     Some(IosSection {
         scheme,
-        xcodegen_spec: crepus_toml::default_xcodegen_spec(),
         ios_destination: crepus_toml::default_ios_destination(),
         bundle_id: None,
         development_team: None,
@@ -156,10 +153,6 @@ fn scaffold_ios_app(name: &str) {
 
     let pascal = to_pascal_case(name);
     let app_target = app_target_name(&pascal);
-    let mut bundle_suffix = bundle_slug(name);
-    if bundle_suffix.is_empty() {
-        bundle_suffix = "app".into();
-    }
 
     let native = dir.join("NativeShell");
     let sources = native.join("Sources").join("NativeShell");
@@ -171,11 +164,6 @@ fn scaffold_ios_app(name: &str) {
         ui::error(&format!("create App: {e}"));
     });
 
-    fs::write(
-        dir.join("project.yml"),
-        project_yml(&app_target, &bundle_suffix),
-    )
-    .unwrap_or_else(|e| ui::error(&format!("write project.yml: {e}")));
     fs::write(dir.join("crepus.toml"), crepus_toml(&app_target)).unwrap_or_else(|e| {
         ui::error(&format!("write crepus.toml: {e}"));
     });
@@ -218,7 +206,6 @@ fn scaffold_ios_app(name: &str) {
     );
     eprintln!();
     eprintln!("{}", style("Next:").dim());
-    eprintln!("  wax install xcodegen   # once");
     eprintln!("  cd {name}");
     eprintln!("  crepus ios generate");
     eprintln!("  open {app_target}.xcodeproj");
@@ -238,61 +225,12 @@ fn app_target_name(pascal: &str) -> String {
     }
 }
 
-fn bundle_slug(name: &str) -> String {
-    name.chars()
-        .map(|c| {
-            if c.is_ascii_alphanumeric() {
-                c.to_ascii_lowercase()
-            } else {
-                '_'
-            }
-        })
-        .collect::<String>()
-        .trim_matches('_')
-        .to_string()
-}
-
 fn crepus_toml(app_target: &str) -> String {
     format!(
         r#"# Crepuscularity — `crepus ios generate` / `crepus ios build` read this (walks up from cwd).
 [ios]
 scheme = "{app_target}"
-xcodegen_spec = "project.yml"
 destination = "platform=iOS Simulator,name=iPhone 16,OS=latest"
-"#
-    )
-}
-
-fn project_yml(app_target: &str, bundle_suffix: &str) -> String {
-    // Keep keys stable for XcodeGen; scheme name matches the app target.
-    format!(
-        r#"name: {app_target}
-options:
-  bundleIdPrefix: dev.crepuscularity
-  deploymentTarget:
-    iOS: "17.0"
-  createIntermediateGroups: true
-settings:
-  base:
-    SWIFT_VERSION: "5.9"
-    TARGETED_DEVICE_FAMILY: "1,2"
-packages:
-  NativeShell:
-    path: NativeShell
-targets:
-  {app_target}:
-    type: application
-    platform: iOS
-    sources:
-      - path: App
-    settings:
-      base:
-        GENERATE_INFOPLIST_FILE: YES
-        INFOPLIST_KEY_UILaunchScreen_Generation: YES
-        PRODUCT_BUNDLE_IDENTIFIER: dev.crepuscularity.{bundle_suffix}
-    dependencies:
-      - package: NativeShell
-        product: NativeShell
 "#
     )
 }
@@ -366,7 +304,7 @@ fn readme_md(name: &str, app_target: &str) -> String {
 
 Generated with `crepus ios new {name}`.
 
-- **XcodeGen** produces `{app_target}.xcodeproj` from `project.yml`.
+- **Crepus** produces `{app_target}.xcodeproj` from `crepus.toml`.
 - **NativeShell** is a local Swift package that decodes View IR JSON (`fixture.json`).
 
 ## Commands
@@ -374,12 +312,11 @@ Generated with `crepus ios new {name}`.
 `crepus.toml` stores the Xcode scheme and simulator destination; run commands from this directory (or any subfolder).
 
 ```bash
-wax install xcodegen
 crepus ios generate
 open {app_target}.xcodeproj
 ```
 
-Build from the CLI (after XcodeGen):
+Build from the CLI:
 
 ```bash
 crepus ios build
@@ -391,27 +328,21 @@ Replace `fixture.json` under `NativeShell/Sources/NativeShell/` when you change 
     )
 }
 
-fn run_xcodegen(dir: &Path, spec: &str) {
-    let spec_path = dir.join(spec);
-    if !spec_path.is_file() {
-        ui::error(&format!(
-            "no XcodeGen spec `{}` in {} — fix [ios] xcodegen_spec or run `crepus ios new`",
-            spec,
-            dir.display()
-        ));
-    }
-    let mut cmd = Command::new("xcodegen");
-    cmd.current_dir(dir);
-    cmd.arg("generate").args(["--spec", spec]);
-    let status = cmd.status().unwrap_or_else(|e| {
-        ui::error(&format!(
-            "failed to run `xcodegen`: {e}\nInstall: wax install xcodegen"
-        ));
-    });
-    if !status.success() {
-        ui::error("xcodegen failed");
-    }
-    eprintln!("{}", style("xcodegen: ok").green());
+fn generate_project(dir: &Path, cfg: &IosSection) {
+    let bundle_id = cfg.bundle_id.as_deref().unwrap_or("dev.crepuscularity.app");
+    crate::apple_project::generate(
+        dir,
+        crate::apple_project::Config {
+            name: &cfg.scheme,
+            bundle_id,
+            platform: crate::apple_project::Platform::Ios,
+            deployment_target: "17.0",
+            package_path: "NativeShell",
+            package_product: "NativeShell",
+        },
+    )
+    .unwrap_or_else(|e| ui::error(&e));
+    eprintln!("{}", style("project: ok").green());
 }
 
 fn run_xcodebuild(

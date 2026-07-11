@@ -1769,7 +1769,7 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-cli"
-version = "0.9.19"
+version = "0.10.0"
 dependencies = [
  "axum",
  "clap",
@@ -2006,7 +2006,7 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-webext"
-version = "0.2.11"
+version = "0.3.0"
 dependencies = [
  "crepuscularity-core",
  "crepuscularity-web",
