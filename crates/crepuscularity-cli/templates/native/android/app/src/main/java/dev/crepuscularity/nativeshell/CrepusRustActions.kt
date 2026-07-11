@@ -253,14 +253,15 @@ object CrepusRustActions {
     }
 
     private fun photoLibraryValue(method: String): JSONObject {
-        if (method != "scan") error("unsupported photoLibrary method: $method")
+        if (method != "scan" && method != "getRecentMedia") error("unsupported photoLibrary method: $method")
+        val action = "photoLibrary.$method"
         Thread {
             runCatching {
                 for (uri in listOf(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, MediaStore.Video.Media.EXTERNAL_CONTENT_URI)) {
-                    scanMediaUri(uri)
+                    scanMediaUri(uri, action)
                 }
             }.onFailure {
-                emit(errorJson("photoLibrary.scan", "photo library scan failed"))
+                emit(errorJson(action, "photo library scan failed"))
             }
         }.start()
         return JSONObject().put("opening", true)
@@ -288,14 +289,15 @@ object CrepusRustActions {
         val files =
             uris.mapNotNull { uri ->
                 runCatching {
-                    appContext.contentResolver.openInputStream(uri)?.use { input ->
-                        val bytes = input.readBytes()
-                        JSONObject()
-                            .put("name", queryDisplayName(uri))
-                            .put("mimeType", appContext.contentResolver.getType(uri) ?: "application/octet-stream")
-                            .put("bytes", bytes.size)
-                            .put("dataBase64", android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP))
-                    }
+                    val name = queryDisplayName(uri)
+                    val mime = appContext.contentResolver.getType(uri) ?: "application/octet-stream"
+                    val file = copyToCache(uri, name, mime)
+                    JSONObject()
+                        .put("name", name)
+                        .put("mimeType", mime)
+                        .put("bytes", file.length())
+                        .put("filePath", file.absolutePath)
+                        .put("importSource", "android-document-picker")
                 }.getOrNull()
             }
         return JSONObject()
@@ -305,7 +307,7 @@ object CrepusRustActions {
             .toString()
     }
 
-    private fun scanMediaUri(uri: Uri) {
+    private fun scanMediaUri(uri: Uri, action: String) {
         val projection = arrayOf(
             MediaStore.MediaColumns._ID,
             MediaStore.MediaColumns.DISPLAY_NAME,
@@ -323,9 +325,10 @@ object CrepusRustActions {
                 val id = cursor.getLong(idColumn)
                 val itemUri = android.content.ContentUris.withAppendedId(uri, id)
                 val mime = cursor.getString(mimeColumn) ?: "application/octet-stream"
-                val file = copyToCache(itemUri, cursor.getString(nameColumn) ?: "Media", mime)
+                val name = cursor.getString(nameColumn) ?: "Media"
+                val file = runCatching { copyToCache(itemUri, name, mime) }.getOrNull() ?: continue
                 val item = JSONObject()
-                    .put("name", cursor.getString(nameColumn) ?: "Media")
+                    .put("name", name)
                     .put("mimeType", mime)
                     .put("bytes", cursor.getLong(sizeColumn))
                     .put("filePath", file.absolutePath)
@@ -333,7 +336,7 @@ object CrepusRustActions {
                     .put("mediaKind", if (mime.startsWith("video/")) "video" else "photo")
                     .put("createdTime", cursor.getLong(createdColumn).takeIf { it > 0 }?.let { Instant.ofEpochSecond(it).toString() })
                     .put("localIdentifier", id.toString())
-                emit(mediaResultJson("photoLibrary.scan", listOf(item)))
+                emit(mediaResultJson(action, listOf(item)))
             }
         }
     }

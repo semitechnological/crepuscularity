@@ -192,7 +192,7 @@ public enum CrepusRustActions {
     private static func dispatchNamedHostAction(_ action: String) -> String? {
         switch action {
         case "pick_media":
-            presentFilePicker(action: action, contentTypes: [.image, .movie], allowsMultiple: true)
+            presentMediaPicker(action: action)
             return pendingJson(action: action)
         case "import_files":
             presentFilePicker(action: action, contentTypes: [.data], allowsMultiple: true)
@@ -351,10 +351,10 @@ public enum CrepusRustActions {
     }
 
     private static func photoLibraryValue(method: String) throws -> Any {
-        guard method == "scan" else {
+        guard method == "scan" || method == "getRecentMedia" else {
             throw HostActionError("unsupported photoLibrary method: \(method)")
         }
-        scanPhotoLibrary(action: "photoLibrary.scan")
+        scanPhotoLibrary(action: "photoLibrary.\(method)")
         return ["opening": true]
     }
 
@@ -517,117 +517,6 @@ public final class CrepusStateStore: ObservableObject {
     }
 }
 
-@MainActor
-public final class CrepusStateStore: ObservableObject {
-    public static let shared = CrepusStateStore()
-
-    @Published public private(set) var revision: UInt64 = 0
-
-    public func applyResult(_ json: String) {
-        let stored = json.withCString { pointer in
-            crepusMobileStoreResultJson(pointer, UInt(strlen(pointer)))
-        }
-        if stored {
-            revision &+= 1
-        }
-    }
-
-    public func text(_ expr: String, scopeName: String? = nil, scope: Any? = nil) -> String {
-        _ = revision
-        return readString(expr: expr, scopeName: scopeName, scopeJson: scopeJson(scope), reader: crepusMobileEvalText)
-    }
-
-    public func bool(_ expr: String, scopeName: String? = nil, scope: Any? = nil) -> Bool {
-        _ = revision
-        return expr.withCString { exprPointer in
-            callOptionalArgs(scopeName, scopeJson(scope)) { scopeNamePointer, scopeNameLength, scopePointer, scopeLength in
-                crepusMobileEvalBool(exprPointer, UInt(strlen(exprPointer)), scopeNamePointer, scopeNameLength, scopePointer, scopeLength)
-            }
-        }
-    }
-
-    public func number(_ expr: String, scopeName: String? = nil, scope: Any? = nil) -> Double {
-        _ = revision
-        return expr.withCString { exprPointer in
-            callOptionalArgs(scopeName, scopeJson(scope)) { scopeNamePointer, scopeNameLength, scopePointer, scopeLength in
-                crepusMobileEvalNumber(exprPointer, UInt(strlen(exprPointer)), scopeNamePointer, scopeNameLength, scopePointer, scopeLength)
-            }
-        }
-    }
-
-    public func items(_ expr: String, scopeName: String? = nil, scope: Any? = nil) -> [Any] {
-        _ = revision
-        let json = readString(expr: expr, scopeName: scopeName, scopeJson: scopeJson(scope), reader: crepusMobileEvalItemsJson)
-        guard let data = json.data(using: .utf8),
-              let array = try? JSONSerialization.jsonObject(with: data) as? [Any]
-        else {
-            return []
-        }
-        return array
-    }
-
-    private func scopeJson(_ scope: Any?) -> String? {
-        guard let scope else {
-            return nil
-        }
-        switch scope {
-        case let text as String:
-            return "\"\(text.replacingOccurrences(of: "\"", with: "\\\""))\""
-        case let number as NSNumber:
-            return number.stringValue
-        case is NSNull:
-            return "null"
-        default:
-            guard JSONSerialization.isValidJSONObject(scope),
-                  let data = try? JSONSerialization.data(withJSONObject: scope),
-                  let json = String(data: data, encoding: .utf8)
-            else {
-                return nil
-            }
-            return json
-        }
-    }
-
-    private func readString(
-        expr: String,
-        scopeName: String?,
-        scopeJson: String?,
-        reader: (UnsafePointer<CChar>, UInt, UnsafePointer<CChar>?, UInt, UnsafePointer<CChar>?, UInt, UnsafeMutablePointer<CChar>, UInt) -> UInt
-    ) -> String {
-        expr.withCString { exprPointer in
-            let capacity = 4096
-            let output = UnsafeMutablePointer<CChar>.allocate(capacity: capacity)
-            defer { output.deallocate() }
-            let written = callOptionalArgs(scopeName, scopeJson) { scopeNamePointer, scopeNameLength, scopePointer, scopeLength in
-                reader(exprPointer, UInt(strlen(exprPointer)), scopeNamePointer, scopeNameLength, scopePointer, scopeLength, output, UInt(capacity))
-            }
-            if written >= capacity {
-                return ""
-            }
-            return String(cString: output)
-        }
-    }
-
-    private func callOptionalArgs<T>(_ scopeName: String?, _ scopeJson: String?, body: (UnsafePointer<CChar>?, UInt, UnsafePointer<CChar>?, UInt) -> T) -> T {
-        if let scopeName {
-            return scopeName.withCString { scopeNamePointer in
-                if let scopeJson {
-                    return scopeJson.withCString { pointer in
-                        body(scopeNamePointer, UInt(strlen(scopeNamePointer)), pointer, UInt(strlen(pointer)))
-                    }
-                }
-                return body(scopeNamePointer, UInt(strlen(scopeNamePointer)), nil, 0)
-            }
-        }
-        guard let scopeJson else {
-            return body(nil, 0, nil, 0)
-        }
-        return scopeJson.withCString { pointer in
-            body(nil, 0, pointer, UInt(strlen(pointer)))
-        }
-    }
-}
-
 private func currentArchitecture() -> String {
     #if arch(arm64)
     return "arm64"
@@ -670,8 +559,8 @@ private final class MediaPickerDelegate: NSObject, PHPickerViewControllerDelegat
                     files.append(file)
                 }
             }
-            CrepusRustActions.emit(mediaResultJson(action: self.action, files: files))
             await MainActor.run {
+                CrepusRustActions.emit(mediaResultJson(action: self.action, files: files))
                 CrepusMediaPicker.shared.clear(delegate: self)
             }
         }
@@ -743,11 +632,15 @@ private func presentMediaPicker(action: String) {
 private func scanPhotoLibrary(action: String) {
     Task.detached {
         let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
-        let allowed = status == .authorized || status == .limited
-            || await PHPhotoLibrary.requestAuthorization(for: .readWrite) == .authorized
-            || PHPhotoLibrary.authorizationStatus(for: .readWrite) == .limited
+        var allowed = status == .authorized || status == .limited
+        if !allowed {
+            let requested = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
+            allowed = requested == .authorized || requested == .limited
+        }
         guard allowed else {
-            CrepusRustActions.emit("{\"ok\":false,\"action\":\"\(action)\",\"error\":\"photo access denied\"}")
+            await MainActor.run {
+                CrepusRustActions.emit("{\"ok\":false,\"action\":\"\(action)\",\"error\":\"photo access denied\"}")
+            }
             return
         }
         let options = PHFetchOptions()
@@ -755,7 +648,9 @@ private func scanPhotoLibrary(action: String) {
         let assets = PHAsset.fetchAssets(with: options)
         for index in 0..<assets.count {
             if let file = await assetPayload(assets.object(at: index)) {
-                CrepusRustActions.emit(mediaResultJson(action: action, files: [file]))
+                await MainActor.run {
+                    CrepusRustActions.emit(mediaResultJson(action: action, files: [file]))
+                }
             }
         }
     }
@@ -790,34 +685,60 @@ private func topViewController() -> UIViewController? {
 }
 
 private func pickedFileJson(url: URL) -> [String: Any]? {
-    guard let data = try? Data(contentsOf: url) else { return nil }
     let values = try? url.resourceValues(forKeys: [.nameKey, .contentTypeKey, .fileSizeKey])
+    let name = values?.name ?? url.lastPathComponent
+    guard let path = try? copyToCache(from: url, name: name) else { return nil }
     return [
-        "name": values?.name ?? url.lastPathComponent,
+        "name": name,
         "mimeType": values?.contentType?.preferredMIMEType ?? "application/octet-stream",
-        "bytes": values?.fileSize ?? data.count,
-        "dataBase64": data.base64EncodedString(),
+        "bytes": values?.fileSize ?? (try? path.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0,
+        "filePath": path.path,
+        "importSource": "ios-document-picker",
     ]
 }
 
 private func mediaPayload(_ result: PHPickerResult) async -> [String: Any]? {
     let provider = result.itemProvider
     let type = provider.registeredTypeIdentifiers.first ?? "public.data"
-    guard let data = try? await provider.loadDataRepresentation(forTypeIdentifier: type) else {
+    let name = provider.suggestedName ?? "Media"
+    guard let path = await copyFileRepresentation(provider, type: type, name: name)
+    else {
         return nil
     }
-    let name = provider.suggestedName ?? "Media"
-    let path = FileManager.default.temporaryDirectory
-        .appendingPathComponent(UUID().uuidString)
-        .appendingPathExtension(fileExtension(type))
-    try? data.write(to: path, options: .atomic)
     return [
         "name": name,
         "mimeType": mimeType(type),
-        "bytes": data.count,
+        "bytes": (try? path.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0,
         "filePath": path.path,
         "importSource": "ios-photo-picker",
     ]
+}
+
+private func copyFileRepresentation(_ provider: NSItemProvider, type: String, name: String) async -> URL? {
+    await withCheckedContinuation { continuation in
+        provider.loadFileRepresentation(forTypeIdentifier: type) { url, _ in
+            guard let url, let path = try? copyToCache(from: url, name: name) else {
+                continuation.resume(returning: nil)
+                return
+            }
+            continuation.resume(returning: path)
+        }
+    }
+}
+
+private func copyToCache(from url: URL, name: String) throws -> URL {
+    let ext = (name as NSString).pathExtension
+    let path = FileManager.default.temporaryDirectory
+        .appendingPathComponent(UUID().uuidString)
+        .appendingPathExtension(ext.isEmpty ? url.pathExtension : ext)
+    let accessing = url.startAccessingSecurityScopedResource()
+    defer {
+        if accessing {
+            url.stopAccessingSecurityScopedResource()
+        }
+    }
+    try FileManager.default.copyItem(at: url, to: path)
+    return path
 }
 
 private func assetPayload(_ asset: PHAsset) async -> [String: Any]? {

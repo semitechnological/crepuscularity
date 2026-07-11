@@ -261,7 +261,9 @@ pub struct PickedFile {
     pub name: String,
     pub mime_type: String,
     pub bytes: u64,
-    pub data_base64: String,
+    pub data_base64: Option<String>,
+    pub file_path: Option<String>,
+    pub import_source: Option<String>,
 }
 
 /// Photo asset returned by `photoLibrary.getRecentMedia` method.
@@ -301,6 +303,22 @@ mod tests {
         assert_eq!(json["kind"], "filePicker");
         assert_eq!(json["accept"][0], "image/*");
         assert_eq!(json["multiple"], true);
+    }
+
+    #[test]
+    fn picked_file_supports_cache_backed_assets() {
+        let file = PickedFile {
+            name: "photo.heic".to_string(),
+            mime_type: "image/heic".to_string(),
+            bytes: 42,
+            data_base64: None,
+            file_path: Some("/tmp/photo.heic".to_string()),
+            import_source: Some("ios-photo-picker".to_string()),
+        };
+        let json = serde_json::to_value(file).expect("serialize picked file");
+
+        assert_eq!(json["filePath"], "/tmp/photo.heic");
+        assert!(json["dataBase64"].is_null());
     }
 
     #[test]
