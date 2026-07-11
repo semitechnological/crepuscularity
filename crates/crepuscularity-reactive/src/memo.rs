@@ -171,4 +171,55 @@ mod tests {
         memo.dispose();
         NODES.with(|nodes| assert!(!nodes.borrow().contains_key(&id)));
     }
+
+    #[test]
+    fn test_memo_get_basic() {
+        let memo = Memo::new(|| 100);
+        assert_eq!(memo.get(), 100);
+    }
+
+    #[test]
+    fn test_memo_get_reacts_to_signal() {
+        use crate::signal::Signal;
+        let sig = Signal::new(1);
+        let sig_clone = sig.clone();
+        let memo = Memo::new(move || sig_clone.get() * 2);
+
+        assert_eq!(memo.get(), 2);
+
+        sig.set(5);
+        assert_eq!(memo.get(), 10);
+    }
+
+    #[test]
+    fn test_memo_get_caches_value() {
+        use crate::signal::Signal;
+        use std::cell::RefCell;
+        use std::rc::Rc;
+
+        let sig = Signal::new(1);
+        let sig_clone = sig.clone();
+        let run_count = Rc::new(RefCell::new(0));
+        let rc_clone = run_count.clone();
+
+        let memo = Memo::new(move || {
+            *rc_clone.borrow_mut() += 1;
+            sig_clone.get() * 10
+        });
+
+        assert_eq!(*run_count.borrow(), 0);
+
+        // First get triggers run
+        assert_eq!(memo.get(), 10);
+        assert_eq!(*run_count.borrow(), 1);
+
+        // Second get uses cache
+        assert_eq!(memo.get(), 10);
+        assert_eq!(*run_count.borrow(), 1);
+
+        // Update signal triggers run on next get
+        sig.set(2);
+        assert_eq!(memo.get(), 20);
+        assert_eq!(*run_count.borrow(), 2);
+    }
 }
