@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-exclude = ["tree-sitter-crepus"]
+exclude = ["tree-sitter-crepus", "examples/benchmarks/apps/leptos"]
 members = [
     "crates/crepuscularity",
     "crates/crepuscularity-core",
