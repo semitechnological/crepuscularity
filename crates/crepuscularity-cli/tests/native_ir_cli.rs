@@ -382,10 +382,10 @@ fn mobile_new_scaffolds_runtime_files() {
 
     let project_yml =
         std::fs::read_to_string(root.join("ios/project.yml")).expect("read project.yml");
-    assert!(project_yml
-        .contains("$(PROJECT_DIR)/build/rust/aarch64-apple-ios/libphone_actions.a"));
-    assert!(project_yml
-        .contains("$(PROJECT_DIR)/build/rust/aarch64-apple-ios-sim/libphone_actions.a"));
+    assert!(project_yml.contains("$(PROJECT_DIR)/build/rust/aarch64-apple-ios/libphone_actions.a"));
+    assert!(
+        project_yml.contains("$(PROJECT_DIR)/build/rust/aarch64-apple-ios-sim/libphone_actions.a")
+    );
     assert!(project_yml.contains("-framework CoreBluetooth"));
     assert!(!project_yml
         .contains("$(PROJECT_DIR)/build/rust/$(PLATFORM_NAME)/libcrepus_mobile_actions.a"));

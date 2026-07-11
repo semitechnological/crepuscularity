@@ -153,7 +153,7 @@ pub fn execute(cmd: MobileCommands) {
 }
 
 fn scaffold_mobile_app(name: &str) {
-    let name_snake = name.replace('-', "_").replace(' ', "_");
+    let name_snake = name.replace(['-', ' '], "_");
     let name_pascal: String = name
         .split(['-', '_', ' '])
         .map(|part| {
@@ -202,9 +202,18 @@ fn scaffold_mobile_app(name: &str) {
     // Step 3: replace generic names with app-specific ones (after codegen).
     let replacements: &[(&str, &str)] = &[
         ("crepus_mobile_actions", &format!("{name_snake}_actions")),
-        ("dev.crepuscularity.nativeshell", &format!("dev.crepuscularity.{name_snake}")),
-        ("dev.crepuscularity.mobile", &format!("dev.crepuscularity.{name_snake}")),
-        ("dev_crepuscularity_nativeshell", &format!("dev_crepuscularity_{name_snake}")),
+        (
+            "dev.crepuscularity.nativeshell",
+            &format!("dev.crepuscularity.{name_snake}"),
+        ),
+        (
+            "dev.crepuscularity.mobile",
+            &format!("dev.crepuscularity.{name_snake}"),
+        ),
+        (
+            "dev_crepuscularity_nativeshell",
+            &format!("dev_crepuscularity_{name_snake}"),
+        ),
         ("CrepusMobileApp", &format!("{name_pascal}App")),
     ];
 

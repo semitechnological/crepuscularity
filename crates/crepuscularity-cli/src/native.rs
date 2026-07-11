@@ -1437,7 +1437,7 @@ fn find_app_under(dir: &Path) -> Option<PathBuf> {
     None
 }
 
-fn booted_or_available_ios_device() -> Option<String> {
+pub(crate) fn booted_or_available_ios_device() -> Option<String> {
     let output = Command::new("xcrun")
         .args(["simctl", "list", "devices", "available"])
         .output()
@@ -1461,7 +1461,7 @@ fn booted_or_available_ios_device() -> Option<String> {
     first
 }
 
-fn simulator_id_from_line(line: &str) -> Option<String> {
+pub(crate) fn simulator_id_from_line(line: &str) -> Option<String> {
     let start = line.find('(')? + 1;
     let rest = &line[start..];
     let end = rest.find(')')?;

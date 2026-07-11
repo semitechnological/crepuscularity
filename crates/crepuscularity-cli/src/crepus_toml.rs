@@ -132,7 +132,11 @@ pub(crate) fn default_ios_scheme() -> String {
 }
 
 pub(crate) fn default_ios_destination() -> String {
-    "platform=iOS Simulator,name=iPhone 16,OS=latest".into()
+    if let Some(id) = crate::native::booted_or_available_ios_device() {
+        format!("id={id}")
+    } else {
+        "platform=iOS Simulator,name=iPhone 16,OS=latest".into()
+    }
 }
 
 /// Resolved web site for `crepus web build` / `dev`.
