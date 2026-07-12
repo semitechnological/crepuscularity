@@ -150,3 +150,34 @@ fn rejects_unsafe_bundle_without_creating_output() {
     assert!(!converted.status.success());
     assert!(!destination.exists());
 }
+
+#[test]
+fn audit_and_conversion_reject_unadapted_tauri_commands() {
+    let source = fixture(2);
+    std::fs::write(
+        source.path().join("src-tauri/lib.rs"),
+        "#[tauri::command]\nfn greet() {}\n",
+    )
+    .unwrap();
+    let audit = crepus()
+        .args(["tauri", "audit", "--dir", source.path().to_str().unwrap()])
+        .output()
+        .unwrap();
+    assert!(!audit.status.success());
+    assert!(String::from_utf8_lossy(&audit.stdout).contains("command"));
+    let output = tempfile::tempdir().unwrap();
+    let destination = output.path().join("native");
+    let converted = crepus()
+        .args([
+            "tauri",
+            "convert",
+            "--dir",
+            source.path().to_str().unwrap(),
+            "--out",
+            destination.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    assert!(!converted.status.success());
+    assert!(!destination.exists());
+}

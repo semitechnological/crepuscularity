@@ -8,14 +8,25 @@ use crate::cli::TauriCommands;
 
 pub fn execute(command: TauriCommands) {
     match command {
+        TauriCommands::Audit { dir } => audit(&dir).unwrap_or_else(|e| crate::ui::error(&e)),
         TauriCommands::Convert { dir, out } => {
             convert(&dir, &out).unwrap_or_else(|e| crate::ui::error(&e))
         }
     }
 }
 
+fn audit(dir: &Path) -> Result<(), String> {
+    let report = TauriProject::open(dir)?.audit();
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&report).map_err(|e| e.to_string())?
+    );
+    report.native_ready()
+}
+
 fn convert(dir: &Path, out: &Path) -> Result<(), String> {
     let project = TauriProject::open(dir)?;
+    project.audit().native_ready()?;
     let bundle = project.bundle()?;
     let ir = project.native_ir()?;
     let fixture = to_json_pretty(&ir).map_err(|e| e.to_string())?;

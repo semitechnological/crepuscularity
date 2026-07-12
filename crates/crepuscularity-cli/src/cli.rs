@@ -479,6 +479,10 @@ pub enum MobileCommands {
 
 #[derive(Subcommand, Debug)]
 pub enum TauriCommands {
+    Audit {
+        #[arg(long, default_value = ".")]
+        dir: PathBuf,
+    },
     Convert {
         #[arg(long, default_value = ".")]
         dir: PathBuf,
