@@ -12,6 +12,7 @@ members = [
     "crates/crepuscularity-gpui",
     "crates/crepuscularity-web",
     "crates/crepuscularity-tauri",
+    "crates/crepuscularity-tauri-macros",
     "crates/crepuscularity-webext",
     "crates/crepuscularity_macros",
     "crates/crepuscularity-runtime",

@@ -1,10 +1,11 @@
 [package]
 name = "crepuscularity-tauri"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 license = "MPL-2.0"
 description = "Tauri v1/v2 static-bundle adapter for Crepuscularity."
 repository = "https://github.com/tschk/crepuscularity"
+readme = "README.md"
 
 [features]
 default = []
@@ -16,10 +17,12 @@ full = ["mobile", "desktop"]
 [dependencies]
 crepuscularity-core = { path = "../crepuscularity-core", version = "=0.4.20" }
 crepuscularity-native = { path = "../crepuscularity-native", version = "0.5.7", optional = true }
+crepuscularity-tauri-macros = { path = "../crepuscularity-tauri-macros", version = "0.1.0" }
 serde_json = { workspace = true }
 serde = { workspace = true }
 toml = { workspace = true }
 json5 = { workspace = true }
+tokio = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

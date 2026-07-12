@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, HashMap};
 use std::fs;
 use std::path::{Component, Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 
 use crepuscularity_core::bundle::{parse_bundle, Bundle};
 use serde::{Deserialize, Serialize};
@@ -125,6 +125,39 @@ pub struct AuditReport {
 pub type CommandHandler = Arc<dyn Fn(Value) -> Result<Value, String> + Send + Sync>;
 type EventHandler = Arc<dyn Fn(&Event) + Send + Sync>;
 
+pub use crepuscularity_tauri_macros::{command, generate_handler};
+
+pub fn block_on<T>(future: impl std::future::Future<Output = T>) -> T {
+    static RUNTIME: OnceLock<tokio::runtime::Runtime> = OnceLock::new();
+    RUNTIME
+        .get_or_init(|| tokio::runtime::Runtime::new().expect("create command runtime"))
+        .block_on(future)
+}
+
+pub struct Command {
+    name: String,
+    handler: CommandHandler,
+}
+
+impl Command {
+    pub fn new(
+        name: impl Into<String>,
+        handler: impl Fn(Value) -> Result<Value, String> + Send + Sync + 'static,
+    ) -> Self {
+        Self {
+            name: name.into(),
+            handler: Arc::new(handler),
+        }
+    }
+}
+
+#[macro_export]
+macro_rules! generate_context {
+    () => {
+        ()
+    };
+}
+
 #[derive(Clone)]
 pub struct Builder {
     commands: HashMap<String, CommandHandler>,
@@ -180,6 +213,17 @@ impl Builder {
             commands: Arc::new(self.commands),
             events: self.events,
         }
+    }
+
+    pub fn invoke_handler(mut self, commands: Vec<Command>) -> Self {
+        for command in commands {
+            self.commands.insert(command.name, command.handler);
+        }
+        self
+    }
+
+    pub fn run(self, _context: ()) -> Result<App, String> {
+        Ok(self.build())
     }
 }
 

@@ -1977,15 +1977,26 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-tauri"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "crepuscularity-core",
  "crepuscularity-native",
+ "crepuscularity-tauri-macros",
  "json5",
  "serde",
  "serde_json",
  "tempfile",
+ "tokio",
  "toml 1.1.2+spec-1.1.0",
+]
+
+[[package]]
+name = "crepuscularity-tauri-macros"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.118",
 ]
 
 [[package]]
