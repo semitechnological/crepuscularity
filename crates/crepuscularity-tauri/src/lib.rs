@@ -1,5 +1,7 @@
+use std::any::{Any, TypeId};
 use std::collections::{BTreeMap, HashMap};
 use std::fs;
+use std::marker::PhantomData;
 use std::path::{Component, Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock};
 
@@ -122,7 +124,7 @@ pub struct AuditReport {
     pub uses: Vec<ApiUse>,
 }
 
-pub type CommandHandler = Arc<dyn Fn(Value) -> Result<Value, String> + Send + Sync>;
+pub type CommandHandler = Arc<dyn Fn(&App, Value) -> Result<Value, String> + Send + Sync>;
 type EventHandler = Arc<dyn Fn(&Event) + Send + Sync>;
 
 pub use crepuscularity_tauri_macros::{command, generate_handler};
@@ -142,7 +144,7 @@ pub struct Command {
 impl Command {
     pub fn new(
         name: impl Into<String>,
-        handler: impl Fn(Value) -> Result<Value, String> + Send + Sync + 'static,
+        handler: impl Fn(&App, Value) -> Result<Value, String> + Send + Sync + 'static,
     ) -> Self {
         Self {
             name: name.into(),
@@ -162,12 +164,27 @@ macro_rules! generate_context {
 pub struct Builder {
     commands: HashMap<String, CommandHandler>,
     events: Arc<Mutex<EventState>>,
+    state: HashMap<TypeId, Arc<dyn Any + Send + Sync>>,
 }
 
 #[derive(Clone)]
 pub struct App {
     commands: Arc<HashMap<String, CommandHandler>>,
     events: Arc<Mutex<EventState>>,
+    state: Arc<HashMap<TypeId, Arc<dyn Any + Send + Sync>>>,
+}
+
+pub struct State<'a, T> {
+    inner: Arc<T>,
+    marker: PhantomData<&'a T>,
+}
+
+impl<'a, T> std::ops::Deref for State<'a, T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -194,6 +211,7 @@ impl Default for Builder {
         Self {
             commands: HashMap::new(),
             events: Arc::new(Mutex::new(EventState::default())),
+            state: HashMap::new(),
         }
     }
 }
@@ -204,7 +222,13 @@ impl Builder {
         name: impl Into<String>,
         handler: impl Fn(Value) -> Result<Value, String> + Send + Sync + 'static,
     ) -> Self {
-        self.commands.insert(name.into(), Arc::new(handler));
+        self.commands
+            .insert(name.into(), Arc::new(move |_, payload| handler(payload)));
+        self
+    }
+
+    pub fn manage<T: Send + Sync + 'static>(mut self, state: T) -> Self {
+        self.state.insert(TypeId::of::<T>(), Arc::new(state));
         self
     }
 
@@ -212,6 +236,7 @@ impl Builder {
         App {
             commands: Arc::new(self.commands),
             events: self.events,
+            state: Arc::new(self.state),
         }
     }
 
@@ -231,7 +256,21 @@ impl App {
     pub fn invoke(&self, command: &str, payload: Value) -> Result<Value, String> {
         self.commands
             .get(command)
-            .ok_or_else(|| format!("unknown command {command:?}"))?(payload)
+            .ok_or_else(|| format!("unknown command {command:?}"))?(self, payload)
+    }
+
+    pub fn state<T: Send + Sync + 'static>(&self) -> Result<State<'static, T>, String> {
+        let inner = self
+            .state
+            .get(&TypeId::of::<T>())
+            .ok_or_else(|| format!("unmanaged state {}", std::any::type_name::<T>()))?
+            .clone()
+            .downcast::<T>()
+            .map_err(|_| format!("invalid state {}", std::any::type_name::<T>()))?;
+        Ok(State {
+            inner,
+            marker: PhantomData,
+        })
     }
 
     pub fn emit(&self, name: impl Into<String>, payload: Value) {

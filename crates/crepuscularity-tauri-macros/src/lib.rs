@@ -1,8 +1,8 @@
 use proc_macro::TokenStream;
 use quote::{format_ident, quote};
 use syn::{
-    parse::Parser, parse_macro_input, punctuated::Punctuated, FnArg, Ident, ItemFn, Pat,
-    ReturnType, Token, Type,
+    parse::Parser, parse_macro_input, punctuated::Punctuated, FnArg, GenericArgument, Ident,
+    ItemFn, Pat, PathArguments, ReturnType, Token, Type,
 };
 
 #[proc_macro_attribute]
@@ -24,6 +24,13 @@ pub fn command(_attribute: TokenStream, item: TokenStream) -> TokenStream {
         let binding = &pattern.ident;
         let key = binding.to_string();
         let ty = &argument.ty;
+        if let Some(state) = state_type(ty) {
+            bindings.push(quote! {
+                let #binding: #ty = app.state::<#state>()?;
+            });
+            arguments.push(quote!(#binding));
+            continue;
+        }
         match ty.as_ref() {
             Type::Reference(reference) if matches!(reference.elem.as_ref(), Type::Path(path) if path.path.is_ident("str")) =>
             {
@@ -57,7 +64,7 @@ pub fn command(_attribute: TokenStream, item: TokenStream) -> TokenStream {
     quote! {
         #function
         #[doc(hidden)]
-        pub fn #bridge(payload: ::serde_json::Value) -> Result<::serde_json::Value, String> {
+        pub fn #bridge(app: &::crepuscularity_tauri::App, payload: ::serde_json::Value) -> Result<::serde_json::Value, String> {
             #(#bindings)*
             ::serde_json::to_value(#call).map_err(|error| error.to_string())
         }
@@ -67,6 +74,23 @@ pub fn command(_attribute: TokenStream, item: TokenStream) -> TokenStream {
 
 fn is_result(ty: &Type) -> bool {
     matches!(ty, Type::Path(path) if path.path.segments.last().is_some_and(|segment| segment.ident == "Result"))
+}
+
+fn state_type(ty: &Type) -> Option<&Type> {
+    let Type::Path(path) = ty else {
+        return None;
+    };
+    let segment = path.path.segments.last()?;
+    if segment.ident != "State" {
+        return None;
+    }
+    let PathArguments::AngleBracketed(arguments) = &segment.arguments else {
+        return None;
+    };
+    arguments.args.iter().find_map(|argument| match argument {
+        GenericArgument::Type(ty) => Some(ty),
+        _ => None,
+    })
 }
 
 #[proc_macro]
