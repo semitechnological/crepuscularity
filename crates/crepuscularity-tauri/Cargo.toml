@@ -14,7 +14,7 @@ desktop = ["native"]
 full = ["mobile", "desktop"]
 
 [dependencies]
-crepuscularity-core = { path = "../crepuscularity-core", version = "0.4.19" }
+crepuscularity-core = { path = "../crepuscularity-core", version = "=0.4.20" }
 crepuscularity-native = { path = "../crepuscularity-native", version = "0.5.7", optional = true }
 serde_json = { workspace = true }
 serde = { workspace = true }
