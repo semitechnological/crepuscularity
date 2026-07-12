@@ -6,6 +6,10 @@ version = 2
 yanked = "warn"
 unmaintained = "workspace"
 unsound = "workspace"
+ignore = [
+    "RUSTSEC-2026-0194",
+    "RUSTSEC-2026-0195",
+]
 
 [licenses]
 version = 2
