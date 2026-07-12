@@ -16,6 +16,8 @@ Guides and references for the `.crepus` DSL, tooling, and browser extensions.
 | [GPUI integration](gpui.md) | Desktop apps with GPUI |
 | [Lite shell](lite.md) | GPUI + V8 desktop shell and Rust plugin bridge |
 | [Native shells](native.md) | iOS/Android apps via native UI frameworks |
+| [Tauri native compatibility](tauri-compatibility.md) | Tauri replacement contract and audit matrix |
+| [React Native adaptation](react-native-adaptation.md) | Source-level React Native migration boundary |
 | [Polyglot plugins](polyglot.md) | Overview: View IR JSON, CLI, optional ABI |
 | [View IR contract](view-ir-contract.md) | Stable JSON boundary, schema, CLI envelopes, hot reload |
 | [Plugin surface](plugin-surface.md) | Required capabilities for language packages |
