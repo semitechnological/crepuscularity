@@ -100,5 +100,6 @@ web-sys = "0.3"
 regex = "1"
 schemars = { version = "1", features = ["derive"] }
 thiserror = "2"
+json5 = "0.4"
 
 # Default build uses crates.io `gpui` 0.2.2 so `cargo publish` matches consumers.

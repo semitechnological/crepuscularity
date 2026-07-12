@@ -1,5 +1,5 @@
 use std::fs;
-use std::path::{Component, Path};
+use std::path::Path;
 
 use crepuscularity_native::{generate_native_source, to_json_pretty, NativeCodegenTarget};
 use crepuscularity_tauri::TauriProject;
@@ -18,48 +18,57 @@ fn convert(dir: &Path, out: &Path) -> Result<(), String> {
     let project = TauriProject::open(dir)?;
     let bundle = project.bundle()?;
     let ir = project.native_ir()?;
-    crate::native::scaffold_native_app_at(out)?;
-    for (path, source) in &bundle.files {
-        let relative = Path::new(path);
-        if relative
-            .components()
-            .any(|part| matches!(part, Component::ParentDir | Component::RootDir))
-        {
-            return Err(format!("bundle contains unsafe path {path:?}"));
-        }
-        let destination = out.join("views").join(relative);
-        if let Some(parent) = destination.parent() {
-            fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-        }
-        fs::write(destination, source).map_err(|e| e.to_string())?;
-    }
-    let entry = bundle
-        .files
-        .get(&bundle.entry)
-        .ok_or_else(|| "bundle entry is missing".to_string())?;
-    fs::write(out.join("views/main.crepus"), entry).map_err(|e| e.to_string())?;
     let fixture = to_json_pretty(&ir).map_err(|e| e.to_string())?;
-    fs::write(out.join("fixture.json"), &fixture).map_err(|e| e.to_string())?;
-    fs::write(
-        out.join("android/app/src/main/assets/fixture.json"),
-        &fixture,
-    )
-    .map_err(|e| e.to_string())?;
-    fs::write(
-        out.join("ios/Sources/NativeShell/Generated/CrepusGeneratedView.swift"),
-        generate_native_source(&ir, NativeCodegenTarget::SwiftUi, "CrepusGeneratedView"),
-    )
-    .map_err(|e| e.to_string())?;
-    fs::write(
-        out.join(
-            "android/app/src/main/java/dev/crepuscularity/nativeshell/generated/CrepusGeneratedView.kt",
-        ),
-        format!(
-            "package dev.crepuscularity.nativeshell\n\n{}",
-            generate_native_source(&ir, NativeCodegenTarget::Compose, "CrepusGeneratedView")
-        ),
-    )
-    .map_err(|e| e.to_string())?;
+    let swift = generate_native_source(&ir, NativeCodegenTarget::SwiftUi, "CrepusGeneratedView");
+    let kotlin = format!(
+        "package dev.crepuscularity.nativeshell\n\n{}",
+        generate_native_source(&ir, NativeCodegenTarget::Compose, "CrepusGeneratedView")
+    );
+    let staging = out.with_extension(format!("crepus-tmp-{}", std::process::id()));
+    if staging.exists() {
+        return Err(format!(
+            "staging directory '{}' already exists",
+            staging.display()
+        ));
+    }
+    let result = (|| {
+        crate::native::scaffold_native_app_at(&staging)?;
+        for (path, source) in &bundle.files {
+            let destination = staging.join("views").join(path);
+            if let Some(parent) = destination.parent() {
+                fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+            }
+            fs::write(destination, source).map_err(|e| e.to_string())?;
+        }
+        fs::write(
+            staging.join("views/main.crepus"),
+            format!("include {}\n", bundle.entry),
+        )
+        .map_err(|e| e.to_string())?;
+        fs::write(staging.join("fixture.json"), &fixture).map_err(|e| e.to_string())?;
+        fs::write(
+            staging.join("android/app/src/main/assets/fixture.json"),
+            &fixture,
+        )
+        .map_err(|e| e.to_string())?;
+        fs::write(
+            staging.join("ios/Sources/NativeShell/Generated/CrepusGeneratedView.swift"),
+            swift,
+        )
+        .map_err(|e| e.to_string())?;
+        fs::write(
+            staging.join(
+                "android/app/src/main/java/dev/crepuscularity/nativeshell/generated/CrepusGeneratedView.kt",
+            ),
+            kotlin,
+        )
+        .map_err(|e| e.to_string())
+    })();
+    if let Err(error) = result {
+        let _ = fs::remove_dir_all(&staging);
+        return Err(error);
+    }
+    fs::rename(&staging, out).map_err(|e| e.to_string())?;
     println!(
         "converted Tauri {:?} project to {}",
         project.version(),

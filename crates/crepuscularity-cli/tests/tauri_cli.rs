@@ -77,3 +77,76 @@ fn converts_shipped_examples() {
         assert!(destination.join("fixture.json").is_file());
     }
 }
+
+#[test]
+fn preserves_nested_bundle_entries_for_native_sync() {
+    let source = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(source.path().join("src-tauri")).unwrap();
+    std::fs::create_dir_all(source.path().join("dist")).unwrap();
+    std::fs::write(
+        source.path().join("src-tauri/tauri.conf.json"),
+        r#"{"build":{"frontendDist":"../dist"}}"#,
+    )
+    .unwrap();
+    std::fs::write(
+        source.path().join("dist/crepus-bundle.json"),
+        r#"{"entry":"app/index.crepus","files":{"app/index.crepus":"include card.crepus#Card","app/card.crepus":"--- Card\ndiv\n  \"Nested\""}}"#,
+    )
+    .unwrap();
+    let output = tempfile::tempdir().unwrap();
+    let destination = output.path().join("native");
+    let converted = crepus()
+        .args([
+            "tauri",
+            "convert",
+            "--dir",
+            source.path().to_str().unwrap(),
+            "--out",
+            destination.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        converted.status.success(),
+        "{}",
+        String::from_utf8_lossy(&converted.stderr)
+    );
+    let sync = crepus()
+        .args([
+            "native",
+            "ir",
+            destination.join("views/main.crepus").to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        sync.status.success(),
+        "{}",
+        String::from_utf8_lossy(&sync.stderr)
+    );
+}
+
+#[test]
+fn rejects_unsafe_bundle_without_creating_output() {
+    let source = fixture(2);
+    std::fs::write(
+        source.path().join("dist/crepus-bundle.json"),
+        r#"{"entry":"../bad.crepus","files":{"../bad.crepus":"div"}}"#,
+    )
+    .unwrap();
+    let output = tempfile::tempdir().unwrap();
+    let destination = output.path().join("native");
+    let converted = crepus()
+        .args([
+            "tauri",
+            "convert",
+            "--dir",
+            source.path().to_str().unwrap(),
+            "--out",
+            destination.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    assert!(!converted.status.success());
+    assert!(!destination.exists());
+}

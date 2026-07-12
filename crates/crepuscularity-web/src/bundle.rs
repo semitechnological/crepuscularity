@@ -3,19 +3,11 @@
 //! in the site `runtime/` crate (call `render_from_files` directly with a `TemplateContext` if you
 //! need dynamic data).
 
-use std::collections::HashMap;
-
+pub use crepuscularity_core::bundle::{parse_bundle, Bundle};
 use crepuscularity_core::context::TemplateContext;
 use crepuscularity_core::CrepusError;
-use serde_json::Value;
 
 use crate::render_from_files;
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Bundle {
-    pub entry: String,
-    pub files: HashMap<String, String>,
-}
 
 /// JSON bundle written by `crepus web build` as `crepus-bundle.json`.
 ///
@@ -38,32 +30,6 @@ pub fn render_bundle_with_context(
 ) -> Result<String, CrepusError> {
     let Bundle { files, entry } = parse_bundle(bundle_json)?;
     render_from_files(&files, &entry, ctx)
-}
-
-pub fn parse_bundle(bundle_json: &str) -> Result<Bundle, CrepusError> {
-    let root: Value = serde_json::from_str(bundle_json)
-        .map_err(|e| CrepusError::render(format!("bundle JSON: {e}")))?;
-    let entry = root
-        .get("entry")
-        .and_then(|v| v.as_str())
-        .ok_or_else(|| CrepusError::render("bundle missing string field \"entry\""))?
-        .to_string();
-
-    let files_val = root
-        .get("files")
-        .ok_or_else(|| CrepusError::render("bundle missing \"files\" object"))?;
-    let files_obj = files_val
-        .as_object()
-        .ok_or_else(|| CrepusError::render("\"files\" must be a JSON object"))?;
-    let mut files = HashMap::new();
-    for (k, v) in files_obj {
-        let s = v
-            .as_str()
-            .ok_or_else(|| CrepusError::render(format!("files[{k:?}] must be a string")))?
-            .to_string();
-        files.insert(k.clone(), s);
-    }
-    Ok(Bundle { entry, files })
 }
 
 #[cfg(test)]

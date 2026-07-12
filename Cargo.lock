@@ -1807,6 +1807,7 @@ name = "crepuscularity-core"
 version = "0.4.19"
 dependencies = [
  "notify",
+ "serde_json",
  "sha2 0.11.0",
  "tempfile",
  "thiserror 2.0.18",
@@ -1979,11 +1980,11 @@ name = "crepuscularity-tauri"
 version = "0.1.0"
 dependencies = [
  "crepuscularity-core",
- "crepuscularity-gpui",
  "crepuscularity-native",
- "crepuscularity-web",
+ "json5",
  "serde_json",
  "tempfile",
+ "toml 1.1.2+spec-1.1.0",
 ]
 
 [[package]]
@@ -4748,6 +4749,17 @@ name = "json-escape-simd"
 version = "3.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "35e770254dd7802184595b1d30da2a15cb72569e2aca2b177aef8d22eac8a693"
+
+[[package]]
+name = "json5"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "96b0db21af676c1ce64250b5f40f3ce2cf27e4e47cb91ed91eb6fe9350b430c1"
+dependencies = [
+ "pest",
+ "pest_derive",
+ "serde",
+]
 
 [[package]]
 name = "kasuari"
