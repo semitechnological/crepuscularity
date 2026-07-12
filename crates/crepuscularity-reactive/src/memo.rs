@@ -145,6 +145,9 @@ pub(crate) fn run_memo(id: NodeId) {
 mod tests {
     use super::*;
     use crate::runtime::{AnyNode, State, NODES};
+    use crate::signal::Signal;
+    use std::cell::Cell;
+    use std::rc::Rc;
 
     #[test]
     fn test_memo_new() {
@@ -170,5 +173,31 @@ mod tests {
         NODES.with(|nodes| assert!(nodes.borrow().contains_key(&id)));
         memo.dispose();
         NODES.with(|nodes| assert!(!nodes.borrow().contains_key(&id)));
+    }
+
+    #[test]
+    fn test_memo_get_computes_lazily_and_caches() {
+        let runs = Rc::new(Cell::new(0));
+        let runs_for_memo = Rc::clone(&runs);
+        let memo = Memo::new(move || {
+            runs_for_memo.set(runs_for_memo.get() + 1);
+            42
+        });
+
+        assert_eq!(runs.get(), 0);
+        assert_eq!(memo.get(), 42);
+        assert_eq!(memo.get(), 42);
+        assert_eq!(runs.get(), 1);
+    }
+
+    #[test]
+    fn test_memo_get_reflects_signal_updates() {
+        let signal = Signal::new(1);
+        let source = signal.clone();
+        let memo = Memo::new(move || source.get() * 2);
+
+        assert_eq!(memo.get(), 2);
+        signal.set(5);
+        assert_eq!(memo.get(), 10);
     }
 }
