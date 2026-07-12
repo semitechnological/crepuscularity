@@ -1,6 +1,6 @@
 [package]
 name = "crepuscularity-tauri"
-version = "0.1.6"
+version = "0.1.7"
 edition = "2021"
 license = "MPL-2.0"
 description = "Tauri v1/v2 static-bundle adapter for Crepuscularity."

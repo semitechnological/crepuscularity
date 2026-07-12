@@ -1851,7 +1851,7 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-gpui"
-version = "0.5.1"
+version = "0.5.2"
 dependencies = [
  "crepuscularity-core",
  "crepuscularity-runtime",
@@ -1977,7 +1977,7 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-tauri"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "crepuscularity-core",
  "crepuscularity-native",
@@ -2050,7 +2050,7 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity_macros"
-version = "0.5.5"
+version = "0.5.6"
 dependencies = [
  "crepuscularity-core",
  "proc-macro2",

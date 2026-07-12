@@ -145,7 +145,7 @@ fn write_desktop_project(
     fs::create_dir_all(root.join("src")).map_err(|e| e.to_string())?;
     fs::write(
         root.join("Cargo.toml"),
-        "[package]\nname = \"crepus-tauri-desktop\"\nversion = \"0.1.0\"\nedition = \"2021\"\n\n[target.'cfg(target_os = \"macos\")'.dependencies]\ncrepuscularity-gpui = { version = \"0.5.1\", features = [\"macos\"] }\n\n[target.'cfg(target_os = \"linux\")'.dependencies]\ncrepuscularity-gpui = { version = \"0.5.1\", features = [\"x11\"] }\n\n[target.'cfg(target_os = \"windows\")'.dependencies]\ncrepuscularity-gpui = { version = \"0.5.1\", features = [\"windows\"] }\n",
+        "[package]\nname = \"crepus-tauri-desktop\"\nversion = \"0.1.0\"\nedition = \"2021\"\n\n[target.'cfg(target_os = \"macos\")'.dependencies]\ncrepuscularity-gpui = { version = \"0.5.2\", features = [\"macos\"] }\n\n[target.'cfg(target_os = \"linux\")'.dependencies]\ncrepuscularity-gpui = { version = \"0.5.2\", features = [\"x11\"] }\n\n[target.'cfg(target_os = \"windows\")'.dependencies]\ncrepuscularity-gpui = { version = \"0.5.2\", features = [\"windows\"] }\n",
     )
     .map_err(|e| e.to_string())?;
     let opens = windows
