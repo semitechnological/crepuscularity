@@ -174,6 +174,14 @@ pub struct App {
     state: Arc<HashMap<TypeId, Arc<dyn Any + Send + Sync>>>,
 }
 
+pub type AppHandle = App;
+
+#[derive(Clone)]
+pub struct Window {
+    app: App,
+    label: String,
+}
+
 pub struct State<'a, T> {
     inner: Arc<T>,
     marker: PhantomData<&'a T>,
@@ -291,6 +299,22 @@ impl App {
         }
     }
 
+    pub fn emit_all(&self, name: impl Into<String>, payload: Value) -> Result<(), String> {
+        self.emit(name, payload);
+        Ok(())
+    }
+
+    pub fn handle(&self) -> AppHandle {
+        self.clone()
+    }
+
+    pub fn get_window(&self, label: &str) -> Option<Window> {
+        (label == "main").then(|| Window {
+            app: self.clone(),
+            label: label.to_string(),
+        })
+    }
+
     pub fn listen(
         &self,
         name: impl Into<String>,
@@ -313,6 +337,25 @@ impl App {
             name,
             id,
         }
+    }
+}
+
+impl Window {
+    pub fn label(&self) -> &str {
+        &self.label
+    }
+
+    pub fn emit(&self, name: impl Into<String>, payload: Value) -> Result<(), String> {
+        self.app.emit(name, payload);
+        Ok(())
+    }
+
+    pub fn listen(
+        &self,
+        name: impl Into<String>,
+        handler: impl Fn(&Event) + Send + Sync + 'static,
+    ) -> Listener {
+        self.app.listen(name, handler)
     }
 }
 

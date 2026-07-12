@@ -17,6 +17,12 @@ fn stateful(prefix: tauri::State<'_, Prefix>, name: String) -> String {
     format!("{} {name}", prefix.0)
 }
 
+#[tauri::command]
+fn window_label(handle: tauri::AppHandle, window: tauri::Window) -> String {
+    handle.emit_all("ready", serde_json::json!(true)).unwrap();
+    window.label().to_string()
+}
+
 #[test]
 fn standard_tauri_command_shape_routes_to_native_bridge() {
     let app = tauri::Builder::default()
@@ -52,5 +58,16 @@ fn managed_state_routes_to_commands() {
         app.invoke("stateful", serde_json::json!({ "name": "Ada" }))
             .unwrap(),
         "Hello, Ada"
+    );
+}
+
+#[test]
+fn injected_app_handle_and_window_route_to_commands() {
+    let app = tauri::Builder::default()
+        .invoke_handler(tauri::generate_handler!(window_label))
+        .build();
+    assert_eq!(
+        app.invoke("window_label", serde_json::Value::Null).unwrap(),
+        "main"
     );
 }

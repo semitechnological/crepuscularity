@@ -31,6 +31,20 @@ pub fn command(_attribute: TokenStream, item: TokenStream) -> TokenStream {
             arguments.push(quote!(#binding));
             continue;
         }
+        if path_ident(ty).is_some_and(|ident| ident == "AppHandle") {
+            bindings.push(quote! {
+                let #binding: #ty = app.handle();
+            });
+            arguments.push(quote!(#binding));
+            continue;
+        }
+        if path_ident(ty).is_some_and(|ident| ident == "Window") {
+            bindings.push(quote! {
+                let #binding: #ty = app.get_window("main").ok_or_else(|| "main window unavailable".to_string())?;
+            });
+            arguments.push(quote!(#binding));
+            continue;
+        }
         match ty.as_ref() {
             Type::Reference(reference) if matches!(reference.elem.as_ref(), Type::Path(path) if path.path.is_ident("str")) =>
             {
@@ -91,6 +105,13 @@ fn state_type(ty: &Type) -> Option<&Type> {
         GenericArgument::Type(ty) => Some(ty),
         _ => None,
     })
+}
+
+fn path_ident(ty: &Type) -> Option<&Ident> {
+    let Type::Path(path) = ty else {
+        return None;
+    };
+    path.path.segments.last().map(|segment| &segment.ident)
 }
 
 #[proc_macro]
