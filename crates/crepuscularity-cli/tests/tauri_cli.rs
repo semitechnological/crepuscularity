@@ -213,6 +213,9 @@ fn conversion_preserves_tauri_application_metadata() {
             .unwrap()
             .contains("Desk Window")
     );
+    assert!(destination
+        .join("android/app/src/main/res/values/themes.xml")
+        .is_file());
     assert!(
         std::fs::read_to_string(destination.join("android/app/build.gradle.kts"))
             .unwrap()

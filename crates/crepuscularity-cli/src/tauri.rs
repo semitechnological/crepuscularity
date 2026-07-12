@@ -113,8 +113,8 @@ fn apply_metadata(
         .unwrap_or("NativeShell");
     replace(
         root.join("android/app/src/main/AndroidManifest.xml"),
-        "NativeShell",
-        product_name,
+        "android:label=\"NativeShell\"",
+        &format!("android:label=\"{product_name}\""),
     )?;
     if let Some(identifier) = &metadata.identifier {
         replace(

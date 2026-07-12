@@ -630,6 +630,10 @@ const TEMPLATE_FILES: &[(&str, &str)] = &[
         include_str!("../templates/native/android/app/src/main/AndroidManifest.xml"),
     ),
     (
+        "android/app/src/main/res/values/themes.xml",
+        include_str!("../templates/native/android/app/src/main/res/values/themes.xml"),
+    ),
+    (
         "android/app/src/main/assets/fixture.json",
         include_str!("../templates/native/android/app/src/main/assets/fixture.json"),
     ),
