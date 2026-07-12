@@ -9,6 +9,8 @@ use crepuscularity_core::bundle::{parse_bundle, Bundle};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+pub use serde_json;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TauriVersion {
     V1,
