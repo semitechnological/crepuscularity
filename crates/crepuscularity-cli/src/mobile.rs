@@ -813,7 +813,7 @@ fn refresh_mobile_state(state: &MobileDevState) {
     };
     let message = plan_hot_reload(&old_template, &new_template, &state.ctx);
     match &message {
-        HotReloadMessage::Patch { .. } | HotReloadMessage::FullReload { ir: _, .. } => {
+        HotReloadMessage::Patch { .. } | HotReloadMessage::FullReload { .. } => {
             if let Ok(json) = to_json(&rendered_ir) {
                 *state
                     .last_ir_json

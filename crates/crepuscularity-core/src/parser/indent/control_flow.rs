@@ -279,13 +279,10 @@ fn try_parse_match_arm(line: &str) -> Option<String> {
 }
 
 pub(crate) fn try_parse_let_decl(line: &str) -> Option<LetDecl> {
-    let (rest, is_default) = if let Some(r) = line.strip_prefix("$: default ") {
-        (r, true)
-    } else if let Some(r) = line.strip_prefix("$: let ") {
-        (r, false)
-    } else {
-        return None;
-    };
+    let (rest, is_default) = line
+        .strip_prefix("$: default ")
+        .map(|r| (r, true))
+        .or_else(|| line.strip_prefix("$: let ").map(|r| (r, false)))?;
     let eq_pos = rest.find('=')?;
     let name = rest[..eq_pos].trim().to_string();
     let expr_str = rest[eq_pos + 1..].trim();

@@ -70,13 +70,13 @@ pub(crate) fn strip_google_font_pragmas(lines: &[&str]) -> (usize, Vec<String>) 
 
 fn parse_google_font_pragma(line: &str) -> Option<Vec<String>> {
     let t = line.trim();
-    let (plural, after_kw) = if let Some(r) = t.strip_prefix("google-fonts") {
-        (true, r.trim_start())
-    } else if let Some(r) = t.strip_prefix("google-font") {
-        (false, r.trim_start())
-    } else {
-        return None;
-    };
+    let (plural, after_kw) = t
+        .strip_prefix("google-fonts")
+        .map(|r| (true, r.trim_start()))
+        .or_else(|| {
+            t.strip_prefix("google-font")
+                .map(|r| (false, r.trim_start()))
+        })?;
 
     let rest = after_kw
         .strip_prefix(':')
