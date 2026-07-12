@@ -28,6 +28,7 @@ fn convert(dir: &Path, out: &Path) -> Result<(), String> {
     let project = TauriProject::open(dir)?;
     project.audit().native_ready()?;
     let metadata = project.metadata();
+    let windows = project.windows();
     let bundle = project.bundle()?;
     let ir = project.native_ir()?;
     let fixture = to_json_pretty(&ir).map_err(|e| e.to_string())?;
@@ -52,12 +53,23 @@ fn convert(dir: &Path, out: &Path) -> Result<(), String> {
                 fs::create_dir_all(parent).map_err(|e| e.to_string())?;
             }
             fs::write(destination, source).map_err(|e| e.to_string())?;
+            let destination = staging.join("desktop/views").join(path);
+            if let Some(parent) = destination.parent() {
+                fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+            }
+            fs::write(destination, source).map_err(|e| e.to_string())?;
         }
         fs::write(
             staging.join("views/main.crepus"),
             format!("include {}\n", bundle.entry),
         )
         .map_err(|e| e.to_string())?;
+        fs::write(
+            staging.join("desktop/views/main.crepus"),
+            format!("include {}\n", bundle.entry),
+        )
+        .map_err(|e| e.to_string())?;
+        write_desktop_project(&staging.join("desktop"), &windows)?;
         fs::write(staging.join("fixture.json"), &fixture).map_err(|e| e.to_string())?;
         fs::write(
             staging.join("android/app/src/main/assets/fixture.json"),
@@ -124,6 +136,41 @@ fn apply_metadata(
         )?;
     }
     Ok(())
+}
+
+fn write_desktop_project(
+    root: &Path,
+    windows: &[crepuscularity_tauri::TauriWindowSpec],
+) -> Result<(), String> {
+    fs::create_dir_all(root.join("src")).map_err(|e| e.to_string())?;
+    fs::write(
+        root.join("Cargo.toml"),
+        "[package]\nname = \"crepus-tauri-desktop\"\nversion = \"0.1.0\"\nedition = \"2021\"\n\n[target.'cfg(target_os = \"macos\")'.dependencies]\ncrepuscularity-gpui = { version = \"0.5.1\", features = [\"macos\"] }\n\n[target.'cfg(target_os = \"linux\")'.dependencies]\ncrepuscularity-gpui = { version = \"0.5.1\", features = [\"x11\"] }\n\n[target.'cfg(target_os = \"windows\")'.dependencies]\ncrepuscularity-gpui = { version = \"0.5.1\", features = [\"windows\"] }\n",
+    )
+    .map_err(|e| e.to_string())?;
+    let opens = windows
+        .iter()
+        .map(|window| {
+            let bounds = match (window.width, window.height) {
+                (Some(width), Some(height)) => format!(
+                    "Some(WindowBounds::Windowed(bounds(point(px(0.), px(0.)), size(px({width}.), px({height}.)))))"
+                ),
+                _ => "None".into(),
+            };
+            format!(
+                "cx.open_window(gpui_window_options({:?}, {:?}, {bounds}, None), |_window, cx| cx.new(|_| CrepusView)).expect(\"open configured window\");",
+                window.label, window.title,
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("\n        ");
+    fs::write(
+        root.join("src/main.rs"),
+        format!(
+            "use crepuscularity_gpui::prelude::*;\nuse crepuscularity_gpui::{{bounds, point, size, view_file, WindowBounds}};\n\nstruct CrepusView;\n\nimpl Render for CrepusView {{\n    fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {{\n        view_file!(\"views/main.crepus\")\n    }}\n}}\n\nfn main() {{\n    Application::new().run(|cx: &mut App| {{\n        {opens}\n    }});\n}}\n"
+        ),
+    )
+    .map_err(|e| e.to_string())
 }
 
 fn replace(path: impl AsRef<Path>, from: &str, to: &str) -> Result<(), String> {

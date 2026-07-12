@@ -1851,7 +1851,7 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-gpui"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "crepuscularity-core",
  "crepuscularity-runtime",
@@ -1977,7 +1977,7 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-tauri"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "crepuscularity-core",
  "crepuscularity-native",

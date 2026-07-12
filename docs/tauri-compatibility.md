@@ -14,7 +14,8 @@ This matrix defines the native Crepuscularity replacement contract. A row is com
 | `AppHandle`, primary `Window`, `Manager` events | supported | native event bridge |
 | `async_runtime::spawn` | supported | shared Tokio runtime |
 | clipboard, dialog, opener, haptics, share plugin requests | supported request mapping | native capability request |
-| multiple windows, tray, menu, webview APIs | unsupported | no native equivalent yet |
+| multiple configured windows | supported | one GPUI native window per Tauri window |
+| tray, menu, webview APIs | unsupported | no native equivalent yet |
 | Tauri capability/allowlist files | unsupported | permissions must be mapped per target |
 | filesystem, HTTP, store plugins | backend required | Rust action backend adapter |
 | updater, shell, SQL, stronghold, sidecars | unsupported | no native equivalent yet |

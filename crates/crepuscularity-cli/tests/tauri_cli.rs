@@ -55,7 +55,7 @@ fn converts_v1_and_v2_static_crepus_bundles() {
 #[test]
 fn converts_shipped_examples() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    for name in ["tauri-v1-crepus", "tauri-v2-crepus"] {
+    for name in ["tauri-v1-crepus", "tauri-v2-crepus", "tauri-v2-multiwindow"] {
         let output = tempfile::tempdir().unwrap();
         let destination = output.path().join("native");
         let out = crepus()
@@ -187,7 +187,7 @@ fn conversion_preserves_tauri_application_metadata() {
     let source = fixture(2);
     std::fs::write(
         source.path().join("src-tauri/tauri.conf.json"),
-        r#"{"productName":"Desk","version":"2.3.4","identifier":"dev.example.desk","build":{"frontendDist":"../dist"},"app":{"windows":[{"title":"Desk Window"}]}}"#,
+        r#"{"productName":"Desk","version":"2.3.4","identifier":"dev.example.desk","build":{"frontendDist":"../dist"},"app":{"windows":[{"label":"main","title":"Desk Window","width":800,"height":600},{"label":"settings","title":"Settings","width":480,"height":360}]}}"#,
     )
     .unwrap();
     let output = tempfile::tempdir().unwrap();
@@ -218,4 +218,8 @@ fn conversion_preserves_tauri_application_metadata() {
             .unwrap()
             .contains("applicationId = \"dev.example.desk\"")
     );
+    let desktop = std::fs::read_to_string(destination.join("desktop/src/main.rs")).unwrap();
+    assert_eq!(desktop.matches("cx.open_window").count(), 2);
+    assert!(desktop.contains("\"settings\", \"Settings\""));
+    assert!(desktop.contains("px(480.), px(360.)"));
 }

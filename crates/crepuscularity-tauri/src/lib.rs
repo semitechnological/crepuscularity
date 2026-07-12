@@ -35,6 +35,15 @@ pub struct TauriMetadata {
     pub window_title: Option<String>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TauriWindowSpec {
+    pub label: String,
+    pub title: String,
+    pub width: Option<u32>,
+    pub height: Option<u32>,
+}
+
 impl TauriProject {
     pub fn open(root: impl AsRef<Path>) -> Result<Self, String> {
         let root = root.as_ref().canonicalize().map_err(|e| e.to_string())?;
@@ -108,6 +117,56 @@ impl TauriProject {
                 .and_then(Value::as_str)
                 .map(str::to_string),
         }
+    }
+
+    pub fn windows(&self) -> Vec<TauriWindowSpec> {
+        self.config_value
+            .pointer("/app/windows")
+            .or_else(|| self.config_value.pointer("/tauri/windows"))
+            .and_then(Value::as_array)
+            .map(|windows| {
+                windows
+                    .iter()
+                    .enumerate()
+                    .map(|(index, window)| TauriWindowSpec {
+                        label: window
+                            .get("label")
+                            .and_then(Value::as_str)
+                            .map(str::to_string)
+                            .unwrap_or_else(|| {
+                                if index == 0 {
+                                    "main".into()
+                                } else {
+                                    format!("window-{index}")
+                                }
+                            }),
+                        title: window
+                            .get("title")
+                            .and_then(Value::as_str)
+                            .map(str::to_string)
+                            .unwrap_or_else(|| "Crepuscularity".into()),
+                        width: window
+                            .get("width")
+                            .and_then(Value::as_u64)
+                            .and_then(|value| u32::try_from(value).ok()),
+                        height: window
+                            .get("height")
+                            .and_then(Value::as_u64)
+                            .and_then(|value| u32::try_from(value).ok()),
+                    })
+                    .collect()
+            })
+            .unwrap_or_else(|| {
+                vec![TauriWindowSpec {
+                    label: "main".into(),
+                    title: self
+                        .metadata()
+                        .product_name
+                        .unwrap_or_else(|| "Crepuscularity".into()),
+                    width: None,
+                    height: None,
+                }]
+            })
     }
 
     pub fn audit(&self) -> AuditReport {
@@ -541,7 +600,7 @@ fn config_uses(config: &Value, config_path: &Path) -> Vec<ApiUse> {
         .and_then(Value::as_array)
         .is_some_and(|windows| windows.len() > 1)
     {
-        uses.push(api_use(&source, "windows.multiple", Coverage::Unsupported));
+        uses.push(api_use(&source, "windows.multiple", Coverage::Native));
     }
     if config.pointer("/tauri/allowlist").is_some()
         || config.pointer("/app/security/capabilities").is_some()
