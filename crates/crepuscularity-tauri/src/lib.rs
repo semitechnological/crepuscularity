@@ -1,5 +1,7 @@
+use std::collections::{BTreeMap, HashMap};
 use std::fs;
 use std::path::{Component, Path, PathBuf};
+use std::sync::{Arc, Mutex};
 
 use crepuscularity_core::bundle::{parse_bundle, Bundle};
 use serde::{Deserialize, Serialize};
@@ -118,6 +120,155 @@ pub struct ApiUse {
 #[serde(rename_all = "camelCase")]
 pub struct AuditReport {
     pub uses: Vec<ApiUse>,
+}
+
+pub type CommandHandler = Arc<dyn Fn(Value) -> Result<Value, String> + Send + Sync>;
+type EventHandler = Arc<dyn Fn(&Event) + Send + Sync>;
+
+#[derive(Clone)]
+pub struct Builder {
+    commands: HashMap<String, CommandHandler>,
+    events: Arc<Mutex<EventState>>,
+}
+
+#[derive(Clone)]
+pub struct App {
+    commands: Arc<HashMap<String, CommandHandler>>,
+    events: Arc<Mutex<EventState>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Event {
+    pub name: String,
+    pub payload: Value,
+}
+
+pub struct Listener {
+    events: Arc<Mutex<EventState>>,
+    name: String,
+    id: u64,
+}
+
+#[derive(Default)]
+struct EventState {
+    next_id: u64,
+    listeners: HashMap<String, BTreeMap<u64, EventHandler>>,
+}
+
+impl Default for Builder {
+    fn default() -> Self {
+        Self {
+            commands: HashMap::new(),
+            events: Arc::new(Mutex::new(EventState::default())),
+        }
+    }
+}
+
+impl Builder {
+    pub fn command(
+        mut self,
+        name: impl Into<String>,
+        handler: impl Fn(Value) -> Result<Value, String> + Send + Sync + 'static,
+    ) -> Self {
+        self.commands.insert(name.into(), Arc::new(handler));
+        self
+    }
+
+    pub fn build(self) -> App {
+        App {
+            commands: Arc::new(self.commands),
+            events: self.events,
+        }
+    }
+}
+
+impl App {
+    pub fn invoke(&self, command: &str, payload: Value) -> Result<Value, String> {
+        self.commands
+            .get(command)
+            .ok_or_else(|| format!("unknown command {command:?}"))?(payload)
+    }
+
+    pub fn emit(&self, name: impl Into<String>, payload: Value) {
+        let event = Event {
+            name: name.into(),
+            payload,
+        };
+        let listeners = self
+            .events
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .listeners
+            .get(&event.name)
+            .map(|listeners| listeners.values().cloned().collect::<Vec<_>>())
+            .unwrap_or_default();
+        for listener in listeners {
+            listener(&event);
+        }
+    }
+
+    pub fn listen(
+        &self,
+        name: impl Into<String>,
+        handler: impl Fn(&Event) + Send + Sync + 'static,
+    ) -> Listener {
+        let name = name.into();
+        let mut events = self
+            .events
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let id = events.next_id;
+        events.next_id += 1;
+        events
+            .listeners
+            .entry(name.clone())
+            .or_default()
+            .insert(id, Arc::new(handler));
+        Listener {
+            events: self.events.clone(),
+            name,
+            id,
+        }
+    }
+}
+
+impl Drop for Listener {
+    fn drop(&mut self) {
+        let mut events = self
+            .events
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if let Some(listeners) = events.listeners.get_mut(&self.name) {
+            listeners.remove(&self.id);
+            if listeners.is_empty() {
+                events.listeners.remove(&self.name);
+            }
+        }
+    }
+}
+
+#[cfg(feature = "native")]
+pub fn plugin_request(
+    plugin: &str,
+    method: impl Into<String>,
+    payload: Value,
+) -> Result<crepuscularity_native::NativeRequest, String> {
+    use crepuscularity_native::{NativeCapability, NativePluginRequest, NativeRequest};
+
+    let capability = match plugin {
+        "clipboard-manager" => NativeCapability::Clipboard,
+        "dialog" => NativeCapability::DocumentPicker,
+        "opener" => NativeCapability::Browser,
+        "haptics" => NativeCapability::Haptics,
+        "share" => NativeCapability::Share,
+        _ => return Err(format!("unsupported Tauri plugin {plugin:?}")),
+    };
+    Ok(NativeRequest::Plugin(NativePluginRequest {
+        capability,
+        method: method.into(),
+        payload,
+    }))
 }
 
 impl AuditReport {
@@ -428,5 +579,35 @@ mod tests {
             .iter()
             .any(|use_| use_.api == "command" && use_.coverage == Coverage::Backend));
         assert!(report.native_ready().is_err());
+    }
+
+    #[test]
+    fn commands_events_and_plugin_requests_use_native_contracts() {
+        let app = Builder::default()
+            .command("greet", |payload| {
+                Ok(serde_json::json!({ "name": payload["name"] }))
+            })
+            .build();
+        assert_eq!(
+            app.invoke("greet", serde_json::json!({ "name": "Ada" }))
+                .unwrap(),
+            serde_json::json!({ "name": "Ada" })
+        );
+        let seen = Arc::new(Mutex::new(Vec::new()));
+        let observed = seen.clone();
+        let listener = app.listen("ready", move |event| {
+            observed.lock().unwrap().push(event.payload.clone())
+        });
+        app.emit("ready", serde_json::json!(true));
+        assert_eq!(*seen.lock().unwrap(), vec![serde_json::json!(true)]);
+        drop(listener);
+        app.emit("ready", serde_json::json!(false));
+        assert_eq!(*seen.lock().unwrap(), vec![serde_json::json!(true)]);
+        #[cfg(feature = "native")]
+        assert_eq!(
+            serde_json::to_value(plugin_request("dialog", "open", Value::Null).unwrap()).unwrap()
+                ["capability"],
+            "documentPicker"
+        );
     }
 }
