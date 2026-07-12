@@ -88,6 +88,10 @@ pub enum Commands {
         #[command(subcommand)]
         command: MobileCommands,
     },
+    Tauri {
+        #[command(subcommand)]
+        command: TauriCommands,
+    },
     Aurora {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         aurorality_args: Vec<String>,
@@ -470,6 +474,16 @@ pub enum MobileCommands {
         view_name: Option<String>,
         #[arg(long = "var", value_name = "KEY=VALUE")]
         vars: Vec<String>,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+pub enum TauriCommands {
+    Convert {
+        #[arg(long, default_value = ".")]
+        dir: PathBuf,
+        #[arg(long)]
+        out: PathBuf,
     },
 }
 

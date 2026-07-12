@@ -195,7 +195,7 @@ public enum CrepusRustActions {
             presentMediaPicker(action: action)
             return pendingJson(action: action)
         case "import_files":
-            presentFilePicker(action: action, contentTypes: [.data], allowsMultiple: true)
+            presentFilePicker(action: action, contentTypes: [], allowsMultiple: true)
             return pendingJson(action: action)
         default:
             return nil
@@ -240,6 +240,7 @@ public enum CrepusRustActions {
     }
 
     private static func hapticsValue(method: String, payload: [String: Any]?) throws -> Any {
+        #if canImport(UIKit)
         Task { @MainActor in
             switch method {
             case "impact":
@@ -276,6 +277,7 @@ public enum CrepusRustActions {
                 break
             }
         }
+        #endif
         switch method {
         case "impact":
             return ["triggered": true, "style": payload?["style"] as? String ?? "medium"]
@@ -295,9 +297,13 @@ public enum CrepusRustActions {
         guard let rawUrl = payload?["url"] as? String, let url = URL(string: rawUrl) else {
             throw HostActionError("\(capability).open requires payload.url")
         }
+        #if canImport(UIKit)
         Task { @MainActor in
             UIApplication.shared.open(url)
         }
+        #elseif canImport(AppKit)
+        NSWorkspace.shared.open(url)
+        #endif
         return ["url": rawUrl, "opened": true]
     }
 
@@ -311,6 +317,7 @@ public enum CrepusRustActions {
         guard text != nil || rawUrl != nil else {
             throw HostActionError("share.share requires payload.text or payload.url")
         }
+        #if canImport(UIKit)
         Task { @MainActor in
             guard let root = topViewController() else {
                 CrepusRustActions.emit(errorJson(action: "share.share", error: "missing root view controller"))
@@ -329,6 +336,7 @@ public enum CrepusRustActions {
             }
             root.present(controller, animated: true)
         }
+        #endif
         var value: [String: Any] = ["shared": true]
         if let text {
             value["text"] = text
@@ -837,7 +845,21 @@ private func clearClipboard() {
 }
 #elseif canImport(AppKit)
 private func presentFilePicker(action: String, contentTypes: [Any], allowsMultiple: Bool) {
-    CrepusRustActions.emit("{\"ok\":false,\"action\":\"\(action)\",\"error\":\"file picker unavailable on AppKit shell\"}")
+    Task { @MainActor in
+        CrepusRustActions.emit("{\"ok\":false,\"action\":\"\(action)\",\"error\":\"file picker unavailable on AppKit shell\"}")
+    }
+}
+
+private func presentMediaPicker(action: String) {
+    Task { @MainActor in
+        CrepusRustActions.emit("{\"ok\":false,\"action\":\"\(action)\",\"error\":\"media picker unavailable on AppKit shell\"}")
+    }
+}
+
+private func scanPhotoLibrary(action: String) {
+    Task { @MainActor in
+        CrepusRustActions.emit("{\"ok\":false,\"action\":\"\(action)\",\"error\":\"photo library unavailable on AppKit shell\"}")
+    }
 }
 
 private func currentClipboardText() -> String? {

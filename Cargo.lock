@@ -1781,6 +1781,7 @@ dependencies = [
  "crepuscularity-plugin-bindgen",
  "crepuscularity-runtime",
  "crepuscularity-ssr",
+ "crepuscularity-tauri",
  "crepuscularity-tui",
  "crepuscularity-web",
  "crepuscularity-webext",
@@ -1971,6 +1972,18 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tracing",
+]
+
+[[package]]
+name = "crepuscularity-tauri"
+version = "0.1.0"
+dependencies = [
+ "crepuscularity-core",
+ "crepuscularity-gpui",
+ "crepuscularity-native",
+ "crepuscularity-web",
+ "serde_json",
+ "tempfile",
 ]
 
 [[package]]

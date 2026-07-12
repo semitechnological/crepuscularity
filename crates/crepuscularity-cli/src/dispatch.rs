@@ -47,6 +47,7 @@ pub fn run(cli: Cli) {
         Commands::Tui { command } => crate::tui::execute(command),
         Commands::Native { command } => crate::native::execute(command),
         Commands::Mobile { command } => crate::mobile::execute(command),
+        Commands::Tauri { command } => crate::tauri::execute(command),
         #[cfg(feature = "aurora")]
         Commands::Aurora { aurorality_args } => crate::aurora::run_forwarded(&aurorality_args),
         #[cfg(not(feature = "aurora"))]

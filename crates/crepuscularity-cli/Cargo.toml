@@ -29,6 +29,10 @@ path = "tests/embedded_cli.rs"
 name = "embedded_check_cli"
 path = "tests/embedded_check_cli.rs"
 
+[[test]]
+name = "tauri_cli"
+path = "tests/tauri_cli.rs"
+
 [features]
 # Default: lightest build — no GPUI, no TUI, no Aurora.
 default = []
@@ -57,6 +61,7 @@ crepuscularity-web = { path = "../crepuscularity-web", version = "0.4.12", featu
 crepuscularity-ssr = { path = "../crepuscularity-ssr", version = "0.3.0" }
 crepuscularity-plugin-bindgen = { path = "../crepuscularity-plugin-bindgen", version = "0.1.0" }
 crepuscularity-webext  = { path = "../crepuscularity-webext", version = "0.3.0" }
+crepuscularity-tauri = { path = "../crepuscularity-tauri", version = "0.1.0", features = ["native"] }
 crepuscularity-native = { path = "../crepuscularity-native", version = "0.5.7" }
 crepuscularity-embedded = { path = "../crepuscularity-embedded", version = "0.1.16" }
 crepuscularity-lvgl = { path = "../crepuscularity-lvgl", version = "0.1.5" }

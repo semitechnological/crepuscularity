@@ -27,7 +27,7 @@ pub mod reactive {
     pub use crepuscularity_reactive::{batch_begin, batch_end, flush, Effect, Memo, Signal};
 }
 
-pub use bundle::{render_bundle, render_bundle_with_context};
+pub use bundle::{parse_bundle, render_bundle, render_bundle_with_context, Bundle};
 pub use crepuscularity_core::build;
 pub use crepuscularity_core::preprocess::google_fonts_head_markup;
 pub use crepuscularity_core::CrepusError;

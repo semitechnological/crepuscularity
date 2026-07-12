@@ -11,6 +11,12 @@ use serde_json::Value;
 
 use crate::render_from_files;
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Bundle {
+    pub entry: String,
+    pub files: HashMap<String, String>,
+}
+
 /// JSON bundle written by `crepus web build` as `crepus-bundle.json`.
 ///
 /// ```json
@@ -20,7 +26,7 @@ use crate::render_from_files;
 /// }
 /// ```
 pub fn render_bundle(bundle_json: &str) -> Result<String, CrepusError> {
-    let (files, entry) = parse_bundle(bundle_json)?;
+    let Bundle { files, entry } = parse_bundle(bundle_json)?;
     let ctx = TemplateContext::new();
     render_from_files(&files, &entry, &ctx)
 }
@@ -30,11 +36,11 @@ pub fn render_bundle_with_context(
     bundle_json: &str,
     ctx: &TemplateContext,
 ) -> Result<String, CrepusError> {
-    let (files, entry) = parse_bundle(bundle_json)?;
+    let Bundle { files, entry } = parse_bundle(bundle_json)?;
     render_from_files(&files, &entry, ctx)
 }
 
-fn parse_bundle(bundle_json: &str) -> Result<(HashMap<String, String>, String), CrepusError> {
+pub fn parse_bundle(bundle_json: &str) -> Result<Bundle, CrepusError> {
     let root: Value = serde_json::from_str(bundle_json)
         .map_err(|e| CrepusError::render(format!("bundle JSON: {e}")))?;
     let entry = root
@@ -57,7 +63,7 @@ fn parse_bundle(bundle_json: &str) -> Result<(HashMap<String, String>, String), 
             .to_string();
         files.insert(k.clone(), s);
     }
-    Ok((files, entry))
+    Ok(Bundle { entry, files })
 }
 
 #[cfg(test)]

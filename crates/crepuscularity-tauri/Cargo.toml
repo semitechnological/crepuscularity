@@ -1,0 +1,25 @@
+[package]
+name = "crepuscularity-tauri"
+version = "0.1.0"
+edition = "2021"
+license = "MPL-2.0"
+description = "Tauri v1/v2 static-bundle adapter for Crepuscularity."
+repository = "https://github.com/tschk/crepuscularity"
+
+[features]
+default = []
+mobile = ["native"]
+native = ["dep:crepuscularity-native"]
+desktop = ["dep:crepuscularity-gpui"]
+aurora = []
+full = ["mobile", "desktop", "aurora"]
+
+[dependencies]
+crepuscularity-web = { path = "../crepuscularity-web", version = "0.4.12" }
+crepuscularity-core = { path = "../crepuscularity-core", version = "0.4.19" }
+crepuscularity-native = { path = "../crepuscularity-native", version = "0.5.7", optional = true }
+crepuscularity-gpui = { path = "../crepuscularity-gpui", version = "0.5.0", optional = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

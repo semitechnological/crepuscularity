@@ -836,6 +836,24 @@ fn scaffold_native_app(name: &str) {
     );
 }
 
+pub(crate) fn scaffold_native_app_at(root: &Path) -> Result<(), String> {
+    if root.exists() {
+        return Err(format!("destination '{}' already exists", root.display()));
+    }
+    for (rel, content) in TEMPLATE_FILES {
+        let target = root.join(rel);
+        if let Some(parent) = target.parent() {
+            fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+        }
+        fs::write(target, content).map_err(|e| e.to_string())?;
+    }
+    fs::write(
+        root.join(".gitignore"),
+        "ios/.build/\nandroid/.gradle/\nandroid/build/\nandroid/app/build/\n",
+    )
+    .map_err(|e| e.to_string())
+}
+
 const IOS_SHARE_INFO_PLIST: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
