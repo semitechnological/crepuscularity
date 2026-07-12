@@ -27,6 +27,7 @@ fn audit(dir: &Path) -> Result<(), String> {
 fn convert(dir: &Path, out: &Path) -> Result<(), String> {
     let project = TauriProject::open(dir)?;
     project.audit().native_ready()?;
+    let metadata = project.metadata();
     let bundle = project.bundle()?;
     let ir = project.native_ir()?;
     let fixture = to_json_pretty(&ir).map_err(|e| e.to_string())?;
@@ -44,6 +45,7 @@ fn convert(dir: &Path, out: &Path) -> Result<(), String> {
     }
     let result = (|| {
         crate::native::scaffold_native_app_at(&staging)?;
+        apply_metadata(&staging, &metadata)?;
         for (path, source) in &bundle.files {
             let destination = staging.join("views").join(path);
             if let Some(parent) = destination.parent() {
@@ -86,4 +88,46 @@ fn convert(dir: &Path, out: &Path) -> Result<(), String> {
         out.display()
     );
     Ok(())
+}
+
+fn apply_metadata(
+    root: &Path,
+    metadata: &crepuscularity_tauri::TauriMetadata,
+) -> Result<(), String> {
+    let product_name = metadata
+        .window_title
+        .as_deref()
+        .or(metadata.product_name.as_deref())
+        .unwrap_or("NativeShell");
+    replace(
+        root.join("android/app/src/main/AndroidManifest.xml"),
+        "NativeShell",
+        product_name,
+    )?;
+    if let Some(identifier) = &metadata.identifier {
+        replace(
+            root.join("android/app/build.gradle.kts"),
+            "applicationId = \"dev.crepuscularity.nativeshell\"",
+            &format!("applicationId = \"{identifier}\""),
+        )?;
+        replace(
+            root.join("ios/project.yml"),
+            "PRODUCT_BUNDLE_IDENTIFIER: dev.crepuscularity.mobile",
+            &format!("PRODUCT_BUNDLE_IDENTIFIER: {identifier}"),
+        )?;
+    }
+    if let Some(version) = &metadata.version {
+        replace(
+            root.join("android/app/build.gradle.kts"),
+            "versionName = \"1.0\"",
+            &format!("versionName = \"{version}\""),
+        )?;
+    }
+    Ok(())
+}
+
+fn replace(path: impl AsRef<Path>, from: &str, to: &str) -> Result<(), String> {
+    let path = path.as_ref();
+    let source = fs::read_to_string(path).map_err(|e| e.to_string())?;
+    fs::write(path, source.replace(from, to)).map_err(|e| e.to_string())
 }

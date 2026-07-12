@@ -24,6 +24,15 @@ pub struct TauriProject {
     config_value: Value,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TauriMetadata {
+    pub product_name: Option<String>,
+    pub version: Option<String>,
+    pub identifier: Option<String>,
+    pub window_title: Option<String>,
+}
+
 impl TauriProject {
     pub fn open(root: impl AsRef<Path>) -> Result<Self, String> {
         let root = root.as_ref().canonicalize().map_err(|e| e.to_string())?;
@@ -67,6 +76,36 @@ impl TauriProject {
     }
     pub fn frontend_dist(&self) -> &Path {
         &self.frontend_dist
+    }
+
+    pub fn metadata(&self) -> TauriMetadata {
+        let windows = self
+            .config_value
+            .pointer("/app/windows")
+            .or_else(|| self.config_value.pointer("/tauri/windows"))
+            .and_then(Value::as_array);
+        TauriMetadata {
+            product_name: self
+                .config_value
+                .get("productName")
+                .and_then(Value::as_str)
+                .map(str::to_string),
+            version: self
+                .config_value
+                .get("version")
+                .and_then(Value::as_str)
+                .map(str::to_string),
+            identifier: self
+                .config_value
+                .get("identifier")
+                .and_then(Value::as_str)
+                .map(str::to_string),
+            window_title: windows
+                .and_then(|windows| windows.first())
+                .and_then(|window| window.get("title"))
+                .and_then(Value::as_str)
+                .map(str::to_string),
+        }
     }
 
     pub fn audit(&self) -> AuditReport {
@@ -656,6 +695,24 @@ mod tests {
         assert_eq!(
             TauriProject::open(toml.path()).unwrap().version(),
             TauriVersion::V1
+        );
+    }
+
+    #[test]
+    fn reads_application_metadata() {
+        let root = project(
+            "tauri.conf.json",
+            r#"{"productName":"Desk","version":"2.3.4","identifier":"dev.example.desk","build":{"frontendDist":"../dist"},"app":{"windows":[{"title":"Desk Window"}]}}"#,
+            "dist",
+        );
+        assert_eq!(
+            TauriProject::open(root.path()).unwrap().metadata(),
+            TauriMetadata {
+                product_name: Some("Desk".into()),
+                version: Some("2.3.4".into()),
+                identifier: Some("dev.example.desk".into()),
+                window_title: Some("Desk Window".into()),
+            }
         );
     }
 

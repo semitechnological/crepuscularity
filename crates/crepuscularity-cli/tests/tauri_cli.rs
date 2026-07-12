@@ -181,3 +181,41 @@ fn audit_and_conversion_reject_unadapted_tauri_commands() {
     assert!(!converted.status.success());
     assert!(!destination.exists());
 }
+
+#[test]
+fn conversion_preserves_tauri_application_metadata() {
+    let source = fixture(2);
+    std::fs::write(
+        source.path().join("src-tauri/tauri.conf.json"),
+        r#"{"productName":"Desk","version":"2.3.4","identifier":"dev.example.desk","build":{"frontendDist":"../dist"},"app":{"windows":[{"title":"Desk Window"}]}}"#,
+    )
+    .unwrap();
+    let output = tempfile::tempdir().unwrap();
+    let destination = output.path().join("native");
+    let converted = crepus()
+        .args([
+            "tauri",
+            "convert",
+            "--dir",
+            source.path().to_str().unwrap(),
+            "--out",
+            destination.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        converted.status.success(),
+        "{}",
+        String::from_utf8_lossy(&converted.stderr)
+    );
+    assert!(
+        std::fs::read_to_string(destination.join("android/app/src/main/AndroidManifest.xml"))
+            .unwrap()
+            .contains("Desk Window")
+    );
+    assert!(
+        std::fs::read_to_string(destination.join("android/app/build.gradle.kts"))
+            .unwrap()
+            .contains("applicationId = \"dev.example.desk\"")
+    );
+}
