@@ -1,4 +1,5 @@
 use crepuscularity_tauri as tauri;
+use tauri::Manager;
 
 #[tauri::command]
 fn greet(name: &str) -> Result<String, String> {
@@ -70,4 +71,18 @@ fn injected_app_handle_and_window_route_to_commands() {
         app.invoke("window_label", serde_json::Value::Null).unwrap(),
         "main"
     );
+}
+
+#[test]
+fn manager_and_async_runtime_match_tauri_imports() {
+    let app = tauri::Builder::default().build();
+    <tauri::App as Manager>::emit_all(&app, "ready", serde_json::json!(true)).unwrap();
+    assert_eq!(
+        <tauri::App as Manager>::get_window(&app, "main")
+            .unwrap()
+            .label(),
+        "main"
+    );
+    let handle = tauri::async_runtime::spawn(async { 42 });
+    assert_eq!(tauri::block_on(handle).unwrap(), 42);
 }

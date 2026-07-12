@@ -169,10 +169,12 @@ type EventHandler = Arc<dyn Fn(&Event) + Send + Sync>;
 pub use crepuscularity_tauri_macros::{command, generate_handler};
 
 pub fn block_on<T>(future: impl std::future::Future<Output = T>) -> T {
+    runtime().block_on(future)
+}
+
+fn runtime() -> &'static tokio::runtime::Runtime {
     static RUNTIME: OnceLock<tokio::runtime::Runtime> = OnceLock::new();
-    RUNTIME
-        .get_or_init(|| tokio::runtime::Runtime::new().expect("create command runtime"))
-        .block_on(future)
+    RUNTIME.get_or_init(|| tokio::runtime::Runtime::new().expect("create command runtime"))
 }
 
 pub struct Command {
@@ -214,6 +216,19 @@ pub struct App {
 }
 
 pub type AppHandle = App;
+
+pub trait Manager {
+    fn emit_all(&self, name: impl Into<String>, payload: Value) -> Result<(), String>;
+    fn get_window(&self, label: &str) -> Option<Window>;
+}
+
+pub mod async_runtime {
+    pub fn spawn<T: Send + 'static>(
+        future: impl std::future::Future<Output = T> + Send + 'static,
+    ) -> tokio::task::JoinHandle<T> {
+        super::runtime().spawn(future)
+    }
+}
 
 #[derive(Clone)]
 pub struct Window {
@@ -395,6 +410,26 @@ impl Window {
         handler: impl Fn(&Event) + Send + Sync + 'static,
     ) -> Listener {
         self.app.listen(name, handler)
+    }
+}
+
+impl Manager for App {
+    fn emit_all(&self, name: impl Into<String>, payload: Value) -> Result<(), String> {
+        self.emit_all(name, payload)
+    }
+
+    fn get_window(&self, label: &str) -> Option<Window> {
+        self.get_window(label)
+    }
+}
+
+impl Manager for Window {
+    fn emit_all(&self, name: impl Into<String>, payload: Value) -> Result<(), String> {
+        self.emit(name, payload)
+    }
+
+    fn get_window(&self, label: &str) -> Option<Window> {
+        self.app.get_window(label)
     }
 }
 
