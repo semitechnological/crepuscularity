@@ -427,6 +427,16 @@ fn native_add_capability_updates_only_the_scaffold() {
         .expect("read manifest");
     assert!(cargo.contains("sensors = []"));
     assert!(manifest.contains("android.hardware.sensor.gyroscope"));
+    let android_sensors = std::fs::read_to_string(
+        root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusRustActions.kt"),
+    )
+    .expect("read Android sensor bridge");
+    let ios_sensors =
+        std::fs::read_to_string(root.join("ios/Sources/NativeShell/CrepusRustActions.swift"))
+            .expect("read iOS sensor bridge");
+    assert!(android_sensors.contains("SensorManager.SENSOR_DELAY_GAME"));
+    assert!(ios_sensors.contains("CMMotionManager"));
+    assert!(ios_sensors.contains("9.80665"));
     assert!(crepus()
         .args(["native", "add", "bluetooth", "--dir"])
         .arg(&root)

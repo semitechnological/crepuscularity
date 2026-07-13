@@ -22,7 +22,8 @@ use crepuscularity_core::context::{TemplateContext, TemplateValue};
 use crepuscularity_core::{DriverCache, Fingerprint};
 use crepuscularity_native::{
     generate_native_source, render_component_file_to_ir, render_from_files, render_template_to_ir,
-    to_json, to_json_pretty, NativeCodegenTarget,
+    to_json, to_json_pretty, NativeCodegenTarget, ANDROID_SENSORS, ANDROID_SENSORS_BRIDGE,
+    IOS_SENSORS, IOS_SENSORS_BRIDGE,
 };
 use serde::Deserialize;
 use serde_json::Value;
@@ -127,13 +128,57 @@ fn add_capability(capability: &str, root: &Path) -> Result<(), String> {
                 .map_err(|e| format!("write '{}': {e}", project.display()))?;
         }
     }
+    if spec.name == "sensors" {
+        add_sensors_host(root)?;
+    }
     ui::success(&format!(
         "added native capability '{}' to '{}'",
         spec.name,
         root.display()
     ));
-    if spec.name == "bluetooth" {
-        ui::warning("Bluetooth adds Rust and platform declarations only; add a capability-owned host adapter before calling it.");
+    Ok(())
+}
+
+fn add_sensors_host(root: &Path) -> Result<(), String> {
+    let android =
+        root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusRustActions.kt");
+    let ios = root.join("ios/Sources/NativeShell/CrepusRustActions.swift");
+    let mut android_source =
+        fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
+    if !android_source.contains("SensorBridge") {
+        android_source = android_source.replace(
+            "import android.net.Uri\n",
+            "import android.net.Uri\nimport android.hardware.Sensor\nimport android.hardware.SensorEvent\nimport android.hardware.SensorEventListener\nimport android.hardware.SensorManager\n",
+        );
+        android_source = android_source.replace(
+            "            \"share\" -> shareValue(method, payload)\n",
+            "            \"share\" -> shareValue(method, payload)\n            \"sensors\", \"motion\" -> sensorsValue(method)\n",
+        );
+        android_source = android_source.replace(
+            "\n}\n\nobject CrepusActionState",
+            &format!("{ANDROID_SENSORS}\n}}\n\nobject CrepusActionState"),
+        );
+        android_source.push_str(ANDROID_SENSORS_BRIDGE);
+        fs::write(&android, android_source)
+            .map_err(|e| format!("write '{}': {e}", android.display()))?;
+    }
+    let mut ios_source =
+        fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
+    if !ios_source.contains("SensorBridge") {
+        ios_source = ios_source.replace(
+            "import Foundation\n",
+            "import Foundation\nimport CoreMotion\n",
+        );
+        ios_source = ios_source.replace(
+            "        case \"share\":\n            return try shareValue(method: method, payload: payload)\n",
+            "        case \"share\":\n            return try shareValue(method: method, payload: payload)\n        case \"sensors\", \"motion\":\n            return try sensorsValue(method: method)\n",
+        );
+        ios_source = ios_source.replace(
+            "\n}\n\nprivate struct HostActionError",
+            &format!("{IOS_SENSORS}\n}}\n\nprivate struct HostActionError"),
+        );
+        ios_source.push_str(IOS_SENSORS_BRIDGE);
+        fs::write(&ios, ios_source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
     }
     Ok(())
 }

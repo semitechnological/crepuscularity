@@ -21,6 +21,7 @@
 //! ## Coverage vs GPUI / web
 //! Not 100% parity with GPUI `styler.rs`—expand [`style`].
 
+pub mod capabilities;
 pub mod codegen;
 pub mod colors;
 pub mod host;
@@ -32,6 +33,7 @@ pub mod native;
 mod render;
 pub mod style;
 
+pub use capabilities::{ANDROID_SENSORS, ANDROID_SENSORS_BRIDGE, IOS_SENSORS, IOS_SENSORS_BRIDGE};
 pub use codegen::{generate_native_source, NativeCodegenTarget};
 pub use colors::resolve_rgba;
 pub use crepuscularity_core::CrepusError;

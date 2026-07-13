@@ -69,7 +69,7 @@ crepus native add sensors --dir .
 crepus native add bluetooth --dir .
 ```
 
-Sensors declares gyro/accelerometer support. Bluetooth adds `btleplug` and platform
+Sensors installs real gyro/accelerometer bridges. Bluetooth adds `btleplug` and platform
 declarations; its capability-owned host adapter is still pending.
 
 The scaffold includes `views/main.crepus` as the Crepus-authored UI source.

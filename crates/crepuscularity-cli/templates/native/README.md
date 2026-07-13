@@ -52,7 +52,7 @@ crepus native add sensors --dir .
 crepus native add bluetooth --dir .
 ```
 
-`sensors` adds the motion capability declarations for gyro and accelerometer. `bluetooth`
+`sensors` installs real gyro and accelerometer bridges. `bluetooth`
 adds the app Rust dependency and platform declarations, but its host adapter is not implemented yet.
 
 ## Regenerating the fixture from a template
