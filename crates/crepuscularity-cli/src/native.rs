@@ -23,7 +23,8 @@ use crepuscularity_core::{DriverCache, Fingerprint};
 use crepuscularity_native::{
     generate_native_source, render_component_file_to_ir, render_from_files, render_template_to_ir,
     to_json, to_json_pretty, NativeCodegenTarget, ANDROID_BLUETOOTH, ANDROID_BLUETOOTH_BRIDGE,
-    ANDROID_SENSORS, ANDROID_SENSORS_BRIDGE, IOS_SENSORS, IOS_SENSORS_BRIDGE,
+    ANDROID_GEOLOCATION, ANDROID_GEOLOCATION_BRIDGE, ANDROID_SENSORS, ANDROID_SENSORS_BRIDGE,
+    IOS_SENSORS, IOS_SENSORS_BRIDGE,
 };
 use serde::Deserialize;
 use serde_json::Value;
@@ -101,6 +102,13 @@ const CAPABILITIES: &[CapabilitySpec] = &[
         android_manifest: "",
         ios_project: "",
     },
+    CapabilitySpec {
+        name: "geolocation",
+        aliases: &["location"],
+        cargo_feature: "geolocation",
+        android_manifest: "    <uses-permission android:name=\"android.permission.ACCESS_FINE_LOCATION\" />\n    <uses-permission android:name=\"android.permission.ACCESS_COARSE_LOCATION\" />\n",
+        ios_project: "        INFOPLIST_KEY_NSLocationWhenInUseUsageDescription: \"$(PRODUCT_NAME) uses your location while the app is open.\"\n",
+    },
 ];
 
 fn add_capability(capability: &str, root: &Path) -> Result<(), String> {
@@ -133,7 +141,19 @@ fn add_capability(capability: &str, root: &Path) -> Result<(), String> {
     if !spec.ios_project.is_empty() {
         let mut source = fs::read_to_string(&project)
             .map_err(|e| format!("read '{}': {e}", project.display()))?;
-        if !source.contains("CoreBluetooth") {
+        if spec.name == "geolocation"
+            && !source.contains("INFOPLIST_KEY_NSLocationWhenInUseUsageDescription")
+        {
+            source = source.replace(
+                "        INFOPLIST_KEY_UILaunchScreen_Generation: YES\n",
+                &format!(
+                    "        INFOPLIST_KEY_UILaunchScreen_Generation: YES\n{}",
+                    spec.ios_project
+                ),
+            );
+            fs::write(&project, source)
+                .map_err(|e| format!("write '{}': {e}", project.display()))?;
+        } else if spec.name == "bluetooth" && !source.contains("CoreBluetooth") {
             source = source.replace(
                 "        OTHER_LDFLAGS: \"-lcrepus_mobile_actions\"\n",
                 spec.ios_project,
@@ -148,12 +168,39 @@ fn add_capability(capability: &str, root: &Path) -> Result<(), String> {
     if spec.name == "bluetooth" {
         add_bluetooth_host(root)?;
     }
+    if spec.name == "geolocation" {
+        add_geolocation_host(root)?;
+    }
     ui::success(&format!(
         "added native capability '{}' to '{}'",
         spec.name,
         root.display()
     ));
     Ok(())
+}
+
+fn add_geolocation_host(root: &Path) -> Result<(), String> {
+    let android =
+        root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusRustActions.kt");
+    let mut source =
+        fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
+    if source.contains("GeolocationBridge") {
+        return Ok(());
+    }
+    source = source.replace(
+        "import android.content.ClipData\n",
+        "import android.content.ClipData\nimport android.Manifest\nimport android.content.pm.PackageManager\nimport android.location.LocationManager\n",
+    );
+    source = source.replace(
+        "            \"share\" -> shareValue(method, payload)\n",
+        "            \"share\" -> shareValue(method, payload)\n            \"geolocation\" -> geolocationValue(method)\n",
+    );
+    source = source.replace(
+        "\n}\n\nobject CrepusActionState",
+        &format!("{ANDROID_GEOLOCATION}\n}}\n\nobject CrepusActionState"),
+    );
+    source.push_str(ANDROID_GEOLOCATION_BRIDGE);
+    fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))
 }
 
 fn add_feature(path: &Path, feature: &str) -> Result<(), String> {

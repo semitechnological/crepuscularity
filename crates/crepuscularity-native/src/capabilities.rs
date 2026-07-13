@@ -164,3 +164,42 @@ private class BluetoothBridge(private val activity: ComponentActivity) {
     }
 }
 "#;
+
+pub const ANDROID_GEOLOCATION: &str = r#"
+    private val geolocation by lazy { GeolocationBridge(activity) }
+
+    private fun geolocationValue(method: String): JSONObject =
+        when (method) {
+            "status" -> geolocation.status()
+            "requestPermission" -> geolocation.requestPermission()
+            "getCurrentPosition" -> geolocation.currentPosition()
+            else -> error("unsupported geolocation method: $method")
+        }
+"#;
+
+pub const ANDROID_GEOLOCATION_BRIDGE: &str = r#"
+private class GeolocationBridge(private val activity: ComponentActivity) {
+    private val manager = activity.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+
+    fun status(): JSONObject = JSONObject()
+        .put("enabled", manager.isProviderEnabled(LocationManager.GPS_PROVIDER) || manager.isProviderEnabled(LocationManager.NETWORK_PROVIDER))
+        .put("permissionGranted", activity.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED)
+
+    fun requestPermission(): JSONObject {
+        activity.requestPermissions(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION), 4769)
+        return JSONObject().put("requested", true)
+    }
+
+    fun currentPosition(): JSONObject {
+        if (activity.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            return requestPermission().put("pending", true)
+        }
+        val location = manager.getLastKnownLocation(LocationManager.GPS_PROVIDER)
+            ?: manager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
+            ?: return JSONObject().put("available", false)
+        return JSONObject().put("available", true).put("latitude", location.latitude)
+            .put("longitude", location.longitude).put("accuracy", location.accuracy)
+            .put("timestampMs", location.time)
+    }
+}
+"#;
