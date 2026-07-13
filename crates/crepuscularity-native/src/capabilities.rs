@@ -892,6 +892,30 @@ private func presentCamera(action: String) {
 #endif
 "#;
 
+pub const ANDROID_DIMENSIONS: &str = r#"
+    private fun dimensionsValue(method: String): JSONObject {
+        if (method != "get" && method != "getWindow") error("unsupported dimensions method: $method")
+        val metrics = activity.windowManager.currentWindowMetrics
+        val bounds = metrics.bounds
+        val density = appContext.resources.displayMetrics.density
+        return JSONObject()
+            .put("width", bounds.width() / density)
+            .put("height", bounds.height() / density)
+            .put("scale", density)
+    }
+"#;
+
+pub const IOS_DIMENSIONS: &str = r#"
+    private static func dimensionsValue(method: String) throws -> Any {
+        guard method == "get" || method == "getWindow" else {
+            throw HostActionError("unsupported dimensions method: \(method)")
+        }
+        let screen = UIScreen.main
+        let bounds = screen.bounds
+        return ["width": bounds.width, "height": bounds.height, "scale": screen.scale]
+    }
+"#;
+
 pub const ANDROID_GEOLOCATION: &str = r#"
     private val geolocation by lazy { GeolocationBridge(activity) }
 

@@ -52,6 +52,7 @@ crepus native add sensors --dir .
 crepus native add bluetooth --dir .
 crepus native add photo-library --dir .
 crepus native add camera --dir .
+crepus native add dimensions --dir .
 ```
 
 `sensors` installs real gyro and accelerometer bridges. `bluetooth` installs Android and iOS BLE scan
@@ -68,6 +69,7 @@ the named `pick_media` action.
 `photo-library` requests platform media permission only for `scan` and `getRecentMedia`, then emits cached-file
 metadata for each asset it can access.
 `camera.takePhoto` opens the system camera and emits one cached JPEG result.
+`dimensions.get` returns the current display width, height, and scale.
 
 ## Regenerating the fixture from a template
 

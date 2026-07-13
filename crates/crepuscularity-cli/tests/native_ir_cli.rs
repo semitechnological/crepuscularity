@@ -444,6 +444,8 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(!default_ios.contains("photoLibraryValue"));
     assert!(!default_android.contains("cameraValue"));
     assert!(!default_ios.contains("cameraValue"));
+    assert!(!default_android.contains("dimensionsValue"));
+    assert!(!default_ios.contains("dimensionsValue"));
     assert!(crepus()
         .args(["native", "add", "share", "--dir"])
         .arg(&root)
@@ -628,6 +630,22 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(camera_ios.contains("UIImagePickerController"));
     assert!(camera_ios.contains("case \"camera\":"));
     assert!(crepus()
+        .args(["native", "add", "dimensions", "--dir"])
+        .arg(&root)
+        .output()
+        .expect("add dimensions")
+        .status
+        .success());
+    let dimensions_android = std::fs::read_to_string(
+        root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusRustActions.kt"),
+    )
+    .expect("read Android dimensions bridge");
+    let dimensions_ios =
+        std::fs::read_to_string(root.join("ios/Sources/NativeShell/CrepusRustActions.swift"))
+            .expect("read iOS dimensions bridge");
+    assert!(dimensions_android.contains("currentWindowMetrics"));
+    assert!(dimensions_ios.contains("UIScreen.main"));
+    assert!(crepus()
         .args(["native", "add", "filesystem", "--dir"])
         .arg(&root)
         .output()
@@ -643,6 +661,7 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(cargo.contains("documentpicker = []"));
     assert!(cargo.contains("photo-library = []"));
     assert!(cargo.contains("camera = []"));
+    assert!(cargo.contains("dimensions = []"));
     assert!(cargo.contains("filesystem = []"));
     assert!(cargo.contains("default = [\"filesystem\"]"));
     assert!(
