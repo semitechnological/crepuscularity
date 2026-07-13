@@ -602,6 +602,24 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(browser_android.contains("Intent.ACTION_VIEW"));
     assert!(browser_ios.contains("UIApplication.shared.open"));
     assert!(crepus()
+        .args(["native", "add", "appearance", "--dir"])
+        .arg(&root)
+        .output()
+        .expect("add appearance")
+        .status
+        .success());
+    let appearance_android = std::fs::read_to_string(
+        root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusRustActions.kt"),
+    )
+    .expect("read Android appearance bridge");
+    let appearance_ios =
+        std::fs::read_to_string(root.join("ios/Sources/NativeShell/CrepusRustActions.swift"))
+            .expect("read iOS appearance bridge");
+    assert!(appearance_android.contains("registerComponentCallbacks"));
+    assert!(appearance_android.contains("appearance.change"));
+    assert!(appearance_ios.contains("traitCollectionDidChange"));
+    assert!(appearance_ios.contains("appearance.change"));
+    assert!(crepus()
         .args(["native", "add", "documents", "--dir"])
         .arg(&root)
         .output()

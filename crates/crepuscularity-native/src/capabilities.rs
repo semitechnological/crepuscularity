@@ -2266,22 +2266,104 @@ pub const IOS_BATTERY: &str = r#"
 "#;
 
 pub const ANDROID_APPEARANCE: &str = r#"
+    private var appearanceWatcher: android.content.ComponentCallbacks? = null
+
     private fun appearanceValue(method: String): JSONObject {
-        if (method != "status") error("unsupported appearance method: $method")
-        val mode = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
+        return when (method) {
+            "status" -> appearanceStatus()
+            "startWatch" -> startAppearanceWatch()
+            "stopWatch" -> stopAppearanceWatch()
+            else -> error("unsupported appearance method: $method")
+        }
+    }
+
+    private fun appearanceStatus(configuration: Configuration = appContext.resources.configuration): JSONObject {
+        val mode = configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
         return JSONObject().put("colorScheme", if (mode == Configuration.UI_MODE_NIGHT_YES) "dark" else "light")
+    }
+
+    private fun startAppearanceWatch(): JSONObject {
+        if (appearanceWatcher == null) {
+            appearanceWatcher = object : android.content.ComponentCallbacks {
+                override fun onConfigurationChanged(configuration: Configuration) {
+                    emit(JSONObject().put("ok", true).put("action", "appearance.change").put("value", appearanceStatus(configuration)).toString())
+                }
+
+                override fun onLowMemory() = Unit
+            }
+            appContext.registerComponentCallbacks(appearanceWatcher!!)
+        }
+        return appearanceStatus().put("watching", true)
+    }
+
+    private fun stopAppearanceWatch(): JSONObject {
+        appearanceWatcher?.let(appContext::unregisterComponentCallbacks)
+        appearanceWatcher = null
+        return appearanceStatus().put("watching", false)
     }
 "#;
 
 pub const IOS_APPEARANCE: &str = r#"
     private static func appearanceValue(method: String) throws -> Any {
-        guard method == "status" else { throw HostActionError("unsupported appearance method: \(method)") }
-        #if canImport(UIKit)
-        return ["colorScheme": UITraitCollection.current.userInterfaceStyle == .dark ? "dark" : "light"]
-        #else
-        return ["colorScheme": "light"]
-        #endif
+        switch method {
+        case "status": return appearanceStatus()
+        case "startWatch": return startAppearanceWatch()
+        case "stopWatch": return stopAppearanceWatch()
+        default: throw HostActionError("unsupported appearance method: \(method)")
+        }
     }
+
+    #if canImport(UIKit)
+    private static var appearanceObserver: AppearanceObserverView?
+
+    private static func appearanceStatus() -> [String: Any] {
+        let style = topViewController()?.traitCollection.userInterfaceStyle ?? UITraitCollection.current.userInterfaceStyle
+        return ["colorScheme": style == .dark ? "dark" : "light"]
+    }
+
+    private static func startAppearanceWatch() -> [String: Any] {
+        guard appearanceObserver == nil else { return appearanceStatus().merging(["watching": true]) { _, new in new } }
+        guard let root = topViewController() else { return appearanceStatus().merging(["watching": false]) { _, new in new } }
+        let observer = AppearanceObserverView()
+        observer.isHidden = true
+        root.view.addSubview(observer)
+        appearanceObserver = observer
+        return appearanceStatus().merging(["watching": true]) { _, new in new }
+    }
+
+    private static func stopAppearanceWatch() -> [String: Any] {
+        appearanceObserver?.removeFromSuperview()
+        appearanceObserver = nil
+        return appearanceStatus().merging(["watching": false]) { _, new in new }
+    }
+
+    private static func emitAppearanceChange(_ style: UIUserInterfaceStyle) {
+        let result: [String: Any] = ["ok": true, "action": "appearance.change", "value": ["colorScheme": style == .dark ? "dark" : "light"]]
+        if let data = try? JSONSerialization.data(withJSONObject: result), let json = String(data: data, encoding: .utf8) {
+            CrepusRustActions.emit(json)
+        }
+    }
+
+    private final class AppearanceObserverView: UIView {
+        override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+            super.traitCollectionDidChange(previousTraitCollection)
+            guard traitCollection.hasDifferentColorAppearance(comparedTo: previousTraitCollection) else { return }
+            CrepusRustActions.emitAppearanceChange(traitCollection.userInterfaceStyle)
+        }
+    }
+    #else
+    private static func appearanceStatus() -> [String: Any] {
+        ["colorScheme": "light"]
+    }
+
+    private static func startAppearanceWatch() -> [String: Any] {
+        appearanceStatus().merging(["watching": false]) { _, new in new }
+    }
+
+    private static func stopAppearanceWatch() -> [String: Any] {
+        appearanceStatus().merging(["watching": false]) { _, new in new }
+    }
+    #endif
 "#;
 
 pub const ANDROID_SYSTEM_BARS: &str = r##"

@@ -81,6 +81,7 @@ bridges with `status`, `requestPermission`, `scan`, and `stopScan` operations.
 `geolocation`, `battery`, `appearance`, `haptics`, `clipboard`, `image-picker`, and `documentPicker` (`documents`) add location permission/current-position,
 battery status, color-scheme status, feedback generators, and clipboard access respectively. Geolocation is
 cached: Android returns the most recent GPS/network fix and iOS returns the location manager's current location.
+`appearance.startWatch` and `appearance.stopWatch` stream system color-scheme changes as `appearance.change`.
 
 `documentPicker.pick` opens the platform multiple-document picker and emits imported cached-file metadata. The
 named `import_files` action remains available for built-in UI actions and uses the same picker lifecycle.

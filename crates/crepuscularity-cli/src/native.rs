@@ -535,8 +535,8 @@ fn add_appearance_host(root: &Path) -> Result<(), String> {
         fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
     if !source.contains("appearanceValue") {
         source = source.replace(
-            "import android.content.ClipData\n",
-            "import android.content.ClipData\nimport android.content.res.Configuration\n",
+            "import android.content.Context\n",
+            "import android.content.Context\nimport android.content.res.Configuration\n",
         );
         source = source.replace(
             "        when (capability) {\n",
