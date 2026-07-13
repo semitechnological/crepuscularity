@@ -165,6 +165,72 @@ private class BluetoothBridge(private val activity: ComponentActivity) {
 }
 "#;
 
+pub const IOS_BLUETOOTH: &str = r#"
+    private static let bluetooth = BluetoothBridge()
+
+    private static func bluetoothValue(method: String) throws -> Any {
+        switch method {
+        case "status": return bluetooth.status()
+        case "requestPermission": return bluetooth.requestPermission()
+        case "scan": return try bluetooth.scan()
+        case "stopScan": return bluetooth.stop()
+        default: throw HostActionError("unsupported bluetooth method: \(method)")
+        }
+    }
+"#;
+
+pub const IOS_BLUETOOTH_BRIDGE: &str = r#"
+private final class BluetoothBridge: NSObject, CBCentralManagerDelegate {
+    private var devices: [String: [String: Any]] = [:]
+    private var scanning = false
+    private lazy var manager = CBCentralManager(delegate: self, queue: .main)
+
+    func status() -> [String: Any] {
+        _ = manager
+        return ["available": manager.state == .poweredOn, "enabled": manager.state == .poweredOn,
+                "scanning": scanning, "authorization": CBManager.authorization.rawValue,
+                "devices": Array(devices.values)]
+    }
+
+    func requestPermission() -> [String: Any] {
+        _ = manager
+        return ["requested": true, "pending": manager.state == .unknown || manager.state == .resetting]
+    }
+
+    func scan() throws -> [String: Any] {
+        guard manager.state == .poweredOn else {
+            throw HostActionError("Bluetooth is unavailable or disabled")
+        }
+        manager.scanForPeripherals(withServices: nil, options: [CBCentralManagerScanOptionAllowDuplicatesKey: false])
+        scanning = true
+        return status()
+    }
+
+    func stop() -> [String: Any] {
+        manager.stopScan()
+        scanning = false
+        return status()
+    }
+
+    func centralManagerDidUpdateState(_ central: CBCentralManager) {
+        if central.state != .poweredOn { scanning = false }
+    }
+
+    func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral,
+                        advertisementData: [String: Any], rssi RSSI: NSNumber) {
+        let device: [String: Any] = ["id": peripheral.identifier.uuidString,
+                                     "name": peripheral.name as Any,
+                                     "rssi": RSSI,
+                                     "timestampMs": Date().timeIntervalSince1970 * 1000]
+        devices[peripheral.identifier.uuidString] = device
+        Task { @MainActor in
+            CrepusRustActions.emit(CrepusRustActions.successJson(action: "bluetooth.device", capability: "bluetooth",
+                                                                  method: "device", value: device))
+        }
+    }
+}
+"#;
+
 pub const ANDROID_GEOLOCATION: &str = r#"
     private val geolocation by lazy { GeolocationBridge(activity) }
 
@@ -261,7 +327,8 @@ pub const IOS_BATTERY: &str = r#"
         guard method == "status" else { throw HostActionError("unsupported battery method: \(method)") }
         #if canImport(UIKit)
         UIDevice.current.isBatteryMonitoringEnabled = true
-        return ["level": UIDevice.current.batteryLevel < 0 ? NSNull() : UIDevice.current.batteryLevel, "charging": UIDevice.current.batteryState == .charging || UIDevice.current.batteryState == .full]
+        let level: Any = UIDevice.current.batteryLevel < 0 ? NSNull() : NSNumber(value: UIDevice.current.batteryLevel)
+        return ["level": level, "charging": UIDevice.current.batteryState == .charging || UIDevice.current.batteryState == .full]
         #else
         return ["level": NSNull(), "charging": false]
         #endif

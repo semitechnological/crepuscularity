@@ -442,6 +442,7 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(android_sensors.contains("SensorManager.SENSOR_DELAY_GAME"));
     assert!(ios_sensors.contains("CMMotionManager"));
     assert!(ios_sensors.contains("9.80665"));
+    assert!(ios_sensors.contains("private static let sensors = SensorBridge()"));
     assert!(crepus()
         .args(["native", "add", "bluetooth", "--dir"])
         .arg(&root)
@@ -457,6 +458,13 @@ fn native_add_capability_updates_only_the_scaffold() {
     .expect("read Bluetooth bridge");
     assert!(bluetooth.contains("BluetoothBridge"));
     assert!(bluetooth.contains("bluetooth.device"));
+    let ios_bluetooth =
+        std::fs::read_to_string(root.join("ios/Sources/NativeShell/CrepusRustActions.swift"))
+            .expect("read iOS Bluetooth bridge");
+    assert!(ios_bluetooth.contains("CBCentralManager"));
+    assert!(ios_bluetooth.contains("bluetooth.device"));
+    assert!(ios_bluetooth.contains("CrepusRustActions.successJson"));
+    assert!(ios_bluetooth.contains("fileprivate static func successJson"));
     assert!(
         std::fs::read_to_string(root.join("android/app/src/main/AndroidManifest.xml"))
             .expect("read manifest")
@@ -530,6 +538,35 @@ fn mobile_new_scaffolds_android_runtime_audit_fixes() {
     );
     assert!(android_gradle
         .contains("sourceSets[\"release\"].jniLibs.srcDir(rustJniLibsDir(\"release\"))"));
+}
+
+#[test]
+#[cfg_attr(
+    windows,
+    ignore = "default desktop crepus.exe does not spawn reliably on Windows CI"
+)]
+fn native_add_capability_finds_renamed_mobile_action_bridge() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    assert!(crepus()
+        .current_dir(tmp.path())
+        .args(["mobile", "new", "phone"])
+        .output()
+        .expect("scaffold")
+        .status
+        .success());
+    let root = tmp.path().join("phone");
+    assert!(crepus()
+        .args(["native", "add", "sensors", "--dir"])
+        .arg(&root)
+        .output()
+        .expect("add sensors")
+        .status
+        .success());
+    let source = std::fs::read_to_string(
+        root.join("android/app/src/main/java/dev/crepuscularity/phone/CrepusRustActions.kt"),
+    )
+    .expect("read renamed Android action bridge");
+    assert!(source.contains("SensorBridge"));
 }
 
 #[test]

@@ -69,8 +69,20 @@ crepus native add sensors --dir .
 crepus native add bluetooth --dir .
 ```
 
-Sensors installs real gyro/accelerometer bridges. Bluetooth installs the Android BLE central scan
-bridge and its platform declarations.
+Sensors installs real gyro/accelerometer bridges. Bluetooth installs BLE central scan bridges on
+Android and iOS, plus only the required platform declarations. It supports `status`,
+`requestPermission`, `scan`, and `stopScan`; discoveries arrive as `bluetooth.device` results.
+
+| Capability | Methods | Boundary |
+| --- | --- | --- |
+| `sensors` | `status`, `latest`, `start`, `stop` | Android accelerometer/gyro; iOS Core Motion |
+| `bluetooth` | `status`, `requestPermission`, `scan`, `stopScan` | Android and iOS central scanning; discoveries are streamed as results |
+| `geolocation` | `status`, `requestPermission`, `getCurrentPosition` | Android last-known GPS/network location; iOS manager's current cached location |
+| `battery` | `status` | Android battery broadcast; iOS battery monitor |
+| `appearance` | `status` | Current light/dark scheme on Android and iOS |
+
+`haptics` and `filesystem` are accepted installers, but their host handlers predate the opt-in
+surface and remain in the baseline shell. They are not yet minimal-scaffold capability gates.
 
 The scaffold includes `views/main.crepus` as the Crepus-authored UI source.
 When the template changes, sync the shared View IR fixture into the native

@@ -22,10 +22,10 @@ use crepuscularity_core::context::{TemplateContext, TemplateValue};
 use crepuscularity_core::{DriverCache, Fingerprint};
 use crepuscularity_native::{
     generate_native_source, render_component_file_to_ir, render_from_files, render_template_to_ir,
-    to_json, to_json_pretty, NativeCodegenTarget, ANDROID_BLUETOOTH, ANDROID_BLUETOOTH_BRIDGE,
-    ANDROID_APPEARANCE, ANDROID_BATTERY, ANDROID_GEOLOCATION, ANDROID_GEOLOCATION_BRIDGE, ANDROID_SENSORS,
-    ANDROID_SENSORS_BRIDGE, IOS_APPEARANCE, IOS_BATTERY, IOS_GEOLOCATION, IOS_GEOLOCATION_BRIDGE, IOS_SENSORS,
-    IOS_SENSORS_BRIDGE,
+    to_json, to_json_pretty, NativeCodegenTarget, ANDROID_APPEARANCE, ANDROID_BATTERY,
+    ANDROID_BLUETOOTH, ANDROID_BLUETOOTH_BRIDGE, ANDROID_GEOLOCATION, ANDROID_GEOLOCATION_BRIDGE,
+    ANDROID_SENSORS, ANDROID_SENSORS_BRIDGE, IOS_APPEARANCE, IOS_BATTERY, IOS_BLUETOOTH,
+    IOS_BLUETOOTH_BRIDGE, IOS_GEOLOCATION, IOS_GEOLOCATION_BRIDGE, IOS_SENSORS, IOS_SENSORS_BRIDGE,
 };
 use serde::Deserialize;
 use serde_json::Value;
@@ -201,7 +201,10 @@ fn add_appearance_host(root: &Path) -> Result<(), String> {
     let mut source = fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
     if !source.contains("appearanceValue") {
         source = source.replace("        case \"share\":\n            return try shareValue(method: method, payload: payload)\n", "        case \"share\":\n            return try shareValue(method: method, payload: payload)\n        case \"appearance\":\n            return try appearanceValue(method: method)\n");
-        source = source.replace("\n}\n\nprivate struct HostActionError", &format!("{IOS_APPEARANCE}\n}}\n\nprivate struct HostActionError"));
+        source = source.replace(
+            "\n    fileprivate static func emit",
+            &format!("{IOS_APPEARANCE}\n\n    fileprivate static func emit"),
+        );
         fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
     }
     Ok(())
@@ -220,7 +223,10 @@ fn add_battery_host(root: &Path) -> Result<(), String> {
     let mut source = fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
     if !source.contains("batteryValue") {
         source = source.replace("        case \"share\":\n            return try shareValue(method: method, payload: payload)\n", "        case \"share\":\n            return try shareValue(method: method, payload: payload)\n        case \"battery\":\n            return try batteryValue(method: method)\n");
-        source = source.replace("\n}\n\nprivate struct HostActionError", &format!("{IOS_BATTERY}\n}}\n\nprivate struct HostActionError"));
+        source = source.replace(
+            "\n    fileprivate static func emit",
+            &format!("{IOS_BATTERY}\n\n    fileprivate static func emit"),
+        );
         fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
     }
     Ok(())
@@ -242,8 +248,8 @@ fn add_geolocation_ios_host(root: &Path) -> Result<(), String> {
         "        case \"share\":\n            return try shareValue(method: method, payload: payload)\n        case \"geolocation\":\n            return try geolocationValue(method: method)\n",
     );
     source = source.replace(
-        "\n}\n\nprivate struct HostActionError",
-        &format!("{IOS_GEOLOCATION}\n}}\n\nprivate struct HostActionError"),
+        "\n    fileprivate static func emit",
+        &format!("{IOS_GEOLOCATION}\n\n    fileprivate static func emit"),
     );
     source = source.replace(
         "    private static func emit(_ result: String)",
@@ -318,7 +324,35 @@ fn add_bluetooth_host(root: &Path) -> Result<(), String> {
         "    internal fun emit(result: String)",
     );
     source.push_str(ANDROID_BLUETOOTH_BRIDGE);
-    fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))
+    fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))?;
+    add_bluetooth_ios_host(root)
+}
+
+fn add_bluetooth_ios_host(root: &Path) -> Result<(), String> {
+    let ios = root.join("ios/Sources/NativeShell/CrepusRustActions.swift");
+    let mut source =
+        fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
+    if source.contains("BluetoothBridge") {
+        return Ok(());
+    }
+    source = source.replace(
+        "import Foundation\n",
+        "import Foundation\nimport CoreBluetooth\n",
+    );
+    source = source.replace(
+        "        case \"share\":\n            return try shareValue(method: method, payload: payload)\n",
+        "        case \"share\":\n            return try shareValue(method: method, payload: payload)\n        case \"bluetooth\":\n            return try bluetoothValue(method: method)\n",
+    );
+    source = source.replace(
+        "    private static func successJson",
+        "    fileprivate static func successJson",
+    );
+    source = source.replace(
+        "\n    fileprivate static func emit",
+        &format!("{IOS_BLUETOOTH}\n\n    fileprivate static func emit"),
+    );
+    source.push_str(IOS_BLUETOOTH_BRIDGE);
+    fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))
 }
 
 fn add_sensors_host(root: &Path) -> Result<(), String> {
@@ -355,8 +389,8 @@ fn add_sensors_host(root: &Path) -> Result<(), String> {
             "        case \"share\":\n            return try shareValue(method: method, payload: payload)\n        case \"sensors\", \"motion\":\n            return try sensorsValue(method: method)\n",
         );
         ios_source = ios_source.replace(
-            "\n}\n\nprivate struct HostActionError",
-            &format!("{IOS_SENSORS}\n}}\n\nprivate struct HostActionError"),
+            "\n    fileprivate static func emit",
+            &format!("{IOS_SENSORS}\n\n    fileprivate static func emit"),
         );
         ios_source.push_str(IOS_SENSORS_BRIDGE);
         fs::write(&ios, ios_source).map_err(|e| format!("write '{}': {e}", ios.display()))?;

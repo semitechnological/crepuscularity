@@ -55,7 +55,7 @@ public enum CrepusRustActions {
             }
         }
         CrepusActions.resultSink = { result in
-            CrepusActions.applyResult(result)
+            CrepusStateStore.shared.applyResult(result)
         }
     }
 
