@@ -462,6 +462,28 @@ fn native_add_capability_updates_only_the_scaffold() {
             .expect("read manifest")
             .contains("android.permission.BLUETOOTH_SCAN")
     );
+    assert!(crepus()
+        .args(["native", "add", "haptics", "--dir"])
+        .arg(&root)
+        .output()
+        .expect("add haptics")
+        .status
+        .success());
+    assert!(crepus()
+        .args(["native", "add", "filesystem", "--dir"])
+        .arg(&root)
+        .output()
+        .expect("add filesystem")
+        .status
+        .success());
+    let cargo = std::fs::read_to_string(root.join("rust/Cargo.toml")).expect("read Cargo.toml");
+    assert!(cargo.contains("haptics = []"));
+    assert!(cargo.contains("filesystem = []"));
+    assert!(
+        std::fs::read_to_string(root.join("android/app/src/main/AndroidManifest.xml"))
+            .expect("read manifest")
+            .contains("android.permission.VIBRATE")
+    );
 }
 
 #[test]

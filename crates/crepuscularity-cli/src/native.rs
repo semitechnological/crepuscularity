@@ -87,6 +87,20 @@ const CAPABILITIES: &[CapabilitySpec] = &[
         android_manifest: "    <uses-permission android:name=\"android.permission.ACCESS_FINE_LOCATION\" android:maxSdkVersion=\"30\" />\n    <uses-permission android:name=\"android.permission.BLUETOOTH_SCAN\" />\n    <uses-permission android:name=\"android.permission.BLUETOOTH_CONNECT\" />\n    <uses-feature android:name=\"android.hardware.bluetooth_le\" android:required=\"false\" />\n",
         ios_project: "        OTHER_LDFLAGS: \"-lcrepus_mobile_actions -framework CoreBluetooth\"\n        INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription: \"$(PRODUCT_NAME) uses Bluetooth for nearby device setup.\"\n",
     },
+    CapabilitySpec {
+        name: "haptics",
+        aliases: &["vibration"],
+        cargo_feature: "haptics",
+        android_manifest: "    <uses-permission android:name=\"android.permission.VIBRATE\" />\n",
+        ios_project: "",
+    },
+    CapabilitySpec {
+        name: "filesystem",
+        aliases: &["files"],
+        cargo_feature: "filesystem",
+        android_manifest: "",
+        ios_project: "",
+    },
 ];
 
 fn add_capability(capability: &str, root: &Path) -> Result<(), String> {
