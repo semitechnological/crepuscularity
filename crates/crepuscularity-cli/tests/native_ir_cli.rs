@@ -826,7 +826,11 @@ fn native_add_capability_updates_only_the_scaffold() {
         std::fs::read_to_string(root.join("ios/Sources/NativeShell/CrepusRustActions.swift"))
             .expect("read iOS accessibility bridge");
     assert!(accessibility_android.contains("Settings.Global.ANIMATOR_DURATION_SCALE"));
+    assert!(accessibility_android.contains("addTouchExplorationStateChangeListener"));
+    assert!(accessibility_android.contains("accessibilityInfo.change"));
     assert!(accessibility_ios.contains("UIAccessibility.isReduceMotionEnabled"));
+    assert!(accessibility_ios.contains("UIAccessibility.reduceMotionStatusDidChangeNotification"));
+    assert!(accessibility_ios.contains("accessibilityInfo.change"));
     assert!(accessibility_android.contains("\"accessibilityInfo\", \"screenReader\""));
     assert!(accessibility_ios.contains("case \"accessibilityInfo\", \"screenReader\":"));
     assert!(crepus()

@@ -1275,9 +1275,20 @@ pub const IOS_SCREEN_ORIENTATION: &str = r#"
 "#;
 
 pub const ANDROID_ACCESSIBILITY_INFO: &str = r#"
+    private var accessibilityStateListener: AccessibilityManager.AccessibilityStateChangeListener? = null
+    private var touchExplorationListener: AccessibilityManager.TouchExplorationStateChangeListener? = null
+
     private fun accessibilityInfoValue(method: String): JSONObject {
-        if (method != "get" && method != "status") error("unsupported accessibilityInfo method: $method")
         val manager = appContext.getSystemService(AccessibilityManager::class.java)
+        return when (method) {
+            "get", "status" -> accessibilityInfoStatus(manager)
+            "startWatch" -> startAccessibilityInfoWatch(manager)
+            "stopWatch" -> stopAccessibilityInfoWatch(manager)
+            else -> error("unsupported accessibilityInfo method: $method")
+        }
+    }
+
+    private fun accessibilityInfoStatus(manager: AccessibilityManager): JSONObject {
         val reduceMotion = Settings.Global.getFloat(
             appContext.contentResolver,
             Settings.Global.ANIMATOR_DURATION_SCALE,
@@ -1287,19 +1298,88 @@ pub const ANDROID_ACCESSIBILITY_INFO: &str = r#"
             .put("reduceMotion", reduceMotion)
             .put("screenReader", manager.isTouchExplorationEnabled)
     }
+
+    private fun startAccessibilityInfoWatch(manager: AccessibilityManager): JSONObject {
+        if (accessibilityStateListener == null) {
+            accessibilityStateListener = AccessibilityManager.AccessibilityStateChangeListener {
+                emitAccessibilityInfoChange(manager)
+            }
+            manager.addAccessibilityStateChangeListener(accessibilityStateListener!!)
+        }
+        if (touchExplorationListener == null) {
+            touchExplorationListener = AccessibilityManager.TouchExplorationStateChangeListener {
+                emitAccessibilityInfoChange(manager)
+            }
+            manager.addTouchExplorationStateChangeListener(touchExplorationListener!!)
+        }
+        return accessibilityInfoStatus(manager).put("watching", true)
+    }
+
+    private fun stopAccessibilityInfoWatch(manager: AccessibilityManager): JSONObject {
+        accessibilityStateListener?.let(manager::removeAccessibilityStateChangeListener)
+        accessibilityStateListener = null
+        touchExplorationListener?.let(manager::removeTouchExplorationStateChangeListener)
+        touchExplorationListener = null
+        return accessibilityInfoStatus(manager).put("watching", false)
+    }
+
+    private fun emitAccessibilityInfoChange(manager: AccessibilityManager) {
+        emit(JSONObject().put("ok", true).put("action", "accessibilityInfo.change").put("value", accessibilityInfoStatus(manager)).toString())
+    }
 "#;
 
 pub const IOS_ACCESSIBILITY_INFO: &str = r#"
     private static func accessibilityInfoValue(method: String) throws -> Any {
-        guard method == "get" || method == "status" else {
-            throw HostActionError("unsupported accessibilityInfo method: \(method)")
+        switch method {
+        case "get", "status": return accessibilityInfoStatus()
+        case "startWatch": return startAccessibilityInfoWatch()
+        case "stopWatch": return stopAccessibilityInfoWatch()
+        default: throw HostActionError("unsupported accessibilityInfo method: \(method)")
         }
-        #if canImport(UIKit)
-        return ["reduceMotion": UIAccessibility.isReduceMotionEnabled, "screenReader": UIAccessibility.isVoiceOverRunning]
-        #else
-        return ["reduceMotion": false, "screenReader": false]
-        #endif
     }
+
+    #if canImport(UIKit)
+    private static var accessibilityInfoObservers: [NSObjectProtocol] = []
+
+    private static func accessibilityInfoStatus() -> [String: Any] {
+        ["reduceMotion": UIAccessibility.isReduceMotionEnabled, "screenReader": UIAccessibility.isVoiceOverRunning]
+    }
+
+    private static func startAccessibilityInfoWatch() -> [String: Any] {
+        guard accessibilityInfoObservers.isEmpty else { return accessibilityInfoStatus().merging(["watching": true]) { _, new in new } }
+        let center = NotificationCenter.default
+        accessibilityInfoObservers = [
+            center.addObserver(forName: UIAccessibility.voiceOverStatusDidChangeNotification, object: nil, queue: .main) { _ in emitAccessibilityInfoChange() },
+            center.addObserver(forName: UIAccessibility.reduceMotionStatusDidChangeNotification, object: nil, queue: .main) { _ in emitAccessibilityInfoChange() },
+        ]
+        return accessibilityInfoStatus().merging(["watching": true]) { _, new in new }
+    }
+
+    private static func stopAccessibilityInfoWatch() -> [String: Any] {
+        accessibilityInfoObservers.forEach(NotificationCenter.default.removeObserver)
+        accessibilityInfoObservers.removeAll()
+        return accessibilityInfoStatus().merging(["watching": false]) { _, new in new }
+    }
+
+    private static func emitAccessibilityInfoChange() {
+        let result: [String: Any] = ["ok": true, "action": "accessibilityInfo.change", "value": accessibilityInfoStatus()]
+        if let data = try? JSONSerialization.data(withJSONObject: result), let json = String(data: data, encoding: .utf8) {
+            CrepusRustActions.emit(json)
+        }
+    }
+    #else
+    private static func accessibilityInfoStatus() -> [String: Any] {
+        ["reduceMotion": false, "screenReader": false]
+    }
+
+    private static func startAccessibilityInfoWatch() -> [String: Any] {
+        accessibilityInfoStatus().merging(["watching": false]) { _, new in new }
+    }
+
+    private static func stopAccessibilityInfoWatch() -> [String: Any] {
+        accessibilityInfoStatus().merging(["watching": false]) { _, new in new }
+    }
+    #endif
 "#;
 
 pub const ANDROID_DEVICE: &str = r#"

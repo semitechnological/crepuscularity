@@ -101,6 +101,7 @@ metadata for each asset it can access.
 `screenOrientation.get` returns portrait or landscape. `screenOrientation.lock` requires
 `orientation: "portrait"` or `"landscape"`; `screenOrientation.unlock` restores rotation.
 `accessibilityInfo.get` and `accessibilityInfo.status` return reduce-motion and screen-reader state.
+`accessibilityInfo.startWatch` and `accessibilityInfo.stopWatch` stream status changes as `accessibilityInfo.change`.
 `device.get` and `device.info` return the platform, device model, and operating-system version.
 `preferences` stores string values with `get`, `set`, `remove`, and `clear`.
 `network.status` returns whether the device has a validated connection and its transport; `network.startWatch` and `network.stopWatch` stream connection changes as `network.change`.

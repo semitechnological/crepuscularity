@@ -96,7 +96,7 @@ Android and iOS, plus only the required platform declarations. It supports `stat
 | `app-state` (`appstate`) | `get`, `startWatch`, `stopWatch` | Current Android lifecycle or iOS application foreground/background state; watch changes stream as `appState.change` |
 | `app` (`app-info`, `appinfo`) | `getInfo` | App name, identifier, version, and build metadata from Android package or iOS bundle |
 | `screen-orientation` (`screenorientation`) | `get`, `lock`, `unlock` | Current orientation plus portrait/landscape lock or unlock through Android activity policy and iOS scene geometry |
-| `accessibility-info` (`accessibilityinfo`, `screen-reader`) | `get`, `status` | Reduce-motion and screen-reader state from Android accessibility settings or iOS UIAccessibility |
+| `accessibility-info` (`accessibilityinfo`, `screen-reader`) | `get`, `status`, `startWatch`, `stopWatch` | Reduce-motion and screen-reader state from Android accessibility settings or iOS UIAccessibility; watch changes stream as `accessibilityInfo.change` |
 | `device` (`device-info`, `deviceinfo`, `platform`) | `get`, `info` | Platform, manufacturer, model, and operating-system version from Android Build or iOS UIDevice |
 | `preferences` (`storage`, `async-storage`) | `get`, `set`, `remove`, `clear` | String values in Android SharedPreferences or iOS UserDefaults; `key` is required except for `clear` |
 | `network` (`net-info`, `netinfo`) | `status`, `startWatch`, `stopWatch` | Validated Android network or iOS NWPathMonitor status, including active transport; watch changes stream as `network.change` |
