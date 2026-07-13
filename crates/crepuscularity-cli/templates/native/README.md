@@ -56,6 +56,7 @@ crepus native add dimensions --dir .
 crepus native add dialog --dir .
 crepus native add action-sheet --dir .
 crepus native add app-state --dir .
+crepus native add screen-orientation --dir .
 ```
 
 `sensors` installs real gyro and accelerometer bridges. `bluetooth` installs Android and iOS BLE scan
@@ -76,6 +77,7 @@ metadata for each asset it can access.
 `dialog.show` presents a native alert and streams whether it was accepted or cancelled.
 `actionSheet.show` presents native choices and streams the selected label and index.
 `appState.get` returns whether the app is active or backgrounded.
+`screenOrientation.get` returns portrait or landscape.
 
 ## Regenerating the fixture from a template
 

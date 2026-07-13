@@ -94,6 +94,7 @@ Android and iOS, plus only the required platform declarations. It supports `stat
 | `dialog` | `show` | Android alert dialog and iOS alert controller; accepts optional `title`, `message`, and `button`, then streams `ok` or `cancel` |
 | `action-sheet` (`actionsheet`) | `show` | Android choices dialog and iOS action sheet; accepts `title` and `options`, then streams the selected label and index |
 | `app-state` (`appstate`) | `get` | Current Android lifecycle or iOS application foreground/background state |
+| `screen-orientation` (`screenorientation`) | `get` | Current Android configuration or iOS screen orientation |
 
 `filesystem` enables its scoped Rust backend only after `crepus native add filesystem`; the
 default app shell and share-extension builds exclude it. It supports `readText`, `writeText`,

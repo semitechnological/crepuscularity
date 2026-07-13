@@ -452,6 +452,8 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(!default_ios.contains("actionSheetValue"));
     assert!(!default_android.contains("appStateValue"));
     assert!(!default_ios.contains("appStateValue"));
+    assert!(!default_android.contains("screenOrientationValue"));
+    assert!(!default_ios.contains("screenOrientationValue"));
     assert!(crepus()
         .args(["native", "add", "share", "--dir"])
         .arg(&root)
@@ -700,6 +702,22 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(app_state_android.contains("activity.lifecycle.currentState"));
     assert!(app_state_ios.contains("UIApplication.shared.applicationState"));
     assert!(crepus()
+        .args(["native", "add", "screen-orientation", "--dir"])
+        .arg(&root)
+        .output()
+        .expect("add screen orientation")
+        .status
+        .success());
+    let orientation_android = std::fs::read_to_string(
+        root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusRustActions.kt"),
+    )
+    .expect("read Android orientation bridge");
+    let orientation_ios =
+        std::fs::read_to_string(root.join("ios/Sources/NativeShell/CrepusRustActions.swift"))
+            .expect("read iOS orientation bridge");
+    assert!(orientation_android.contains("ORIENTATION_LANDSCAPE"));
+    assert!(orientation_ios.contains("UIScreen.main.bounds"));
+    assert!(crepus()
         .args(["native", "add", "filesystem", "--dir"])
         .arg(&root)
         .output()
@@ -719,6 +737,7 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(cargo.contains("dialog = []"));
     assert!(cargo.contains("action-sheet = []"));
     assert!(cargo.contains("app-state = []"));
+    assert!(cargo.contains("screen-orientation = []"));
     assert!(cargo.contains("filesystem = []"));
     assert!(cargo.contains("default = [\"filesystem\"]"));
     assert!(

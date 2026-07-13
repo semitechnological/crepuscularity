@@ -1073,6 +1073,22 @@ pub const IOS_APP_STATE: &str = r#"
     }
 "#;
 
+pub const ANDROID_SCREEN_ORIENTATION: &str = r#"
+    private fun screenOrientationValue(method: String): JSONObject {
+        if (method != "get") error("unsupported screenOrientation method: $method")
+        val orientation = appContext.resources.configuration.orientation
+        return JSONObject().put("orientation", if (orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE) "landscape" else "portrait")
+    }
+"#;
+
+pub const IOS_SCREEN_ORIENTATION: &str = r#"
+    private static func screenOrientationValue(method: String) throws -> Any {
+        guard method == "get" else { throw HostActionError("unsupported screenOrientation method: \(method)") }
+        let landscape = UIScreen.main.bounds.width > UIScreen.main.bounds.height
+        return ["orientation": landscape ? "landscape" : "portrait"]
+    }
+"#;
+
 pub const ANDROID_GEOLOCATION: &str = r#"
     private val geolocation by lazy { GeolocationBridge(activity) }
 
