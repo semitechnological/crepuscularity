@@ -84,7 +84,7 @@ Android and iOS, plus only the required platform declarations. It supports `stat
 | `appearance` | `status` | Current light/dark scheme on Android and iOS |
 | `haptics` | `impact`, `selection`, `notification` | Android vibrator; iOS UIKit feedback generators |
 | `clipboard` | `get`, `set`, `clear` | Android clipboard manager; iOS system pasteboard |
-| `browser` (`linking`) | `open` | Android `ACTION_VIEW`; iOS `UIApplication.open` |
+| `browser` (`linking`, `app-launcher`) | `open` | Android `ACTION_VIEW`; iOS `UIApplication.open`, including custom app schemes |
 | `share` | `share` | Android chooser; iOS activity sheet; accepts `text`, `url`, and optional `title` |
 | `image-picker` (`imagepicker`, `media-picker`) | `pick` | Android system picker; iOS PHPicker; results stream as `imagePicker.pick`. The named `pick_media` action is installed with this capability. |
 | `documentPicker` (`documents`) | `pick` | Android/iOS multiple-document picker; emits imported cached-file metadata |
