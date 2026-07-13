@@ -29,17 +29,18 @@ use crepuscularity_native::{
     ANDROID_DIMENSIONS, ANDROID_DOCUMENT_PICKER, ANDROID_GEOLOCATION, ANDROID_GEOLOCATION_BRIDGE,
     ANDROID_HAPTICS, ANDROID_IMAGE_PICKER, ANDROID_IN_APP_BROWSER, ANDROID_KEYBOARD,
     ANDROID_LOCAL_NOTIFICATIONS, ANDROID_MICROPHONE, ANDROID_NETWORK, ANDROID_PERMISSIONS,
-    ANDROID_PHOTO_LIBRARY, ANDROID_PREFERENCES, ANDROID_SCREEN_ORIENTATION, ANDROID_SECURE_STORAGE,
-    ANDROID_SENSORS, ANDROID_SENSORS_BRIDGE, ANDROID_SETTINGS, ANDROID_SHARE, ANDROID_SYSTEM_BARS,
-    IOS_ACCESSIBILITY_INFO, IOS_ACTION_SHEET, IOS_ACTION_SHEET_BRIDGE, IOS_APP, IOS_APPEARANCE,
-    IOS_APP_STATE, IOS_BATTERY, IOS_BIOMETRICS, IOS_BLUETOOTH, IOS_BLUETOOTH_BRIDGE, IOS_BROWSER,
-    IOS_CALENDAR, IOS_CAMERA, IOS_CAMERA_BRIDGE, IOS_CLIPBOARD, IOS_CLIPBOARD_BRIDGE, IOS_CONTACTS,
-    IOS_DEEP_LINKS, IOS_DEVICE, IOS_DIALOG, IOS_DIALOG_BRIDGE, IOS_DIMENSIONS, IOS_DOCUMENT_PICKER,
-    IOS_GEOLOCATION, IOS_GEOLOCATION_BRIDGE, IOS_HAPTICS, IOS_IMAGE_PICKER,
-    IOS_IMAGE_PICKER_BRIDGE, IOS_IN_APP_BROWSER, IOS_KEYBOARD, IOS_LOCAL_NOTIFICATIONS,
-    IOS_MICROPHONE, IOS_NETWORK, IOS_PERMISSIONS, IOS_PHOTO_LIBRARY, IOS_PHOTO_LIBRARY_BRIDGE,
-    IOS_PREFERENCES, IOS_SCREEN_ORIENTATION, IOS_SECURE_STORAGE, IOS_SENSORS, IOS_SENSORS_BRIDGE,
-    IOS_SETTINGS, IOS_SHARE, IOS_SYSTEM_BARS,
+    ANDROID_PHOTO_LIBRARY, ANDROID_PREFERENCES, ANDROID_SCHEDULED_NOTIFICATION_RECEIVER,
+    ANDROID_SCREEN_ORIENTATION, ANDROID_SECURE_STORAGE, ANDROID_SENSORS, ANDROID_SENSORS_BRIDGE,
+    ANDROID_SETTINGS, ANDROID_SHARE, ANDROID_SYSTEM_BARS, IOS_ACCESSIBILITY_INFO, IOS_ACTION_SHEET,
+    IOS_ACTION_SHEET_BRIDGE, IOS_APP, IOS_APPEARANCE, IOS_APP_STATE, IOS_BATTERY, IOS_BIOMETRICS,
+    IOS_BLUETOOTH, IOS_BLUETOOTH_BRIDGE, IOS_BROWSER, IOS_CALENDAR, IOS_CAMERA, IOS_CAMERA_BRIDGE,
+    IOS_CLIPBOARD, IOS_CLIPBOARD_BRIDGE, IOS_CONTACTS, IOS_DEEP_LINKS, IOS_DEVICE, IOS_DIALOG,
+    IOS_DIALOG_BRIDGE, IOS_DIMENSIONS, IOS_DOCUMENT_PICKER, IOS_GEOLOCATION,
+    IOS_GEOLOCATION_BRIDGE, IOS_HAPTICS, IOS_IMAGE_PICKER, IOS_IMAGE_PICKER_BRIDGE,
+    IOS_IN_APP_BROWSER, IOS_KEYBOARD, IOS_LOCAL_NOTIFICATIONS, IOS_MICROPHONE, IOS_NETWORK,
+    IOS_PERMISSIONS, IOS_PHOTO_LIBRARY, IOS_PHOTO_LIBRARY_BRIDGE, IOS_PREFERENCES,
+    IOS_SCREEN_ORIENTATION, IOS_SECURE_STORAGE, IOS_SENSORS, IOS_SENSORS_BRIDGE, IOS_SETTINGS,
+    IOS_SHARE, IOS_SYSTEM_BARS,
 };
 use serde::Deserialize;
 use serde_json::Value;
@@ -1515,13 +1516,26 @@ fn add_settings_host(root: &Path) -> Result<(), String> {
 }
 
 fn add_local_notifications_host(root: &Path) -> Result<(), String> {
+    let receiver = root.join(
+        "android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusNotificationReceiver.kt",
+    );
+    if !receiver.exists() {
+        fs::write(&receiver, ANDROID_SCHEDULED_NOTIFICATION_RECEIVER)
+            .map_err(|e| format!("write '{}': {e}", receiver.display()))?;
+    }
+    let manifest = root.join("android/app/src/main/AndroidManifest.xml");
+    add_once(
+        &manifest,
+        "        <receiver android:name=\".CrepusNotificationReceiver\" android:exported=\"false\" />\n",
+        "        <activity\n",
+    )?;
     let android = android_actions_path(root)?;
     let mut source =
         fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
     if !source.contains("localNotificationsValue") {
         source = source.replace(
             "import android.content.Context\n",
-            "import android.Manifest\nimport android.app.Notification\nimport android.app.NotificationChannel\nimport android.app.NotificationManager\nimport android.content.Context\nimport android.content.pm.PackageManager\nimport android.os.Build\n",
+            "import android.Manifest\nimport android.app.AlarmManager\nimport android.app.Notification\nimport android.app.NotificationChannel\nimport android.app.NotificationManager\nimport android.app.PendingIntent\nimport android.content.Context\nimport android.content.Intent\nimport android.content.pm.PackageManager\nimport android.os.Build\n",
         );
         source = source.replace(
             "        when (capability) {\n",

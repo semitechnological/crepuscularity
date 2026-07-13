@@ -869,8 +869,11 @@ fn native_add_capability_updates_only_the_scaffold() {
         std::fs::read_to_string(root.join("ios/Sources/NativeShell/CrepusRustActions.swift"))
             .expect("read iOS notifications bridge");
     assert!(notifications_android.contains("NotificationChannel"));
+    assert!(notifications_android.contains("AlarmManager"));
     assert!(notifications_ios.contains("UNUserNotificationCenter"));
     assert!(notifications_ios.contains("getNotificationSettings"));
+    assert!(notifications_ios.contains("UNCalendarNotificationTrigger"));
+    assert!(root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusNotificationReceiver.kt").exists());
     assert!(crepus()
         .args(["native", "add", "secure-storage", "--dir"])
         .arg(&root)

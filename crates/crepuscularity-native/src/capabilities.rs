@@ -1303,11 +1303,47 @@ pub const ANDROID_LOCAL_NOTIFICATIONS: &str = r#"
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) activity.requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 4770)
             return JSONObject().put("requested", true)
         }
-        if (method != "post") error("unsupported localNotifications method: $method")
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && activity.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             activity.requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 4770)
             return JSONObject().put("requested", true).put("pending", true)
         }
+        if (method == "schedule") {
+            val id = payload?.optString("id")?.takeIf { it.isNotBlank() } ?: error("localNotifications.schedule requires id")
+            val at = when {
+                payload.has("at") -> payload.optLong("at")
+                payload.has("seconds") -> System.currentTimeMillis() + payload.optLong("seconds") * 1_000
+                else -> error("localNotifications.schedule requires at or seconds")
+            }
+            if (at <= System.currentTimeMillis()) error("localNotifications.schedule must be in the future")
+            val stored = JSONObject()
+                .put("id", id)
+                .put("at", at)
+                .put("title", payload?.optString("title", appContext.applicationInfo.loadLabel(appContext.packageManager).toString()))
+                .put("body", payload?.optString("body", "") ?: "")
+                .put("notificationId", payload?.optInt("notificationId", id.hashCode()) ?: id.hashCode())
+            appContext.getSharedPreferences("crepus_notifications", Context.MODE_PRIVATE).edit().putString("schedule.$id", stored.toString()).apply()
+            val intent = Intent(appContext, CrepusNotificationReceiver::class.java).putExtra("id", id)
+            val pending = PendingIntent.getBroadcast(appContext, id.hashCode(), intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+            (appContext.getSystemService(Context.ALARM_SERVICE) as AlarmManager).setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pending)
+            return JSONObject().put("scheduled", true).put("id", id).put("at", at)
+        }
+        if (method == "cancel") {
+            val id = payload?.optString("id")?.takeIf { it.isNotBlank() } ?: error("localNotifications.cancel requires id")
+            val intent = Intent(appContext, CrepusNotificationReceiver::class.java).putExtra("id", id)
+            val pending = PendingIntent.getBroadcast(appContext, id.hashCode(), intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+            (appContext.getSystemService(Context.ALARM_SERVICE) as AlarmManager).cancel(pending)
+            pending.cancel()
+            appContext.getSharedPreferences("crepus_notifications", Context.MODE_PRIVATE).edit().remove("schedule.$id").apply()
+            return JSONObject().put("cancelled", true).put("id", id)
+        }
+        if (method == "list") {
+            val schedules = JSONArray()
+            appContext.getSharedPreferences("crepus_notifications", Context.MODE_PRIVATE).all.values.forEach { value ->
+                (value as? String)?.let { schedules.put(JSONObject(it)) }
+            }
+            return JSONObject().put("schedules", schedules)
+        }
+        if (method != "post") error("unsupported localNotifications method: $method")
         val manager = appContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         manager.createNotificationChannel(NotificationChannel("crepus", appContext.applicationInfo.loadLabel(appContext.packageManager), NotificationManager.IMPORTANCE_DEFAULT))
         val notification = Notification.Builder(appContext, "crepus")
@@ -1319,6 +1355,38 @@ pub const ANDROID_LOCAL_NOTIFICATIONS: &str = r#"
         manager.notify(payload?.optInt("id", 0) ?: 0, notification)
         return JSONObject().put("posted", true)
     }
+"#;
+
+pub const ANDROID_SCHEDULED_NOTIFICATION_RECEIVER: &str = r#"package dev.crepuscularity.nativeshell
+
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.os.Build
+import org.json.JSONObject
+
+class CrepusNotificationReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        val id = intent.getStringExtra("id") ?: return
+        val preferences = context.getSharedPreferences("crepus_notifications", Context.MODE_PRIVATE)
+        val raw = preferences.getString("schedule.$id", null) ?: return
+        val payload = JSONObject(raw)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) return
+        val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        manager.createNotificationChannel(NotificationChannel("crepus", context.applicationInfo.loadLabel(context.packageManager), NotificationManager.IMPORTANCE_DEFAULT))
+        val notification = Notification.Builder(context, "crepus")
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentTitle(payload.optString("title", context.applicationInfo.loadLabel(context.packageManager).toString()))
+            .setContentText(payload.optString("body", ""))
+            .setAutoCancel(true)
+            .build()
+        manager.notify(payload.optInt("notificationId", id.hashCode()), notification)
+        preferences.edit().remove("schedule.$id").apply()
+    }
+}
 "#;
 
 pub const IOS_LOCAL_NOTIFICATIONS: &str = r#"
@@ -1344,6 +1412,40 @@ pub const IOS_LOCAL_NOTIFICATIONS: &str = r#"
             content.sound = .default
             center.add(UNNotificationRequest(identifier: payload?["id"] as? String ?? UUID().uuidString, content: content, trigger: nil))
             return ["posted": true]
+        case "schedule":
+            guard let id = payload?["id"] as? String, !id.isEmpty else { throw HostActionError("localNotifications.schedule requires id") }
+            let repeats = payload?["repeats"] as? Bool ?? false
+            let trigger: UNNotificationTrigger
+            if let seconds = payload?["seconds"] as? NSNumber {
+                guard seconds.doubleValue >= (repeats ? 60 : 1) else { throw HostActionError("localNotifications.schedule seconds is too short") }
+                trigger = UNTimeIntervalNotificationTrigger(timeInterval: seconds.doubleValue, repeats: repeats)
+            } else if let at = payload?["at"] as? NSNumber {
+                let date = Date(timeIntervalSince1970: at.doubleValue / 1_000)
+                guard date > Date() else { throw HostActionError("localNotifications.schedule must be in the future") }
+                let components = Calendar.current.dateComponents([.calendar, .timeZone, .era, .year, .month, .day, .hour, .minute, .second], from: date)
+                trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: repeats)
+            } else {
+                throw HostActionError("localNotifications.schedule requires at or seconds")
+            }
+            let content = UNMutableNotificationContent()
+            content.title = payload?["title"] as? String ?? ""
+            content.body = payload?["body"] as? String ?? ""
+            content.sound = .default
+            center.add(UNNotificationRequest(identifier: id, content: content, trigger: trigger))
+            return ["scheduled": true, "id": id]
+        case "cancel":
+            guard let id = payload?["id"] as? String, !id.isEmpty else { throw HostActionError("localNotifications.cancel requires id") }
+            center.removePendingNotificationRequests(withIdentifiers: [id])
+            center.removeDeliveredNotifications(withIdentifiers: [id])
+            return ["cancelled": true, "id": id]
+        case "list":
+            center.getPendingNotificationRequests { requests in
+                let schedules = requests.map { request in
+                    ["id": request.identifier, "title": request.content.title, "body": request.content.body]
+                }
+                CrepusRustActions.emit(CrepusRustActions.successJson(action: "localNotifications.list", capability: "localNotifications", method: "list", value: ["schedules": schedules]))
+            }
+            return ["pending": true]
         default:
             throw HostActionError("unsupported localNotifications method: \(method)")
         }

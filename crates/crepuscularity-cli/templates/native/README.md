@@ -101,7 +101,7 @@ metadata for each asset it can access.
 `network.status` returns whether the device has a validated connection and its transport.
 `keyboard.dismiss` closes the active system keyboard.
 `settings.open` opens the operating system's page for this app.
-`localNotifications.status` reports current notification authorization; `localNotifications` requests notification permission and posts immediate local notifications.
+`localNotifications.status` reports current notification authorization; `localNotifications` requests notification permission, posts immediate local notifications, and can `schedule`/`cancel`/`list` notifications. Scheduling requires an `id` and future Unix-millisecond `at` or `seconds` delay.
 `secureStorage` persists values with Android Keystore encryption or the iOS Keychain.
 `biometrics.authenticate` opens the system biometric/device-credential prompt.
 `permissions.status`, `permissions.check`, and `permissions.request` operate on camera, microphone, location, photos, contacts, notifications, or Bluetooth; iOS notification checks emit the current OS authorization asynchronously.

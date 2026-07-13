@@ -102,7 +102,7 @@ Android and iOS, plus only the required platform declarations. It supports `stat
 | `network` (`net-info`, `netinfo`) | `status` | Validated Android network or app-lifetime iOS NWPathMonitor status, including active transport |
 | `keyboard` | `dismiss` | Hides Android's active input method or resigns iOS's current first responder |
 | `settings` (`app-settings`) | `open` | Opens the app's Android or iOS settings page |
-| `local-notifications` (`notifications`) | `status`, `requestPermission`, `post` | Android notification channel and iOS UserNotifications; `status` reports current OS authorization asynchronously |
+| `local-notifications` (`notifications`) | `status`, `requestPermission`, `post`, `schedule`, `cancel`, `list` | Android AlarmManager receiver and iOS UserNotifications; schedule with `id` plus future Unix-millisecond `at` or `seconds`; iOS `list` reports asynchronously |
 | `secure-storage` | `get`, `set`, `remove`, `clear` | Android Keystore-encrypted values and iOS Keychain values |
 | `biometrics` (`authentication`) | `status`, `authenticate` | AndroidX BiometricPrompt or iOS LocalAuthentication, streaming the authentication result |
 | `permissions` (`permission`) | `status`, `check`, `request` | Checks or requests `camera`, `microphone`, `location`, `photoLibrary`/`photos`, `contacts`, `notifications`, and `bluetooth`; notification checks report current iOS OS authorization asynchronously |
