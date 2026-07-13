@@ -18,11 +18,9 @@ crepuscularity/
     crepuscularity-lvgl/     — LVGL XML generation
     crepuscularity-gpui/     — GPUI desktop rendering
     crepuscularity-runtime/  — hot-reload + shared runtime
-    crepuscularity-ssr/      — server-side rendering (Axum)
-    crepuscularity-lite/     — V8-based JS runtime
+        crepuscularity-lite/     — V8-based JS runtime
     crepuscularity-macros/   — proc macros
-    crepuscularity-dev/      — GPUI dev server (crepus-dev)
-  examples/
+      examples/
     web-site/                — reference site: index.crepus + runtime/
     counter/                 — SSR counter
     todo-web/                — SSR todo

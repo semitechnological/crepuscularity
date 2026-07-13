@@ -105,7 +105,7 @@ fn ssr_handle_missing_variable() {
 
 #[test]
 fn ssr_router_basic() {
-    use crepuscularity_ssr::SsrRouter;
+    use crepuscularity_web::SsrRouter;
 
     // Smoke test: router builds without panicking
     let _router = SsrRouter::new()
@@ -116,7 +116,7 @@ fn ssr_router_basic() {
 
 #[test]
 fn ssr_options_works() {
-    use crepuscularity_ssr::{SsrHandler, SsrOptions};
+    use crepuscularity_web::{SsrHandler, SsrOptions};
 
     let opts = SsrOptions::new(r#"div "Hello from options""#, "Options Test");
     assert_eq!(opts.title, "Options Test");

@@ -210,7 +210,7 @@ pub fn render_ssr_document(
 }
 
 /// Like [`render_ssr_document`] but takes pre-parsed AST nodes instead of a template string.
-/// Use this when the caller has already parsed and cached the AST (e.g. [`SsrOptions`](/crates/crepuscularity-ssr)).
+/// Use this when the caller has already parsed and cached the AST (e.g. [`SsrOptions`](crate::SsrOptions)).
 /// The `counter` and `bind` are reused across calls for hydration consistency.
 pub fn render_ssr_document_with_nodes(
     nodes: &[Node],

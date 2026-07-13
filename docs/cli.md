@@ -45,6 +45,19 @@ Creates:
 - `src/main.rs` with GPUI boilerplate
 - `views/` directory for `.crepus` templates
 
+### `crepus inspect`
+
+Dump AST / HTML / View IR / context, or open a live GPUI preview for one `.crepus` file.
+Replaces the old `crepus-dev` binary.
+
+```bash
+crepus inspect app.crepus --mode ast
+crepus inspect app.crepus --mode render --var name=Ada
+crepus inspect app.crepus --mode ir
+crepus inspect app.crepus --mode ctx
+crepus inspect app.crepus --mode preview
+```
+
 ### `crepus dev`
 
 Start the hot-reload development loop:

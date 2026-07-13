@@ -46,6 +46,15 @@ pub use ssr::{
     wrap_ssr_document, BindMap, SsrDocument,
 };
 
+#[cfg(feature = "axum")]
+pub mod axum_ssr;
+
+#[cfg(feature = "axum")]
+pub use axum_ssr::{
+    escape_html_error, stream_ssr_response, stream_ssr_response_with_nodes, stream_static_template,
+    RouteEntry, SsrHandler, SsrOptions, SsrRouter,
+};
+
 /// Render an entry point from an in-memory file map — no filesystem access.
 ///
 /// `entry` is `"path/to/file.crepus"` or `"path/to/file.crepus#ComponentName"`.

@@ -1,7 +1,10 @@
-//! SSR pipeline for Crepuscularity: Axum handlers that render .crepus templates server-side.
-pub mod handler;
-pub mod router;
-pub mod stream;
+//! Axum handlers/router/stream helpers for SSR.
+//!
+//! Gated behind the `axum` feature (implies `ssr`).
+
+mod handler;
+mod router;
+mod stream;
 mod util;
 
 pub use handler::{SsrHandler, SsrOptions};

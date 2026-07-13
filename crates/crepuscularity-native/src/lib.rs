@@ -23,6 +23,7 @@
 
 pub mod codegen;
 pub mod colors;
+pub mod host;
 pub mod hot_reload;
 mod include_expand;
 pub mod ir;

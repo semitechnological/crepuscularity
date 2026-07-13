@@ -1,9 +1,9 @@
 use axum::{extract::State, response::Html};
 use crepuscularity_core::{TemplateContext, TemplateValue};
-use crepuscularity_web::{render_ssr_document_with_nodes, SsrDocument};
+use crate::{render_ssr_document_with_nodes, SsrDocument};
 use std::{cell::Cell, collections::HashMap, sync::Arc};
 
-use crate::escape_html_error;
+use super::escape_html_error;
 
 /// Configuration for [`SsrHandler`].
 ///
@@ -71,7 +71,7 @@ impl SsrHandler {
     ///
     /// ```rust,no_run
     /// use axum::{routing::get, Router};
-    /// use crepuscularity_ssr::{SsrHandler, SsrOptions};
+    /// use crate::{SsrHandler, SsrOptions};
     /// use std::sync::Arc;
     ///
     /// let handler = SsrHandler::new(SsrOptions::new(r#"div "Hello""#, "Title"));
@@ -101,7 +101,7 @@ impl SsrHandler {
                 virtual_files: std::sync::Arc::new(HashMap::new()),
             };
             let counter = Cell::new(0u32);
-            let mut bind = crepuscularity_web::BindMap::new();
+            let mut bind = crate::BindMap::new();
             let doc = SsrDocument {
                 title: &title,
                 ..Default::default()

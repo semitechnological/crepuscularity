@@ -3,24 +3,9 @@ name = "crepuscularity-dev"
 version = "0.4.8"
 edition = "2021"
 license = "MPL-2.0"
-description = "crepus-dev hot-reload development server (UNSTABLE; in active development)."
-repository = "https://github.com/tschk/crepuscularity"
-documentation = "https://docs.rs/crepuscularity-dev"
-readme = "../../README.md"
+description = "Deprecated: use `crepus inspect` instead."
+publish = false
 
 [[bin]]
 name = "crepus-dev"
 path = "src/main.rs"
-
-[features]
-default = ["gpui-viewer"]
-gpui-viewer = ["dep:gpui", "dep:crepuscularity-runtime"]
-
-[dependencies]
-crepuscularity-core = { path = "../crepuscularity-core", version = "0.4.15" }
-crepuscularity-web = { path = "../crepuscularity-web", version = "0.4.7", features = ["ssr"] }
-crepuscularity-runtime = { path = "../crepuscularity-runtime", version = "0.4.10", optional = true }
-crepuscularity-native = { path = "../crepuscularity-native", version = "0.5.6" }
-serde_json = { workspace = true }
-toml = { workspace = true }
-gpui = { version = "=0.2.2", default-features = false, features = ["font-kit"], optional = true }

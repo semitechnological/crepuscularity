@@ -1,4 +1,4 @@
-//! Shared utilities for crepuscularity-ssr.
+//! Shared utilities for crepuscularity-web.
 //!
 //! # ponytail: extracted to avoid duplicate escape_html_error in handler.rs and router.rs.
 //!   If this grows beyond 3 functions, move to crepuscularity-web.

@@ -19,6 +19,7 @@ mod embedded;
 pub mod events;
 #[cfg(feature = "desktop")]
 mod hud;
+mod inspect;
 mod ios;
 mod mobile;
 mod native;

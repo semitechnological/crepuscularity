@@ -233,8 +233,6 @@ crates/
   crepuscularity-lite/      GPUI + V8 shell and native plugin bridge
   crepuscularity-native/    View IR JSON for SwiftUI / Compose shells
   crepuscularity-reactive/  WASM signals, memos, effects, hydration lifecycle
-  crepuscularity-ssr/       Server-rendering helpers
-  crepuscularity-dev/       crepus-dev hot-reload server
   crepuscularity-cli/       crepus CLI
 examples/
   examples.toml             Catalog by target (see examples/README.md)

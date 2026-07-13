@@ -7,7 +7,7 @@ use axum::body::Body;
 use axum::response::{IntoResponse, Response};
 use crepuscularity_core::ast::Node;
 use crepuscularity_core::TemplateContext;
-use crepuscularity_web::{render_nodes_ssr, BindMap, SsrDocument};
+use crate::{render_nodes_ssr, BindMap, SsrDocument};
 use http::StatusCode;
 use std::cell::Cell;
 use std::sync::Arc;

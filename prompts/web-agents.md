@@ -104,4 +104,4 @@ twitter_site = "@handle"
 
 - `crepuscularity-web` — HTML rendering, bundle parser, SSR
 - `crepuscularity-core` — parser, AST, context, eval
-- `crepuscularity-ssr` — Axum server-side rendering (optional)
+- `crepuscularity-web` (`axum` feature) — Axum SSR handlers

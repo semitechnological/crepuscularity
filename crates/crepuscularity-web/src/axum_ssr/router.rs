@@ -11,9 +11,9 @@ use axum::{
 };
 use crepuscularity_core::ast::Node;
 use crepuscularity_core::TemplateContext;
-use crepuscularity_web::{render_ssr_document_with_nodes, SsrDocument};
+use crate::{render_ssr_document_with_nodes, SsrDocument};
 
-use crate::escape_html_error;
+use super::escape_html_error;
 
 /// A single route entry pointing to a pre-parsed template.
 ///
@@ -32,7 +32,7 @@ pub struct RouteEntry {
 ///
 /// # Example
 /// ```rust,no_run
-/// use crepuscularity_ssr::SsrRouter;
+/// use crate::SsrRouter;
 ///
 /// let router = SsrRouter::new()
 ///     .route("/", r#"div "Home""#, "Home")
@@ -113,7 +113,7 @@ async fn render_entry(routes: &HashMap<String, RouteEntry>, path: &str) -> Html<
     let result = tokio::task::spawn_blocking(move || {
         let ctx = TemplateContext::new();
         let counter = Cell::new(0u32);
-        let mut bind = crepuscularity_web::BindMap::new();
+        let mut bind = crate::BindMap::new();
         let doc = SsrDocument {
             title: &title,
             ..Default::default()

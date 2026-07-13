@@ -1132,7 +1132,7 @@ struct AxumState {
     last_sse_msg: Arc<RwLock<String>>,
 }
 
-/// Axum-based SSR dev server using `crepuscularity-ssr` rendering.
+/// Axum-based SSR dev server using `crepuscularity_web` SSR rendering.
 ///
 /// Starts an Axum HTTP server that renders `.crepus` templates via
 /// [`crepuscularity_web::render_ssr_document`] with hot-reload SSE support.

@@ -6,6 +6,17 @@ use clap::{Args, Parser, Subcommand, ValueEnum};
 
 use crate::build_options::BuildOptionsArgs;
 
+#[derive(Clone, Debug, ValueEnum, Default)]
+pub enum InspectMode {
+    Ast,
+    Render,
+    Ir,
+    Ctx,
+    #[default]
+    Preview,
+}
+
+
 #[derive(Parser, Debug)]
 #[command(
     name = "crepus",
@@ -59,6 +70,23 @@ pub enum Commands {
         vars: Vec<String>,
         #[arg(long)]
         component: Option<String>,
+    },
+    /// Inspect a `.crepus` file (AST / HTML / View IR / context / live preview).
+    /// Replaces the old `crepus-dev` binary.
+    Inspect {
+        file: PathBuf,
+        #[arg(long, value_enum, default_value_t = InspectMode::Preview)]
+        mode: InspectMode,
+        #[arg(long = "var", value_name = "KEY=VALUE")]
+        vars: Vec<String>,
+        #[arg(long = "bool", value_name = "KEY=BOOL")]
+        bools: Vec<String>,
+        #[arg(long = "int", value_name = "KEY=INT")]
+        ints: Vec<String>,
+        #[arg(long, default_value_t = 1200.0)]
+        width: f32,
+        #[arg(long, default_value_t = 800.0)]
+        height: f32,
     },
     Web {
         #[command(subcommand)]

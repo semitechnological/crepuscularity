@@ -2,13 +2,13 @@ use std::fs;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
-use std::process::Command;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{mpsc, Arc, RwLock};
 use std::time::{Duration, Instant};
 
 use console::style;
 use crepuscularity_core::context::{TemplateContext, TemplateValue};
+use crepuscularity_native::host;
 use crepuscularity_native::{
     plan_hot_reload, render_template_to_ir, to_json, HotReloadEnvelope, HotReloadMessage,
 };
@@ -382,305 +382,31 @@ fn run_mobile_run(platform: MobilePlatform, dir: Option<PathBuf>, flavor: String
 fn run_doctor(platform: MobilePlatform) {
     let mut ok = true;
     eprintln!("{}", style("crepus mobile doctor").cyan().bold());
-    ok &= doctor_command("cargo", &["--version"]);
+    ok &= host::doctor_command("cargo", &["--version"]);
     match platform {
         MobilePlatform::Ios | MobilePlatform::All => {
-            ok &= doctor_rust_target("aarch64-apple-ios");
-            ok &= doctor_command("xcodebuild", &["-version"]);
-            ok &= doctor_command("xcodegen", &["--version"]);
-            ok &= doctor_command("xcrun", &["simctl", "list", "runtimes"]);
+            ok &= host::doctor_rust_target("aarch64-apple-ios");
+            ok &= host::doctor_command("xcodebuild", &["-version"]);
+            ok &= host::doctor_command("xcodegen", &["--version"]);
+            ok &= host::doctor_command("xcrun", &["simctl", "list", "runtimes"]);
         }
         _ => {}
     }
     match platform {
         MobilePlatform::Android | MobilePlatform::All => {
-            ok &= doctor_rust_target("aarch64-linux-android");
-            ok &= doctor_command("java", &["-version"]);
-            ok &= doctor_java17();
-            ok &= doctor_java_home();
-            ok &= doctor_command("gradle", &["--version"]);
-            ok &= doctor_android_sdk();
-            ok &= doctor_android_ndk();
+            ok &= host::doctor_rust_target("aarch64-linux-android");
+            ok &= host::doctor_command("java", &["-version"]);
+            ok &= host::doctor_java17();
+            ok &= host::doctor_java_home();
+            ok &= host::doctor_command("gradle", &["--version"]);
+            ok &= host::doctor_android_sdk();
+            ok &= host::doctor_android_ndk();
         }
         _ => {}
     }
     if !ok {
         std::process::exit(1);
     }
-}
-
-fn doctor_command(command: &str, args: &[&str]) -> bool {
-    let mut cmd = Command::new(command);
-    cmd.args(args);
-    if command == "gradle" {
-        configure_java_home(&mut cmd);
-    }
-    match cmd.output() {
-        Ok(out) if out.status.success() => {
-            eprintln!("{} {command}", style("✓").green());
-            true
-        }
-        Ok(out) => {
-            let stderr = String::from_utf8_lossy(&out.stderr);
-            eprintln!("{} {command}: {}", style("✗").red(), stderr.trim());
-            false
-        }
-        Err(e) => {
-            eprintln!("{} {command}: {e}", style("✗").red());
-            false
-        }
-    }
-}
-
-fn configure_java_home(cmd: &mut Command) {
-    match std::env::var("JAVA_HOME") {
-        Ok(raw) if PathBuf::from(&raw).join("bin/java").exists() => {}
-        _ => {
-            if let Some(java_home) = discover_java_home() {
-                cmd.env("JAVA_HOME", java_home);
-            } else {
-                cmd.env_remove("JAVA_HOME");
-            }
-        }
-    }
-}
-
-fn discover_java_home() -> Option<String> {
-    for candidate in [
-        "/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home",
-        "/opt/homebrew/opt/openjdk/libexec/openjdk.jdk/Contents/Home",
-    ] {
-        let path = Path::new(candidate);
-        if path.join("bin/java").exists() {
-            return Some(candidate.to_string());
-        }
-    }
-    if let Ok(out) = Command::new("/usr/libexec/java_home")
-        .args(["-v", "17"])
-        .output()
-    {
-        if out.status.success() {
-            let path = String::from_utf8(out.stdout).ok()?;
-            let trimmed = path.trim();
-            if !trimmed.is_empty() {
-                return Some(trimmed.to_string());
-            }
-        }
-    }
-    let java = std::fs::canonicalize("/opt/homebrew/bin/java")
-        .or_else(|_| std::fs::canonicalize("/usr/bin/java"))
-        .ok()?;
-    let home = java.parent()?.parent()?;
-    if home.join("bin/java").exists() {
-        Some(home.display().to_string())
-    } else {
-        None
-    }
-}
-
-fn doctor_rust_target(target: &str) -> bool {
-    match Command::new("rustup")
-        .args(["target", "list", "--installed"])
-        .output()
-    {
-        Ok(out) if out.status.success() => {
-            let stdout = String::from_utf8_lossy(&out.stdout);
-            if stdout.lines().any(|line| line.trim() == target) {
-                eprintln!("{} rust target {target}", style("✓").green());
-                true
-            } else {
-                eprintln!(
-                    "{} rust target {target}: install with `rustup target add {target}`",
-                    style("✗").red()
-                );
-                false
-            }
-        }
-        Ok(out) => {
-            let stderr = String::from_utf8_lossy(&out.stderr);
-            eprintln!("{} rustup: {}", style("✗").red(), stderr.trim());
-            false
-        }
-        Err(e) => {
-            eprintln!("{} rustup: {e}", style("✗").red());
-            false
-        }
-    }
-}
-
-fn doctor_java17() -> bool {
-    if let Ok(java_home) = std::env::var("JAVA_HOME") {
-        let java = PathBuf::from(&java_home).join("bin/java");
-        if java_version_at_least(&java, 17) {
-            eprintln!("{} Java 17 {}", style("✓").green(), java_home);
-            true
-        } else if java_version_at_least(Path::new("java"), 17) {
-            eprintln!("{} Java 17 java on PATH", style("✓").green());
-            true
-        } else {
-            eprintln!(
-                "{} Java 17: JAVA_HOME does not point to Java 17+",
-                style("✗").red()
-            );
-            false
-        }
-    } else {
-        match Command::new("/usr/libexec/java_home")
-            .args(["-v", "17"])
-            .output()
-        {
-            Ok(out) if out.status.success() => {
-                let path = String::from_utf8_lossy(&out.stdout);
-                eprintln!("{} Java 17 {}", style("✓").green(), path.trim());
-                true
-            }
-            _ if java_version_at_least(Path::new("java"), 17) => {
-                eprintln!("{} Java 17 java on PATH", style("✓").green());
-                true
-            }
-            _ => {
-                eprintln!(
-                    "{} Java 17: install openjdk@17 and expose it to Gradle",
-                    style("✗").red()
-                );
-                false
-            }
-        }
-    }
-}
-
-fn java_version_at_least(java: &Path, major: u32) -> bool {
-    let Ok(out) = Command::new(java).arg("-version").output() else {
-        return false;
-    };
-    let text = format!(
-        "{}{}",
-        String::from_utf8_lossy(&out.stdout),
-        String::from_utf8_lossy(&out.stderr)
-    );
-    text.split(|ch: char| !(ch.is_ascii_digit() || ch == '.'))
-        .find_map(parse_java_major)
-        .is_some_and(|found| found >= major)
-}
-
-fn parse_java_major(raw: &str) -> Option<u32> {
-    if raw.is_empty() {
-        return None;
-    }
-    let first = raw.split('.').next()?;
-    first.parse().ok()
-}
-
-fn doctor_java_home() -> bool {
-    match std::env::var("JAVA_HOME") {
-        Ok(raw) => {
-            let path = PathBuf::from(&raw);
-            if path.join("bin/java").exists() {
-                eprintln!("{} JAVA_HOME {}", style("✓").green(), path.display());
-                true
-            } else if Path::new("java").exists() || java_version_at_least(Path::new("java"), 17) {
-                eprintln!(
-                    "{} JAVA_HOME invalid; Gradle will use java from PATH",
-                    style("✓").green()
-                );
-                true
-            } else {
-                eprintln!(
-                    "{} JAVA_HOME {} does not contain bin/java",
-                    style("✗").red(),
-                    path.display()
-                );
-                false
-            }
-        }
-        Err(_) => {
-            eprintln!(
-                "{} JAVA_HOME not set; Gradle will use java from PATH",
-                style("✓").green()
-            );
-            true
-        }
-    }
-}
-
-fn doctor_android_sdk() -> bool {
-    let sdk = std::env::var("ANDROID_HOME")
-        .or_else(|_| std::env::var("ANDROID_SDK_ROOT"))
-        .ok()
-        .map(PathBuf::from);
-    match sdk {
-        Some(path) if path.join("platforms").exists() => {
-            eprintln!("{} Android SDK {}", style("✓").green(), path.display());
-            true
-        }
-        Some(path) => {
-            eprintln!(
-                "{} Android SDK {} missing platforms/",
-                style("✗").red(),
-                path.display()
-            );
-            false
-        }
-        None => {
-            eprintln!(
-                "{} Android SDK: set ANDROID_HOME or ANDROID_SDK_ROOT",
-                style("✗").red()
-            );
-            false
-        }
-    }
-}
-
-fn doctor_android_ndk() -> bool {
-    if let Ok(path) = std::env::var("ANDROID_NDK_HOME").map(PathBuf::from) {
-        if android_ndk_clang(&path).is_some() {
-            eprintln!("{} Android NDK {}", style("✓").green(), path.display());
-            return true;
-        }
-    }
-    let sdk = std::env::var("ANDROID_HOME")
-        .or_else(|_| std::env::var("ANDROID_SDK_ROOT"))
-        .ok()
-        .map(PathBuf::from);
-    if let Some(sdk) = sdk {
-        let ndk = sdk.join("ndk");
-        if let Some(path) = latest_android_ndk(&ndk) {
-            eprintln!("{} Android NDK {}", style("✓").green(), path.display());
-            return true;
-        }
-    }
-    eprintln!(
-        "{} Android NDK: install via Android Studio SDK Manager or set ANDROID_NDK_HOME",
-        style("✗").red()
-    );
-    false
-}
-
-fn latest_android_ndk(ndk_dir: &Path) -> Option<PathBuf> {
-    let mut entries = ndk_dir
-        .read_dir()
-        .ok()?
-        .flatten()
-        .map(|entry| entry.path())
-        .filter(|path| path.is_dir() && android_ndk_clang(path).is_some())
-        .collect::<Vec<_>>();
-    entries.sort();
-    entries.pop()
-}
-
-fn android_ndk_clang(ndk: &Path) -> Option<PathBuf> {
-    let prebuilt = ndk.join("toolchains/llvm/prebuilt");
-    prebuilt
-        .read_dir()
-        .ok()?
-        .flatten()
-        .map(|entry| {
-            entry
-                .path()
-                .join("bin")
-                .join("aarch64-linux-android26-clang")
-        })
-        .find(|path| path.exists())
 }
 
 fn run_dev(args: MobileDevArgs) -> Result<(), String> {

@@ -54,8 +54,7 @@ gpui                   = { version = "=0.2.2", default-features = false, feature
 crepuscularity-core = { path = "../crepuscularity-core", version = "0.4.19" }
 crepuscularity-runtime = { path = "../crepuscularity-runtime", version = "0.4.12", optional = true }
 crepuscularity-tui = { path = "../crepuscularity-tui", version = "0.4.12", optional = true }
-crepuscularity-web = { path = "../crepuscularity-web", version = "0.4.12", features = ["parallel", "ssr"] }
-crepuscularity-ssr = { path = "../crepuscularity-ssr", version = "0.3.0" }
+crepuscularity-web = { path = "../crepuscularity-web", version = "0.4.13", features = ["parallel", "ssr", "axum"] }
 crepuscularity-plugin-bindgen = { path = "../crepuscularity-plugin-bindgen", version = "0.1.0" }
 crepuscularity-webext  = { path = "../crepuscularity-webext", version = "0.3.0" }
 crepuscularity-tauri = { path = "../crepuscularity-tauri", version = "0.1.0", features = ["native"] }
