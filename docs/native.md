@@ -91,6 +91,7 @@ Android and iOS, plus only the required platform declarations. It supports `stat
 | `documentPicker` (`documents`) | `pick` | Android/iOS multiple-document picker; emits imported cached-file metadata |
 | `photo-library` (`photolibrary`, `media-library`) | `scan`, `getRecentMedia` | Android MediaStore and iOS PhotoKit, each requesting media access only when called; emits one cached-file result per asset |
 | `camera` | `takePhoto` | Android system camera preview and iOS camera picker; emits one cached JPEG result |
+| `video` | `capture` | Android system video camera or iOS camera movie picker; emits cached video metadata |
 | `dimensions` | `get`, `getWindow` | Current Android window metrics or iOS screen bounds, expressed in display points |
 | `dialog` | `show` | Android alert dialog and iOS alert controller; accepts optional `title`, `message`, and `button`, then streams `ok` or `cancel` |
 | `action-sheet` (`actionsheet`) | `show` | Android choices dialog and iOS action sheet; accepts `title` and `options`, then streams the selected label and index |

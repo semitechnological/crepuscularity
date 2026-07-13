@@ -93,6 +93,7 @@ the named `pick_media` action.
 `photo-library` requests platform media permission only for `scan` and `getRecentMedia`, then emits cached-file
 metadata for each asset it can access.
 `camera.takePhoto` opens the system camera and emits one cached JPEG result.
+`video.capture` opens the system video camera and emits cached video metadata.
 `dimensions.get` returns the current display width, height, and scale.
 `dialog.show` presents a native alert and streams whether it was accepted or cancelled.
 `actionSheet.show` presents native choices and streams the selected label and index.

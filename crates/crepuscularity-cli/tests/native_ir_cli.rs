@@ -711,6 +711,24 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(camera_ios.contains("UIImagePickerController"));
     assert!(camera_ios.contains("case \"camera\":"));
     assert!(crepus()
+        .args(["native", "add", "video", "--dir"])
+        .arg(&root)
+        .output()
+        .expect("add video")
+        .status
+        .success());
+    let video_android = std::fs::read_to_string(
+        root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusRustActions.kt"),
+    )
+    .expect("read Android video bridge");
+    let video_ios =
+        std::fs::read_to_string(root.join("ios/Sources/NativeShell/CrepusRustActions.swift"))
+            .expect("read iOS video bridge");
+    assert!(video_android.contains("MediaStore.ACTION_VIDEO_CAPTURE"));
+    assert!(video_android.contains("android-video-camera"));
+    assert!(video_ios.contains("cameraCaptureMode = .video"));
+    assert!(video_ios.contains("ios-video-camera"));
+    assert!(crepus()
         .args(["native", "add", "dimensions", "--dir"])
         .arg(&root)
         .output()
