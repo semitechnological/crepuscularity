@@ -753,8 +753,12 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(device_ios.contains("UIDevice.current"));
     assert!(device_android.contains("\"device\", \"platform\""));
     assert!(device_ios.contains("case \"device\", \"platform\":"));
-    assert!(browser_android.contains("\"browser\", \"linking\", \"appLauncher\""));
-    assert!(browser_ios.contains("case \"browser\", \"linking\", \"appLauncher\":"));
+    assert!(
+        browser_android.contains("\"browser\", \"linking\", \"appLauncher\", \"phone\", \"sms\"")
+    );
+    assert!(
+        browser_ios.contains("case \"browser\", \"linking\", \"appLauncher\", \"phone\", \"sms\":")
+    );
     assert!(crepus()
         .args(["native", "add", "preferences", "--dir"])
         .arg(&root)

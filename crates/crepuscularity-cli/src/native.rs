@@ -107,7 +107,7 @@ const CAPABILITIES: &[CapabilitySpec] = &[
         ios_project: "",
     },
     CapabilitySpec { name: "clipboard", aliases: &[], cargo_feature: "clipboard", android_manifest: "", ios_project: "" },
-    CapabilitySpec { name: "browser", aliases: &["linking", "app-launcher", "applauncher"], cargo_feature: "browser", android_manifest: "", ios_project: "" },
+    CapabilitySpec { name: "browser", aliases: &["linking", "app-launcher", "applauncher", "phone", "sms"], cargo_feature: "browser", android_manifest: "", ios_project: "" },
     CapabilitySpec { name: "share", aliases: &[], cargo_feature: "share", android_manifest: "", ios_project: "" },
     CapabilitySpec {
         name: "documentpicker",
@@ -596,7 +596,7 @@ fn add_browser_host(root: &Path) -> Result<(), String> {
     if !source.contains("openUrlValue") {
         source = source.replace(
             "        when (capability) {\n",
-            "        when (capability) {\n            \"browser\", \"linking\", \"appLauncher\" -> openUrlValue(capability, method, payload)\n",
+            "        when (capability) {\n            \"browser\", \"linking\", \"appLauncher\", \"phone\", \"sms\" -> openUrlValue(capability, method, payload)\n",
         );
         source = source.replace(
             "\n    private fun dispatchHostAction",
@@ -610,7 +610,7 @@ fn add_browser_host(root: &Path) -> Result<(), String> {
     if !source.contains("openUrlValue") {
         source = source.replace(
             "        switch capability {\n",
-            "        switch capability {\n        case \"browser\", \"linking\", \"appLauncher\":\n            return try openUrlValue(capability: capability, method: method, payload: payload)\n",
+            "        switch capability {\n        case \"browser\", \"linking\", \"appLauncher\", \"phone\", \"sms\":\n            return try openUrlValue(capability: capability, method: method, payload: payload)\n",
         );
         source = source.replace(
             "\n    private static func dispatchHostAction",
