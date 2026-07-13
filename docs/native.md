@@ -93,7 +93,7 @@ Android and iOS, plus only the required platform declarations. It supports `stat
 | `dimensions` | `get`, `getWindow` | Current Android window metrics or iOS screen bounds, expressed in display points |
 | `dialog` | `show` | Android alert dialog and iOS alert controller; accepts optional `title`, `message`, and `button`, then streams `ok` or `cancel` |
 | `action-sheet` (`actionsheet`) | `show` | Android choices dialog and iOS action sheet; accepts `title` and `options`, then streams the selected label and index |
-| `app-state` (`appstate`) | `get` | Current Android lifecycle or iOS application foreground/background state |
+| `app-state` (`appstate`) | `get`, `startWatch`, `stopWatch` | Current Android lifecycle or iOS application foreground/background state; watch changes stream as `appState.change` |
 | `app` (`app-info`, `appinfo`) | `getInfo` | App name, identifier, version, and build metadata from Android package or iOS bundle |
 | `screen-orientation` (`screenorientation`) | `get`, `lock`, `unlock` | Current orientation plus portrait/landscape lock or unlock through Android activity policy and iOS scene geometry |
 | `accessibility-info` (`accessibilityinfo`, `screen-reader`) | `get`, `status` | Reduce-motion and screen-reader state from Android accessibility settings or iOS UIAccessibility |

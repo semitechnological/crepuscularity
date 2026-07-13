@@ -715,7 +715,11 @@ fn native_add_capability_updates_only_the_scaffold() {
         std::fs::read_to_string(root.join("ios/Sources/NativeShell/CrepusRustActions.swift"))
             .expect("read iOS app state bridge");
     assert!(app_state_android.contains("activity.lifecycle.currentState"));
+    assert!(app_state_android.contains("LifecycleEventObserver"));
+    assert!(app_state_android.contains("appState.change"));
     assert!(app_state_ios.contains("UIApplication.shared.applicationState"));
+    assert!(app_state_ios.contains("UIApplication.didBecomeActiveNotification"));
+    assert!(app_state_ios.contains("appState.change"));
     assert!(crepus()
         .args(["native", "add", "app", "--dir"])
         .arg(&root)

@@ -92,7 +92,8 @@ metadata for each asset it can access.
 `dimensions.get` returns the current display width, height, and scale.
 `dialog.show` presents a native alert and streams whether it was accepted or cancelled.
 `actionSheet.show` presents native choices and streams the selected label and index.
-`appState.get` returns whether the app is active or backgrounded.
+`appState.get` returns whether the app is active or backgrounded. `appState.startWatch` and
+`appState.stopWatch` stream lifecycle changes as `appState.change`.
 `app.getInfo` returns the app name, identifier, version, and build.
 `screenOrientation.get` returns portrait or landscape. `screenOrientation.lock` requires
 `orientation: "portrait"` or `"landscape"`; `screenOrientation.unlock` restores rotation.

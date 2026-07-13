@@ -1085,18 +1085,90 @@ private func actionSheetResultJson(action: String, selection: String, index: Int
 "#;
 
 pub const ANDROID_APP_STATE: &str = r#"
+    private var appStateObserver: androidx.lifecycle.LifecycleEventObserver? = null
+
     private fun appStateValue(method: String): JSONObject {
-        if (method != "get") error("unsupported appState method: $method")
-        val state = if (activity.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)) "active" else "background"
-        return JSONObject().put("state", state)
+        return when (method) {
+            "get" -> appStateStatus()
+            "startWatch" -> startAppStateWatch()
+            "stopWatch" -> stopAppStateWatch()
+            else -> error("unsupported appState method: $method")
+        }
     }
+
+    private fun appStateStatus(): JSONObject = JSONObject().put(
+        "state",
+        if (activity.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)) "active" else "background",
+    )
+
+    private fun startAppStateWatch(): JSONObject {
+        if (appStateObserver == null) {
+            appStateObserver = androidx.lifecycle.LifecycleEventObserver { _, event ->
+                when (event) {
+                    androidx.lifecycle.Lifecycle.Event.ON_START -> emit(appStateChangeJson("active"))
+                    androidx.lifecycle.Lifecycle.Event.ON_STOP -> emit(appStateChangeJson("background"))
+                    else -> Unit
+                }
+            }
+            activity.lifecycle.addObserver(appStateObserver!!)
+        }
+        return appStateStatus().put("watching", true)
+    }
+
+    private fun stopAppStateWatch(): JSONObject {
+        appStateObserver?.let(activity.lifecycle::removeObserver)
+        appStateObserver = null
+        return appStateStatus().put("watching", false)
+    }
+
+    private fun appStateChangeJson(state: String): String = JSONObject()
+        .put("ok", true)
+        .put("action", "appState.change")
+        .put("value", JSONObject().put("state", state))
+        .toString()
 "#;
 
 pub const IOS_APP_STATE: &str = r#"
+    private static var appStateObservers: [NSObjectProtocol] = []
+
     private static func appStateValue(method: String) throws -> Any {
-        guard method == "get" else { throw HostActionError("unsupported appState method: \(method)") }
-        let state = UIApplication.shared.applicationState == .active ? "active" : "background"
-        return ["state": state]
+        switch method {
+        case "get": return appStateStatus()
+        case "startWatch": return startAppStateWatch()
+        case "stopWatch": return stopAppStateWatch()
+        default: throw HostActionError("unsupported appState method: \(method)")
+        }
+    }
+
+    private static func appStateStatus() -> [String: Any] {
+        ["state": UIApplication.shared.applicationState == .active ? "active" : "background"]
+    }
+
+    private static func startAppStateWatch() -> [String: Any] {
+        guard appStateObservers.isEmpty else { return appStateStatus().merging(["watching": true]) { _, new in new } }
+        let center = NotificationCenter.default
+        appStateObservers = [
+            center.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { _ in
+                emitAppStateChange("active")
+            },
+            center.addObserver(forName: UIApplication.willResignActiveNotification, object: nil, queue: .main) { _ in
+                emitAppStateChange("background")
+            },
+        ]
+        return appStateStatus().merging(["watching": true]) { _, new in new }
+    }
+
+    private static func stopAppStateWatch() -> [String: Any] {
+        appStateObservers.forEach(NotificationCenter.default.removeObserver)
+        appStateObservers.removeAll()
+        return appStateStatus().merging(["watching": false]) { _, new in new }
+    }
+
+    private static func emitAppStateChange(_ state: String) {
+        let result: [String: Any] = ["ok": true, "action": "appState.change", "value": ["state": state]]
+        if let data = try? JSONSerialization.data(withJSONObject: result), let json = String(data: data, encoding: .utf8) {
+            CrepusRustActions.emit(json)
+        }
     }
 "#;
 
