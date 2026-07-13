@@ -1,7 +1,7 @@
 # Native shell scaffold
 
 Scaffolded by `crepus mobile new` or `crepus native new`. This is a starter for iOS (XcodeGen + SwiftUI) and
-Android (Gradle + Compose) apps whose host shells call into the Rust crate
+Android (Gradle + Compose) apps whose thin host shells call into the Rust crate
 [`crepuscularity-native`](https://crates.io/crates/crepuscularity-native) and render generated native source.
 
 ## Layout
@@ -12,6 +12,7 @@ Android (Gradle + Compose) apps whose host shells call into the Rust crate
 | `fixture.json` | Shared IR artifact kept in sync with the template. |
 | `ios/` | XcodeGen app target plus local Swift Package runtime. |
 | `android/` | Gradle module (open in Android Studio, or run `./gradlew :app:assembleDebug` after generating the Gradle wrapper). |
+| `rust/` | App-local cdylib/staticlib action bridge. |
 
 ## Dev server
 
@@ -40,6 +41,19 @@ gradle wrapper --gradle-version 8.10
 ```
 
 Or open `android/` in Android Studio — it regenerates the wrapper on import.
+
+## Capabilities
+
+The default scaffold ships no Bluetooth Java and requests no Bluetooth permissions.
+Install on-demand capabilities into the app instead:
+
+```bash
+crepus native add sensors --dir .
+crepus native add bluetooth --dir .
+```
+
+`sensors` adds the motion capability declarations for gyro and accelerometer. `bluetooth`
+adds the app Rust dependency and platform declarations, but its host adapter is not implemented yet.
 
 ## Regenerating the fixture from a template
 

@@ -43,6 +43,9 @@ pub(crate) enum IosBuildTarget {
 pub fn execute(cmd: NativeCommands) {
     match cmd {
         NativeCommands::New { name } => scaffold_native_app(&name),
+        NativeCommands::Add { capability, dir } => {
+            add_capability(&capability, &dir).unwrap_or_else(|e| ui::error(&e))
+        }
         NativeCommands::Extension { extension } => handle_extension(extension),
         NativeCommands::Ir { args } => run_ir_from(args),
         NativeCommands::Sync { args } => {
@@ -58,6 +61,96 @@ pub fn execute(cmd: NativeCommands) {
         NativeCommands::Build { platform } => handle_build(platform),
         NativeCommands::Run { platform } => handle_run(platform),
     }
+}
+
+struct CapabilitySpec {
+    name: &'static str,
+    aliases: &'static [&'static str],
+    cargo: &'static str,
+    android_manifest: &'static str,
+    ios_project: &'static str,
+}
+
+const CAPABILITIES: &[CapabilitySpec] = &[
+    CapabilitySpec {
+        name: "sensors",
+        aliases: &["motion", "gyro", "accelerometer"],
+        cargo: "[features]\nsensors = []\n",
+        android_manifest: "    <uses-feature android:name=\"android.hardware.sensor.accelerometer\" android:required=\"false\" />\n    <uses-feature android:name=\"android.hardware.sensor.gyroscope\" android:required=\"false\" />\n",
+        ios_project: "",
+    },
+    CapabilitySpec {
+        name: "bluetooth",
+        aliases: &["ble"],
+        cargo: "btleplug = \"0.11\"\n",
+        android_manifest: "    <uses-permission android:name=\"android.permission.ACCESS_FINE_LOCATION\" android:maxSdkVersion=\"30\" />\n    <uses-permission android:name=\"android.permission.BLUETOOTH_SCAN\" />\n    <uses-permission android:name=\"android.permission.BLUETOOTH_CONNECT\" />\n    <uses-feature android:name=\"android.hardware.bluetooth_le\" android:required=\"false\" />\n",
+        ios_project: "        OTHER_LDFLAGS: \"-lcrepus_mobile_actions -framework CoreBluetooth\"\n        INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription: \"$(PRODUCT_NAME) uses Bluetooth for nearby device setup.\"\n",
+    },
+];
+
+fn add_capability(capability: &str, root: &Path) -> Result<(), String> {
+    let capability = capability.to_ascii_lowercase();
+    let spec = CAPABILITIES
+        .iter()
+        .find(|spec| capability == spec.name || spec.aliases.contains(&capability.as_str()))
+        .ok_or_else(|| {
+            format!(
+                "unknown native capability '{capability}'; available: {}",
+                CAPABILITIES
+                    .iter()
+                    .map(|spec| spec.name)
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )
+        })?;
+    let cargo = root.join("rust/Cargo.toml");
+    let manifest = root.join("android/app/src/main/AndroidManifest.xml");
+    let project = root.join("ios/project.yml");
+    if !cargo.is_file() || !manifest.is_file() || !project.is_file() {
+        return Err(format!("'{}' is not a native scaffold", root.display()));
+    }
+    add_once(&cargo, spec.cargo, "[dependencies]\n")?;
+    add_once(
+        &manifest,
+        spec.android_manifest,
+        "    <uses-permission android:name=\"android.permission.INTERNET\" />\n",
+    )?;
+    if !spec.ios_project.is_empty() {
+        let mut source = fs::read_to_string(&project)
+            .map_err(|e| format!("read '{}': {e}", project.display()))?;
+        if !source.contains("CoreBluetooth") {
+            source = source.replace(
+                "        OTHER_LDFLAGS: \"-lcrepus_mobile_actions\"\n",
+                spec.ios_project,
+            );
+            fs::write(&project, source)
+                .map_err(|e| format!("write '{}': {e}", project.display()))?;
+        }
+    }
+    ui::success(&format!(
+        "added native capability '{}' to '{}'",
+        spec.name,
+        root.display()
+    ));
+    if spec.name == "bluetooth" {
+        ui::warning("Bluetooth adds Rust and platform declarations only; add a capability-owned host adapter before calling it.");
+    }
+    Ok(())
+}
+
+fn add_once(path: &Path, addition: &str, anchor: &str) -> Result<(), String> {
+    let mut source =
+        fs::read_to_string(path).map_err(|e| format!("read '{}': {e}", path.display()))?;
+    if source.contains(addition.lines().next().unwrap_or_default()) {
+        return Ok(());
+    }
+    if addition.starts_with("[features]") {
+        source.push('\n');
+        source.push_str(addition);
+    } else {
+        source = source.replacen(anchor, &format!("{anchor}{addition}"), 1);
+    }
+    fs::write(path, source).map_err(|e| format!("write '{}': {e}", path.display()))
 }
 
 fn handle_extension(extension: NativeExtensionCommands) {
@@ -648,118 +741,6 @@ const TEMPLATE_FILES: &[(&str, &str)] = &[
         include_str!(
             "../templates/native/android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusRustActions.kt"
         ),
-    ),
-    (
-        "android/app/src/main/java/com/nonpolynomial/btleplug/android/impl/Adapter.java",
-        include_str!("../templates/native/android/app/src/main/java/com/nonpolynomial/btleplug/android/impl/Adapter.java"),
-    ),
-    (
-        "android/app/src/main/java/com/nonpolynomial/btleplug/android/impl/BluetoothException.java",
-        include_str!("../templates/native/android/app/src/main/java/com/nonpolynomial/btleplug/android/impl/BluetoothException.java"),
-    ),
-    (
-        "android/app/src/main/java/com/nonpolynomial/btleplug/android/impl/NoBluetoothAdapterException.java",
-        include_str!("../templates/native/android/app/src/main/java/com/nonpolynomial/btleplug/android/impl/NoBluetoothAdapterException.java"),
-    ),
-    (
-        "android/app/src/main/java/com/nonpolynomial/btleplug/android/impl/NoSuchCharacteristicException.java",
-        include_str!("../templates/native/android/app/src/main/java/com/nonpolynomial/btleplug/android/impl/NoSuchCharacteristicException.java"),
-    ),
-    (
-        "android/app/src/main/java/com/nonpolynomial/btleplug/android/impl/NotConnectedException.java",
-        include_str!("../templates/native/android/app/src/main/java/com/nonpolynomial/btleplug/android/impl/NotConnectedException.java"),
-    ),
-    (
-        "android/app/src/main/java/com/nonpolynomial/btleplug/android/impl/Peripheral.java",
-        include_str!("../templates/native/android/app/src/main/java/com/nonpolynomial/btleplug/android/impl/Peripheral.java"),
-    ),
-    (
-        "android/app/src/main/java/com/nonpolynomial/btleplug/android/impl/PermissionDeniedException.java",
-        include_str!("../templates/native/android/app/src/main/java/com/nonpolynomial/btleplug/android/impl/PermissionDeniedException.java"),
-    ),
-    (
-        "android/app/src/main/java/com/nonpolynomial/btleplug/android/impl/ScanFilter.java",
-        include_str!("../templates/native/android/app/src/main/java/com/nonpolynomial/btleplug/android/impl/ScanFilter.java"),
-    ),
-    (
-        "android/app/src/main/java/com/nonpolynomial/btleplug/android/impl/UnexpectedCallbackException.java",
-        include_str!("../templates/native/android/app/src/main/java/com/nonpolynomial/btleplug/android/impl/UnexpectedCallbackException.java"),
-    ),
-    (
-        "android/app/src/main/java/com/nonpolynomial/btleplug/android/impl/UnexpectedCharacteristicException.java",
-        include_str!("../templates/native/android/app/src/main/java/com/nonpolynomial/btleplug/android/impl/UnexpectedCharacteristicException.java"),
-    ),
-    (
-        "android/app/src/main/java/io/github/gedgygedgy/rust/future/Future.java",
-        include_str!("../templates/native/android/app/src/main/java/io/github/gedgygedgy/rust/future/Future.java"),
-    ),
-    (
-        "android/app/src/main/java/io/github/gedgygedgy/rust/future/FutureException.java",
-        include_str!("../templates/native/android/app/src/main/java/io/github/gedgygedgy/rust/future/FutureException.java"),
-    ),
-    (
-        "android/app/src/main/java/io/github/gedgygedgy/rust/future/SimpleFuture.java",
-        include_str!("../templates/native/android/app/src/main/java/io/github/gedgygedgy/rust/future/SimpleFuture.java"),
-    ),
-    (
-        "android/app/src/main/java/io/github/gedgygedgy/rust/ops/FnAdapter.java",
-        include_str!("../templates/native/android/app/src/main/java/io/github/gedgygedgy/rust/ops/FnAdapter.java"),
-    ),
-    (
-        "android/app/src/main/java/io/github/gedgygedgy/rust/ops/FnBiFunction.java",
-        include_str!("../templates/native/android/app/src/main/java/io/github/gedgygedgy/rust/ops/FnBiFunction.java"),
-    ),
-    (
-        "android/app/src/main/java/io/github/gedgygedgy/rust/ops/FnBiFunctionImpl.java",
-        include_str!("../templates/native/android/app/src/main/java/io/github/gedgygedgy/rust/ops/FnBiFunctionImpl.java"),
-    ),
-    (
-        "android/app/src/main/java/io/github/gedgygedgy/rust/ops/FnFunction.java",
-        include_str!("../templates/native/android/app/src/main/java/io/github/gedgygedgy/rust/ops/FnFunction.java"),
-    ),
-    (
-        "android/app/src/main/java/io/github/gedgygedgy/rust/ops/FnFunctionImpl.java",
-        include_str!("../templates/native/android/app/src/main/java/io/github/gedgygedgy/rust/ops/FnFunctionImpl.java"),
-    ),
-    (
-        "android/app/src/main/java/io/github/gedgygedgy/rust/ops/FnRunnable.java",
-        include_str!("../templates/native/android/app/src/main/java/io/github/gedgygedgy/rust/ops/FnRunnable.java"),
-    ),
-    (
-        "android/app/src/main/java/io/github/gedgygedgy/rust/ops/FnRunnableImpl.java",
-        include_str!("../templates/native/android/app/src/main/java/io/github/gedgygedgy/rust/ops/FnRunnableImpl.java"),
-    ),
-    (
-        "android/app/src/main/java/io/github/gedgygedgy/rust/panic/PanicException.java",
-        include_str!("../templates/native/android/app/src/main/java/io/github/gedgygedgy/rust/panic/PanicException.java"),
-    ),
-    (
-        "android/app/src/main/java/io/github/gedgygedgy/rust/stream/QueueStream.java",
-        include_str!("../templates/native/android/app/src/main/java/io/github/gedgygedgy/rust/stream/QueueStream.java"),
-    ),
-    (
-        "android/app/src/main/java/io/github/gedgygedgy/rust/stream/Stream.java",
-        include_str!("../templates/native/android/app/src/main/java/io/github/gedgygedgy/rust/stream/Stream.java"),
-    ),
-    (
-        "android/app/src/main/java/io/github/gedgygedgy/rust/stream/StreamPoll.java",
-        include_str!("../templates/native/android/app/src/main/java/io/github/gedgygedgy/rust/stream/StreamPoll.java"),
-    ),
-    (
-        "android/app/src/main/java/io/github/gedgygedgy/rust/task/PollResult.java",
-        include_str!("../templates/native/android/app/src/main/java/io/github/gedgygedgy/rust/task/PollResult.java"),
-    ),
-    (
-        "android/app/src/main/java/io/github/gedgygedgy/rust/task/Waker.java",
-        include_str!("../templates/native/android/app/src/main/java/io/github/gedgygedgy/rust/task/Waker.java"),
-    ),
-    (
-        "android/app/src/main/java/io/github/gedgygedgy/rust/thread/LocalThreadChecker.java",
-        include_str!("../templates/native/android/app/src/main/java/io/github/gedgygedgy/rust/thread/LocalThreadChecker.java"),
-    ),
-    (
-        "android/app/src/main/java/io/github/gedgygedgy/rust/thread/LocalThreadException.java",
-        include_str!("../templates/native/android/app/src/main/java/io/github/gedgygedgy/rust/thread/LocalThreadException.java"),
     ),
     (
         "android/app/src/main/java/dev/crepuscularity/nativeshell/generated/CrepusGeneratedView.kt",
@@ -1895,20 +1876,18 @@ scheme = "CrepusMobileApp"
         for (rel, content) in TEMPLATE_FILES {
             assert!(!content.is_empty(), "empty template content at {rel}");
         }
-        assert!(TEMPLATE_FILES.iter().any(|(rel, content)| {
-            *rel == "android/app/src/main/AndroidManifest.xml"
-                && content.contains("android.permission.BLUETOOTH_SCAN")
-        }));
-        assert!(TEMPLATE_FILES.iter().any(|(rel, content)| {
-            *rel == "ios/project.yml"
-                && content.contains("INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription")
+        assert!(!TEMPLATE_FILES.iter().any(|(rel, content)| {
+            rel.contains("btleplug")
+                || rel.contains("gedgygedgy")
+                || content.contains("android.permission.BLUETOOTH_SCAN")
+                || content.contains("CoreBluetooth")
         }));
         assert!(TEMPLATE_FILES.iter().any(|(rel, _)| {
-            *rel == "android/app/src/main/java/com/nonpolynomial/btleplug/android/impl/Adapter.java"
+            *rel == "android/app/src/main/java/dev/crepuscularity/nativeshell/MainActivity.kt"
         }));
-        assert!(TEMPLATE_FILES.iter().any(|(rel, _)| {
-            *rel == "android/app/src/main/java/io/github/gedgygedgy/rust/future/Future.java"
-        }));
+        assert!(TEMPLATE_FILES
+            .iter()
+            .any(|(rel, _)| { *rel == "ios/Sources/NativeShell/CrepusRustActions.swift" }));
     }
 
     #[test]

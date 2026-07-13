@@ -21,7 +21,6 @@ struct MobileActionState {
     last_payload: Option<String>,
     last_result: String,
     last_error: Option<String>,
-    auto_scan_started: bool,
 }
 
 #[derive(Clone, Copy)]
@@ -767,17 +766,6 @@ pub extern "C" fn crepus_mobile_dispatch_change_json(
 }
 
 #[no_mangle]
-pub extern "C" fn crepus_mobile_start_auto_scan() -> *mut c_char {
-    let mut state = lock_action_state();
-    if !state.auto_scan_started {
-        state.auto_scan_started = true;
-        let result = dispatch_action_json("preview");
-        return alloc_c_string(&result);
-    }
-    alloc_c_string(&state.last_result)
-}
-
-#[no_mangle]
 pub extern "C" fn crepus_mobile_last_result() -> *mut c_char {
     let state = lock_action_state();
     alloc_c_string(&state.last_result)
@@ -1302,25 +1290,6 @@ pub extern "system" fn Java_dev_crepuscularity_nativeshell_CrepusRustActions_eva
 
 #[cfg(target_os = "android")]
 #[no_mangle]
-pub extern "system" fn Java_dev_crepuscularity_nativeshell_CrepusRustActions_startAutoScan<'a>(
-    env: JNIEnv<'a>,
-    _class: JClass<'a>,
-) -> JString<'a> {
-    let ptr = crepus_mobile_start_auto_scan();
-    let result = if ptr.is_null() {
-        String::new()
-    } else {
-        let result = unsafe { CStr::from_ptr(ptr) }
-            .to_string_lossy()
-            .into_owned();
-        unsafe { crepus_mobile_free_string(ptr) };
-        result
-    };
-    env.new_string(result).unwrap()
-}
-
-#[cfg(target_os = "android")]
-#[no_mangle]
 pub extern "system" fn Java_dev_crepuscularity_nativeshell_CrepusRustActions_lastResult<'a>(
     env: JNIEnv<'a>,
     _class: JClass<'a>,
@@ -1524,26 +1493,6 @@ mod tests {
         assert!(device["value"]["value"]["targetOs"].is_string());
         assert_eq!(app["ok"], true);
         assert_eq!(app["value"]["value"]["syncCount"], 0);
-    }
-
-    #[test]
-    fn start_auto_scan_tracks_last_result() {
-        let _guard = test_lock();
-        reset_action_state();
-        let first_ptr = crepus_mobile_start_auto_scan();
-        let first = unsafe { CStr::from_ptr(first_ptr) }
-            .to_string_lossy()
-            .into_owned();
-        unsafe { crepus_mobile_free_string(first_ptr) };
-        let second_ptr = crepus_mobile_start_auto_scan();
-        let second = unsafe { CStr::from_ptr(second_ptr) }
-            .to_string_lossy()
-            .into_owned();
-        unsafe { crepus_mobile_free_string(second_ptr) };
-        let first: serde_json::Value = serde_json::from_str(&first).expect("json");
-        let second: serde_json::Value = serde_json::from_str(&second).expect("json");
-        assert_eq!(first["ok"], true);
-        assert_eq!(second["ok"], true);
     }
 
     #[test]

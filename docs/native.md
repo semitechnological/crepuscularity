@@ -61,6 +61,17 @@ cd android && gradle wrapper --gradle-version 8.10
 connected device/emulator and prints the `adb shell am start` line you need to
 launch the app.
 
+The default shell contains View IR, host glue, and the app-local Rust bridge only: no
+vendored Bluetooth Java or Bluetooth permission. Add platform capabilities per app:
+
+```bash
+crepus native add sensors --dir .
+crepus native add bluetooth --dir .
+```
+
+Sensors declares gyro/accelerometer support. Bluetooth adds `btleplug` and platform
+declarations; its capability-owned host adapter is still pending.
+
 The scaffold includes `views/main.crepus` as the Crepus-authored UI source.
 When the template changes, sync the shared View IR fixture into the native
 containers:

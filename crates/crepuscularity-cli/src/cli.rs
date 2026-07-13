@@ -16,7 +16,6 @@ pub enum InspectMode {
     Preview,
 }
 
-
 #[derive(Parser, Debug)]
 #[command(
     name = "crepus",
@@ -291,6 +290,11 @@ pub enum TuiCommands {
 pub enum NativeCommands {
     New {
         name: String,
+    },
+    Add {
+        capability: String,
+        #[arg(long, default_value = ".")]
+        dir: PathBuf,
     },
     Extension {
         #[command(subcommand)]

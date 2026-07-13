@@ -386,9 +386,62 @@ fn mobile_new_scaffolds_runtime_files() {
     assert!(
         project_yml.contains("$(PROJECT_DIR)/build/rust/aarch64-apple-ios-sim/libphone_actions.a")
     );
-    assert!(project_yml.contains("-framework CoreBluetooth"));
+    assert!(!project_yml.contains("CoreBluetooth"));
     assert!(!project_yml
         .contains("$(PROJECT_DIR)/build/rust/$(PLATFORM_NAME)/libcrepus_mobile_actions.a"));
+    let manifest = std::fs::read_to_string(root.join("android/app/src/main/AndroidManifest.xml"))
+        .expect("read manifest");
+    assert!(!manifest.contains("BLUETOOTH"));
+    assert!(!root
+        .join("android/app/src/main/java/com/nonpolynomial/btleplug")
+        .exists());
+    assert!(!root
+        .join("android/app/src/main/java/io/github/gedgygedgy")
+        .exists());
+}
+
+#[test]
+#[cfg_attr(
+    windows,
+    ignore = "default desktop crepus.exe does not spawn reliably on Windows CI"
+)]
+fn native_add_capability_updates_only_the_scaffold() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let root = tmp.path().join("phone");
+    assert!(crepus()
+        .current_dir(tmp.path())
+        .args(["native", "new", "phone"])
+        .output()
+        .expect("scaffold")
+        .status
+        .success());
+    assert!(crepus()
+        .args(["native", "add", "sensors", "--dir"])
+        .arg(&root)
+        .output()
+        .expect("add sensors")
+        .status
+        .success());
+    let cargo = std::fs::read_to_string(root.join("rust/Cargo.toml")).expect("read Cargo.toml");
+    let manifest = std::fs::read_to_string(root.join("android/app/src/main/AndroidManifest.xml"))
+        .expect("read manifest");
+    assert!(cargo.contains("sensors = []"));
+    assert!(manifest.contains("android.hardware.sensor.gyroscope"));
+    assert!(crepus()
+        .args(["native", "add", "bluetooth", "--dir"])
+        .arg(&root)
+        .output()
+        .expect("add bluetooth")
+        .status
+        .success());
+    assert!(std::fs::read_to_string(root.join("rust/Cargo.toml"))
+        .expect("read Cargo.toml")
+        .contains("btleplug = \"0.11\""));
+    assert!(
+        std::fs::read_to_string(root.join("android/app/src/main/AndroidManifest.xml"))
+            .expect("read manifest")
+            .contains("android.permission.BLUETOOTH_SCAN")
+    );
 }
 
 #[test]

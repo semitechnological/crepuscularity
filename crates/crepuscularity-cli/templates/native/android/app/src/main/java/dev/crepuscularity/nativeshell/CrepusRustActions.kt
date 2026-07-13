@@ -82,7 +82,6 @@ object CrepusRustActions {
     external fun evalItemsJson(expr: String, scopeName: String?, scopeJson: String?): String
     external fun initAndroid(context: Context)
     external fun lastError(): String
-    external fun startAutoScan(): String
     external fun shutdownAndroid()
 
     fun install(activity: ComponentActivity) {
@@ -373,10 +372,6 @@ object CrepusRustActions {
 object CrepusActionState {
     val lastResult = mutableStateOf("{}")
     val lastError = mutableStateOf<String?>(null)
-
-    fun startAutoScan() {
-        record(CrepusRustActions.startAutoScan())
-    }
 
     fun dispatch(action: String) {
         record(CrepusActions.dispatch(action))

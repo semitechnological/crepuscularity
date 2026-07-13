@@ -1,7 +1,5 @@
 package dev.crepuscularity.nativeshell
 
-import android.Manifest
-import android.os.Build
 import android.os.Bundle
 import androidx.activity.SystemBarStyle
 import androidx.activity.ComponentActivity
@@ -22,7 +20,6 @@ class MainActivity : ComponentActivity() {
             navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
         )
         super.onCreate(savedInstanceState)
-        requestBluetoothPermissions()
         CrepusRustActions.install(this)
         setContent {
             MaterialTheme {
@@ -41,13 +38,5 @@ class MainActivity : ComponentActivity() {
     override fun onDestroy() {
         CrepusRustActions.shutdownAndroid()
         super.onDestroy()
-    }
-
-    private fun requestBluetoothPermissions() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            requestPermissions(arrayOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT), 4768)
-        } else {
-            requestPermissions(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION), 4768)
-        }
     }
 }

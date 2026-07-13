@@ -373,6 +373,8 @@ The scaffolded SwiftUI and Compose runtimes load bundled `fixture.json` first, t
 
 ## Native View IR and Source (`crepus native`)
 
+`crepus native new` creates a thin SwiftUI/Compose shell with View IR and its app-local Rust bridge; it ships no Bluetooth Java or Bluetooth permissions. Add capabilities only where needed: `crepus native add sensors --dir .` or `crepus native add bluetooth --dir .`. Bluetooth currently installs its Rust and platform declarations; its host adapter remains pending.
+
 Emit the same **View IR** JSON contract used by native shells and polyglot plugins:
 
 ```bash
