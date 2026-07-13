@@ -750,6 +750,22 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(device_android.contains("Build.MANUFACTURER"));
     assert!(device_ios.contains("UIDevice.current"));
     assert!(crepus()
+        .args(["native", "add", "preferences", "--dir"])
+        .arg(&root)
+        .output()
+        .expect("add preferences")
+        .status
+        .success());
+    let preferences_android = std::fs::read_to_string(
+        root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusRustActions.kt"),
+    )
+    .expect("read Android preferences bridge");
+    let preferences_ios =
+        std::fs::read_to_string(root.join("ios/Sources/NativeShell/CrepusRustActions.swift"))
+            .expect("read iOS preferences bridge");
+    assert!(preferences_android.contains("getSharedPreferences"));
+    assert!(preferences_ios.contains("UserDefaults.standard"));
+    assert!(crepus()
         .args(["native", "add", "filesystem", "--dir"])
         .arg(&root)
         .output()
@@ -772,6 +788,7 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(cargo.contains("screen-orientation = []"));
     assert!(cargo.contains("accessibility-info = []"));
     assert!(cargo.contains("device = []"));
+    assert!(cargo.contains("preferences = []"));
     assert!(cargo.contains("filesystem = []"));
     assert!(cargo.contains("default = [\"filesystem\"]"));
     assert!(

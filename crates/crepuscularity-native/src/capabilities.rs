@@ -1143,6 +1143,60 @@ pub const IOS_DEVICE: &str = r#"
     }
 "#;
 
+pub const ANDROID_PREFERENCES: &str = r#"
+    private fun preferencesValue(method: String, payload: JSONObject?): JSONObject {
+        val preferences = appContext.getSharedPreferences("crepus", Context.MODE_PRIVATE)
+        val key = payload?.optString("key") ?: ""
+        return when (method) {
+            "get" -> {
+                if (key.isEmpty()) error("preferences.get requires key")
+                JSONObject().put("value", preferences.getString(key, null))
+            }
+            "set" -> {
+                if (key.isEmpty()) error("preferences.set requires key")
+                preferences.edit().putString(key, payload?.optString("value") ?: "").apply()
+                JSONObject().put("saved", true)
+            }
+            "remove" -> {
+                if (key.isEmpty()) error("preferences.remove requires key")
+                preferences.edit().remove(key).apply()
+                JSONObject().put("removed", true)
+            }
+            "clear" -> {
+                preferences.edit().clear().apply()
+                JSONObject().put("cleared", true)
+            }
+            else -> error("unsupported preferences method: $method")
+        }
+    }
+"#;
+
+pub const IOS_PREFERENCES: &str = r#"
+    private static func preferencesValue(method: String, payload: [String: Any]?) throws -> Any {
+        let preferences = UserDefaults.standard
+        let key = payload?["key"] as? String ?? ""
+        switch method {
+        case "get":
+            guard !key.isEmpty else { throw HostActionError("preferences.get requires key") }
+            return ["value": preferences.string(forKey: key) as Any]
+        case "set":
+            guard !key.isEmpty else { throw HostActionError("preferences.set requires key") }
+            preferences.set(payload?["value"] as? String ?? "", forKey: key)
+            return ["saved": true]
+        case "remove":
+            guard !key.isEmpty else { throw HostActionError("preferences.remove requires key") }
+            preferences.removeObject(forKey: key)
+            return ["removed": true]
+        case "clear":
+            guard let bundle = Bundle.main.bundleIdentifier else { throw HostActionError("missing bundle identifier") }
+            preferences.removePersistentDomain(forName: bundle)
+            return ["cleared": true]
+        default:
+            throw HostActionError("unsupported preferences method: \(method)")
+        }
+    }
+"#;
+
 pub const ANDROID_GEOLOCATION: &str = r#"
     private val geolocation by lazy { GeolocationBridge(activity) }
 
