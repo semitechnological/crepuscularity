@@ -7,7 +7,10 @@ The `crepus` CLI provides commands for scaffolding, building, and developing cre
 ## Installation
 
 ```bash
+# Default features = full (`crepus dev`, `preview`, TUI, Aurora)
 cargo install --path crates/crepuscularity-cli
+# Slim web/native/embedded only:
+# cargo install --path crates/crepuscularity-cli --no-default-features
 ```
 
 ## Commands

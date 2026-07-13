@@ -22,8 +22,9 @@ Use [Aurorality](https://github.com/tschk/aurorality) for united SwiftUI macOS +
 ## Quick Start
 
 ```bash
-# Install the CLI
+# Install the CLI (default = full: dev/preview/tui/aurora)
 cargo install --path crates/crepuscularity-cli
+# Slim (no GPUI): cargo install --path crates/crepuscularity-cli --no-default-features
 
 # If `crepus` is not found, Cargo still installed the binary under ~/.cargo/bin — add it to PATH,
 # e.g. for zsh:  export PATH="$HOME/.cargo/bin:$PATH"
@@ -258,6 +259,7 @@ also have a working cross platform mobile app that ill have an example for soon 
 Install the CLI:
 
 ```bash
+# default features include desktop/tui/aurora (`crepus dev`)
 cargo install --path crates/crepuscularity-cli
 ```
 

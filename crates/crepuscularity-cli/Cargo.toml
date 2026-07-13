@@ -34,22 +34,19 @@ name = "tauri_cli"
 path = "tests/tauri_cli.rs"
 
 [features]
-# Default: lightest build — no GPUI, no TUI, no Aurora.
-default = []
+# Default matches docs + release binaries: `crepus dev`, TUI, Aurora.
+# Slim installs: `--no-default-features` (web/native/embedded only).
+default = ["full"]
 
 # Desktop (GPUI) commands: `crepus new`, `crepus dev`, `crepus preview`.
-# Enable for GPUI windowed preview on desktop platforms.
 desktop = ["dep:gpui", "dep:crepuscularity-runtime"]
 
 # TUI commands: `crepus tui preview`, `crepus benchmark` live dashboard.
-# Requires ratatui + crossterm.
 tui = ["dep:ratatui", "dep:crepuscularity-tui"]
 
-# Aurora (SwiftUI) commands: `crepus aurora dev/build/new/swiftgen`.
-# Shells out to the external `aurorality` CLI.
+# Aurora (SwiftUI) commands: `crepus aurora ...` (forwards to `aurorality`).
 aurora = []
 
-# Everything enabled — use this for release binaries.
 full = ["desktop", "tui", "aurora"]
 
 [dependencies]
