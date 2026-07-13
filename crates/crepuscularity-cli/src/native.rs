@@ -22,8 +22,8 @@ use crepuscularity_core::context::{TemplateContext, TemplateValue};
 use crepuscularity_core::{DriverCache, Fingerprint};
 use crepuscularity_native::{
     generate_native_source, render_component_file_to_ir, render_from_files, render_template_to_ir,
-    to_json, to_json_pretty, NativeCodegenTarget, ANDROID_SENSORS, ANDROID_SENSORS_BRIDGE,
-    IOS_SENSORS, IOS_SENSORS_BRIDGE,
+    to_json, to_json_pretty, NativeCodegenTarget, ANDROID_BLUETOOTH, ANDROID_BLUETOOTH_BRIDGE,
+    ANDROID_SENSORS, ANDROID_SENSORS_BRIDGE, IOS_SENSORS, IOS_SENSORS_BRIDGE,
 };
 use serde::Deserialize;
 use serde_json::Value;
@@ -67,7 +67,7 @@ pub fn execute(cmd: NativeCommands) {
 struct CapabilitySpec {
     name: &'static str,
     aliases: &'static [&'static str],
-    cargo: &'static str,
+    cargo_feature: &'static str,
     android_manifest: &'static str,
     ios_project: &'static str,
 }
@@ -76,14 +76,14 @@ const CAPABILITIES: &[CapabilitySpec] = &[
     CapabilitySpec {
         name: "sensors",
         aliases: &["motion", "gyro", "accelerometer"],
-        cargo: "[features]\nsensors = []\n",
+        cargo_feature: "sensors",
         android_manifest: "    <uses-feature android:name=\"android.hardware.sensor.accelerometer\" android:required=\"false\" />\n    <uses-feature android:name=\"android.hardware.sensor.gyroscope\" android:required=\"false\" />\n",
         ios_project: "",
     },
     CapabilitySpec {
         name: "bluetooth",
         aliases: &["ble"],
-        cargo: "btleplug = \"0.11\"\n",
+        cargo_feature: "bluetooth",
         android_manifest: "    <uses-permission android:name=\"android.permission.ACCESS_FINE_LOCATION\" android:maxSdkVersion=\"30\" />\n    <uses-permission android:name=\"android.permission.BLUETOOTH_SCAN\" />\n    <uses-permission android:name=\"android.permission.BLUETOOTH_CONNECT\" />\n    <uses-feature android:name=\"android.hardware.bluetooth_le\" android:required=\"false\" />\n",
         ios_project: "        OTHER_LDFLAGS: \"-lcrepus_mobile_actions -framework CoreBluetooth\"\n        INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription: \"$(PRODUCT_NAME) uses Bluetooth for nearby device setup.\"\n",
     },
@@ -110,7 +110,7 @@ fn add_capability(capability: &str, root: &Path) -> Result<(), String> {
     if !cargo.is_file() || !manifest.is_file() || !project.is_file() {
         return Err(format!("'{}' is not a native scaffold", root.display()));
     }
-    add_once(&cargo, spec.cargo, "[dependencies]\n")?;
+    add_feature(&cargo, spec.cargo_feature)?;
     add_once(
         &manifest,
         spec.android_manifest,
@@ -131,12 +131,60 @@ fn add_capability(capability: &str, root: &Path) -> Result<(), String> {
     if spec.name == "sensors" {
         add_sensors_host(root)?;
     }
+    if spec.name == "bluetooth" {
+        add_bluetooth_host(root)?;
+    }
     ui::success(&format!(
         "added native capability '{}' to '{}'",
         spec.name,
         root.display()
     ));
     Ok(())
+}
+
+fn add_feature(path: &Path, feature: &str) -> Result<(), String> {
+    let mut source =
+        fs::read_to_string(path).map_err(|e| format!("read '{}': {e}", path.display()))?;
+    if source
+        .lines()
+        .any(|line| line.trim_start().starts_with(&format!("{feature} =")))
+    {
+        return Ok(());
+    }
+    if source.contains("[features]") {
+        source.push_str(&format!("{feature} = []\n"));
+    } else {
+        source.push_str(&format!("\n[features]\n{feature} = []\n"));
+    }
+    fs::write(path, source).map_err(|e| format!("write '{}': {e}", path.display()))
+}
+
+fn add_bluetooth_host(root: &Path) -> Result<(), String> {
+    let android =
+        root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusRustActions.kt");
+    let mut source =
+        fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
+    if source.contains("BluetoothBridge") {
+        return Ok(());
+    }
+    source = source.replace(
+        "import android.content.ClipData\n",
+        "import android.content.ClipData\nimport android.Manifest\nimport android.bluetooth.BluetoothAdapter\nimport android.bluetooth.le.ScanCallback\nimport android.bluetooth.le.ScanResult\nimport android.content.pm.PackageManager\n",
+    );
+    source = source.replace(
+        "            \"share\" -> shareValue(method, payload)\n",
+        "            \"share\" -> shareValue(method, payload)\n            \"bluetooth\" -> bluetoothValue(method)\n",
+    );
+    source = source.replace(
+        "\n}\n\nobject CrepusActionState",
+        &format!("{ANDROID_BLUETOOTH}\n}}\n\nobject CrepusActionState"),
+    );
+    source = source.replace(
+        "    private fun emit(result: String)",
+        "    internal fun emit(result: String)",
+    );
+    source.push_str(ANDROID_BLUETOOTH_BRIDGE);
+    fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))
 }
 
 fn add_sensors_host(root: &Path) -> Result<(), String> {

@@ -444,9 +444,14 @@ fn native_add_capability_updates_only_the_scaffold() {
         .expect("add bluetooth")
         .status
         .success());
-    assert!(std::fs::read_to_string(root.join("rust/Cargo.toml"))
-        .expect("read Cargo.toml")
-        .contains("btleplug = \"0.11\""));
+    let cargo = std::fs::read_to_string(root.join("rust/Cargo.toml")).expect("read Cargo.toml");
+    assert!(cargo.contains("bluetooth = []"));
+    let bluetooth = std::fs::read_to_string(
+        root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusRustActions.kt"),
+    )
+    .expect("read Bluetooth bridge");
+    assert!(bluetooth.contains("BluetoothBridge"));
+    assert!(bluetooth.contains("bluetooth.device"));
     assert!(
         std::fs::read_to_string(root.join("android/app/src/main/AndroidManifest.xml"))
             .expect("read manifest")

@@ -105,3 +105,62 @@ private final class SensorBridge {
     }
 }
 "#;
+
+pub const ANDROID_BLUETOOTH: &str = r#"
+    private val bluetooth by lazy { BluetoothBridge(activity) }
+
+    private fun bluetoothValue(method: String): JSONObject =
+        when (method) {
+            "status" -> bluetooth.status()
+            "requestPermission" -> bluetooth.requestPermission()
+            "scan" -> bluetooth.scan()
+            "stopScan" -> bluetooth.stop()
+            else -> error("unsupported bluetooth method: $method")
+        }
+"#;
+
+pub const ANDROID_BLUETOOTH_BRIDGE: &str = r#"
+private class BluetoothBridge(private val activity: ComponentActivity) {
+    private val adapter = BluetoothAdapter.getDefaultAdapter()
+    private val devices = linkedMapOf<String, JSONObject>()
+    private var scanning = false
+    private val callback = object : ScanCallback() {
+        override fun onScanResult(type: Int, result: ScanResult) {
+            val device = JSONObject().put("id", result.device.address).put("name", result.device.name)
+                .put("rssi", result.rssi).put("timestampMs", System.currentTimeMillis())
+            devices[result.device.address] = device
+            CrepusRustActions.emit(JSONObject().put("ok", true).put("action", "bluetooth.device")
+                .put("value", device).toString())
+        }
+    }
+
+    fun status(): JSONObject = JSONObject().put("available", adapter != null)
+        .put("enabled", adapter?.isEnabled == true).put("scanning", scanning)
+        .put("devices", devices.values.toList())
+
+    fun requestPermission(): JSONObject {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            activity.requestPermissions(arrayOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT), 4768)
+        } else {
+            activity.requestPermissions(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION), 4768)
+        }
+        return JSONObject().put("requested", true)
+    }
+
+    fun scan(): JSONObject {
+        if (adapter == null || !adapter.isEnabled) error("Bluetooth is unavailable or disabled")
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && activity.checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) {
+            return requestPermission().put("pending", true)
+        }
+        adapter.bluetoothLeScanner.startScan(callback)
+        scanning = true
+        return status()
+    }
+
+    fun stop(): JSONObject {
+        adapter?.bluetoothLeScanner?.stopScan(callback)
+        scanning = false
+        return status()
+    }
+}
+"#;

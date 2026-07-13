@@ -69,8 +69,8 @@ crepus native add sensors --dir .
 crepus native add bluetooth --dir .
 ```
 
-Sensors installs real gyro/accelerometer bridges. Bluetooth adds `btleplug` and platform
-declarations; its capability-owned host adapter is still pending.
+Sensors installs real gyro/accelerometer bridges. Bluetooth installs the Android BLE central scan
+bridge and its platform declarations.
 
 The scaffold includes `views/main.crepus` as the Crepus-authored UI source.
 When the template changes, sync the shared View IR fixture into the native
