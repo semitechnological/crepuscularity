@@ -110,6 +110,15 @@ Android and iOS, plus only the required platform declarations. It supports `stat
 default app shell and share-extension builds exclude it. It supports `readText`, `writeText`,
 `delete`, `mkdir`, `list`, and `stat`, and rejects absolute paths and parent-directory segments.
 
+### Service and entitlement boundaries
+
+Capabilities installed by `crepus native add` stay local to the app and add only their required
+platform declarations. Push delivery needs an APNs/FCM project and server credentials; payments,
+wallets, Google Maps, cloud sync, and authentication need the app's own provider configuration.
+Contacts, calendar, health, NFC, background execution, widgets, and media services also require
+their platform-specific entitlement or user permission before an app can use them. They are not
+included in the default scaffold or represented as successful no-op bridges.
+
 The scaffold includes `views/main.crepus` as the Crepus-authored UI source.
 When the template changes, sync the shared View IR fixture into the native
 containers:
