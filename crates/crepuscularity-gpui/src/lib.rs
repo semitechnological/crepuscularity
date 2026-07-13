@@ -12,6 +12,14 @@ pub mod animation;
 
 pub const GPUI_MANIFEST_DIR: &str = env!("CARGO_MANIFEST_DIR");
 
+/// Embed a view with paint recycling when its parent re-renders.
+///
+/// Mirrors Zed's `AnyView::cached` pattern: previous layout/paint is reused unless
+/// the child entity called `cx.notify()` (or the window is force-refreshed).
+pub fn cached_view(view: impl Into<AnyView>) -> AnyView {
+    view.into().cached(StyleRefinement::default())
+}
+
 pub fn gpui_window_options(
     app_id: impl Into<String>,
     title: impl Into<SharedString>,
