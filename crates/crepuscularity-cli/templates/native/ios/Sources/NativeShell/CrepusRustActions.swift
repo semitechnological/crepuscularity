@@ -194,8 +194,6 @@ public enum CrepusRustActions {
 
     private static func hostPluginValue(capability: String, method: String, payload: [String: Any]?) throws -> Any {
         switch capability {
-        case "browser", "linking":
-            return try openUrlValue(capability: capability, method: method, payload: payload)
         case "imagePicker":
             return try imagePickerValue(method: method)
         case "documentPicker":
@@ -205,23 +203,6 @@ public enum CrepusRustActions {
         default:
             throw HostActionError("unsupported host capability: \(capability)")
         }
-    }
-
-    private static func openUrlValue(capability: String, method: String, payload: [String: Any]?) throws -> Any {
-        guard method == "open" else {
-            throw HostActionError("unsupported \(capability) method: \(method)")
-        }
-        guard let rawUrl = payload?["url"] as? String, let url = URL(string: rawUrl) else {
-            throw HostActionError("\(capability).open requires payload.url")
-        }
-        #if canImport(UIKit)
-        Task { @MainActor in
-            UIApplication.shared.open(url)
-        }
-        #elseif canImport(AppKit)
-        NSWorkspace.shared.open(url)
-        #endif
-        return ["url": rawUrl, "opened": true]
     }
 
     private static func imagePickerValue(method: String) throws -> Any {

@@ -23,11 +23,11 @@ use crepuscularity_core::{DriverCache, Fingerprint};
 use crepuscularity_native::{
     generate_native_source, render_component_file_to_ir, render_from_files, render_template_to_ir,
     to_json, to_json_pretty, NativeCodegenTarget, ANDROID_APPEARANCE, ANDROID_BATTERY,
-    ANDROID_BLUETOOTH, ANDROID_BLUETOOTH_BRIDGE, ANDROID_CLIPBOARD, ANDROID_GEOLOCATION,
-    ANDROID_GEOLOCATION_BRIDGE, ANDROID_HAPTICS, ANDROID_SENSORS, ANDROID_SENSORS_BRIDGE,
-    ANDROID_SHARE, IOS_APPEARANCE, IOS_BATTERY, IOS_BLUETOOTH, IOS_BLUETOOTH_BRIDGE, IOS_CLIPBOARD,
-    IOS_CLIPBOARD_BRIDGE, IOS_GEOLOCATION, IOS_GEOLOCATION_BRIDGE, IOS_HAPTICS, IOS_SENSORS,
-    IOS_SENSORS_BRIDGE, IOS_SHARE,
+    ANDROID_BLUETOOTH, ANDROID_BLUETOOTH_BRIDGE, ANDROID_BROWSER, ANDROID_CLIPBOARD,
+    ANDROID_GEOLOCATION, ANDROID_GEOLOCATION_BRIDGE, ANDROID_HAPTICS, ANDROID_SENSORS,
+    ANDROID_SENSORS_BRIDGE, ANDROID_SHARE, IOS_APPEARANCE, IOS_BATTERY, IOS_BLUETOOTH,
+    IOS_BLUETOOTH_BRIDGE, IOS_BROWSER, IOS_CLIPBOARD, IOS_CLIPBOARD_BRIDGE, IOS_GEOLOCATION,
+    IOS_GEOLOCATION_BRIDGE, IOS_HAPTICS, IOS_SENSORS, IOS_SENSORS_BRIDGE, IOS_SHARE,
 };
 use serde::Deserialize;
 use serde_json::Value;
@@ -99,6 +99,7 @@ const CAPABILITIES: &[CapabilitySpec] = &[
         ios_project: "",
     },
     CapabilitySpec { name: "clipboard", aliases: &[], cargo_feature: "clipboard", android_manifest: "", ios_project: "" },
+    CapabilitySpec { name: "browser", aliases: &["linking"], cargo_feature: "browser", android_manifest: "", ios_project: "" },
     CapabilitySpec { name: "share", aliases: &[], cargo_feature: "share", android_manifest: "", ios_project: "" },
     CapabilitySpec {
         name: "filesystem",
@@ -140,6 +141,9 @@ fn add_capability(capability: &str, root: &Path) -> Result<(), String> {
         return Err(format!("'{}' is not a native scaffold", root.display()));
     }
     add_feature(&cargo, spec.cargo_feature)?;
+    if spec.name == "filesystem" {
+        enable_default_feature(&cargo, spec.cargo_feature)?;
+    }
     add_once(
         &manifest,
         spec.android_manifest,
@@ -177,6 +181,9 @@ fn add_capability(capability: &str, root: &Path) -> Result<(), String> {
     }
     if spec.name == "clipboard" {
         add_clipboard_host(root)?;
+    }
+    if spec.name == "browser" {
+        add_browser_host(root)?;
     }
     if spec.name == "share" {
         add_share_host(root)?;
@@ -318,10 +325,37 @@ fn add_feature(path: &Path, feature: &str) -> Result<(), String> {
     {
         return Ok(());
     }
-    if source.contains("[features]") {
-        source.push_str(&format!("{feature} = []\n"));
+    if let Some(features) = source.find("[features]\n") {
+        let start = features + "[features]\n".len();
+        let end = source[start..]
+            .find("\n[")
+            .map_or(source.len(), |offset| start + offset);
+        source.insert_str(end, &format!("{feature} = []\n"));
     } else {
         source.push_str(&format!("\n[features]\n{feature} = []\n"));
+    }
+    fs::write(path, source).map_err(|e| format!("write '{}': {e}", path.display()))
+}
+
+fn enable_default_feature(path: &Path, feature: &str) -> Result<(), String> {
+    let mut source =
+        fs::read_to_string(path).map_err(|e| format!("read '{}': {e}", path.display()))?;
+    let default = "default = []";
+    if source.contains(&format!("\"{feature}\"")) {
+        return Ok(());
+    }
+    if source.contains(default) {
+        source = source.replacen(default, &format!("default = [\"{feature}\"]"), 1);
+    } else if source.contains("default = [") {
+        source = source.replacen("default = [", &format!("default = [\"{feature}\", "), 1);
+    } else if source.contains("[features]\n") {
+        source = source.replacen(
+            "[features]\n",
+            &format!("[features]\ndefault = [\"{feature}\"]\n"),
+            1,
+        );
+    } else {
+        return Err(format!("missing feature table in '{}'", path.display()));
     }
     fs::write(path, source).map_err(|e| format!("write '{}': {e}", path.display()))
 }
@@ -449,6 +483,38 @@ fn add_clipboard_host(root: &Path) -> Result<(), String> {
             &format!("{IOS_CLIPBOARD}\n\n    fileprivate static func emit"),
         );
         source.push_str(IOS_CLIPBOARD_BRIDGE);
+        fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
+    }
+    Ok(())
+}
+
+fn add_browser_host(root: &Path) -> Result<(), String> {
+    let android = android_actions_path(root)?;
+    let mut source =
+        fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
+    if !source.contains("openUrlValue") {
+        source = source.replace(
+            "        when (capability) {\n",
+            "        when (capability) {\n            \"browser\", \"linking\" -> openUrlValue(capability, method, payload)\n",
+        );
+        source = source.replace(
+            "\n    private fun imagePickerValue",
+            &format!("{ANDROID_BROWSER}\n    private fun imagePickerValue"),
+        );
+        fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))?;
+    }
+    let ios = root.join("ios/Sources/NativeShell/CrepusRustActions.swift");
+    let mut source =
+        fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
+    if !source.contains("openUrlValue") {
+        source = source.replace(
+            "        switch capability {\n",
+            "        switch capability {\n        case \"browser\", \"linking\":\n            return try openUrlValue(capability: capability, method: method, payload: payload)\n",
+        );
+        source = source.replace(
+            "\n    private static func imagePickerValue",
+            &format!("{IOS_BROWSER}\n    private static func imagePickerValue"),
+        );
         fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
     }
     Ok(())

@@ -125,7 +125,6 @@ object CrepusRustActions {
 
     private fun hostPluginValue(capability: String, method: String, payload: JSONObject?): Any =
         when (capability) {
-            "browser", "linking" -> openUrlValue(capability, method, payload)
             "imagePicker" -> imagePickerValue(method)
             "documentPicker" -> documentPickerValue(method)
             "photoLibrary" -> photoLibraryValue(method)
@@ -146,14 +145,6 @@ object CrepusRustActions {
             }
             else -> null
         }
-
-    private fun openUrlValue(capability: String, method: String, payload: JSONObject?): JSONObject {
-        if (method != "open") error("unsupported $capability method: $method")
-        val url = payload?.optString("url", null) ?: error("$capability.open requires payload.url")
-        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        activity.startActivity(intent)
-        return JSONObject().put("url", url).put("opened", true)
-    }
 
     private fun imagePickerValue(method: String): JSONObject {
         if (method != "pick") error("unsupported imagePicker method: $method")

@@ -82,10 +82,12 @@ Android and iOS, plus only the required platform declarations. It supports `stat
 | `appearance` | `status` | Current light/dark scheme on Android and iOS |
 | `haptics` | `impact`, `selection`, `notification` | Android vibrator; iOS UIKit feedback generators |
 | `clipboard` | `get`, `set`, `clear` | Android clipboard manager; iOS system pasteboard |
+| `browser` (`linking`) | `open` | Android `ACTION_VIEW`; iOS `UIApplication.open` |
 | `share` | `share` | Android chooser; iOS activity sheet; accepts `text`, `url`, and optional `title` |
 
-`filesystem` is accepted by the installer, but its Rust handler predates the opt-in surface and
-remains in the baseline shell. It is not yet a minimal-scaffold capability gate.
+`filesystem` enables its scoped Rust backend only after `crepus native add filesystem`; the
+default app shell and share-extension builds exclude it. It supports `readText`, `writeText`,
+`delete`, `mkdir`, `list`, and `stat`, and rejects absolute paths and parent-directory segments.
 
 The scaffold includes `views/main.crepus` as the Crepus-authored UI source.
 When the template changes, sync the shared View IR fixture into the native

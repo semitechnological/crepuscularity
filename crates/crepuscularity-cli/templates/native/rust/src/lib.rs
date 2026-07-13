@@ -4,7 +4,9 @@ use std::fs;
 use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
 use std::os::raw::c_char;
-use std::path::{Component, Path, PathBuf};
+#[cfg(feature = "filesystem")]
+use std::path::Component;
+use std::path::{Path, PathBuf};
 use std::sync::{Mutex, MutexGuard, OnceLock};
 use std::time::Duration;
 
@@ -201,6 +203,7 @@ fn plugin_action(
     let payload = request.get("payload");
     let value = match capability {
         "preferences" => preferences_backend(method, payload)?,
+        #[cfg(feature = "filesystem")]
         "filesystem" => filesystem_backend(method, payload)?,
         "device" => device_backend(method)?,
         "app" => app_backend(state, method)?,
@@ -255,6 +258,7 @@ fn preferences_backend(
     }
 }
 
+#[cfg(feature = "filesystem")]
 fn filesystem_backend(
     method: &str,
     payload: Option<&serde_json::Value>,
@@ -614,11 +618,13 @@ fn ensure_parent_dir(path: &Path) -> Result<(), String> {
     fs::create_dir_all(parent).map_err(|error| format!("mkdir {}: {error}", parent.display()))
 }
 
+#[cfg(feature = "filesystem")]
 fn scoped_data_path(raw: &str) -> Result<PathBuf, String> {
     let relative = sanitize_relative_path(raw)?;
     Ok(data_root_dir().join(relative))
 }
 
+#[cfg(feature = "filesystem")]
 fn sanitize_relative_path(raw: &str) -> Result<PathBuf, String> {
     let path = Path::new(raw);
     if path.is_absolute() {
@@ -639,6 +645,7 @@ fn sanitize_relative_path(raw: &str) -> Result<PathBuf, String> {
     Ok(clean)
 }
 
+#[cfg(feature = "filesystem")]
 fn file_stat_json(path: &Path) -> Result<serde_json::Value, String> {
     let metadata =
         fs::metadata(path).map_err(|error| format!("stat {}: {error}", path.display()))?;
@@ -1443,6 +1450,7 @@ mod tests {
         assert_eq!(keys["value"]["value"][0], "theme");
     }
 
+    #[cfg(feature = "filesystem")]
     #[test]
     fn filesystem_round_trip_handles_text_files() {
         let _guard = test_lock();
@@ -1466,6 +1474,7 @@ mod tests {
         assert_eq!(list["value"]["value"]["entries"][0]["name"], "hello.txt");
     }
 
+    #[cfg(feature = "filesystem")]
     #[test]
     fn filesystem_rejects_parent_escape() {
         let _guard = test_lock();
@@ -1477,6 +1486,20 @@ mod tests {
         let result: serde_json::Value = serde_json::from_str(&result).expect("json");
         assert_eq!(result["ok"], false);
         assert_eq!(result["error"], "parent segments are not allowed");
+    }
+
+    #[cfg(not(feature = "filesystem"))]
+    #[test]
+    fn filesystem_requires_the_installed_feature() {
+        let _guard = test_lock();
+        reset_action_state();
+        let result = dispatch_action_json(
+            r#"{"kind":"plugin","capability":"filesystem","method":"readText","payload":{"path":"notes/hello.txt"}}"#,
+        );
+
+        let result: serde_json::Value = serde_json::from_str(&result).expect("json");
+        assert_eq!(result["ok"], false);
+        assert_eq!(result["error"], "unsupported capability: filesystem");
     }
 
     #[test]

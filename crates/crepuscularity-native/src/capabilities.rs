@@ -388,6 +388,35 @@ private func clearClipboard() {}
 #endif
 "#;
 
+pub const ANDROID_BROWSER: &str = r#"
+    private fun openUrlValue(capability: String, method: String, payload: JSONObject?): JSONObject {
+        if (method != "open") error("unsupported $capability method: $method")
+        val url = payload?.optString("url", null) ?: error("$capability.open requires payload.url")
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        activity.startActivity(intent)
+        return JSONObject().put("url", url).put("opened", true)
+    }
+"#;
+
+pub const IOS_BROWSER: &str = r#"
+    private static func openUrlValue(capability: String, method: String, payload: [String: Any]?) throws -> Any {
+        guard method == "open" else {
+            throw HostActionError("unsupported \(capability) method: \(method)")
+        }
+        guard let rawUrl = payload?["url"] as? String, let url = URL(string: rawUrl) else {
+            throw HostActionError("\(capability).open requires payload.url")
+        }
+        #if canImport(UIKit)
+        Task { @MainActor in
+            UIApplication.shared.open(url)
+        }
+        #elseif canImport(AppKit)
+        NSWorkspace.shared.open(url)
+        #endif
+        return ["url": rawUrl, "opened": true]
+    }
+"#;
+
 pub const ANDROID_SHARE: &str = r#"
     private fun shareValue(method: String, payload: JSONObject?): JSONObject {
         if (method != "share") error("unsupported share method: $method")

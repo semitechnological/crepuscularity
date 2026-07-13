@@ -431,6 +431,8 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(!default_ios.contains("hapticsValue"));
     assert!(!default_android.contains("clipboardValue"));
     assert!(!default_ios.contains("clipboardValue"));
+    assert!(!default_android.contains("openUrlValue"));
+    assert!(!default_ios.contains("openUrlValue"));
     assert!(!default_android.contains("shareValue"));
     assert!(!default_ios.contains("shareValue"));
     assert!(crepus()
@@ -532,6 +534,22 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(clipboard_android.contains("ClipboardManager"));
     assert!(clipboard_ios.contains("UIPasteboard.general"));
     assert!(crepus()
+        .args(["native", "add", "linking", "--dir"])
+        .arg(&root)
+        .output()
+        .expect("add browser")
+        .status
+        .success());
+    let browser_android = std::fs::read_to_string(
+        root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusRustActions.kt"),
+    )
+    .expect("read Android browser bridge");
+    let browser_ios =
+        std::fs::read_to_string(root.join("ios/Sources/NativeShell/CrepusRustActions.swift"))
+            .expect("read iOS browser bridge");
+    assert!(browser_android.contains("Intent.ACTION_VIEW"));
+    assert!(browser_ios.contains("UIApplication.shared.open"));
+    assert!(crepus()
         .args(["native", "add", "filesystem", "--dir"])
         .arg(&root)
         .output()
@@ -541,8 +559,10 @@ fn native_add_capability_updates_only_the_scaffold() {
     let cargo = std::fs::read_to_string(root.join("rust/Cargo.toml")).expect("read Cargo.toml");
     assert!(cargo.contains("haptics = []"));
     assert!(cargo.contains("clipboard = []"));
+    assert!(cargo.contains("browser = []"));
     assert!(cargo.contains("share = []"));
     assert!(cargo.contains("filesystem = []"));
+    assert!(cargo.contains("default = [\"filesystem\"]"));
     assert!(
         std::fs::read_to_string(root.join("android/app/src/main/AndroidManifest.xml"))
             .expect("read manifest")
