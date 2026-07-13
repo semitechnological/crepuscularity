@@ -16,8 +16,10 @@ pub const GPUI_MANIFEST_DIR: &str = env!("CARGO_MANIFEST_DIR");
 ///
 /// Mirrors Zed's `AnyView::cached` pattern: previous layout/paint is reused unless
 /// the child entity called `cx.notify()` (or the window is force-refreshed).
+/// Style must fill the parent slot — default style lays out as empty block.
 pub fn cached_view(view: impl Into<AnyView>) -> AnyView {
-    view.into().cached(StyleRefinement::default())
+    view.into()
+        .cached(StyleRefinement::default().flex_1().size_full())
 }
 
 pub fn gpui_window_options(
