@@ -80,9 +80,10 @@ Android and iOS, plus only the required platform declarations. It supports `stat
 | `geolocation` | `status`, `requestPermission`, `getCurrentPosition` | Android last-known GPS/network location; iOS manager's current cached location |
 | `battery` | `status` | Android battery broadcast; iOS battery monitor |
 | `appearance` | `status` | Current light/dark scheme on Android and iOS |
+| `haptics` | `impact`, `selection`, `notification` | Android vibrator; iOS UIKit feedback generators |
 
-`haptics` and `filesystem` are accepted installers, but their host handlers predate the opt-in
-surface and remain in the baseline shell. They are not yet minimal-scaffold capability gates.
+`filesystem` is accepted by the installer, but its Rust handler predates the opt-in surface and
+remains in the baseline shell. It is not yet a minimal-scaffold capability gate.
 
 The scaffold includes `views/main.crepus` as the Crepus-authored UI source.
 When the template changes, sync the shared View IR fixture into the native

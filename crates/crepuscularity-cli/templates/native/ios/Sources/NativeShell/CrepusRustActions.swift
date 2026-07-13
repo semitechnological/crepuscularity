@@ -196,8 +196,6 @@ public enum CrepusRustActions {
         switch capability {
         case "clipboard":
             return try clipboardValue(method: method, payload: payload)
-        case "haptics":
-            return try hapticsValue(method: method, payload: payload)
         case "browser", "linking":
             return try openUrlValue(capability: capability, method: method, payload: payload)
         case "imagePicker":
@@ -228,57 +226,6 @@ public enum CrepusRustActions {
             return ["cleared": true]
         default:
             throw HostActionError("unsupported clipboard method: \(method)")
-        }
-    }
-
-    private static func hapticsValue(method: String, payload: [String: Any]?) throws -> Any {
-        #if canImport(UIKit)
-        Task { @MainActor in
-            switch method {
-            case "impact":
-                let styleName = payload?["style"] as? String ?? "medium"
-                let style: UIImpactFeedbackGenerator.FeedbackStyle
-                switch styleName {
-                case "light":
-                    style = .light
-                case "heavy":
-                    style = .heavy
-                case "soft":
-                    style = .soft
-                case "rigid":
-                    style = .rigid
-                default:
-                    style = .medium
-                }
-                UIImpactFeedbackGenerator(style: style).impactOccurred()
-            case "selection":
-                UISelectionFeedbackGenerator().selectionChanged()
-            case "notification":
-                let typeName = payload?["type"] as? String ?? "success"
-                let type: UINotificationFeedbackGenerator.FeedbackType
-                switch typeName {
-                case "warning":
-                    type = .warning
-                case "error":
-                    type = .error
-                default:
-                    type = .success
-                }
-                UINotificationFeedbackGenerator().notificationOccurred(type)
-            default:
-                break
-            }
-        }
-        #endif
-        switch method {
-        case "impact":
-            return ["triggered": true, "style": payload?["style"] as? String ?? "medium"]
-        case "selection":
-            return ["triggered": true]
-        case "notification":
-            return ["triggered": true, "type": payload?["type"] as? String ?? "success"]
-        default:
-            throw HostActionError("unsupported haptics method: \(method)")
         }
     }
 

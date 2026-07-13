@@ -359,7 +359,7 @@ fn mobile_new_scaffolds_runtime_files() {
     assert!(rust_actions.contains("crepusMobileStoreResultJson"));
     assert!(rust_actions.contains("crepusMobileEvalText"));
     assert!(rust_actions.contains("JSONSerialization.data(withJSONObject:"));
-    assert!(rust_actions.contains("UIImpactFeedbackGenerator"));
+    assert!(!rust_actions.contains("UIImpactFeedbackGenerator"));
     assert!(rust_actions.contains("crepusMobileLastResult"));
     assert!(!rust_actions.contains("UIDevice.current"));
     assert!(!rust_actions.contains("Bundle.main.bundleIdentifier"));
@@ -379,7 +379,7 @@ fn mobile_new_scaffolds_runtime_files() {
     assert!(!android_actions.contains("getSharedPreferences(\"crepus_preferences\""));
     assert!(!android_actions.contains("Build.MANUFACTURER"));
     assert!(!android_actions.contains("packageManager.getPackageInfo"));
-    assert!(android_actions.contains("VibrationEffect.createOneShot"));
+    assert!(!android_actions.contains("VibrationEffect.createOneShot"));
     let ios_actions =
         std::fs::read_to_string(root.join("ios/Sources/NativeShell/CrepusRustActions.swift"))
             .expect("read iOS actions");
@@ -420,6 +420,15 @@ fn native_add_capability_updates_only_the_scaffold() {
         .expect("scaffold")
         .status
         .success());
+    let default_android = std::fs::read_to_string(
+        root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusRustActions.kt"),
+    )
+    .expect("read default Android actions");
+    let default_ios =
+        std::fs::read_to_string(root.join("ios/Sources/NativeShell/CrepusRustActions.swift"))
+            .expect("read default iOS actions");
+    assert!(!default_android.contains("hapticsValue"));
+    assert!(!default_ios.contains("hapticsValue"));
     assert!(crepus()
         .args(["native", "add", "sensors", "--dir"])
         .arg(&root)
@@ -477,6 +486,15 @@ fn native_add_capability_updates_only_the_scaffold() {
         .expect("add haptics")
         .status
         .success());
+    let haptics_android = std::fs::read_to_string(
+        root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusRustActions.kt"),
+    )
+    .expect("read Android haptics bridge");
+    let haptics_ios =
+        std::fs::read_to_string(root.join("ios/Sources/NativeShell/CrepusRustActions.swift"))
+            .expect("read iOS haptics bridge");
+    assert!(haptics_android.contains("VibrationEffect.createOneShot"));
+    assert!(haptics_ios.contains("UIImpactFeedbackGenerator"));
     assert!(crepus()
         .args(["native", "add", "filesystem", "--dir"])
         .arg(&root)

@@ -24,8 +24,9 @@ use crepuscularity_native::{
     generate_native_source, render_component_file_to_ir, render_from_files, render_template_to_ir,
     to_json, to_json_pretty, NativeCodegenTarget, ANDROID_APPEARANCE, ANDROID_BATTERY,
     ANDROID_BLUETOOTH, ANDROID_BLUETOOTH_BRIDGE, ANDROID_GEOLOCATION, ANDROID_GEOLOCATION_BRIDGE,
-    ANDROID_SENSORS, ANDROID_SENSORS_BRIDGE, IOS_APPEARANCE, IOS_BATTERY, IOS_BLUETOOTH,
+    ANDROID_HAPTICS, ANDROID_SENSORS, ANDROID_SENSORS_BRIDGE, IOS_APPEARANCE, IOS_BATTERY, IOS_BLUETOOTH,
     IOS_BLUETOOTH_BRIDGE, IOS_GEOLOCATION, IOS_GEOLOCATION_BRIDGE, IOS_SENSORS, IOS_SENSORS_BRIDGE,
+    IOS_HAPTICS,
 };
 use serde::Deserialize;
 use serde_json::Value;
@@ -167,6 +168,9 @@ fn add_capability(capability: &str, root: &Path) -> Result<(), String> {
     }
     if spec.name == "sensors" {
         add_sensors_host(root)?;
+    }
+    if spec.name == "haptics" {
+        add_haptics_host(root)?;
     }
     if spec.name == "bluetooth" {
         add_bluetooth_host(root)?;
@@ -353,6 +357,42 @@ fn add_bluetooth_ios_host(root: &Path) -> Result<(), String> {
     );
     source.push_str(IOS_BLUETOOTH_BRIDGE);
     fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))
+}
+
+fn add_haptics_host(root: &Path) -> Result<(), String> {
+    let android = android_actions_path(root)?;
+    let mut source =
+        fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
+    if !source.contains("hapticsValue") {
+        source = source.replace(
+            "import android.net.Uri\n",
+            "import android.net.Uri\nimport android.os.Build\nimport android.os.VibrationEffect\nimport android.os.Vibrator\nimport android.os.VibratorManager\n",
+        );
+        source = source.replace(
+            "            \"clipboard\" -> clipboardValue(method, payload)\n",
+            "            \"clipboard\" -> clipboardValue(method, payload)\n            \"haptics\" -> hapticsValue(method, payload)\n",
+        );
+        source = source.replace(
+            "\n}\n\nobject CrepusActionState",
+            &format!("{ANDROID_HAPTICS}\n}}\n\nobject CrepusActionState"),
+        );
+        fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))?;
+    }
+    let ios = root.join("ios/Sources/NativeShell/CrepusRustActions.swift");
+    let mut source =
+        fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
+    if !source.contains("hapticsValue") {
+        source = source.replace(
+            "        case \"clipboard\":\n            return try clipboardValue(method: method, payload: payload)\n",
+            "        case \"clipboard\":\n            return try clipboardValue(method: method, payload: payload)\n        case \"haptics\":\n            return try hapticsValue(method: method, payload: payload)\n",
+        );
+        source = source.replace(
+            "\n    fileprivate static func emit",
+            &format!("{IOS_HAPTICS}\n\n    fileprivate static func emit"),
+        );
+        fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
+    }
+    Ok(())
 }
 
 fn add_sensors_host(root: &Path) -> Result<(), String> {

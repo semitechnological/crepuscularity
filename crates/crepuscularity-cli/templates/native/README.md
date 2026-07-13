@@ -55,9 +55,9 @@ crepus native add bluetooth --dir .
 `sensors` installs real gyro and accelerometer bridges. `bluetooth` installs Android and iOS BLE scan
 bridges with `status`, `requestPermission`, `scan`, and `stopScan` operations.
 
-`geolocation`, `battery`, and `appearance` add `getCurrentPosition`/permission, battery status,
-and color-scheme status bridges respectively. Geolocation is cached: Android returns the most recent
-GPS/network fix and iOS returns the location manager's current location.
+`geolocation`, `battery`, `appearance`, and `haptics` add location permission/current-position,
+battery status, color-scheme status, and feedback generators respectively. Geolocation is cached:
+Android returns the most recent GPS/network fix and iOS returns the location manager's current location.
 
 ## Regenerating the fixture from a template
 

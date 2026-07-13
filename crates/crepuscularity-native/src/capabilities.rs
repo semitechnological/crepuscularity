@@ -231,6 +231,99 @@ private final class BluetoothBridge: NSObject, CBCentralManagerDelegate {
 }
 "#;
 
+pub const ANDROID_HAPTICS: &str = r#"
+    private fun hapticsValue(method: String, payload: JSONObject?): JSONObject {
+        val vibrator =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val manager = appContext.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
+                manager.defaultVibrator
+            } else {
+                @Suppress("DEPRECATION")
+                appContext.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+            }
+        val duration =
+            when (method) {
+                "impact" -> when (payload?.optString("style", "medium")) {
+                    "light" -> 10L
+                    "heavy" -> 30L
+                    else -> 20L
+                }
+                "selection" -> 10L
+                "notification" -> when (payload?.optString("type", "success")) {
+                    "warning" -> 25L
+                    "error" -> 35L
+                    else -> 20L
+                }
+                else -> error("unsupported haptics method: $method")
+            }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            vibrator.vibrate(VibrationEffect.createOneShot(duration, VibrationEffect.DEFAULT_AMPLITUDE))
+        } else {
+            @Suppress("DEPRECATION")
+            vibrator.vibrate(duration)
+        }
+        return when (method) {
+            "impact" -> JSONObject().put("triggered", true).put("style", payload?.optString("style", "medium") ?: "medium")
+            "selection" -> JSONObject().put("triggered", true)
+            "notification" -> JSONObject().put("triggered", true).put("type", payload?.optString("type", "success") ?: "success")
+            else -> error("unsupported haptics method: $method")
+        }
+    }
+"#;
+
+pub const IOS_HAPTICS: &str = r#"
+    private static func hapticsValue(method: String, payload: [String: Any]?) throws -> Any {
+        #if canImport(UIKit)
+        Task { @MainActor in
+            switch method {
+            case "impact":
+                let styleName = payload?["style"] as? String ?? "medium"
+                let style: UIImpactFeedbackGenerator.FeedbackStyle
+                switch styleName {
+                case "light":
+                    style = .light
+                case "heavy":
+                    style = .heavy
+                case "soft":
+                    style = .soft
+                case "rigid":
+                    style = .rigid
+                default:
+                    style = .medium
+                }
+                UIImpactFeedbackGenerator(style: style).impactOccurred()
+            case "selection":
+                UISelectionFeedbackGenerator().selectionChanged()
+            case "notification":
+                let typeName = payload?["type"] as? String ?? "success"
+                let type: UINotificationFeedbackGenerator.FeedbackType
+                switch typeName {
+                case "warning":
+                    type = .warning
+                case "error":
+                    type = .error
+                default:
+                    type = .success
+                }
+                UINotificationFeedbackGenerator().notificationOccurred(type)
+            default:
+                break
+            }
+        }
+        #endif
+        switch method {
+        case "impact":
+            return ["triggered": true, "style": payload?["style"] as? String ?? "medium"]
+        case "selection":
+            return ["triggered": true]
+        case "notification":
+            return ["triggered": true, "type": payload?["type"] as? String ?? "success"]
+        default:
+            throw HostActionError("unsupported haptics method: \(method)")
+        }
+    }
+"#;
+
 pub const ANDROID_GEOLOCATION: &str = r#"
     private val geolocation by lazy { GeolocationBridge(activity) }
 
