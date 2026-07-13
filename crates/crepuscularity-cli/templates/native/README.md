@@ -86,6 +86,7 @@ metadata for each asset it can access.
 `dialog.show` presents a native alert and streams whether it was accepted or cancelled.
 `actionSheet.show` presents native choices and streams the selected label and index.
 `appState.get` returns whether the app is active or backgrounded.
+`app.getInfo` returns the app name, identifier, version, and build.
 `screenOrientation.get` returns portrait or landscape.
 `accessibilityInfo.get` and `accessibilityInfo.status` return reduce-motion and screen-reader state.
 `device.get` and `device.info` return the platform, device model, and operating-system version.

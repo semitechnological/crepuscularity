@@ -23,20 +23,21 @@ use crepuscularity_core::{DriverCache, Fingerprint};
 use crepuscularity_native::{
     generate_native_source, render_component_file_to_ir, render_from_files, render_template_to_ir,
     to_json, to_json_pretty, NativeCodegenTarget, ANDROID_ACCESSIBILITY_INFO, ANDROID_ACTION_SHEET,
-    ANDROID_APPEARANCE, ANDROID_APP_STATE, ANDROID_BATTERY, ANDROID_BIOMETRICS, ANDROID_BLUETOOTH,
-    ANDROID_BLUETOOTH_BRIDGE, ANDROID_BROWSER, ANDROID_CAMERA, ANDROID_CLIPBOARD, ANDROID_DEVICE,
-    ANDROID_DIALOG, ANDROID_DIMENSIONS, ANDROID_DOCUMENT_PICKER, ANDROID_GEOLOCATION,
-    ANDROID_GEOLOCATION_BRIDGE, ANDROID_HAPTICS, ANDROID_IMAGE_PICKER, ANDROID_KEYBOARD,
-    ANDROID_LOCAL_NOTIFICATIONS, ANDROID_NETWORK, ANDROID_PHOTO_LIBRARY, ANDROID_PREFERENCES,
-    ANDROID_SCREEN_ORIENTATION, ANDROID_SECURE_STORAGE, ANDROID_SENSORS, ANDROID_SENSORS_BRIDGE,
-    ANDROID_SETTINGS, ANDROID_SHARE, IOS_ACCESSIBILITY_INFO, IOS_ACTION_SHEET,
-    IOS_ACTION_SHEET_BRIDGE, IOS_APPEARANCE, IOS_APP_STATE, IOS_BATTERY, IOS_BIOMETRICS,
-    IOS_BLUETOOTH, IOS_BLUETOOTH_BRIDGE, IOS_BROWSER, IOS_CAMERA, IOS_CAMERA_BRIDGE, IOS_CLIPBOARD,
-    IOS_CLIPBOARD_BRIDGE, IOS_DEVICE, IOS_DIALOG, IOS_DIALOG_BRIDGE, IOS_DIMENSIONS,
-    IOS_DOCUMENT_PICKER, IOS_GEOLOCATION, IOS_GEOLOCATION_BRIDGE, IOS_HAPTICS, IOS_IMAGE_PICKER,
-    IOS_IMAGE_PICKER_BRIDGE, IOS_KEYBOARD, IOS_LOCAL_NOTIFICATIONS, IOS_NETWORK, IOS_PHOTO_LIBRARY,
-    IOS_PHOTO_LIBRARY_BRIDGE, IOS_PREFERENCES, IOS_SCREEN_ORIENTATION, IOS_SECURE_STORAGE,
-    IOS_SENSORS, IOS_SENSORS_BRIDGE, IOS_SETTINGS, IOS_SHARE,
+    ANDROID_APP, ANDROID_APPEARANCE, ANDROID_APP_STATE, ANDROID_BATTERY, ANDROID_BIOMETRICS,
+    ANDROID_BLUETOOTH, ANDROID_BLUETOOTH_BRIDGE, ANDROID_BROWSER, ANDROID_CAMERA,
+    ANDROID_CLIPBOARD, ANDROID_DEVICE, ANDROID_DIALOG, ANDROID_DIMENSIONS, ANDROID_DOCUMENT_PICKER,
+    ANDROID_GEOLOCATION, ANDROID_GEOLOCATION_BRIDGE, ANDROID_HAPTICS, ANDROID_IMAGE_PICKER,
+    ANDROID_KEYBOARD, ANDROID_LOCAL_NOTIFICATIONS, ANDROID_NETWORK, ANDROID_PHOTO_LIBRARY,
+    ANDROID_PREFERENCES, ANDROID_SCREEN_ORIENTATION, ANDROID_SECURE_STORAGE, ANDROID_SENSORS,
+    ANDROID_SENSORS_BRIDGE, ANDROID_SETTINGS, ANDROID_SHARE, IOS_ACCESSIBILITY_INFO,
+    IOS_ACTION_SHEET, IOS_ACTION_SHEET_BRIDGE, IOS_APP, IOS_APPEARANCE, IOS_APP_STATE, IOS_BATTERY,
+    IOS_BIOMETRICS, IOS_BLUETOOTH, IOS_BLUETOOTH_BRIDGE, IOS_BROWSER, IOS_CAMERA,
+    IOS_CAMERA_BRIDGE, IOS_CLIPBOARD, IOS_CLIPBOARD_BRIDGE, IOS_DEVICE, IOS_DIALOG,
+    IOS_DIALOG_BRIDGE, IOS_DIMENSIONS, IOS_DOCUMENT_PICKER, IOS_GEOLOCATION,
+    IOS_GEOLOCATION_BRIDGE, IOS_HAPTICS, IOS_IMAGE_PICKER, IOS_IMAGE_PICKER_BRIDGE, IOS_KEYBOARD,
+    IOS_LOCAL_NOTIFICATIONS, IOS_NETWORK, IOS_PHOTO_LIBRARY, IOS_PHOTO_LIBRARY_BRIDGE,
+    IOS_PREFERENCES, IOS_SCREEN_ORIENTATION, IOS_SECURE_STORAGE, IOS_SENSORS, IOS_SENSORS_BRIDGE,
+    IOS_SETTINGS, IOS_SHARE,
 };
 use serde::Deserialize;
 use serde_json::Value;
@@ -142,6 +143,7 @@ const CAPABILITIES: &[CapabilitySpec] = &[
     CapabilitySpec { name: "dialog", aliases: &[], cargo_feature: "dialog", android_manifest: "", ios_project: "" },
     CapabilitySpec { name: "action-sheet", aliases: &["actionsheet"], cargo_feature: "action-sheet", android_manifest: "", ios_project: "" },
     CapabilitySpec { name: "app-state", aliases: &["appstate"], cargo_feature: "app-state", android_manifest: "", ios_project: "" },
+    CapabilitySpec { name: "app", aliases: &["app-info", "appinfo"], cargo_feature: "app", android_manifest: "", ios_project: "" },
     CapabilitySpec { name: "screen-orientation", aliases: &["screenorientation"], cargo_feature: "screen-orientation", android_manifest: "", ios_project: "" },
     CapabilitySpec { name: "accessibility-info", aliases: &["accessibilityinfo", "screen-reader", "screenreader"], cargo_feature: "accessibility-info", android_manifest: "", ios_project: "" },
     CapabilitySpec { name: "device", aliases: &["device-info", "deviceinfo", "platform"], cargo_feature: "device", android_manifest: "", ios_project: "" },
@@ -265,6 +267,9 @@ fn add_capability(capability: &str, root: &Path) -> Result<(), String> {
     }
     if spec.name == "app-state" {
         add_app_state_host(root)?;
+    }
+    if spec.name == "app" {
+        add_app_host(root)?;
     }
     if spec.name == "screen-orientation" {
         add_screen_orientation_host(root)?;
@@ -983,6 +988,38 @@ fn add_app_state_host(root: &Path) -> Result<(), String> {
         source = source.replace(
             "\n    private static func dispatchHostAction",
             &format!("{IOS_APP_STATE}\n\n    private static func dispatchHostAction"),
+        );
+        fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
+    }
+    Ok(())
+}
+
+fn add_app_host(root: &Path) -> Result<(), String> {
+    let android = android_actions_path(root)?;
+    let mut source =
+        fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
+    if !source.contains("appValue") {
+        source = source.replace(
+            "        when (capability) {\n",
+            "        when (capability) {\n            \"app\" -> appValue(method)\n",
+        );
+        source = source.replace(
+            "\n    private fun dispatchHostAction",
+            &format!("{ANDROID_APP}\n    private fun dispatchHostAction"),
+        );
+        fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))?;
+    }
+    let ios = root.join("ios/Sources/NativeShell/CrepusRustActions.swift");
+    let mut source =
+        fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
+    if !source.contains("appValue") {
+        source = source.replace(
+            "        switch capability {\n",
+            "        switch capability {\n        case \"app\":\n            return try appValue(method: method)\n",
+        );
+        source = source.replace(
+            "\n    private static func dispatchHostAction",
+            &format!("{IOS_APP}\n\n    private static func dispatchHostAction"),
         );
         fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
     }

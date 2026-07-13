@@ -1453,6 +1453,23 @@ pub const IOS_BIOMETRICS: &str = r#"
     }
 "#;
 
+pub const ANDROID_APP: &str = r#"
+    private fun appValue(method: String): JSONObject {
+        if (method != "getInfo") error("unsupported app method: $method")
+        val info = appContext.packageManager.getPackageInfo(appContext.packageName, 0)
+        val label = appContext.applicationInfo.loadLabel(appContext.packageManager).toString()
+        return JSONObject().put("name", label).put("version", info.versionName ?: "").put("build", info.longVersionCode).put("id", appContext.packageName)
+    }
+"#;
+
+pub const IOS_APP: &str = r#"
+    private static func appValue(method: String) throws -> Any {
+        guard method == "getInfo" else { throw HostActionError("unsupported app method: \(method)") }
+        let bundle = Bundle.main
+        return ["name": bundle.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String ?? bundle.object(forInfoDictionaryKey: "CFBundleName") as? String ?? "", "version": bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "", "build": bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "", "id": bundle.bundleIdentifier ?? ""]
+    }
+"#;
+
 pub const ANDROID_GEOLOCATION: &str = r#"
     private val geolocation by lazy { GeolocationBridge(activity) }
 
