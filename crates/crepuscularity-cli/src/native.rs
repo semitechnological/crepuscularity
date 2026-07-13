@@ -28,15 +28,15 @@ use crepuscularity_native::{
     ANDROID_DIALOG, ANDROID_DIMENSIONS, ANDROID_DOCUMENT_PICKER, ANDROID_GEOLOCATION,
     ANDROID_GEOLOCATION_BRIDGE, ANDROID_HAPTICS, ANDROID_IMAGE_PICKER, ANDROID_KEYBOARD,
     ANDROID_LOCAL_NOTIFICATIONS, ANDROID_NETWORK, ANDROID_PHOTO_LIBRARY, ANDROID_PREFERENCES,
-    ANDROID_SCREEN_ORIENTATION, ANDROID_SENSORS, ANDROID_SENSORS_BRIDGE, ANDROID_SETTINGS,
-    ANDROID_SHARE, IOS_ACCESSIBILITY_INFO, IOS_ACTION_SHEET, IOS_ACTION_SHEET_BRIDGE,
-    IOS_APPEARANCE, IOS_APP_STATE, IOS_BATTERY, IOS_BLUETOOTH, IOS_BLUETOOTH_BRIDGE, IOS_BROWSER,
-    IOS_CAMERA, IOS_CAMERA_BRIDGE, IOS_CLIPBOARD, IOS_CLIPBOARD_BRIDGE, IOS_DEVICE, IOS_DIALOG,
-    IOS_DIALOG_BRIDGE, IOS_DIMENSIONS, IOS_DOCUMENT_PICKER, IOS_GEOLOCATION,
-    IOS_GEOLOCATION_BRIDGE, IOS_HAPTICS, IOS_IMAGE_PICKER, IOS_IMAGE_PICKER_BRIDGE, IOS_KEYBOARD,
-    IOS_LOCAL_NOTIFICATIONS, IOS_NETWORK, IOS_PHOTO_LIBRARY, IOS_PHOTO_LIBRARY_BRIDGE,
-    IOS_PREFERENCES, IOS_SCREEN_ORIENTATION, IOS_SENSORS, IOS_SENSORS_BRIDGE, IOS_SETTINGS,
-    IOS_SHARE,
+    ANDROID_SCREEN_ORIENTATION, ANDROID_SECURE_STORAGE, ANDROID_SENSORS, ANDROID_SENSORS_BRIDGE,
+    ANDROID_SETTINGS, ANDROID_SHARE, IOS_ACCESSIBILITY_INFO, IOS_ACTION_SHEET,
+    IOS_ACTION_SHEET_BRIDGE, IOS_APPEARANCE, IOS_APP_STATE, IOS_BATTERY, IOS_BLUETOOTH,
+    IOS_BLUETOOTH_BRIDGE, IOS_BROWSER, IOS_CAMERA, IOS_CAMERA_BRIDGE, IOS_CLIPBOARD,
+    IOS_CLIPBOARD_BRIDGE, IOS_DEVICE, IOS_DIALOG, IOS_DIALOG_BRIDGE, IOS_DIMENSIONS,
+    IOS_DOCUMENT_PICKER, IOS_GEOLOCATION, IOS_GEOLOCATION_BRIDGE, IOS_HAPTICS, IOS_IMAGE_PICKER,
+    IOS_IMAGE_PICKER_BRIDGE, IOS_KEYBOARD, IOS_LOCAL_NOTIFICATIONS, IOS_NETWORK, IOS_PHOTO_LIBRARY,
+    IOS_PHOTO_LIBRARY_BRIDGE, IOS_PREFERENCES, IOS_SCREEN_ORIENTATION, IOS_SECURE_STORAGE,
+    IOS_SENSORS, IOS_SENSORS_BRIDGE, IOS_SETTINGS, IOS_SHARE,
 };
 use serde::Deserialize;
 use serde_json::Value;
@@ -150,6 +150,7 @@ const CAPABILITIES: &[CapabilitySpec] = &[
     CapabilitySpec { name: "keyboard", aliases: &[], cargo_feature: "keyboard", android_manifest: "", ios_project: "" },
     CapabilitySpec { name: "settings", aliases: &["app-settings"], cargo_feature: "settings", android_manifest: "", ios_project: "" },
     CapabilitySpec { name: "local-notifications", aliases: &["localnotifications", "notifications"], cargo_feature: "local-notifications", android_manifest: "    <uses-permission android:name=\"android.permission.POST_NOTIFICATIONS\" />\n", ios_project: "" },
+    CapabilitySpec { name: "secure-storage", aliases: &["securestorage"], cargo_feature: "secure-storage", android_manifest: "", ios_project: "" },
     CapabilitySpec {
         name: "filesystem",
         aliases: &["files"],
@@ -287,6 +288,9 @@ fn add_capability(capability: &str, root: &Path) -> Result<(), String> {
     }
     if spec.name == "local-notifications" {
         add_local_notifications_host(root)?;
+    }
+    if spec.name == "secure-storage" {
+        add_secure_storage_host(root)?;
     }
     if spec.name == "bluetooth" {
         add_bluetooth_host(root)?;
@@ -1250,6 +1254,46 @@ fn add_local_notifications_host(root: &Path) -> Result<(), String> {
         source = source.replace(
             "\n    private static func dispatchHostAction",
             &format!("{IOS_LOCAL_NOTIFICATIONS}\n\n    private static func dispatchHostAction"),
+        );
+        fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
+    }
+    Ok(())
+}
+
+fn add_secure_storage_host(root: &Path) -> Result<(), String> {
+    let android = android_actions_path(root)?;
+    let mut source =
+        fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
+    if !source.contains("secureStorageValue") {
+        source = source.replace(
+            "import android.content.Context\n",
+            "import android.content.Context\nimport android.security.keystore.KeyGenParameterSpec\nimport android.security.keystore.KeyProperties\nimport android.util.Base64\nimport java.security.KeyStore\nimport javax.crypto.Cipher\nimport javax.crypto.KeyGenerator\nimport javax.crypto.SecretKey\nimport javax.crypto.spec.GCMParameterSpec\n",
+        );
+        source = source.replace(
+            "        when (capability) {\n",
+            "        when (capability) {\n            \"secureStorage\" -> secureStorageValue(method, payload)\n",
+        );
+        source = source.replace(
+            "\n    private fun dispatchHostAction",
+            &format!("{ANDROID_SECURE_STORAGE}\n    private fun dispatchHostAction"),
+        );
+        fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))?;
+    }
+    let ios = root.join("ios/Sources/NativeShell/CrepusRustActions.swift");
+    let mut source =
+        fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
+    if !source.contains("secureStorageValue") {
+        source = source.replace(
+            "import Foundation\n",
+            "import Foundation\nimport Security\n",
+        );
+        source = source.replace(
+            "        switch capability {\n",
+            "        switch capability {\n        case \"secureStorage\":\n            return try secureStorageValue(method: method, payload: payload)\n",
+        );
+        source = source.replace(
+            "\n    private static func dispatchHostAction",
+            &format!("{IOS_SECURE_STORAGE}\n\n    private static func dispatchHostAction"),
         );
         fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
     }

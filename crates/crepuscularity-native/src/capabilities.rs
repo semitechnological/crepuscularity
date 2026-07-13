@@ -1316,6 +1316,98 @@ pub const IOS_LOCAL_NOTIFICATIONS: &str = r#"
     }
 "#;
 
+pub const ANDROID_SECURE_STORAGE: &str = r#"
+    private fun secureStorageValue(method: String, payload: JSONObject?): JSONObject {
+        val key = payload?.optString("key") ?: ""
+        if (key.isEmpty() && method != "clear") error("secureStorage.$method requires key")
+        val store = appContext.getSharedPreferences("crepus-secure", Context.MODE_PRIVATE)
+        return when (method) {
+            "get" -> JSONObject().put("value", store.getString(key, null)?.let(::decryptSecureValue))
+            "set" -> {
+                store.edit().putString(key, encryptSecureValue(payload?.optString("value") ?: "")).apply()
+                JSONObject().put("saved", true)
+            }
+            "remove" -> {
+                store.edit().remove(key).apply()
+                JSONObject().put("removed", true)
+            }
+            "clear" -> {
+                store.edit().clear().apply()
+                JSONObject().put("cleared", true)
+            }
+            else -> error("unsupported secureStorage method: $method")
+        }
+    }
+
+    private fun secureStorageKey(): SecretKey {
+        val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
+        (store.getKey("crepus-secure", null) as? SecretKey)?.let { return it }
+        val generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore")
+        generator.init(KeyGenParameterSpec.Builder("crepus-secure", KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
+            .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+            .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+            .build())
+        return generator.generateKey()
+    }
+
+    private fun encryptSecureValue(value: String): String {
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        cipher.init(Cipher.ENCRYPT_MODE, secureStorageKey())
+        return Base64.encodeToString(cipher.iv, Base64.NO_WRAP) + ":" + Base64.encodeToString(cipher.doFinal(value.toByteArray(Charsets.UTF_8)), Base64.NO_WRAP)
+    }
+
+    private fun decryptSecureValue(value: String): String? = runCatching {
+        val parts = value.split(":", limit = 2)
+        if (parts.size != 2) return@runCatching null
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        cipher.init(Cipher.DECRYPT_MODE, secureStorageKey(), GCMParameterSpec(128, Base64.decode(parts[0], Base64.NO_WRAP)))
+        String(cipher.doFinal(Base64.decode(parts[1], Base64.NO_WRAP)), Charsets.UTF_8)
+    }.getOrNull()
+"#;
+
+pub const IOS_SECURE_STORAGE: &str = r#"
+    private static func secureStorageValue(method: String, payload: [String: Any]?) throws -> Any {
+        let key = payload?["key"] as? String ?? ""
+        if key.isEmpty && method != "clear" { throw HostActionError("secureStorage.\(method) requires key") }
+        switch method {
+        case "get":
+            return ["value": keychainValue(key) as Any]
+        case "set":
+            try setKeychainValue(payload?["value"] as? String ?? "", key: key)
+            return ["saved": true]
+        case "remove":
+            SecItemDelete(keychainQuery(key) as CFDictionary)
+            return ["removed": true]
+        case "clear":
+            SecItemDelete([kSecClass: kSecClassGenericPassword, kSecAttrService: "dev.crepuscularity.secure"] as CFDictionary)
+            return ["cleared": true]
+        default:
+            throw HostActionError("unsupported secureStorage method: \(method)")
+        }
+    }
+
+    private static func keychainQuery(_ key: String) -> [CFString: Any] {
+        [kSecClass: kSecClassGenericPassword, kSecAttrService: "dev.crepuscularity.secure", kSecAttrAccount: key]
+    }
+
+    private static func keychainValue(_ key: String) -> String? {
+        var query = keychainQuery(key)
+        query[kSecReturnData] = true
+        query[kSecMatchLimit] = kSecMatchLimitOne
+        var result: CFTypeRef?
+        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess, let data = result as? Data else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+
+    private static func setKeychainValue(_ value: String, key: String) throws {
+        let query = keychainQuery(key)
+        let data = value.data(using: .utf8) ?? Data()
+        SecItemDelete(query as CFDictionary)
+        let status = SecItemAdd(query.merging([kSecValueData: data]) { _, new in new } as CFDictionary, nil)
+        guard status == errSecSuccess else { throw HostActionError("keychain write failed: \(status)") }
+    }
+"#;
+
 pub const ANDROID_GEOLOCATION: &str = r#"
     private val geolocation by lazy { GeolocationBridge(activity) }
 
