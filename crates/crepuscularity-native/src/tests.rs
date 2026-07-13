@@ -37,6 +37,31 @@ fn plain_text_stack() {
 }
 
 #[test]
+fn webview_embeds_lower_to_native_ir() {
+    let embed = render_template_to_ir(
+        "embed https://example.com adapter=\"webview\"",
+        &TemplateContext::new(),
+    )
+    .unwrap();
+    let iframe = render_template_to_ir(
+        "iframe w-full h-64 src=\"https://example.com/frame\"",
+        &TemplateContext::new(),
+    )
+    .unwrap();
+
+    assert_eq!(
+        to_json(&embed).unwrap(),
+        format!(
+            r#"{{"version":{IR_VERSION},"root":[{{"kind":"webView","src":"https://example.com"}}]}}"#
+        )
+    );
+    assert!(matches!(
+        &iframe.root[0],
+        crate::ViewNode::WebView { src, style: Some(_) } if src == "https://example.com/frame"
+    ));
+}
+
+#[test]
 fn codegen_swiftui_emits_standalone_view_source() {
     let ir = render_template_to_ir(
         "div flex flex-col gap-4 p-4 bg-blue-500\n  span text-lg font-bold text-white\n    \"Hello Ada\"",
@@ -85,6 +110,29 @@ fn codegen_compose_emits_composable_source() {
     assert!(source.contains("android.os.Handler(android.os.Looper.getMainLooper()).post"));
     assert!(!source.contains("knownActions"));
     assert!(source.contains("Button(onClick = { CrepusActions.perform(\"tap\") })"));
+}
+
+#[test]
+fn codegen_emits_native_webviews() {
+    let ir = ViewIr {
+        version: IR_VERSION,
+        root: vec![crate::ViewNode::WebView {
+            src: "https://example.com/embed".to_string(),
+            style: None,
+        }],
+    };
+
+    let swift = generate_native_source(&ir, NativeCodegenTarget::SwiftUi, "WebViewScreen");
+    assert!(swift.contains("import WebKit"));
+    assert!(swift.contains("public struct CrepusWebView: UIViewRepresentable"));
+    assert!(swift.contains("CrepusWebView(source: \"https://example.com/embed\")"));
+    assert!(swift.contains("webView.load(URLRequest(url: url))"));
+
+    let compose = generate_native_source(&ir, NativeCodegenTarget::Compose, "WebViewScreen");
+    assert!(compose.contains("import androidx.compose.ui.viewinterop.AndroidView"));
+    assert!(compose.contains("import android.webkit.WebView"));
+    assert!(compose.contains("settings.javaScriptEnabled = true"));
+    assert!(compose.contains("loadUrl(\"https://example.com/embed\")"));
 }
 
 #[test]

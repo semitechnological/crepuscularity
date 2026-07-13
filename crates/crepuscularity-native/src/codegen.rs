@@ -15,8 +15,9 @@ pub fn generate_native_source(ir: &ViewIr, target: NativeCodegenTarget, view_nam
 
 fn generate_swiftui(ir: &ViewIr, view_name: &str) -> String {
     let body = swiftui_nodes(&ir.root, 2, None, None);
+    let webview = "import WebKit\n#if canImport(UIKit)\npublic struct CrepusWebView: UIViewRepresentable {\n    public let source: String\n\n    public func makeUIView(context: Context) -> WKWebView {\n        WKWebView()\n    }\n\n    public func updateUIView(_ webView: WKWebView, context: Context) {\n        guard webView.url?.absoluteString != source, let url = URL(string: source) else { return }\n        webView.load(URLRequest(url: url))\n    }\n}\n#elseif canImport(AppKit)\npublic struct CrepusWebView: NSViewRepresentable {\n    public let source: String\n\n    public func makeNSView(context: Context) -> WKWebView {\n        WKWebView()\n    }\n\n    public func updateNSView(_ webView: WKWebView, context: Context) {\n        guard webView.url?.absoluteString != source, let url = URL(string: source) else { return }\n        webView.load(URLRequest(url: url))\n    }\n}\n#endif\n\n";
     format!(
-        "import Foundation\nimport SwiftUI\n#if canImport(UIKit)\nimport UIKit\n#endif\n#if canImport(AppKit)\nimport AppKit\n#endif\n\n@MainActor\npublic enum CrepusActions {{\n    public static let model = CrepusStateStore.shared\n    public static var dispatch: (String) -> String = {{ _ in \"{{}}\" }}\n    public static var resultSink: (String) -> Void = {{ _ in }}\n\n    public static func applyResult(_ json: String) {{\n        model.applyResult(json)\n    }}\n\n    public static func perform(_ action: String) {{\n        let dispatch = dispatch\n        let resultSink = resultSink\n        DispatchQueue.global(qos: .userInitiated).async {{\n            let result = dispatch(action)\n            DispatchQueue.main.async {{\n                resultSink(result)\n            }}\n        }}\n    }}\n\n    public static func performChange(_ action: String?, bind: String, value: Any) {{\n        resultSink(CrepusRustActions.dispatchChangeStored(action ?? \"\", bind: bind, value: value))\n    }}\n\n    public static func dismissKeyboard() {{\n#if canImport(UIKit)\n        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)\n#elseif canImport(AppKit)\n        NSApp.keyWindow?.makeFirstResponder(nil)\n#endif\n    }}\n}}\n\n@MainActor\npublic struct {view_name}: View {{\n    @ObservedObject private var model = CrepusActions.model\n\n    public init() {{}}\n\n    public var body: some View {{\n{body}\n        .contentShape(Rectangle())\n        .onTapGesture {{ CrepusActions.dismissKeyboard() }}\n    }}\n}}\n"
+        "import Foundation\nimport SwiftUI\n{webview}#if canImport(UIKit)\nimport UIKit\n#endif\n#if canImport(AppKit)\nimport AppKit\n#endif\n\n@MainActor\npublic enum CrepusActions {{\n    public static let model = CrepusStateStore.shared\n    public static var dispatch: (String) -> String = {{ _ in \"{{}}\" }}\n    public static var resultSink: (String) -> Void = {{ _ in }}\n\n    public static func applyResult(_ json: String) {{\n        model.applyResult(json)\n    }}\n\n    public static func perform(_ action: String) {{\n        let dispatch = dispatch\n        let resultSink = resultSink\n        DispatchQueue.global(qos: .userInitiated).async {{\n            let result = dispatch(action)\n            DispatchQueue.main.async {{\n                resultSink(result)\n            }}\n        }}\n    }}\n\n    public static func performChange(_ action: String?, bind: String, value: Any) {{\n        resultSink(CrepusRustActions.dispatchChangeStored(action ?? \"\", bind: bind, value: value))\n    }}\n\n    public static func dismissKeyboard() {{\n#if canImport(UIKit)\n        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)\n#elseif canImport(AppKit)\n        NSApp.keyWindow?.makeFirstResponder(nil)\n#endif\n    }}\n}}\n\n@MainActor\npublic struct {view_name}: View {{\n    @ObservedObject private var model = CrepusActions.model\n\n    public init() {{}}\n\n    public var body: some View {{\n{body}\n        .contentShape(Rectangle())\n        .onTapGesture {{ CrepusActions.dismissKeyboard() }}\n    }}\n}}\n"
     )
 }
 
@@ -340,6 +341,11 @@ fn swiftui_node(
             let label = alt.as_deref().unwrap_or(src);
             let mut out = format!("{pad}Text(\"{}\")", swift_escape(label));
             swiftui_style(&mut out, style.as_ref(), true, indent);
+            out
+        }
+        ViewNode::WebView { src, style } => {
+            let mut out = format!("{pad}CrepusWebView(source: \"{}\")", swift_escape(src));
+            swiftui_style(&mut out, style.as_ref(), false, indent);
             out
         }
         ViewNode::Scroll {
@@ -875,9 +881,12 @@ fn swiftui_font_weight(weight: u16) -> &'static str {
 
 fn generate_compose(ir: &ViewIr, view_name: &str) -> String {
     let body = compose_nodes(&ir.root, 1, None, None);
-    format!(
+    let webview_imports =
+        "import android.webkit.WebView\nimport android.webkit.WebViewClient\nimport androidx.compose.ui.viewinterop.AndroidView\n";
+    let source = format!(
         "import androidx.compose.foundation.background\nimport androidx.compose.foundation.border\nimport androidx.compose.foundation.horizontalScroll\nimport androidx.compose.foundation.layout.Arrangement\nimport androidx.compose.foundation.layout.Column\nimport androidx.compose.foundation.layout.ExperimentalLayoutApi\nimport androidx.compose.foundation.layout.FlowRow\nimport androidx.compose.foundation.layout.PaddingValues\nimport androidx.compose.foundation.layout.Row\nimport androidx.compose.foundation.layout.Spacer\nimport androidx.compose.foundation.layout.fillMaxHeight\nimport androidx.compose.foundation.layout.fillMaxSize\nimport androidx.compose.foundation.layout.fillMaxWidth\nimport androidx.compose.foundation.layout.height\nimport androidx.compose.foundation.layout.heightIn\nimport androidx.compose.foundation.layout.offset\nimport androidx.compose.foundation.layout.padding\nimport androidx.compose.foundation.layout.width\nimport androidx.compose.foundation.layout.widthIn\nimport androidx.compose.foundation.lazy.LazyColumn\nimport androidx.compose.foundation.rememberScrollState\nimport androidx.compose.foundation.shape.RoundedCornerShape\nimport androidx.compose.foundation.verticalScroll\nimport androidx.compose.material3.Button\nimport androidx.compose.material3.ButtonDefaults\nimport androidx.compose.material3.Divider\nimport androidx.compose.material3.FilterChip\nimport androidx.compose.material3.LinearProgressIndicator\nimport androidx.compose.material3.LocalContentColor\nimport androidx.compose.material3.NavigationBar\nimport androidx.compose.material3.NavigationBarItem\nimport androidx.compose.material3.Scaffold\nimport androidx.compose.material3.Slider\nimport androidx.compose.material3.Switch\nimport androidx.compose.material3.Text\nimport androidx.compose.material3.TextField\nimport androidx.compose.runtime.Composable\nimport androidx.compose.runtime.CompositionLocalProvider\nimport androidx.compose.ui.Alignment\nimport androidx.compose.ui.Modifier\nimport androidx.compose.ui.draw.alpha\nimport androidx.compose.ui.draw.clip\nimport androidx.compose.ui.draw.rotate\nimport androidx.compose.ui.draw.scale\nimport androidx.compose.ui.graphics.Color\nimport androidx.compose.ui.text.font.FontStyle\nimport androidx.compose.ui.text.font.FontWeight\nimport androidx.compose.ui.text.input.PasswordVisualTransformation\nimport androidx.compose.ui.text.style.TextAlign\nimport androidx.compose.ui.text.style.TextDecoration\nimport androidx.compose.ui.unit.dp\nimport androidx.compose.ui.unit.sp\nimport kotlinx.serialization.json.JsonElement\nimport kotlinx.serialization.json.JsonPrimitive\n\nobject CrepusActions {{\n    var dispatch: (String) -> String = {{ \"{{}}\" }}\n    var resultSink: (String) -> Unit = {{}}\n\n    fun applyResult(raw: String) {{\n        CrepusStateStore.applyResult(raw)\n    }}\n\n    fun perform(action: String) {{\n        val dispatch = dispatch\n        val resultSink = resultSink\n        Thread {{\n            val result = dispatch(action)\n            android.os.Handler(android.os.Looper.getMainLooper()).post {{\n                resultSink(result)\n            }}\n        }}.start()\n    }}\n\n    fun performChange(action: String?, bind: String, value: JsonElement) {{\n        resultSink(CrepusRustActions.dispatchChangeJson(action ?: \"\", bind, value.toString()))\n    }}\n}}\n\n@OptIn(ExperimentalLayoutApi::class)\n@Composable\nfun {view_name}(modifier: Modifier = Modifier) {{\n{body}\n}}\n"
-    )
+    );
+    format!("{webview_imports}{source}")
 }
 
 fn compose_nodes(
@@ -1180,6 +1189,14 @@ fn compose_node_with_base(
             format!(
                 "{pad}Text(\"{}\"{args})",
                 kotlin_escape(alt.as_deref().unwrap_or(src))
+            )
+        }
+        ViewNode::WebView { src, style } => {
+            let modifier = compose_modifier_chain(base_modifier, style.as_ref())
+                .unwrap_or_else(|| "Modifier".to_string());
+            let src = kotlin_escape(src);
+            format!(
+                "{pad}AndroidView(factory = {{ context -> WebView(context).apply {{ webViewClient = WebViewClient(); settings.javaScriptEnabled = true; loadUrl(\"{src}\") }} }}, update = {{ webView -> if (webView.url != \"{src}\") webView.loadUrl(\"{src}\") }}, modifier = {modifier})"
             )
         }
         ViewNode::Scroll {

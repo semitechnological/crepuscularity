@@ -468,6 +468,12 @@ pub enum ViewNode {
         #[serde(skip_serializing_if = "Option::is_none")]
         style: Option<ViewStyle>,
     },
+    #[serde(rename = "webView")]
+    WebView {
+        src: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        style: Option<ViewStyle>,
+    },
     #[serde(rename = "scroll")]
     Scroll {
         axis: StackAxis,

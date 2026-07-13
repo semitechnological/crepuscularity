@@ -53,7 +53,45 @@ fn converts_v1_and_v2_static_crepus_bundles() {
 }
 
 #[test]
-fn webview_conversion_reports_the_native_lowering_boundary() {
+fn webview_conversion_targets_mobile_and_omits_desktop_from_all() {
+    let source = fixture(2);
+    std::fs::write(
+        source.path().join("dist/crepus-bundle.json"),
+        r#"{"entry":"index.crepus","files":{"index.crepus":"embed https://example.com adapter=\"webview\""}}"#,
+    )
+    .unwrap();
+    for target in ["mobile", "all"] {
+        let output = tempfile::tempdir().unwrap();
+        let destination = output.path().join("native");
+        let out = crepus()
+            .args([
+                "tauri",
+                "convert",
+                "--target",
+                target,
+                "--dir",
+                source.path().to_str().unwrap(),
+                "--out",
+                destination.to_str().unwrap(),
+            ])
+            .output()
+            .unwrap();
+        assert!(
+            out.status.success(),
+            "{}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        assert!(destination.join("ios").is_dir());
+        assert!(destination.join("android").is_dir());
+        assert!(!destination.join("desktop").exists());
+        if target == "all" {
+            assert!(String::from_utf8_lossy(&out.stderr).contains("omit GPUI desktop output"));
+        }
+    }
+}
+
+#[test]
+fn webview_conversion_rejects_desktop() {
     let source = fixture(2);
     std::fs::write(
         source.path().join("dist/crepus-bundle.json"),
@@ -67,7 +105,7 @@ fn webview_conversion_reports_the_native_lowering_boundary() {
             "tauri",
             "convert",
             "--target",
-            "mobile",
+            "desktop",
             "--dir",
             source.path().to_str().unwrap(),
             "--out",
@@ -76,8 +114,7 @@ fn webview_conversion_reports_the_native_lowering_boundary() {
         .output()
         .unwrap();
     assert!(!out.status.success());
-    assert!(String::from_utf8_lossy(&out.stderr)
-        .contains("mobile renderer does not yet embed WebViews"));
+    assert!(String::from_utf8_lossy(&out.stderr).contains("GPUI has no WebView host"));
 }
 
 #[test]

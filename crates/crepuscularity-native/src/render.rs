@@ -102,6 +102,12 @@ fn render_node(node: &Node, ctx: &TemplateContext) -> Result<ViewNode, CrepusErr
         Node::Include(_) => Err(CrepusError::render(
             "internal error: include should be expanded in render_nodes_list",
         )),
+        Node::Embed(embed) if embed.adapter.as_deref() == Some("webview") => {
+            Ok(ViewNode::WebView {
+                src: embed.src.clone(),
+                style: None,
+            })
+        }
         Node::Embed(_) => Ok(ViewNode::Text {
             content: String::new(),
             bind: None,
@@ -166,6 +172,14 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<ViewNode, Crepu
     }
 
     let classes = active_classes(el, ctx)?;
+
+    if tag == "iframe" {
+        let hints = style::extract_stack_hints(&classes, Some(ctx));
+        return Ok(ViewNode::WebView {
+            src: binding_string(el, "src", ctx).unwrap_or_default(),
+            style: hints.style.opt(),
+        });
+    }
 
     if tag == "button" {
         let label = collect_primary_text(&el.children, ctx)?;

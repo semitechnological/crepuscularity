@@ -38,14 +38,12 @@ fn convert(dir: &Path, out: &Path, target: TauriTargetArg) -> Result<(), String>
                 .lines()
                 .any(|line| line.trim_start().starts_with("iframe "))
     });
-    if webview {
-        let platform = match target {
-            TauriTargetArg::All | TauriTargetArg::Mobile => "mobile",
-            TauriTargetArg::Desktop => "desktop",
-        };
-        return Err(format!(
-            "WebView components need native {platform} lowering; GPUI has no WebView host and the mobile renderer does not yet embed WebViews"
-        ));
+    if webview && target == TauriTargetArg::Desktop {
+        return Err("WebView components cannot target desktop: GPUI has no WebView host".into());
+    }
+    let desktop = target != TauriTargetArg::Mobile && !webview;
+    if webview && target == TauriTargetArg::All {
+        crate::ui::warning("WebView components omit GPUI desktop output; generated iOS and Android projects embed them natively");
     }
     let ir = project.native_ir()?;
     let fixture = to_json_pretty(&ir).map_err(|e| e.to_string())?;
@@ -70,7 +68,7 @@ fn convert(dir: &Path, out: &Path, target: TauriTargetArg) -> Result<(), String>
                 fs::create_dir_all(parent).map_err(|e| e.to_string())?;
             }
             fs::write(destination, source).map_err(|e| e.to_string())?;
-            if target != TauriTargetArg::Mobile {
+            if desktop {
                 let destination = staging.join("desktop/views").join(path);
                 if let Some(parent) = destination.parent() {
                     fs::create_dir_all(parent).map_err(|e| e.to_string())?;
@@ -83,7 +81,7 @@ fn convert(dir: &Path, out: &Path, target: TauriTargetArg) -> Result<(), String>
             format!("include {}\n", bundle.entry),
         )
         .map_err(|e| e.to_string())?;
-        if target != TauriTargetArg::Mobile {
+        if desktop {
             fs::write(
                 staging.join("desktop/views/main.crepus"),
                 format!("include {}\n", bundle.entry),

@@ -443,6 +443,7 @@ fn node_style_mut(node: &mut ViewNode) -> Option<&mut Option<ViewStyle>> {
         | ViewNode::Dropzone { style, .. }
         | ViewNode::FilePicker { style, .. }
         | ViewNode::Image { style, .. }
+        | ViewNode::WebView { style, .. }
         | ViewNode::Scroll { style, .. }
         | ViewNode::List { style, .. }
         | ViewNode::ListItem { style, .. }
