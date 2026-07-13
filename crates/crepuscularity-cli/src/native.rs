@@ -29,18 +29,20 @@ use crepuscularity_native::{
     ANDROID_DIMENSIONS, ANDROID_DOCUMENT_PICKER, ANDROID_GEOLOCATION, ANDROID_GEOLOCATION_BRIDGE,
     ANDROID_HAPTICS, ANDROID_IMAGE_PICKER, ANDROID_IN_APP_BROWSER, ANDROID_KEYBOARD,
     ANDROID_LOCAL_NOTIFICATIONS, ANDROID_MICROPHONE, ANDROID_NETWORK, ANDROID_PERMISSIONS,
-    ANDROID_PHOTO_LIBRARY, ANDROID_PREFERENCES, ANDROID_SCHEDULED_NOTIFICATION_RECEIVER,
-    ANDROID_SCREEN_ORIENTATION, ANDROID_SECURE_STORAGE, ANDROID_SENSORS, ANDROID_SENSORS_BRIDGE,
-    ANDROID_SETTINGS, ANDROID_SHARE, ANDROID_SYSTEM_BARS, ANDROID_TOAST, ANDROID_VIDEO,
-    IOS_ACCESSIBILITY_INFO, IOS_ACTION_SHEET, IOS_ACTION_SHEET_BRIDGE, IOS_APP, IOS_APPEARANCE,
-    IOS_APP_STATE, IOS_BATTERY, IOS_BIOMETRICS, IOS_BLUETOOTH, IOS_BLUETOOTH_BRIDGE, IOS_BROWSER,
-    IOS_CALENDAR, IOS_CAMERA, IOS_CAMERA_BRIDGE, IOS_CLIPBOARD, IOS_CLIPBOARD_BRIDGE, IOS_CONTACTS,
-    IOS_DEEP_LINKS, IOS_DEVICE, IOS_DIALOG, IOS_DIALOG_BRIDGE, IOS_DIMENSIONS, IOS_DOCUMENT_PICKER,
-    IOS_GEOLOCATION, IOS_GEOLOCATION_BRIDGE, IOS_HAPTICS, IOS_IMAGE_PICKER,
-    IOS_IMAGE_PICKER_BRIDGE, IOS_IN_APP_BROWSER, IOS_KEYBOARD, IOS_LOCAL_NOTIFICATIONS,
-    IOS_MICROPHONE, IOS_NETWORK, IOS_PERMISSIONS, IOS_PHOTO_LIBRARY, IOS_PHOTO_LIBRARY_BRIDGE,
-    IOS_PREFERENCES, IOS_SCREEN_ORIENTATION, IOS_SECURE_STORAGE, IOS_SENSORS, IOS_SENSORS_BRIDGE,
-    IOS_SETTINGS, IOS_SHARE, IOS_SYSTEM_BARS, IOS_TOAST, IOS_VIDEO, IOS_VIDEO_BRIDGE,
+    ANDROID_PHOTO_LIBRARY, ANDROID_PREFERENCES, ANDROID_PRIVACY_SCREEN,
+    ANDROID_SCHEDULED_NOTIFICATION_RECEIVER, ANDROID_SCREEN_ORIENTATION, ANDROID_SECURE_STORAGE,
+    ANDROID_SENSORS, ANDROID_SENSORS_BRIDGE, ANDROID_SETTINGS, ANDROID_SHARE, ANDROID_SYSTEM_BARS,
+    ANDROID_TOAST, ANDROID_VIDEO, IOS_ACCESSIBILITY_INFO, IOS_ACTION_SHEET,
+    IOS_ACTION_SHEET_BRIDGE, IOS_APP, IOS_APPEARANCE, IOS_APP_STATE, IOS_BATTERY, IOS_BIOMETRICS,
+    IOS_BLUETOOTH, IOS_BLUETOOTH_BRIDGE, IOS_BROWSER, IOS_CALENDAR, IOS_CAMERA, IOS_CAMERA_BRIDGE,
+    IOS_CLIPBOARD, IOS_CLIPBOARD_BRIDGE, IOS_CONTACTS, IOS_DEEP_LINKS, IOS_DEVICE, IOS_DIALOG,
+    IOS_DIALOG_BRIDGE, IOS_DIMENSIONS, IOS_DOCUMENT_PICKER, IOS_GEOLOCATION,
+    IOS_GEOLOCATION_BRIDGE, IOS_HAPTICS, IOS_IMAGE_PICKER, IOS_IMAGE_PICKER_BRIDGE,
+    IOS_IN_APP_BROWSER, IOS_KEYBOARD, IOS_LOCAL_NOTIFICATIONS, IOS_MICROPHONE, IOS_NETWORK,
+    IOS_PERMISSIONS, IOS_PHOTO_LIBRARY, IOS_PHOTO_LIBRARY_BRIDGE, IOS_PREFERENCES,
+    IOS_PRIVACY_SCREEN, IOS_SCREEN_ORIENTATION, IOS_SECURE_STORAGE, IOS_SENSORS,
+    IOS_SENSORS_BRIDGE, IOS_SETTINGS, IOS_SHARE, IOS_SYSTEM_BARS, IOS_TOAST, IOS_VIDEO,
+    IOS_VIDEO_BRIDGE,
 };
 use serde::Deserialize;
 use serde_json::Value;
@@ -113,6 +115,7 @@ const CAPABILITIES: &[CapabilitySpec] = &[
     },
     CapabilitySpec { name: "clipboard", aliases: &[], cargo_feature: "clipboard", android_manifest: "", ios_project: "" },
     CapabilitySpec { name: "toast", aliases: &[], cargo_feature: "toast", android_manifest: "", ios_project: "" },
+    CapabilitySpec { name: "privacy-screen", aliases: &["privacyscreen"], cargo_feature: "privacy-screen", android_manifest: "", ios_project: "" },
     CapabilitySpec { name: "video", aliases: &[], cargo_feature: "video", android_manifest: "    <uses-permission android:name=\"android.permission.CAMERA\" />\n    <uses-permission android:name=\"android.permission.RECORD_AUDIO\" />\n    <uses-feature android:name=\"android.hardware.camera\" android:required=\"false\" />\n", ios_project: "        INFOPLIST_KEY_NSCameraUsageDescription: \"$(PRODUCT_NAME) records video when you ask it to.\"\n        INFOPLIST_KEY_NSMicrophoneUsageDescription: \"$(PRODUCT_NAME) records video audio when you ask it to.\"\n" },
     CapabilitySpec { name: "browser", aliases: &["linking", "app-launcher", "applauncher", "phone", "sms"], cargo_feature: "browser", android_manifest: "", ios_project: "" },
     CapabilitySpec { name: "in-app-browser", aliases: &["inappbrowser", "web-browser"], cargo_feature: "in-app-browser", android_manifest: "", ios_project: "" },
@@ -270,6 +273,9 @@ fn add_capability(capability: &str, root: &Path) -> Result<(), String> {
     }
     if spec.name == "toast" {
         add_toast_host(root)?;
+    }
+    if spec.name == "privacy-screen" {
+        add_privacy_screen_host(root)?;
     }
     if spec.name == "video" {
         add_video_host(root)?;
@@ -891,6 +897,36 @@ fn add_video_host(root: &Path) -> Result<(), String> {
             &format!("{IOS_VIDEO}\n\n    private static func dispatchHostAction"),
         );
         source.push_str(IOS_VIDEO_BRIDGE);
+        fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
+    }
+    Ok(())
+}
+
+fn add_privacy_screen_host(root: &Path) -> Result<(), String> {
+    let android = android_actions_path(root)?;
+    let mut source =
+        fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
+    if !source.contains("privacyScreenValue") {
+        source = source.replace(
+            "import android.content.Context\n",
+            "import android.content.Context\nimport android.view.WindowManager\n",
+        );
+        source = source.replace("        when (capability) {\n", "        when (capability) {\n            \"privacyScreen\" -> privacyScreenValue(method)\n");
+        source = source.replace(
+            "\n}\n\nobject CrepusActionState",
+            &format!("{ANDROID_PRIVACY_SCREEN}\n}}\n\nobject CrepusActionState"),
+        );
+        fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))?;
+    }
+    let ios = root.join("ios/Sources/NativeShell/CrepusRustActions.swift");
+    let mut source =
+        fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
+    if !source.contains("privacyScreenValue") {
+        source = source.replace("        switch capability {\n", "        switch capability {\n        case \"privacyScreen\":\n            return try privacyScreenValue(method: method)\n");
+        source = source.replace(
+            "\n    fileprivate static func emit",
+            &format!("{IOS_PRIVACY_SCREEN}\n\n    fileprivate static func emit"),
+        );
         fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
     }
     Ok(())

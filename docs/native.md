@@ -85,6 +85,7 @@ Android and iOS, plus only the required platform declarations. It supports `stat
 | `haptics` | `impact`, `selection`, `notification` | Android vibrator; iOS UIKit feedback generators |
 | `clipboard` | `get`, `set`, `clear`, `startWatch`, `stopWatch` | Android clipboard manager and iOS system pasteboard; watch changes stream as `clipboard.change` |
 | `toast` | `show` | Android system toast or a transient UIKit overlay; payload requires `text` and accepts `duration: "short"` or `"long"` |
+| `privacy-screen` (`privacyscreen`) | `status`, `enable`, `disable` | Blocks Android screenshots/recording or obscures the app while iOS is inactive |
 | `browser` (`linking`, `app-launcher`, `phone`, `sms`) | `open` | Android `ACTION_VIEW`; iOS `UIApplication.open`, including custom app, `tel:`, and `sms:` schemes |
 | `share` | `share` | Android chooser; iOS activity sheet; accepts `text`, `url`, and optional `title` |
 | `image-picker` (`imagepicker`, `media-picker`) | `pick` | Android system picker; iOS PHPicker; results stream as `imagePicker.pick`. The named `pick_media` action is installed with this capability. |

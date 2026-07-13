@@ -388,6 +388,46 @@ pub const IOS_TOAST: &str = r#"
     #endif
 "#;
 
+pub const ANDROID_PRIVACY_SCREEN: &str = r#"
+    private fun privacyScreenValue(method: String): JSONObject {
+        val enabled = activity.window.attributes.flags and WindowManager.LayoutParams.FLAG_SECURE != 0
+        return when (method) {
+            "status" -> JSONObject().put("enabled", enabled)
+            "enable" -> { activity.window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE); JSONObject().put("enabled", true) }
+            "disable" -> { activity.window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE); JSONObject().put("enabled", false) }
+            else -> error("unsupported privacyScreen method: $method")
+        }
+    }
+"#;
+
+pub const IOS_PRIVACY_SCREEN: &str = r#"
+    private static var privacyScreenEnabled = false
+    private static var privacyScreenWindow: UIWindow?
+    private static var privacyScreenObservers: [NSObjectProtocol] = []
+    private static func privacyScreenValue(method: String) throws -> Any {
+        switch method {
+        case "status": return ["enabled": privacyScreenEnabled]
+        case "enable": enablePrivacyScreen(); return ["enabled": true]
+        case "disable": disablePrivacyScreen(); return ["enabled": false]
+        default: throw HostActionError("unsupported privacyScreen method: \(method)")
+        }
+    }
+    private static func enablePrivacyScreen() {
+        guard !privacyScreenEnabled else { return }; privacyScreenEnabled = true
+        let center = NotificationCenter.default
+        privacyScreenObservers = [
+            center.addObserver(forName: UIApplication.willResignActiveNotification, object: nil, queue: .main) { _ in showPrivacyScreen() },
+            center.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { _ in hidePrivacyScreen() },
+        ]
+    }
+    private static func disablePrivacyScreen() { privacyScreenEnabled = false; privacyScreenObservers.forEach(NotificationCenter.default.removeObserver); privacyScreenObservers.removeAll(); hidePrivacyScreen() }
+    private static func showPrivacyScreen() {
+        guard privacyScreenEnabled, let scene = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first else { return }
+        let window = UIWindow(windowScene: scene); window.frame = scene.screen.bounds; window.backgroundColor = .systemBackground; window.windowLevel = .alert + 1; window.isHidden = false; privacyScreenWindow = window
+    }
+    private static func hidePrivacyScreen() { privacyScreenWindow?.isHidden = true; privacyScreenWindow = nil }
+"#;
+
 pub const ANDROID_CLIPBOARD: &str = r#"
     private var clipboardListener: ClipboardManager.OnPrimaryClipChangedListener? = null
 

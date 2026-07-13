@@ -85,6 +85,7 @@ cached: Android returns the most recent GPS/network fix and iOS returns the loca
 `appearance.startWatch` and `appearance.stopWatch` stream system color-scheme changes as `appearance.change`.
 `clipboard.startWatch` and `clipboard.stopWatch` stream pasteboard changes as `clipboard.change`.
 `toast.show` displays `text` for a `short` or `long` duration.
+`privacyScreen.enable` protects the app until `privacyScreen.disable`.
 
 `documentPicker.pick` opens the platform multiple-document picker and emits imported cached-file metadata. The
 named `import_files` action remains available for built-in UI actions and uses the same picker lifecycle.
