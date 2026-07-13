@@ -450,6 +450,8 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(!default_ios.contains("dialogValue"));
     assert!(!default_android.contains("actionSheetValue"));
     assert!(!default_ios.contains("actionSheetValue"));
+    assert!(!default_android.contains("appStateValue"));
+    assert!(!default_ios.contains("appStateValue"));
     assert!(crepus()
         .args(["native", "add", "share", "--dir"])
         .arg(&root)
@@ -682,6 +684,22 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(action_sheet_android.contains("setItems(labels)"));
     assert!(action_sheet_ios.contains("preferredStyle: .actionSheet"));
     assert!(crepus()
+        .args(["native", "add", "app-state", "--dir"])
+        .arg(&root)
+        .output()
+        .expect("add app state")
+        .status
+        .success());
+    let app_state_android = std::fs::read_to_string(
+        root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusRustActions.kt"),
+    )
+    .expect("read Android app state bridge");
+    let app_state_ios =
+        std::fs::read_to_string(root.join("ios/Sources/NativeShell/CrepusRustActions.swift"))
+            .expect("read iOS app state bridge");
+    assert!(app_state_android.contains("activity.lifecycle.currentState"));
+    assert!(app_state_ios.contains("UIApplication.shared.applicationState"));
+    assert!(crepus()
         .args(["native", "add", "filesystem", "--dir"])
         .arg(&root)
         .output()
@@ -700,6 +718,7 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(cargo.contains("dimensions = []"));
     assert!(cargo.contains("dialog = []"));
     assert!(cargo.contains("action-sheet = []"));
+    assert!(cargo.contains("app-state = []"));
     assert!(cargo.contains("filesystem = []"));
     assert!(cargo.contains("default = [\"filesystem\"]"));
     assert!(

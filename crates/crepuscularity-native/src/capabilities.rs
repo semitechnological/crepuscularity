@@ -1057,6 +1057,22 @@ private func actionSheetResultJson(action: String, selection: String, index: Int
 #endif
 "#;
 
+pub const ANDROID_APP_STATE: &str = r#"
+    private fun appStateValue(method: String): JSONObject {
+        if (method != "get") error("unsupported appState method: $method")
+        val state = if (activity.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)) "active" else "background"
+        return JSONObject().put("state", state)
+    }
+"#;
+
+pub const IOS_APP_STATE: &str = r#"
+    private static func appStateValue(method: String) throws -> Any {
+        guard method == "get" else { throw HostActionError("unsupported appState method: \(method)") }
+        let state = UIApplication.shared.applicationState == .active ? "active" : "background"
+        return ["state": state]
+    }
+"#;
+
 pub const ANDROID_GEOLOCATION: &str = r#"
     private val geolocation by lazy { GeolocationBridge(activity) }
 
