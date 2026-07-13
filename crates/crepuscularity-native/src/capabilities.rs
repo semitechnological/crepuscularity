@@ -1256,10 +1256,19 @@ pub const IOS_PREFERENCES: &str = r#"
 "#;
 
 pub const ANDROID_NETWORK: &str = r#"
+    private var networkCallback: ConnectivityManager.NetworkCallback? = null
+
     private fun networkValue(method: String): JSONObject {
-        if (method != "status") error("unsupported network method: $method")
         val manager = appContext.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        val capabilities = manager.activeNetwork?.let(manager::getNetworkCapabilities)
+        return when (method) {
+            "status" -> networkStatus(manager, manager.activeNetwork?.let(manager::getNetworkCapabilities))
+            "startWatch" -> startNetworkWatch(manager)
+            "stopWatch" -> stopNetworkWatch(manager)
+            else -> error("unsupported network method: $method")
+        }
+    }
+
+    private fun networkStatus(manager: ConnectivityManager, capabilities: NetworkCapabilities? = manager.activeNetwork?.let(manager::getNetworkCapabilities)): JSONObject {
         val connected = capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) == true
         val transport = when {
             capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true -> "wifi"
@@ -1270,6 +1279,28 @@ pub const ANDROID_NETWORK: &str = r#"
         }
         return JSONObject().put("connected", connected).put("transport", transport)
     }
+
+    private fun startNetworkWatch(manager: ConnectivityManager): JSONObject {
+        if (networkCallback == null) {
+            networkCallback = object : ConnectivityManager.NetworkCallback() {
+                override fun onCapabilitiesChanged(network: Network, capabilities: NetworkCapabilities) {
+                    CrepusRustActions.emit(JSONObject().put("ok", true).put("action", "network.change").put("value", networkStatus(manager, capabilities)).toString())
+                }
+
+                override fun onLost(network: Network) {
+                    CrepusRustActions.emit(JSONObject().put("ok", true).put("action", "network.change").put("value", networkStatus(manager)).toString())
+                }
+            }
+            manager.registerDefaultNetworkCallback(networkCallback!!)
+        }
+        return JSONObject().put("watching", true)
+    }
+
+    private fun stopNetworkWatch(manager: ConnectivityManager): JSONObject {
+        networkCallback?.let(manager::unregisterNetworkCallback)
+        networkCallback = null
+        return JSONObject().put("watching", false)
+    }
 "#;
 
 pub const IOS_NETWORK: &str = r#"
@@ -1278,12 +1309,44 @@ pub const IOS_NETWORK: &str = r#"
         monitor.start(queue: DispatchQueue(label: "dev.crepuscularity.network"))
         return monitor
     }()
+    private static var networkWatcher: NWPathMonitor?
 
     private static func networkValue(method: String) throws -> Any {
-        guard method == "status" else { throw HostActionError("unsupported network method: \(method)") }
-        let path = networkMonitor.currentPath
+        switch method {
+        case "status":
+            return networkStatus(networkMonitor.currentPath)
+        case "startWatch":
+            return startNetworkWatch()
+        case "stopWatch":
+            return stopNetworkWatch()
+        default:
+            throw HostActionError("unsupported network method: \(method)")
+        }
+    }
+
+    private static func networkStatus(_ path: NWPath) -> [String: Any] {
         let transport = path.usesInterfaceType(.wifi) ? "wifi" : path.usesInterfaceType(.cellular) ? "cellular" : path.usesInterfaceType(.wiredEthernet) ? "ethernet" : path.status == .satisfied ? "other" : "none"
         return ["connected": path.status == .satisfied, "transport": transport]
+    }
+
+    private static func startNetworkWatch() -> [String: Any] {
+        guard networkWatcher == nil else { return ["watching": true] }
+        let monitor = NWPathMonitor()
+        monitor.pathUpdateHandler = { path in
+            Task { @MainActor in
+                let result: [String: Any] = ["ok": true, "action": "network.change", "value": networkStatus(path)]
+                if let data = try? JSONSerialization.data(withJSONObject: result), let json = String(data: data, encoding: .utf8) { CrepusRustActions.emit(json) }
+            }
+        }
+        monitor.start(queue: DispatchQueue(label: "dev.crepuscularity.network.watch"))
+        networkWatcher = monitor
+        return ["watching": true]
+    }
+
+    private static func stopNetworkWatch() -> [String: Any] {
+        networkWatcher?.cancel()
+        networkWatcher = nil
+        return ["watching": false]
     }
 "#;
 

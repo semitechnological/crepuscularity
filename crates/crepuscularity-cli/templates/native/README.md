@@ -99,7 +99,7 @@ metadata for each asset it can access.
 `accessibilityInfo.get` and `accessibilityInfo.status` return reduce-motion and screen-reader state.
 `device.get` and `device.info` return the platform, device model, and operating-system version.
 `preferences` stores string values with `get`, `set`, `remove`, and `clear`.
-`network.status` returns whether the device has a validated connection and its transport.
+`network.status` returns whether the device has a validated connection and its transport; `network.startWatch` and `network.stopWatch` stream connection changes as `network.change`.
 `keyboard.dismiss` closes the active system keyboard.
 `settings.open` opens the operating system's page for this app.
 `localNotifications.status` reports current notification authorization; `localNotifications` requests notification permission, posts immediate local notifications, and can `schedule`/`cancel`/`list` notifications. Scheduling requires an `id` and future Unix-millisecond `at` or `seconds` delay.

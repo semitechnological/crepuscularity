@@ -840,7 +840,9 @@ fn native_add_capability_updates_only_the_scaffold() {
         std::fs::read_to_string(root.join("ios/Sources/NativeShell/CrepusRustActions.swift"))
             .expect("read iOS network bridge");
     assert!(network_android.contains("NetworkCapabilities.NET_CAPABILITY_VALIDATED"));
+    assert!(network_android.contains("registerDefaultNetworkCallback"));
     assert!(network_ios.contains("NWPathMonitor"));
+    assert!(network_ios.contains("network.change"));
     assert!(crepus()
         .args(["native", "add", "keyboard", "--dir"])
         .arg(&root)

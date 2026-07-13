@@ -1421,7 +1421,7 @@ fn add_network_host(root: &Path) -> Result<(), String> {
     if !source.contains("networkValue") {
         source = source.replace(
             "import android.net.Uri\n",
-            "import android.net.Uri\nimport android.net.ConnectivityManager\nimport android.net.NetworkCapabilities\n",
+            "import android.net.Uri\nimport android.net.ConnectivityManager\nimport android.net.Network\nimport android.net.NetworkCapabilities\n",
         );
         source = source.replace(
             "        when (capability) {\n",

@@ -99,7 +99,7 @@ Android and iOS, plus only the required platform declarations. It supports `stat
 | `accessibility-info` (`accessibilityinfo`, `screen-reader`) | `get`, `status` | Reduce-motion and screen-reader state from Android accessibility settings or iOS UIAccessibility |
 | `device` (`device-info`, `deviceinfo`, `platform`) | `get`, `info` | Platform, manufacturer, model, and operating-system version from Android Build or iOS UIDevice |
 | `preferences` (`storage`, `async-storage`) | `get`, `set`, `remove`, `clear` | String values in Android SharedPreferences or iOS UserDefaults; `key` is required except for `clear` |
-| `network` (`net-info`, `netinfo`) | `status` | Validated Android network or app-lifetime iOS NWPathMonitor status, including active transport |
+| `network` (`net-info`, `netinfo`) | `status`, `startWatch`, `stopWatch` | Validated Android network or iOS NWPathMonitor status, including active transport; watch changes stream as `network.change` |
 | `keyboard` | `dismiss` | Hides Android's active input method or resigns iOS's current first responder |
 | `settings` (`app-settings`) | `open` | Opens the app's Android or iOS settings page |
 | `local-notifications` (`notifications`) | `status`, `requestPermission`, `post`, `schedule`, `cancel`, `list` | Android AlarmManager receiver and iOS UserNotifications; schedule with `id` plus future Unix-millisecond `at` or `seconds`; iOS `list` reports asynchronously |
