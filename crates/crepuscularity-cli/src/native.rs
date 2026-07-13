@@ -23,8 +23,8 @@ use crepuscularity_core::{DriverCache, Fingerprint};
 use crepuscularity_native::{
     generate_native_source, render_component_file_to_ir, render_from_files, render_template_to_ir,
     to_json, to_json_pretty, NativeCodegenTarget, ANDROID_BLUETOOTH, ANDROID_BLUETOOTH_BRIDGE,
-    ANDROID_BATTERY, ANDROID_GEOLOCATION, ANDROID_GEOLOCATION_BRIDGE, ANDROID_SENSORS,
-    ANDROID_SENSORS_BRIDGE, IOS_BATTERY, IOS_GEOLOCATION, IOS_GEOLOCATION_BRIDGE, IOS_SENSORS,
+    ANDROID_APPEARANCE, ANDROID_BATTERY, ANDROID_GEOLOCATION, ANDROID_GEOLOCATION_BRIDGE, ANDROID_SENSORS,
+    ANDROID_SENSORS_BRIDGE, IOS_APPEARANCE, IOS_BATTERY, IOS_GEOLOCATION, IOS_GEOLOCATION_BRIDGE, IOS_SENSORS,
     IOS_SENSORS_BRIDGE,
 };
 use serde::Deserialize;
@@ -111,6 +111,7 @@ const CAPABILITIES: &[CapabilitySpec] = &[
         ios_project: "        INFOPLIST_KEY_NSLocationWhenInUseUsageDescription: \"$(PRODUCT_NAME) uses your location while the app is open.\"\n",
     },
     CapabilitySpec { name: "battery", aliases: &[], cargo_feature: "battery", android_manifest: "", ios_project: "" },
+    CapabilitySpec { name: "appearance", aliases: &[], cargo_feature: "appearance", android_manifest: "", ios_project: "" },
 ];
 
 fn add_capability(capability: &str, root: &Path) -> Result<(), String> {
@@ -176,11 +177,33 @@ fn add_capability(capability: &str, root: &Path) -> Result<(), String> {
     if spec.name == "battery" {
         add_battery_host(root)?;
     }
+    if spec.name == "appearance" {
+        add_appearance_host(root)?;
+    }
     ui::success(&format!(
         "added native capability '{}' to '{}'",
         spec.name,
         root.display()
     ));
+    Ok(())
+}
+
+fn add_appearance_host(root: &Path) -> Result<(), String> {
+    let android = root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusRustActions.kt");
+    let mut source = fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
+    if !source.contains("appearanceValue") {
+        source = source.replace("import android.content.ClipData\n", "import android.content.ClipData\nimport android.content.res.Configuration\n");
+        source = source.replace("            \"share\" -> shareValue(method, payload)\n", "            \"share\" -> shareValue(method, payload)\n            \"appearance\" -> appearanceValue(method)\n");
+        source = source.replace("\n}\n\nobject CrepusActionState", &format!("{ANDROID_APPEARANCE}\n}}\n\nobject CrepusActionState"));
+        fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))?;
+    }
+    let ios = root.join("ios/Sources/NativeShell/CrepusRustActions.swift");
+    let mut source = fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
+    if !source.contains("appearanceValue") {
+        source = source.replace("        case \"share\":\n            return try shareValue(method: method, payload: payload)\n", "        case \"share\":\n            return try shareValue(method: method, payload: payload)\n        case \"appearance\":\n            return try appearanceValue(method: method)\n");
+        source = source.replace("\n}\n\nprivate struct HostActionError", &format!("{IOS_APPEARANCE}\n}}\n\nprivate struct HostActionError"));
+        fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
+    }
     Ok(())
 }
 

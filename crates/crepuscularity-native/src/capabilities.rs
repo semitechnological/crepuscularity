@@ -267,3 +267,22 @@ pub const IOS_BATTERY: &str = r#"
         #endif
     }
 "#;
+
+pub const ANDROID_APPEARANCE: &str = r#"
+    private fun appearanceValue(method: String): JSONObject {
+        if (method != "status") error("unsupported appearance method: $method")
+        val mode = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
+        return JSONObject().put("colorScheme", if (mode == Configuration.UI_MODE_NIGHT_YES) "dark" else "light")
+    }
+"#;
+
+pub const IOS_APPEARANCE: &str = r#"
+    private static func appearanceValue(method: String) throws -> Any {
+        guard method == "status" else { throw HostActionError("unsupported appearance method: \(method)") }
+        #if canImport(UIKit)
+        return ["colorScheme": UITraitCollection.current.userInterfaceStyle == .dark ? "dark" : "light"]
+        #else
+        return ["colorScheme": "light"]
+        #endif
+    }
+"#;
