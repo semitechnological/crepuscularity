@@ -602,6 +602,24 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(browser_android.contains("Intent.ACTION_VIEW"));
     assert!(browser_ios.contains("UIApplication.shared.open"));
     assert!(crepus()
+        .args(["native", "add", "battery", "--dir"])
+        .arg(&root)
+        .output()
+        .expect("add battery")
+        .status
+        .success());
+    let battery_android = std::fs::read_to_string(
+        root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusRustActions.kt"),
+    )
+    .expect("read Android battery bridge");
+    let battery_ios =
+        std::fs::read_to_string(root.join("ios/Sources/NativeShell/CrepusRustActions.swift"))
+            .expect("read iOS battery bridge");
+    assert!(battery_android.contains("BroadcastReceiver"));
+    assert!(battery_android.contains("battery.change"));
+    assert!(battery_ios.contains("UIDevice.batteryLevelDidChangeNotification"));
+    assert!(battery_ios.contains("battery.change"));
+    assert!(crepus()
         .args(["native", "add", "appearance", "--dir"])
         .arg(&root)
         .output()

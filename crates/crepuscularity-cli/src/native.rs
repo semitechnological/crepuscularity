@@ -567,7 +567,7 @@ fn add_battery_host(root: &Path) -> Result<(), String> {
     let mut source =
         fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
     if !source.contains("batteryValue") {
-        source = source.replace("import android.content.ClipData\n", "import android.content.ClipData\nimport android.content.Intent\nimport android.content.IntentFilter\nimport android.os.BatteryManager\n");
+        source = source.replace("import android.content.Context\n", "import android.content.BroadcastReceiver\nimport android.content.Context\nimport android.content.IntentFilter\nimport android.os.BatteryManager\n");
         source = source.replace(
             "        when (capability) {\n",
             "        when (capability) {\n            \"battery\" -> batteryValue(method)\n",

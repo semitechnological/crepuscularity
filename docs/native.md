@@ -80,7 +80,7 @@ Android and iOS, plus only the required platform declarations. It supports `stat
 | `sensors` | `status`, `latest`, `start`, `stop` | Android accelerometer/gyro; iOS Core Motion |
 | `bluetooth` | `status`, `requestPermission`, `scan`, `stopScan` | Android and iOS central scanning; discoveries are streamed as results |
 | `geolocation` | `status`, `requestPermission`, `getCurrentPosition`, `startWatch`, `stopWatch` | Android GPS/network watch and iOS CLLocationManager updates; locations stream as `geolocation.update` |
-| `battery` | `status` | Android battery broadcast; iOS battery monitor |
+| `battery` | `status`, `startWatch`, `stopWatch` | Android battery broadcast and iOS battery notifications; watch changes stream as `battery.change` |
 | `appearance` | `status`, `startWatch`, `stopWatch` | Current light/dark scheme on Android and iOS; watch changes stream as `appearance.change` |
 | `haptics` | `impact`, `selection`, `notification` | Android vibrator; iOS UIKit feedback generators |
 | `clipboard` | `get`, `set`, `clear` | Android clipboard manager; iOS system pasteboard |

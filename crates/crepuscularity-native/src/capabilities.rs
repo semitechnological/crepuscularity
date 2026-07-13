@@ -2242,27 +2242,90 @@ private final class GeolocationBridge: NSObject, CLLocationManagerDelegate {
 "#;
 
 pub const ANDROID_BATTERY: &str = r#"
+    private var batteryReceiver: BroadcastReceiver? = null
+
     private fun batteryValue(method: String): JSONObject {
-        if (method != "status") error("unsupported battery method: $method")
-        val state = registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        return when (method) {
+            "status" -> batteryStatus(appContext.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED)))
+            "startWatch" -> startBatteryWatch()
+            "stopWatch" -> stopBatteryWatch()
+            else -> error("unsupported battery method: $method")
+        }
+    }
+
+    private fun batteryStatus(state: Intent?): JSONObject {
         val level = state?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
         val scale = state?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
         return JSONObject().put("level", if (level >= 0 && scale > 0) level.toDouble() / scale else JSONObject.NULL)
             .put("charging", state?.getIntExtra(BatteryManager.EXTRA_STATUS, 0) == BatteryManager.BATTERY_STATUS_CHARGING)
     }
+
+    private fun startBatteryWatch(): JSONObject {
+        if (batteryReceiver == null) {
+            batteryReceiver = object : BroadcastReceiver() {
+                override fun onReceive(context: Context, intent: Intent) {
+                    emit(JSONObject().put("ok", true).put("action", "battery.change").put("value", batteryStatus(intent)).toString())
+                }
+            }
+            appContext.registerReceiver(batteryReceiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        }
+        return batteryValue("status").put("watching", true)
+    }
+
+    private fun stopBatteryWatch(): JSONObject {
+        batteryReceiver?.let(appContext::unregisterReceiver)
+        batteryReceiver = null
+        return batteryValue("status").put("watching", false)
+    }
 "#;
 
 pub const IOS_BATTERY: &str = r#"
     private static func batteryValue(method: String) throws -> Any {
-        guard method == "status" else { throw HostActionError("unsupported battery method: \(method)") }
         #if canImport(UIKit)
+        switch method {
+        case "status": return batteryStatus()
+        case "startWatch": return startBatteryWatch()
+        case "stopWatch": return stopBatteryWatch()
+        default: throw HostActionError("unsupported battery method: \(method)")
+        }
+        #else
+        guard method == "status" || method == "startWatch" || method == "stopWatch" else { throw HostActionError("unsupported battery method: \(method)") }
+        return ["level": NSNull(), "charging": false, "watching": false]
+        #endif
+    }
+
+    #if canImport(UIKit)
+    private static var batteryObservers: [NSObjectProtocol] = []
+
+    private static func batteryStatus() -> [String: Any] {
         UIDevice.current.isBatteryMonitoringEnabled = true
         let level: Any = UIDevice.current.batteryLevel < 0 ? NSNull() : NSNumber(value: UIDevice.current.batteryLevel)
         return ["level": level, "charging": UIDevice.current.batteryState == .charging || UIDevice.current.batteryState == .full]
-        #else
-        return ["level": NSNull(), "charging": false]
-        #endif
     }
+
+    private static func startBatteryWatch() -> [String: Any] {
+        guard batteryObservers.isEmpty else { return batteryStatus().merging(["watching": true]) { _, new in new } }
+        let center = NotificationCenter.default
+        batteryObservers = [
+            center.addObserver(forName: UIDevice.batteryLevelDidChangeNotification, object: nil, queue: .main) { _ in emitBatteryChange() },
+            center.addObserver(forName: UIDevice.batteryStateDidChangeNotification, object: nil, queue: .main) { _ in emitBatteryChange() },
+        ]
+        return batteryStatus().merging(["watching": true]) { _, new in new }
+    }
+
+    private static func stopBatteryWatch() -> [String: Any] {
+        batteryObservers.forEach(NotificationCenter.default.removeObserver)
+        batteryObservers.removeAll()
+        return batteryStatus().merging(["watching": false]) { _, new in new }
+    }
+
+    private static func emitBatteryChange() {
+        let result: [String: Any] = ["ok": true, "action": "battery.change", "value": batteryStatus()]
+        if let data = try? JSONSerialization.data(withJSONObject: result), let json = String(data: data, encoding: .utf8) {
+            CrepusRustActions.emit(json)
+        }
+    }
+    #endif
 "#;
 
 pub const ANDROID_APPEARANCE: &str = r#"
