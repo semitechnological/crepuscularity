@@ -1089,6 +1089,34 @@ pub const IOS_SCREEN_ORIENTATION: &str = r#"
     }
 "#;
 
+pub const ANDROID_ACCESSIBILITY_INFO: &str = r#"
+    private fun accessibilityInfoValue(method: String): JSONObject {
+        if (method != "get" && method != "status") error("unsupported accessibilityInfo method: $method")
+        val manager = appContext.getSystemService(AccessibilityManager::class.java)
+        val reduceMotion = Settings.Global.getFloat(
+            appContext.contentResolver,
+            Settings.Global.ANIMATOR_DURATION_SCALE,
+            1f,
+        ) == 0f
+        return JSONObject()
+            .put("reduceMotion", reduceMotion)
+            .put("screenReader", manager.isTouchExplorationEnabled)
+    }
+"#;
+
+pub const IOS_ACCESSIBILITY_INFO: &str = r#"
+    private static func accessibilityInfoValue(method: String) throws -> Any {
+        guard method == "get" || method == "status" else {
+            throw HostActionError("unsupported accessibilityInfo method: \(method)")
+        }
+        #if canImport(UIKit)
+        return ["reduceMotion": UIAccessibility.isReduceMotionEnabled, "screenReader": UIAccessibility.isVoiceOverRunning]
+        #else
+        return ["reduceMotion": false, "screenReader": false]
+        #endif
+    }
+"#;
+
 pub const ANDROID_GEOLOCATION: &str = r#"
     private val geolocation by lazy { GeolocationBridge(activity) }
 

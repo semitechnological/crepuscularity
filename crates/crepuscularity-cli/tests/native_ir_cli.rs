@@ -718,6 +718,22 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(orientation_android.contains("ORIENTATION_LANDSCAPE"));
     assert!(orientation_ios.contains("UIScreen.main.bounds"));
     assert!(crepus()
+        .args(["native", "add", "accessibility-info", "--dir"])
+        .arg(&root)
+        .output()
+        .expect("add accessibility info")
+        .status
+        .success());
+    let accessibility_android = std::fs::read_to_string(
+        root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusRustActions.kt"),
+    )
+    .expect("read Android accessibility bridge");
+    let accessibility_ios =
+        std::fs::read_to_string(root.join("ios/Sources/NativeShell/CrepusRustActions.swift"))
+            .expect("read iOS accessibility bridge");
+    assert!(accessibility_android.contains("Settings.Global.ANIMATOR_DURATION_SCALE"));
+    assert!(accessibility_ios.contains("UIAccessibility.isReduceMotionEnabled"));
+    assert!(crepus()
         .args(["native", "add", "filesystem", "--dir"])
         .arg(&root)
         .output()
@@ -738,6 +754,7 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(cargo.contains("action-sheet = []"));
     assert!(cargo.contains("app-state = []"));
     assert!(cargo.contains("screen-orientation = []"));
+    assert!(cargo.contains("accessibility-info = []"));
     assert!(cargo.contains("filesystem = []"));
     assert!(cargo.contains("default = [\"filesystem\"]"));
     assert!(
