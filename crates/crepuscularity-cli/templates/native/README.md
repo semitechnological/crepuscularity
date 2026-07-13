@@ -71,6 +71,7 @@ crepus native add contacts --dir .
 crepus native add calendar --dir .
 crepus native add in-app-browser --dir .
 crepus native add system-bars --dir .
+crepus native add deep-links --dir .
 ```
 
 `sensors` installs real gyro and accelerometer bridges. `bluetooth` installs Android and iOS BLE scan
@@ -99,14 +100,15 @@ metadata for each asset it can access.
 `network.status` returns whether the device has a validated connection and its transport.
 `keyboard.dismiss` closes the active system keyboard.
 `settings.open` opens the operating system's page for this app.
-`localNotifications` requests notification permission and posts immediate local notifications.
+`localNotifications.status` reports current notification authorization; `localNotifications` requests notification permission and posts immediate local notifications.
 `secureStorage` persists values with Android Keystore encryption or the iOS Keychain.
 `biometrics.authenticate` opens the system biometric/device-credential prompt.
-`permissions.status`, `permissions.check`, and `permissions.request` operate on a named permission after its related capability has installed the required declarations.
+`permissions.status`, `permissions.check`, and `permissions.request` operate on camera, location, photos, contacts, notifications, or Bluetooth; iOS notification checks emit the current OS authorization asynchronously.
 `contacts.status`, `contacts.requestPermission`, and `contacts.list` use the Android contacts provider or iOS Contacts framework after explicit access is granted.
 `calendar` requests access, lists calendars, and creates events using the platform calendar service.
 `inAppBrowser.open` presents Android Custom Tabs or iOS Safari View Controller.
 `systemBars.status` and `systemBars.set` inspect or update Android bar colors and icon contrast; iOS controls the supported window appearance style.
+`deepLinks` receives `crepus://` URLs as `deepLinks.openUrl` events and opens URLs with `deepLinks.open`.
 
 ## Regenerating the fixture from a template
 

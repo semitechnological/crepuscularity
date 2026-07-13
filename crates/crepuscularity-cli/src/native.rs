@@ -25,20 +25,21 @@ use crepuscularity_native::{
     to_json, to_json_pretty, NativeCodegenTarget, ANDROID_ACCESSIBILITY_INFO, ANDROID_ACTION_SHEET,
     ANDROID_APP, ANDROID_APPEARANCE, ANDROID_APP_STATE, ANDROID_BATTERY, ANDROID_BIOMETRICS,
     ANDROID_BLUETOOTH, ANDROID_BLUETOOTH_BRIDGE, ANDROID_BROWSER, ANDROID_CALENDAR, ANDROID_CAMERA,
-    ANDROID_CLIPBOARD, ANDROID_CONTACTS, ANDROID_DEVICE, ANDROID_DIALOG, ANDROID_DIMENSIONS,
-    ANDROID_DOCUMENT_PICKER, ANDROID_GEOLOCATION, ANDROID_GEOLOCATION_BRIDGE, ANDROID_HAPTICS,
-    ANDROID_IMAGE_PICKER, ANDROID_IN_APP_BROWSER, ANDROID_KEYBOARD, ANDROID_LOCAL_NOTIFICATIONS,
-    ANDROID_NETWORK, ANDROID_PERMISSIONS, ANDROID_PHOTO_LIBRARY, ANDROID_PREFERENCES,
-    ANDROID_SCREEN_ORIENTATION, ANDROID_SECURE_STORAGE, ANDROID_SENSORS, ANDROID_SENSORS_BRIDGE,
-    ANDROID_SETTINGS, ANDROID_SHARE, ANDROID_SYSTEM_BARS, IOS_ACCESSIBILITY_INFO, IOS_ACTION_SHEET,
-    IOS_ACTION_SHEET_BRIDGE, IOS_APP, IOS_APPEARANCE, IOS_APP_STATE, IOS_BATTERY, IOS_BIOMETRICS,
-    IOS_BLUETOOTH, IOS_BLUETOOTH_BRIDGE, IOS_BROWSER, IOS_CALENDAR, IOS_CAMERA, IOS_CAMERA_BRIDGE,
-    IOS_CLIPBOARD, IOS_CLIPBOARD_BRIDGE, IOS_CONTACTS, IOS_DEVICE, IOS_DIALOG, IOS_DIALOG_BRIDGE,
-    IOS_DIMENSIONS, IOS_DOCUMENT_PICKER, IOS_GEOLOCATION, IOS_GEOLOCATION_BRIDGE, IOS_HAPTICS,
-    IOS_IMAGE_PICKER, IOS_IMAGE_PICKER_BRIDGE, IOS_IN_APP_BROWSER, IOS_KEYBOARD,
-    IOS_LOCAL_NOTIFICATIONS, IOS_NETWORK, IOS_PERMISSIONS, IOS_PHOTO_LIBRARY,
-    IOS_PHOTO_LIBRARY_BRIDGE, IOS_PREFERENCES, IOS_SCREEN_ORIENTATION, IOS_SECURE_STORAGE,
-    IOS_SENSORS, IOS_SENSORS_BRIDGE, IOS_SETTINGS, IOS_SHARE, IOS_SYSTEM_BARS,
+    ANDROID_CLIPBOARD, ANDROID_CONTACTS, ANDROID_DEEP_LINKS, ANDROID_DEVICE, ANDROID_DIALOG,
+    ANDROID_DIMENSIONS, ANDROID_DOCUMENT_PICKER, ANDROID_GEOLOCATION, ANDROID_GEOLOCATION_BRIDGE,
+    ANDROID_HAPTICS, ANDROID_IMAGE_PICKER, ANDROID_IN_APP_BROWSER, ANDROID_KEYBOARD,
+    ANDROID_LOCAL_NOTIFICATIONS, ANDROID_NETWORK, ANDROID_PERMISSIONS, ANDROID_PHOTO_LIBRARY,
+    ANDROID_PREFERENCES, ANDROID_SCREEN_ORIENTATION, ANDROID_SECURE_STORAGE, ANDROID_SENSORS,
+    ANDROID_SENSORS_BRIDGE, ANDROID_SETTINGS, ANDROID_SHARE, ANDROID_SYSTEM_BARS,
+    IOS_ACCESSIBILITY_INFO, IOS_ACTION_SHEET, IOS_ACTION_SHEET_BRIDGE, IOS_APP, IOS_APPEARANCE,
+    IOS_APP_STATE, IOS_BATTERY, IOS_BIOMETRICS, IOS_BLUETOOTH, IOS_BLUETOOTH_BRIDGE, IOS_BROWSER,
+    IOS_CALENDAR, IOS_CAMERA, IOS_CAMERA_BRIDGE, IOS_CLIPBOARD, IOS_CLIPBOARD_BRIDGE, IOS_CONTACTS,
+    IOS_DEEP_LINKS, IOS_DEVICE, IOS_DIALOG, IOS_DIALOG_BRIDGE, IOS_DIMENSIONS, IOS_DOCUMENT_PICKER,
+    IOS_GEOLOCATION, IOS_GEOLOCATION_BRIDGE, IOS_HAPTICS, IOS_IMAGE_PICKER,
+    IOS_IMAGE_PICKER_BRIDGE, IOS_IN_APP_BROWSER, IOS_KEYBOARD, IOS_LOCAL_NOTIFICATIONS,
+    IOS_NETWORK, IOS_PERMISSIONS, IOS_PHOTO_LIBRARY, IOS_PHOTO_LIBRARY_BRIDGE, IOS_PREFERENCES,
+    IOS_SCREEN_ORIENTATION, IOS_SECURE_STORAGE, IOS_SENSORS, IOS_SENSORS_BRIDGE, IOS_SETTINGS,
+    IOS_SHARE, IOS_SYSTEM_BARS,
 };
 use serde::Deserialize;
 use serde_json::Value;
@@ -156,7 +157,7 @@ const CAPABILITIES: &[CapabilitySpec] = &[
     CapabilitySpec { name: "local-notifications", aliases: &["localnotifications", "notifications"], cargo_feature: "local-notifications", android_manifest: "    <uses-permission android:name=\"android.permission.POST_NOTIFICATIONS\" />\n", ios_project: "" },
     CapabilitySpec { name: "secure-storage", aliases: &["securestorage"], cargo_feature: "secure-storage", android_manifest: "", ios_project: "" },
     CapabilitySpec { name: "biometrics", aliases: &["authentication"], cargo_feature: "biometrics", android_manifest: "", ios_project: "" },
-    CapabilitySpec { name: "permissions", aliases: &["permission"], cargo_feature: "permissions", android_manifest: "", ios_project: "" },
+    CapabilitySpec { name: "permissions", aliases: &["permission"], cargo_feature: "permissions", android_manifest: "", ios_project: "        OTHER_LDFLAGS: \"-lcrepus_mobile_actions -framework CoreBluetooth\"\n        INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription: \"$(PRODUCT_NAME) uses Bluetooth when you ask it to.\"\n" },
     CapabilitySpec { name: "calendar", aliases: &["calendars"], cargo_feature: "calendar", android_manifest: "    <uses-permission android:name=\"android.permission.READ_CALENDAR\" />\n    <uses-permission android:name=\"android.permission.WRITE_CALENDAR\" />\n", ios_project: "        INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription: \"$(PRODUCT_NAME) accesses your calendar when you ask it to.\"\n" },
     CapabilitySpec {
         name: "contacts",
@@ -182,6 +183,7 @@ const CAPABILITIES: &[CapabilitySpec] = &[
     CapabilitySpec { name: "battery", aliases: &[], cargo_feature: "battery", android_manifest: "", ios_project: "" },
     CapabilitySpec { name: "appearance", aliases: &[], cargo_feature: "appearance", android_manifest: "", ios_project: "" },
     CapabilitySpec { name: "system-bars", aliases: &["systembars", "status-bar", "statusbar"], cargo_feature: "system-bars", android_manifest: "", ios_project: "" },
+    CapabilitySpec { name: "deep-links", aliases: &["deeplinks", "deep-link", "url-events"], cargo_feature: "deep-links", android_manifest: "", ios_project: "" },
 ];
 
 fn add_capability(capability: &str, root: &Path) -> Result<(), String> {
@@ -236,7 +238,9 @@ fn add_capability(capability: &str, root: &Path) -> Result<(), String> {
             );
             fs::write(&project, source)
                 .map_err(|e| format!("write '{}': {e}", project.display()))?;
-        } else if spec.name == "bluetooth" && !source.contains("CoreBluetooth") {
+        } else if (spec.name == "bluetooth" || spec.name == "permissions")
+            && !source.contains("CoreBluetooth")
+        {
             source = source.replace(
                 "        OTHER_LDFLAGS: \"-lcrepus_mobile_actions\"\n",
                 spec.ios_project,
@@ -344,11 +348,103 @@ fn add_capability(capability: &str, root: &Path) -> Result<(), String> {
     if spec.name == "system-bars" {
         add_system_bars_host(root)?;
     }
+    if spec.name == "deep-links" {
+        add_deep_links_host(root)?;
+    }
     ui::success(&format!(
         "added native capability '{}' to '{}'",
         spec.name,
         root.display()
     ));
+    Ok(())
+}
+
+fn add_deep_links_host(root: &Path) -> Result<(), String> {
+    let manifest = root.join("android/app/src/main/AndroidManifest.xml");
+    let mut source =
+        fs::read_to_string(&manifest).map_err(|e| format!("read '{}': {e}", manifest.display()))?;
+    if !source.contains("android.intent.action.VIEW") {
+        source = source.replace(
+            "        </activity>\n",
+            "            <intent-filter>\n                <action android:name=\"android.intent.action.VIEW\" />\n                <category android:name=\"android.intent.category.DEFAULT\" />\n                <category android:name=\"android.intent.category.BROWSABLE\" />\n                <data android:scheme=\"crepus\" />\n            </intent-filter>\n        </activity>\n",
+        );
+        fs::write(&manifest, source).map_err(|e| format!("write '{}': {e}", manifest.display()))?;
+    }
+    let android = android_actions_path(root)?;
+    let mut source =
+        fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
+    if !source.contains("deepLinksValue") {
+        source = source.replace(
+            "        when (capability) {\n",
+            "        when (capability) {\n            \"deepLinks\" -> deepLinksValue(method, payload)\n",
+        );
+        source = source.replace(
+            "\n    private fun dispatchHostAction",
+            &format!("{ANDROID_DEEP_LINKS}\n    private fun dispatchHostAction"),
+        );
+        fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))?;
+    }
+    let activity =
+        root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/MainActivity.kt");
+    let mut source =
+        fs::read_to_string(&activity).map_err(|e| format!("read '{}': {e}", activity.display()))?;
+    if !source.contains("receiveDeepLink(intent.data)") {
+        source = source.replace(
+            "import android.os.Bundle\n",
+            "import android.content.Intent\nimport android.os.Bundle\n",
+        );
+        source = source.replace(
+            "        CrepusRustActions.install(this)\n",
+            "        CrepusRustActions.install(this)\n        CrepusRustActions.receiveDeepLink(intent.data)\n",
+        );
+        source = source.replace(
+            "\n    override fun onDestroy()",
+            "\n    override fun onNewIntent(intent: Intent) {\n        super.onNewIntent(intent)\n        setIntent(intent)\n        CrepusRustActions.receiveDeepLink(intent.data)\n    }\n\n    override fun onDestroy()",
+        );
+        fs::write(&activity, source).map_err(|e| format!("write '{}': {e}", activity.display()))?;
+    }
+    let ios = root.join("ios/Sources/NativeShell/CrepusRustActions.swift");
+    let mut source =
+        fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
+    if !source.contains("deepLinksValue") {
+        source = source.replace(
+            "        switch capability {\n",
+            "        switch capability {\n        case \"deepLinks\":\n            return try deepLinksValue(method: method, payload: payload)\n",
+        );
+        source = source.replace(
+            "\n    private static func dispatchHostAction",
+            &format!("{IOS_DEEP_LINKS}\n\n    private static func dispatchHostAction"),
+        );
+        fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
+    }
+    let app = root.join("ios/App/CrepusMobileApp.swift");
+    let mut source =
+        fs::read_to_string(&app).map_err(|e| format!("read '{}': {e}", app.display()))?;
+    if !source.contains(".onOpenURL") {
+        source = source.replace(
+            "        WindowGroup {\n            ContentView()\n        }\n",
+            "        WindowGroup {\n            ContentView()\n                .onOpenURL { CrepusRustActions.receiveDeepLink($0) }\n        }\n",
+        );
+        fs::write(&app, source).map_err(|e| format!("write '{}': {e}", app.display()))?;
+    }
+    let project = root.join("ios/project.yml");
+    let mut source =
+        fs::read_to_string(&project).map_err(|e| format!("read '{}': {e}", project.display()))?;
+    if source.contains("GENERATE_INFOPLIST_FILE: YES") {
+        source = source.replace(
+            "        GENERATE_INFOPLIST_FILE: YES\n",
+            "        GENERATE_INFOPLIST_FILE: NO\n        INFOPLIST_FILE: App/Info.plist\n",
+        );
+        fs::write(&project, source).map_err(|e| format!("write '{}': {e}", project.display()))?;
+    }
+    let info = root.join("ios/App/Info.plist");
+    if !info.exists() {
+        fs::write(
+            &info,
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\">\n<dict>\n    <key>CFBundleURLTypes</key>\n    <array>\n        <dict>\n            <key>CFBundleTypeRole</key>\n            <string>Editor</string>\n            <key>CFBundleURLName</key>\n            <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>\n            <key>CFBundleURLSchemes</key>\n            <array>\n                <string>crepus</string>\n            </array>\n        </dict>\n    </array>\n    <key>UILaunchScreen</key>\n    <dict/>\n</dict>\n</plist>\n",
+        )
+        .map_err(|e| format!("write '{}': {e}", info.display()))?;
+    }
     Ok(())
 }
 
@@ -1515,7 +1611,7 @@ fn add_permissions_host(root: &Path) -> Result<(), String> {
     if !source.contains("permissionsValue") {
         source = source.replace(
             "import Foundation\n",
-            "import Foundation\nimport AVFoundation\nimport Contacts\nimport CoreLocation\nimport Photos\n",
+            "import Foundation\nimport AVFoundation\nimport Contacts\nimport CoreBluetooth\nimport CoreLocation\nimport Photos\nimport UserNotifications\n",
         );
         source = source.replace(
             "        switch capability {\n",

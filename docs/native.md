@@ -102,14 +102,15 @@ Android and iOS, plus only the required platform declarations. It supports `stat
 | `network` (`net-info`, `netinfo`) | `status` | Validated Android network or app-lifetime iOS NWPathMonitor status, including active transport |
 | `keyboard` | `dismiss` | Hides Android's active input method or resigns iOS's current first responder |
 | `settings` (`app-settings`) | `open` | Opens the app's Android or iOS settings page |
-| `local-notifications` (`notifications`) | `status`, `requestPermission`, `post` | Android notification channel and iOS UserNotifications; Android permission is added only for this capability |
+| `local-notifications` (`notifications`) | `status`, `requestPermission`, `post` | Android notification channel and iOS UserNotifications; `status` reports current OS authorization asynchronously |
 | `secure-storage` | `get`, `set`, `remove`, `clear` | Android Keystore-encrypted values and iOS Keychain values |
 | `biometrics` (`authentication`) | `status`, `authenticate` | AndroidX BiometricPrompt or iOS LocalAuthentication, streaming the authentication result |
-| `permissions` (`permission`) | `status`, `check`, `request` | Checks or requests `camera`, `location`, `photoLibrary`/`photos`, and `contacts` after the related capability has added its platform declarations; Android also supports `notifications` and `bluetooth` when those capabilities are installed |
+| `permissions` (`permission`) | `status`, `check`, `request` | Checks or requests `camera`, `location`, `photoLibrary`/`photos`, `contacts`, `notifications`, and `bluetooth`; notification checks report current iOS OS authorization asynchronously |
 | `contacts` | `status`, `requestPermission`, `list` | Android ContactsContract or iOS CNContactStore; access is declared only when installed |
 | `calendar` (`calendars`) | `status`, `check`, `request`, `list`, `create` | Android CalendarContract and iOS EventKit; `create` accepts `title`, optional Unix-millisecond `start`, `end`, `calendarId`, and `notes` |
 | `in-app-browser` (`inappbrowser`, `web-browser`) | `open` | Android Custom Tabs or iOS Safari View Controller |
 | `system-bars` (`systembars`, `status-bar`) | `status`, `set` | Android status/navigation colors and light-icon flags; iOS supported window appearance style |
+| `deep-links` (`deeplinks`, `deep-link`, `url-events`) | `status`, `getInitialUrl`, `open` | Receives `crepus://` URLs as `deepLinks.openUrl` events and opens valid URLs through the platform |
 
 `filesystem` enables its scoped Rust backend only after `crepus native add filesystem`; the
 default app shell and share-extension builds exclude it. It supports `readText`, `writeText`,

@@ -427,6 +427,8 @@ fn native_add_capability_updates_only_the_scaffold() {
     let default_ios =
         std::fs::read_to_string(root.join("ios/Sources/NativeShell/CrepusRustActions.swift"))
             .expect("read default iOS actions");
+    let default_cargo = std::fs::read_to_string(root.join("rust/Cargo.toml"))
+        .expect("read default native Cargo manifest");
     assert!(!default_android.contains("hapticsValue"));
     assert!(!default_ios.contains("hapticsValue"));
     assert!(!default_android.contains("clipboardValue"));
@@ -462,6 +464,9 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(!default_ios.contains("inAppBrowserValue"));
     assert!(!default_android.contains("systemBarsValue"));
     assert!(!default_ios.contains("systemBarsValue"));
+    assert!(!default_android.contains("deepLinksValue"));
+    assert!(!default_ios.contains("deepLinksValue"));
+    assert!(!default_cargo.contains("deep-links = []"));
     assert!(crepus()
         .args(["native", "add", "share", "--dir"])
         .arg(&root)
@@ -863,6 +868,7 @@ fn native_add_capability_updates_only_the_scaffold() {
             .expect("read iOS notifications bridge");
     assert!(notifications_android.contains("NotificationChannel"));
     assert!(notifications_ios.contains("UNUserNotificationCenter"));
+    assert!(notifications_ios.contains("getNotificationSettings"));
     assert!(crepus()
         .args(["native", "add", "secure-storage", "--dir"])
         .arg(&root)
@@ -911,6 +917,11 @@ fn native_add_capability_updates_only_the_scaffold() {
             .expect("read iOS permissions bridge");
     assert!(permissions_android.contains("android.Manifest.permission.CAMERA"));
     assert!(permissions_ios.contains("AVCaptureDevice.authorizationStatus"));
+    assert!(permissions_ios.contains("CBManager.authorization"));
+    assert!(permissions_ios.contains("UNUserNotificationCenter.current"));
+    assert!(std::fs::read_to_string(root.join("ios/project.yml"))
+        .expect("read iOS project")
+        .contains("NSBluetoothAlwaysUsageDescription"));
     assert!(crepus()
         .args(["native", "add", "contacts", "--dir"])
         .arg(&root)
@@ -976,6 +987,36 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(calendar_android.contains("CalendarContract.Events.CONTENT_URI"));
     assert!(calendar_ios.contains("EKEventStore"));
     assert!(crepus()
+        .args(["native", "add", "deep-links", "--dir"])
+        .arg(&root)
+        .output()
+        .expect("add deep links")
+        .status
+        .success());
+    let deep_links_android = std::fs::read_to_string(
+        root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusRustActions.kt"),
+    )
+    .expect("read Android deep links bridge");
+    let deep_links_ios =
+        std::fs::read_to_string(root.join("ios/Sources/NativeShell/CrepusRustActions.swift"))
+            .expect("read iOS deep links bridge");
+    let main_activity = std::fs::read_to_string(
+        root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/MainActivity.kt"),
+    )
+    .expect("read main activity");
+    let app =
+        std::fs::read_to_string(root.join("ios/App/CrepusMobileApp.swift")).expect("read iOS app");
+    let manifest = std::fs::read_to_string(root.join("android/app/src/main/AndroidManifest.xml"))
+        .expect("read manifest");
+    let info = std::fs::read_to_string(root.join("ios/App/Info.plist"))
+        .expect("read deep links info plist");
+    assert!(deep_links_android.contains("receiveDeepLink"));
+    assert!(deep_links_ios.contains("receiveDeepLink"));
+    assert!(main_activity.contains("onNewIntent"));
+    assert!(app.contains(".onOpenURL"));
+    assert!(manifest.contains("android:scheme=\"crepus\""));
+    assert!(info.contains("CFBundleURLSchemes"));
+    assert!(crepus()
         .args(["native", "add", "filesystem", "--dir"])
         .arg(&root)
         .output()
@@ -1009,6 +1050,7 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(cargo.contains("permissions = []"));
     assert!(cargo.contains("calendar = []"));
     assert!(cargo.contains("contacts = []"));
+    assert!(cargo.contains("deep-links = []"));
     assert!(haptics_android.contains("\"haptics\", \"vibration\""));
     assert!(haptics_ios.contains("case \"haptics\", \"vibration\":"));
     assert!(cargo.contains("filesystem = []"));

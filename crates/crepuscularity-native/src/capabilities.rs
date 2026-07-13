@@ -1326,10 +1326,17 @@ pub const IOS_LOCAL_NOTIFICATIONS: &str = r#"
         let center = UNUserNotificationCenter.current()
         switch method {
         case "status":
-            return ["available": true]
+            center.getNotificationSettings { settings in
+                CrepusRustActions.emit(CrepusRustActions.successJson(action: "localNotifications.status", capability: "localNotifications", method: "status", value: localNotificationPermissionValue(settings)))
+            }
+            return ["pending": true]
         case "requestPermission":
-            center.requestAuthorization(options: [.alert, .badge, .sound]) { _, _ in }
-            return ["requested": true]
+            center.requestAuthorization(options: [.alert, .badge, .sound]) { _, _ in
+                center.getNotificationSettings { settings in
+                    CrepusRustActions.emit(CrepusRustActions.successJson(action: "localNotifications.requestPermission", capability: "localNotifications", method: "requestPermission", value: localNotificationPermissionValue(settings)))
+                }
+            }
+            return ["requested": true, "pending": true]
         case "post":
             let content = UNMutableNotificationContent()
             content.title = payload?["title"] as? String ?? ""
@@ -1340,6 +1347,15 @@ pub const IOS_LOCAL_NOTIFICATIONS: &str = r#"
         default:
             throw HostActionError("unsupported localNotifications method: \(method)")
         }
+    }
+
+    private static func localNotificationPermissionValue(_ settings: UNNotificationSettings) -> [String: Any] {
+        let status: String = switch settings.authorizationStatus {
+        case .authorized, .provisional, .ephemeral: "granted"
+        case .notDetermined: "prompt"
+        default: "denied"
+        }
+        return ["status": status, "granted": status == "granted"]
     }
 "#;
 
@@ -1612,6 +1628,7 @@ pub const ANDROID_PERMISSIONS: &str = r#"
 
 pub const IOS_PERMISSIONS: &str = r#"
     private static let permissionsLocation = CLLocationManager()
+    private static let permissionsBluetooth = CBCentralManager(delegate: nil, queue: nil)
 
     private static func permissionsValue(method: String, payload: [String: Any]?) throws -> Any {
         guard let permission = payload?["permission"] as? String, !permission.isEmpty else {
@@ -1622,7 +1639,28 @@ pub const IOS_PERMISSIONS: &str = r#"
         case "location": Bundle.main.object(forInfoDictionaryKey: "NSLocationWhenInUseUsageDescription") != nil
         case "photoLibrary", "photos": Bundle.main.object(forInfoDictionaryKey: "NSPhotoLibraryUsageDescription") != nil
         case "contacts": Bundle.main.object(forInfoDictionaryKey: "NSContactsUsageDescription") != nil
+        case "notifications": true
+        case "bluetooth": Bundle.main.object(forInfoDictionaryKey: "NSBluetoothAlwaysUsageDescription") != nil
         default: throw HostActionError("unsupported permission: \(permission)")
+        }
+        if permission == "notifications" {
+            let center = UNUserNotificationCenter.current()
+            if method == "request" {
+                center.requestAuthorization(options: [.alert, .badge, .sound]) { _, _ in
+                    center.getNotificationSettings { settings in
+                        let value = permissionsNotificationValue(permission: permission, settings: settings)
+                        CrepusRustActions.emit(CrepusRustActions.successJson(action: "permissions.request", capability: "permissions", method: "request", value: value))
+                    }
+                }
+            } else if method == "status" || method == "check" {
+                center.getNotificationSettings { settings in
+                    let value = permissionsNotificationValue(permission: permission, settings: settings)
+                    CrepusRustActions.emit(CrepusRustActions.successJson(action: "permissions.\(method)", capability: "permissions", method: method, value: value))
+                }
+            } else {
+                throw HostActionError("unsupported permissions method: \(method)")
+            }
+            return ["permission": permission, "configured": true, "pending": true]
         }
         let status: String = switch permission {
         case "camera":
@@ -1649,6 +1687,12 @@ pub const IOS_PERMISSIONS: &str = r#"
             case .notDetermined: "prompt"
             default: "denied"
             }
+        case "bluetooth":
+            switch CBManager.authorization {
+            case .allowedAlways: "granted"
+            case .notDetermined: "prompt"
+            default: "denied"
+            }
         default: "denied"
         }
         if method == "status" || method == "check" {
@@ -1661,9 +1705,19 @@ pub const IOS_PERMISSIONS: &str = r#"
         case "location": permissionsLocation.requestWhenInUseAuthorization()
         case "photoLibrary", "photos": Task { _ = await PHPhotoLibrary.requestAuthorization(for: .readWrite) }
         case "contacts": CNContactStore().requestAccess(for: .contacts) { _, _ in }
+        case "bluetooth": _ = permissionsBluetooth
         default: break
         }
         return ["permission": permission, "configured": true, "requested": true, "pending": status == "prompt"]
+    }
+
+    private static func permissionsNotificationValue(permission: String, settings: UNNotificationSettings) -> [String: Any] {
+        let status: String = switch settings.authorizationStatus {
+        case .authorized, .provisional, .ephemeral: "granted"
+        case .notDetermined: "prompt"
+        default: "denied"
+        }
+        return ["permission": permission, "configured": true, "status": status, "granted": status == "granted"]
     }
 "#;
 
@@ -1917,5 +1971,55 @@ pub const IOS_SYSTEM_BARS: &str = r#"
         if method == "status" { return ["style": "system"] }
         throw HostActionError("system bars are unavailable")
         #endif
+    }
+"#;
+
+pub const ANDROID_DEEP_LINKS: &str = r#"
+    private var lastDeepLink: String? = null
+
+    fun receiveDeepLink(uri: Uri?) {
+        val url = uri?.toString() ?: return
+        lastDeepLink = url
+        emit(JSONObject().put("ok", true).put("action", "deepLinks.openUrl")
+            .put("value", JSONObject().put("url", url)).toString())
+    }
+
+    private fun deepLinksValue(method: String, payload: JSONObject?): JSONObject =
+        when (method) {
+            "status", "getInitialUrl" -> JSONObject().put("url", lastDeepLink ?: JSONObject.NULL)
+            "open" -> {
+                val url = payload?.optString("url")?.takeIf { it.isNotBlank() }
+                    ?: error("deepLinks.open requires payload.url")
+                activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                JSONObject().put("opened", true).put("url", url)
+            }
+            else -> error("unsupported deepLinks method: $method")
+        }
+"#;
+
+pub const IOS_DEEP_LINKS: &str = r#"
+    private static var lastDeepLink: String?
+
+    public static func receiveDeepLink(_ url: URL) {
+        let value = url.absoluteString
+        lastDeepLink = value
+        emit(stringify(["ok": true, "action": "deepLinks.openUrl", "value": ["url": value]]))
+    }
+
+    private static func deepLinksValue(method: String, payload: [String: Any]?) throws -> Any {
+        switch method {
+        case "status", "getInitialUrl": return ["url": lastDeepLink.map { $0 as Any } ?? NSNull()]
+        case "open":
+            guard let value = payload?["url"] as? String, let url = URL(string: value) else {
+                throw HostActionError("deepLinks.open requires payload.url")
+            }
+            #if canImport(UIKit)
+            UIApplication.shared.open(url)
+            return ["opened": true, "url": value]
+            #else
+            throw HostActionError("deep links are unavailable")
+            #endif
+        default: throw HostActionError("unsupported deepLinks method: \(method)")
+        }
     }
 "#;
