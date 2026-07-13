@@ -53,6 +53,34 @@ fn converts_v1_and_v2_static_crepus_bundles() {
 }
 
 #[test]
+fn webview_conversion_reports_the_native_lowering_boundary() {
+    let source = fixture(2);
+    std::fs::write(
+        source.path().join("dist/crepus-bundle.json"),
+        r#"{"entry":"index.crepus","files":{"index.crepus":"embed https://example.com adapter=\"webview\""}}"#,
+    )
+    .unwrap();
+    let output = tempfile::tempdir().unwrap();
+    let destination = output.path().join("native");
+    let out = crepus()
+        .args([
+            "tauri",
+            "convert",
+            "--target",
+            "mobile",
+            "--dir",
+            source.path().to_str().unwrap(),
+            "--out",
+            destination.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    assert!(!out.status.success());
+    assert!(String::from_utf8_lossy(&out.stderr)
+        .contains("mobile renderer does not yet embed WebViews"));
+}
+
+#[test]
 fn converts_shipped_examples() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     for name in ["tauri-v1-crepus", "tauri-v2-crepus", "tauri-v2-multiwindow"] {

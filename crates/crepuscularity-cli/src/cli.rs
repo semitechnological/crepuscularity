@@ -488,7 +488,16 @@ pub enum TauriCommands {
         dir: PathBuf,
         #[arg(long)]
         out: PathBuf,
+        #[arg(long, default_value = "all")]
+        target: TauriTargetArg,
     },
+}
+
+#[derive(Clone, Copy, Debug, ValueEnum, PartialEq, Eq)]
+pub enum TauriTargetArg {
+    All,
+    Desktop,
+    Mobile,
 }
 
 #[derive(Clone, Copy, Debug, ValueEnum)]
