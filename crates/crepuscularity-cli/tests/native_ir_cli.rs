@@ -590,6 +590,24 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(clipboard_ios.contains("UIPasteboard.changedNotification"));
     assert!(clipboard_ios.contains("clipboard.change"));
     assert!(crepus()
+        .args(["native", "add", "toast", "--dir"])
+        .arg(&root)
+        .output()
+        .expect("add toast")
+        .status
+        .success());
+    let toast_android = std::fs::read_to_string(
+        root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusRustActions.kt"),
+    )
+    .expect("read Android toast bridge");
+    let toast_ios =
+        std::fs::read_to_string(root.join("ios/Sources/NativeShell/CrepusRustActions.swift"))
+            .expect("read iOS toast bridge");
+    assert!(toast_android.contains("Toast.makeText"));
+    assert!(toast_android.contains("\"toast\" -> toastValue"));
+    assert!(toast_ios.contains("presentToast"));
+    assert!(toast_ios.contains("case \"toast\":"));
+    assert!(crepus()
         .args(["native", "add", "linking", "--dir"])
         .arg(&root)
         .output()
@@ -1391,4 +1409,37 @@ fn mobile_codegen_writes_swiftui_and_compose_source() {
             .unwrap()
             .contains("Hello Ada")
     );
+}
+
+#[test]
+#[cfg_attr(
+    windows,
+    ignore = "default desktop crepus.exe does not spawn reliably on Windows CI"
+)]
+fn native_add_merges_overlapping_android_permissions() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let root = tmp.path().join("fixture");
+    assert!(crepus()
+        .args(["native", "new", root.to_str().unwrap()])
+        .output()
+        .expect("scaffold native app")
+        .status
+        .success());
+    for capability in ["bluetooth", "geolocation"] {
+        assert!(crepus()
+            .args(["native", "add", capability, "--dir", root.to_str().unwrap()])
+            .output()
+            .expect("add capability")
+            .status
+            .success());
+    }
+    let manifest = std::fs::read_to_string(root.join("android/app/src/main/AndroidManifest.xml"))
+        .expect("read manifest");
+    assert_eq!(
+        manifest
+            .matches("android.permission.ACCESS_FINE_LOCATION")
+            .count(),
+        1
+    );
+    assert!(!manifest.contains("android.permission.ACCESS_FINE_LOCATION\" android:maxSdkVersion"));
 }

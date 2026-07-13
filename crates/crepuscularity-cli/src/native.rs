@@ -11,7 +11,7 @@
 //! (or just open the project in Android Studio, which regenerates it
 //! automatically) before the first `./gradlew` invocation.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -31,16 +31,16 @@ use crepuscularity_native::{
     ANDROID_LOCAL_NOTIFICATIONS, ANDROID_MICROPHONE, ANDROID_NETWORK, ANDROID_PERMISSIONS,
     ANDROID_PHOTO_LIBRARY, ANDROID_PREFERENCES, ANDROID_SCHEDULED_NOTIFICATION_RECEIVER,
     ANDROID_SCREEN_ORIENTATION, ANDROID_SECURE_STORAGE, ANDROID_SENSORS, ANDROID_SENSORS_BRIDGE,
-    ANDROID_SETTINGS, ANDROID_SHARE, ANDROID_SYSTEM_BARS, IOS_ACCESSIBILITY_INFO, IOS_ACTION_SHEET,
-    IOS_ACTION_SHEET_BRIDGE, IOS_APP, IOS_APPEARANCE, IOS_APP_STATE, IOS_BATTERY, IOS_BIOMETRICS,
-    IOS_BLUETOOTH, IOS_BLUETOOTH_BRIDGE, IOS_BROWSER, IOS_CALENDAR, IOS_CAMERA, IOS_CAMERA_BRIDGE,
-    IOS_CLIPBOARD, IOS_CLIPBOARD_BRIDGE, IOS_CONTACTS, IOS_DEEP_LINKS, IOS_DEVICE, IOS_DIALOG,
-    IOS_DIALOG_BRIDGE, IOS_DIMENSIONS, IOS_DOCUMENT_PICKER, IOS_GEOLOCATION,
-    IOS_GEOLOCATION_BRIDGE, IOS_HAPTICS, IOS_IMAGE_PICKER, IOS_IMAGE_PICKER_BRIDGE,
-    IOS_IN_APP_BROWSER, IOS_KEYBOARD, IOS_LOCAL_NOTIFICATIONS, IOS_MICROPHONE, IOS_NETWORK,
-    IOS_PERMISSIONS, IOS_PHOTO_LIBRARY, IOS_PHOTO_LIBRARY_BRIDGE, IOS_PREFERENCES,
-    IOS_SCREEN_ORIENTATION, IOS_SECURE_STORAGE, IOS_SENSORS, IOS_SENSORS_BRIDGE, IOS_SETTINGS,
-    IOS_SHARE, IOS_SYSTEM_BARS,
+    ANDROID_SETTINGS, ANDROID_SHARE, ANDROID_SYSTEM_BARS, ANDROID_TOAST, IOS_ACCESSIBILITY_INFO,
+    IOS_ACTION_SHEET, IOS_ACTION_SHEET_BRIDGE, IOS_APP, IOS_APPEARANCE, IOS_APP_STATE, IOS_BATTERY,
+    IOS_BIOMETRICS, IOS_BLUETOOTH, IOS_BLUETOOTH_BRIDGE, IOS_BROWSER, IOS_CALENDAR, IOS_CAMERA,
+    IOS_CAMERA_BRIDGE, IOS_CLIPBOARD, IOS_CLIPBOARD_BRIDGE, IOS_CONTACTS, IOS_DEEP_LINKS,
+    IOS_DEVICE, IOS_DIALOG, IOS_DIALOG_BRIDGE, IOS_DIMENSIONS, IOS_DOCUMENT_PICKER,
+    IOS_GEOLOCATION, IOS_GEOLOCATION_BRIDGE, IOS_HAPTICS, IOS_IMAGE_PICKER,
+    IOS_IMAGE_PICKER_BRIDGE, IOS_IN_APP_BROWSER, IOS_KEYBOARD, IOS_LOCAL_NOTIFICATIONS,
+    IOS_MICROPHONE, IOS_NETWORK, IOS_PERMISSIONS, IOS_PHOTO_LIBRARY, IOS_PHOTO_LIBRARY_BRIDGE,
+    IOS_PREFERENCES, IOS_SCREEN_ORIENTATION, IOS_SECURE_STORAGE, IOS_SENSORS, IOS_SENSORS_BRIDGE,
+    IOS_SETTINGS, IOS_SHARE, IOS_SYSTEM_BARS, IOS_TOAST,
 };
 use serde::Deserialize;
 use serde_json::Value;
@@ -112,6 +112,7 @@ const CAPABILITIES: &[CapabilitySpec] = &[
         ios_project: "",
     },
     CapabilitySpec { name: "clipboard", aliases: &[], cargo_feature: "clipboard", android_manifest: "", ios_project: "" },
+    CapabilitySpec { name: "toast", aliases: &[], cargo_feature: "toast", android_manifest: "", ios_project: "" },
     CapabilitySpec { name: "browser", aliases: &["linking", "app-launcher", "applauncher", "phone", "sms"], cargo_feature: "browser", android_manifest: "", ios_project: "" },
     CapabilitySpec { name: "in-app-browser", aliases: &["inappbrowser", "web-browser"], cargo_feature: "in-app-browser", android_manifest: "", ios_project: "" },
     CapabilitySpec { name: "share", aliases: &[], cargo_feature: "share", android_manifest: "", ios_project: "" },
@@ -264,6 +265,9 @@ fn add_capability(capability: &str, root: &Path) -> Result<(), String> {
     if spec.name == "clipboard" {
         add_clipboard_host(root)?;
     }
+    if spec.name == "toast" {
+        add_toast_host(root)?;
+    }
     if spec.name == "browser" {
         add_browser_host(root)?;
     }
@@ -360,6 +364,7 @@ fn add_capability(capability: &str, root: &Path) -> Result<(), String> {
     if spec.name == "deep-links" {
         add_deep_links_host(root)?;
     }
+    dedupe_android_imports(root)?;
     ui::success(&format!(
         "added native capability '{}' to '{}'",
         spec.name,
@@ -699,8 +704,8 @@ fn add_bluetooth_host(root: &Path) -> Result<(), String> {
         return Ok(());
     }
     source = source.replace(
-        "import android.content.ClipData\n",
-        "import android.content.ClipData\nimport android.Manifest\nimport android.bluetooth.BluetoothAdapter\nimport android.bluetooth.le.ScanCallback\nimport android.bluetooth.le.ScanResult\nimport android.content.pm.PackageManager\n",
+        "import android.content.Context\n",
+        "import android.Manifest\nimport android.bluetooth.BluetoothAdapter\nimport android.bluetooth.le.ScanCallback\nimport android.bluetooth.le.ScanResult\nimport android.content.Context\nimport android.content.pm.PackageManager\n",
     );
     source = source.replace(
         "        when (capability) {\n",
@@ -814,6 +819,42 @@ fn add_clipboard_host(root: &Path) -> Result<(), String> {
             &format!("{IOS_CLIPBOARD}\n\n    fileprivate static func emit"),
         );
         source.push_str(IOS_CLIPBOARD_BRIDGE);
+        fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
+    }
+    Ok(())
+}
+
+fn add_toast_host(root: &Path) -> Result<(), String> {
+    let android = android_actions_path(root)?;
+    let mut source =
+        fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
+    if !source.contains("toastValue") {
+        source = source.replace(
+            "import android.content.Context\n",
+            "import android.content.Context\nimport android.widget.Toast\n",
+        );
+        source = source.replace(
+            "        when (capability) {\n",
+            "        when (capability) {\n            \"toast\" -> toastValue(method, payload)\n",
+        );
+        source = source.replace(
+            "\n}\n\nobject CrepusActionState",
+            &format!("{ANDROID_TOAST}\n}}\n\nobject CrepusActionState"),
+        );
+        fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))?;
+    }
+    let ios = root.join("ios/Sources/NativeShell/CrepusRustActions.swift");
+    let mut source =
+        fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
+    if !source.contains("toastValue") {
+        source = source.replace(
+            "        switch capability {\n",
+            "        switch capability {\n        case \"toast\":\n            return try toastValue(method: method, payload: payload)\n",
+        );
+        source = source.replace(
+            "\n    fileprivate static func emit",
+            &format!("{IOS_TOAST}\n\n    fileprivate static func emit"),
+        );
         fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
     }
     Ok(())
@@ -1636,6 +1677,19 @@ fn add_biometrics_host(root: &Path) -> Result<(), String> {
             &format!("{ANDROID_BIOMETRICS}\n    private fun dispatchHostAction"),
         );
         fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))?;
+        let activity =
+            root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/MainActivity.kt");
+        let source = fs::read_to_string(&activity)
+            .map_err(|e| format!("read '{}': {e}", activity.display()))?
+            .replace(
+                "import androidx.activity.ComponentActivity\n",
+                "import androidx.fragment.app.FragmentActivity\n",
+            )
+            .replace(
+                "class MainActivity : ComponentActivity()",
+                "class MainActivity : FragmentActivity()",
+            );
+        fs::write(&activity, source).map_err(|e| format!("write '{}': {e}", activity.display()))?;
     }
     let ios = root.join("ios/Sources/NativeShell/CrepusRustActions.swift");
     let mut source =
@@ -1868,9 +1922,63 @@ fn android_actions_path(root: &Path) -> Result<PathBuf, String> {
         })
 }
 
+fn dedupe_android_imports(root: &Path) -> Result<(), String> {
+    let path = android_actions_path(root)?;
+    let source =
+        fs::read_to_string(&path).map_err(|e| format!("read '{}': {e}", path.display()))?;
+    let mut imports = HashSet::new();
+    let deduped = source
+        .lines()
+        .filter(|line| !line.starts_with("import ") || imports.insert(*line))
+        .collect::<Vec<_>>()
+        .join("\n");
+    if deduped != source.trim_end() {
+        fs::write(&path, format!("{deduped}\n"))
+            .map_err(|e| format!("write '{}': {e}", path.display()))?;
+    }
+    Ok(())
+}
+
 fn add_once(path: &Path, addition: &str, anchor: &str) -> Result<(), String> {
     let mut source =
         fs::read_to_string(path).map_err(|e| format!("read '{}': {e}", path.display()))?;
+    if addition.starts_with("    <uses-") {
+        let mut missing = String::new();
+        for line in addition.lines() {
+            let Some(name) = line
+                .split("android:name=\"")
+                .nth(1)
+                .and_then(|part| part.split('"').next())
+            else {
+                missing.push_str(line);
+                missing.push('\n');
+                continue;
+            };
+            let identity = format!("android:name=\"{name}\"");
+            let existing = source
+                .lines()
+                .find(|candidate| candidate.contains(&identity))
+                .map(str::to_owned);
+            match existing {
+                Some(existing)
+                    if existing.contains("android:maxSdkVersion")
+                        && !line.contains("android:maxSdkVersion") =>
+                {
+                    source = source.replacen(&existing, line, 1);
+                }
+                Some(_) => {}
+                None => {
+                    missing.push_str(line);
+                    missing.push('\n');
+                }
+            }
+        }
+        if missing.is_empty() {
+            return fs::write(path, source).map_err(|e| format!("write '{}': {e}", path.display()));
+        }
+        source = source.replacen(anchor, &format!("{anchor}{missing}"), 1);
+        return fs::write(path, source).map_err(|e| format!("write '{}': {e}", path.display()));
+    }
     if source.contains(addition.lines().next().unwrap_or_default()) {
         return Ok(());
     }

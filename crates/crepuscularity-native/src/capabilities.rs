@@ -324,6 +324,70 @@ pub const IOS_HAPTICS: &str = r#"
     }
 "#;
 
+pub const ANDROID_TOAST: &str = r#"
+    private fun toastValue(method: String, payload: JSONObject?): JSONObject {
+        if (method != "show") error("unsupported toast method: $method")
+        val text = payload?.optString("text", null) ?: error("toast.show requires payload.text")
+        val duration = if (payload?.optString("duration") == "long") Toast.LENGTH_LONG else Toast.LENGTH_SHORT
+        Toast.makeText(appContext, text, duration).show()
+        return JSONObject().put("shown", true)
+    }
+"#;
+
+pub const IOS_TOAST: &str = r#"
+    private static func toastValue(method: String, payload: [String: Any]?) throws -> Any {
+        guard method == "show" else { throw HostActionError("unsupported toast method: \(method)") }
+        guard let text = payload?["text"] as? String, !text.isEmpty else {
+            throw HostActionError("toast.show requires payload.text")
+        }
+        #if canImport(UIKit)
+        guard let root = topViewController() else { throw HostActionError("toast unavailable") }
+        let seconds = payload?["duration"] as? String == "long" ? 3.5 : 2.0
+        let show = { presentToast(text: text, seconds: seconds, root: root) }
+        if Thread.isMainThread { show() } else { DispatchQueue.main.async(execute: show) }
+        return ["shown": true]
+        #else
+        throw HostActionError("toast unavailable on AppKit shell")
+        #endif
+    }
+
+    #if canImport(UIKit)
+    private static var toastView: UIView?
+
+    private static func presentToast(text: String, seconds: Double, root: UIViewController) {
+        toastView?.removeFromSuperview()
+        let label = UILabel()
+        label.text = text
+        label.textColor = .white
+        label.backgroundColor = UIColor.black.withAlphaComponent(0.82)
+        label.numberOfLines = 0
+        label.textAlignment = .center
+        label.layer.cornerRadius = 12
+        label.clipsToBounds = true
+        label.translatesAutoresizingMaskIntoConstraints = false
+        label.alpha = 0
+        root.view.addSubview(label)
+        NSLayoutConstraint.activate([
+            label.centerXAnchor.constraint(equalTo: root.view.centerXAnchor),
+            label.bottomAnchor.constraint(equalTo: root.view.safeAreaLayoutGuide.bottomAnchor, constant: -24),
+            label.leadingAnchor.constraint(greaterThanOrEqualTo: root.view.leadingAnchor, constant: 24),
+            label.trailingAnchor.constraint(lessThanOrEqualTo: root.view.trailingAnchor, constant: -24),
+            label.widthAnchor.constraint(lessThanOrEqualTo: root.view.widthAnchor, multiplier: 0.85),
+        ])
+        label.layoutMargins = UIEdgeInsets(top: 12, left: 16, bottom: 12, right: 16)
+        label.text = "  \(text)  "
+        toastView = label
+        UIView.animate(withDuration: 0.2) { label.alpha = 1 }
+        DispatchQueue.main.asyncAfter(deadline: .now() + seconds) {
+            UIView.animate(withDuration: 0.2, animations: { label.alpha = 0 }) { _ in
+                label.removeFromSuperview()
+                if toastView === label { toastView = nil }
+            }
+        }
+    }
+    #endif
+"#;
+
 pub const ANDROID_CLIPBOARD: &str = r#"
     private var clipboardListener: ClipboardManager.OnPrimaryClipChangedListener? = null
 
@@ -871,7 +935,7 @@ pub const ANDROID_CAMERA: &str = r#"
                 .put("mimeType", "image/jpeg")
                 .put("bytes", file.length())
                 .put("filePath", file.absolutePath)
-                .put("importSource", "android-camera"))))
+                .put("importSource", "android-camera")))))
             .toString()
     }
 "#;
@@ -1861,7 +1925,7 @@ pub const ANDROID_BIOMETRICS: &str = r#"
             return JSONObject().put("available", manager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL) == BiometricManager.BIOMETRIC_SUCCESS)
         }
         if (method != "authenticate") error("unsupported biometrics method: $method")
-        val prompt = BiometricPrompt(activity, ContextCompat.getMainExecutor(activity), object : BiometricPrompt.AuthenticationCallback() {
+        val prompt = BiometricPrompt(activity as androidx.fragment.app.FragmentActivity, ContextCompat.getMainExecutor(activity), object : BiometricPrompt.AuthenticationCallback() {
             override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
                 emit(JSONObject().put("ok", true).put("capability", "biometrics").put("method", "authenticate").put("value", JSONObject().put("authenticated", true)).toString())
             }
