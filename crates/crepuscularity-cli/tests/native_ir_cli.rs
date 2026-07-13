@@ -746,8 +746,9 @@ fn native_add_capability_updates_only_the_scaffold() {
     let orientation_ios =
         std::fs::read_to_string(root.join("ios/Sources/NativeShell/CrepusRustActions.swift"))
             .expect("read iOS orientation bridge");
-    assert!(orientation_android.contains("ORIENTATION_LANDSCAPE"));
-    assert!(orientation_ios.contains("UIScreen.main.bounds"));
+    assert!(orientation_android.contains("SCREEN_ORIENTATION_LANDSCAPE"));
+    assert!(orientation_android.contains("SCREEN_ORIENTATION_UNSPECIFIED"));
+    assert!(orientation_ios.contains("requestGeometryUpdate"));
     assert!(crepus()
         .args(["native", "add", "accessibility-info", "--dir"])
         .arg(&root)
@@ -865,6 +866,9 @@ fn native_add_capability_updates_only_the_scaffold() {
         root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusRustActions.kt"),
     )
     .expect("read Android notifications bridge");
+    let notifications_manifest =
+        std::fs::read_to_string(root.join("android/app/src/main/AndroidManifest.xml"))
+            .expect("read Android notifications manifest");
     let notifications_ios =
         std::fs::read_to_string(root.join("ios/Sources/NativeShell/CrepusRustActions.swift"))
             .expect("read iOS notifications bridge");
@@ -873,6 +877,10 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(notifications_ios.contains("UNUserNotificationCenter"));
     assert!(notifications_ios.contains("getNotificationSettings"));
     assert!(notifications_ios.contains("UNCalendarNotificationTrigger"));
+    assert!(
+        notifications_manifest.find("CrepusNotificationReceiver")
+            < notifications_manifest.find("</application>")
+    );
     assert!(root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusNotificationReceiver.kt").exists());
     assert!(crepus()
         .args(["native", "add", "secure-storage", "--dir"])

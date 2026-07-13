@@ -1285,7 +1285,7 @@ fn add_screen_orientation_host(root: &Path) -> Result<(), String> {
     let mut source =
         fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
     if !source.contains("screenOrientationValue") {
-        source = source.replace("        when (capability) {\n", "        when (capability) {\n            \"screenOrientation\" -> screenOrientationValue(method)\n");
+        source = source.replace("        when (capability) {\n", "        when (capability) {\n            \"screenOrientation\" -> screenOrientationValue(method, payload)\n");
         source = source.replace(
             "\n    private fun dispatchHostAction",
             &format!("{ANDROID_SCREEN_ORIENTATION}\n    private fun dispatchHostAction"),
@@ -1296,7 +1296,7 @@ fn add_screen_orientation_host(root: &Path) -> Result<(), String> {
     let mut source =
         fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
     if !source.contains("screenOrientationValue") {
-        source = source.replace("        switch capability {\n", "        switch capability {\n        case \"screenOrientation\":\n            return try screenOrientationValue(method: method)\n");
+        source = source.replace("        switch capability {\n", "        switch capability {\n        case \"screenOrientation\":\n            return try screenOrientationValue(method: method, payload: payload)\n");
         source = source.replace(
             "\n    private static func dispatchHostAction",
             &format!("{IOS_SCREEN_ORIENTATION}\n\n    private static func dispatchHostAction"),
@@ -1527,7 +1527,7 @@ fn add_local_notifications_host(root: &Path) -> Result<(), String> {
     add_once(
         &manifest,
         "        <receiver android:name=\".CrepusNotificationReceiver\" android:exported=\"false\" />\n",
-        "        <activity\n",
+        "        </activity>\n",
     )?;
     let android = android_actions_path(root)?;
     let mut source =
@@ -1535,7 +1535,7 @@ fn add_local_notifications_host(root: &Path) -> Result<(), String> {
     if !source.contains("localNotificationsValue") {
         source = source.replace(
             "import android.content.Context\n",
-            "import android.Manifest\nimport android.app.AlarmManager\nimport android.app.Notification\nimport android.app.NotificationChannel\nimport android.app.NotificationManager\nimport android.app.PendingIntent\nimport android.content.Context\nimport android.content.Intent\nimport android.content.pm.PackageManager\nimport android.os.Build\n",
+            "import android.Manifest\nimport android.app.AlarmManager\nimport android.app.Notification\nimport android.app.NotificationChannel\nimport android.app.NotificationManager\nimport android.app.PendingIntent\nimport android.content.Context\nimport android.content.pm.PackageManager\nimport android.os.Build\n",
         );
         source = source.replace(
             "        when (capability) {\n",

@@ -94,7 +94,8 @@ metadata for each asset it can access.
 `actionSheet.show` presents native choices and streams the selected label and index.
 `appState.get` returns whether the app is active or backgrounded.
 `app.getInfo` returns the app name, identifier, version, and build.
-`screenOrientation.get` returns portrait or landscape.
+`screenOrientation.get` returns portrait or landscape. `screenOrientation.lock` requires
+`orientation: "portrait"` or `"landscape"`; `screenOrientation.unlock` restores rotation.
 `accessibilityInfo.get` and `accessibilityInfo.status` return reduce-motion and screen-reader state.
 `device.get` and `device.info` return the platform, device model, and operating-system version.
 `preferences` stores string values with `get`, `set`, `remove`, and `clear`.

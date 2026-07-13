@@ -1101,7 +1101,19 @@ pub const IOS_APP_STATE: &str = r#"
 "#;
 
 pub const ANDROID_SCREEN_ORIENTATION: &str = r#"
-    private fun screenOrientationValue(method: String): JSONObject {
+    private fun screenOrientationValue(method: String, payload: JSONObject?): JSONObject {
+        if (method == "unlock") {
+            activity.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            return screenOrientationValue("get", null).put("locked", false)
+        }
+        if (method == "lock") {
+            when (payload?.optString("orientation")) {
+                "portrait" -> activity.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                "landscape" -> activity.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+                else -> error("screenOrientation.lock requires payload.orientation of portrait or landscape")
+            }
+            return screenOrientationValue("get", null).put("locked", true)
+        }
         if (method != "get") error("unsupported screenOrientation method: $method")
         val orientation = appContext.resources.configuration.orientation
         return JSONObject().put("orientation", if (orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE) "landscape" else "portrait")
@@ -1109,7 +1121,26 @@ pub const ANDROID_SCREEN_ORIENTATION: &str = r#"
 "#;
 
 pub const IOS_SCREEN_ORIENTATION: &str = r#"
-    private static func screenOrientationValue(method: String) throws -> Any {
+    private static func screenOrientationValue(method: String, payload: [String: Any]?) throws -> Any {
+        if method == "unlock" || method == "lock" {
+            let mask: UIInterfaceOrientationMask
+            if method == "unlock" {
+                mask = .all
+            } else {
+                switch payload?["orientation"] as? String {
+                case "portrait": mask = .portrait
+                case "landscape": mask = .landscape
+                default: throw HostActionError("screenOrientation.lock requires payload.orientation of portrait or landscape")
+                }
+            }
+            guard let scene = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first else {
+                throw HostActionError("missing window scene")
+            }
+            scene.requestGeometryUpdate(.iOS(interfaceOrientations: mask)) { error in
+                CrepusRustActions.emit(CrepusRustActions.errorJson(action: "screenOrientation.\(method)", error: error.localizedDescription))
+            }
+            return ["locked": method == "lock", "pending": true]
+        }
         guard method == "get" else { throw HostActionError("unsupported screenOrientation method: \(method)") }
         let landscape = UIScreen.main.bounds.width > UIScreen.main.bounds.height
         return ["orientation": landscape ? "landscape" : "portrait"]
@@ -1322,14 +1353,14 @@ pub const ANDROID_LOCAL_NOTIFICATIONS: &str = r#"
                 .put("body", payload?.optString("body", "") ?: "")
                 .put("notificationId", payload?.optInt("notificationId", id.hashCode()) ?: id.hashCode())
             appContext.getSharedPreferences("crepus_notifications", Context.MODE_PRIVATE).edit().putString("schedule.$id", stored.toString()).apply()
-            val intent = Intent(appContext, CrepusNotificationReceiver::class.java).putExtra("id", id)
+            val intent = android.content.Intent(appContext, CrepusNotificationReceiver::class.java).putExtra("id", id)
             val pending = PendingIntent.getBroadcast(appContext, id.hashCode(), intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
             (appContext.getSystemService(Context.ALARM_SERVICE) as AlarmManager).setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pending)
             return JSONObject().put("scheduled", true).put("id", id).put("at", at)
         }
         if (method == "cancel") {
             val id = payload?.optString("id")?.takeIf { it.isNotBlank() } ?: error("localNotifications.cancel requires id")
-            val intent = Intent(appContext, CrepusNotificationReceiver::class.java).putExtra("id", id)
+            val intent = android.content.Intent(appContext, CrepusNotificationReceiver::class.java).putExtra("id", id)
             val pending = PendingIntent.getBroadcast(appContext, id.hashCode(), intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
             (appContext.getSystemService(Context.ALARM_SERVICE) as AlarmManager).cancel(pending)
             pending.cancel()
