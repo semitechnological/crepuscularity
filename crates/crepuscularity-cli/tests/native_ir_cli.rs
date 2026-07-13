@@ -751,6 +751,8 @@ fn native_add_capability_updates_only_the_scaffold() {
             .expect("read iOS device bridge");
     assert!(device_android.contains("Build.MANUFACTURER"));
     assert!(device_ios.contains("UIDevice.current"));
+    assert!(device_android.contains("\"device\", \"platform\""));
+    assert!(device_ios.contains("case \"device\", \"platform\":"));
     assert!(crepus()
         .args(["native", "add", "preferences", "--dir"])
         .arg(&root)

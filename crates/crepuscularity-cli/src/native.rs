@@ -143,7 +143,7 @@ const CAPABILITIES: &[CapabilitySpec] = &[
     CapabilitySpec { name: "app-state", aliases: &["appstate"], cargo_feature: "app-state", android_manifest: "", ios_project: "" },
     CapabilitySpec { name: "screen-orientation", aliases: &["screenorientation"], cargo_feature: "screen-orientation", android_manifest: "", ios_project: "" },
     CapabilitySpec { name: "accessibility-info", aliases: &["accessibilityinfo", "screen-reader", "screenreader"], cargo_feature: "accessibility-info", android_manifest: "", ios_project: "" },
-    CapabilitySpec { name: "device", aliases: &["device-info", "deviceinfo"], cargo_feature: "device", android_manifest: "", ios_project: "" },
+    CapabilitySpec { name: "device", aliases: &["device-info", "deviceinfo", "platform"], cargo_feature: "device", android_manifest: "", ios_project: "" },
     CapabilitySpec { name: "preferences", aliases: &["storage", "async-storage"], cargo_feature: "preferences", android_manifest: "", ios_project: "" },
     CapabilitySpec { name: "network", aliases: &["net-info", "netinfo"], cargo_feature: "network", android_manifest: "", ios_project: "" },
     CapabilitySpec { name: "keyboard", aliases: &[], cargo_feature: "keyboard", android_manifest: "", ios_project: "" },
@@ -1049,7 +1049,7 @@ fn add_device_host(root: &Path) -> Result<(), String> {
         );
         source = source.replace(
             "        when (capability) {\n",
-            "        when (capability) {\n            \"device\" -> deviceValue(method)\n",
+            "        when (capability) {\n            \"device\", \"platform\" -> deviceValue(method)\n",
         );
         source = source.replace(
             "\n    private fun dispatchHostAction",
@@ -1063,7 +1063,7 @@ fn add_device_host(root: &Path) -> Result<(), String> {
     if !source.contains("deviceValue") {
         source = source.replace(
             "        switch capability {\n",
-            "        switch capability {\n        case \"device\":\n            return try deviceValue(method: method)\n",
+            "        switch capability {\n        case \"device\", \"platform\":\n            return try deviceValue(method: method)\n",
         );
         source = source.replace(
             "\n    private static func dispatchHostAction",
