@@ -27,17 +27,18 @@ use crepuscularity_native::{
     ANDROID_BLUETOOTH, ANDROID_BLUETOOTH_BRIDGE, ANDROID_BROWSER, ANDROID_CAMERA,
     ANDROID_CLIPBOARD, ANDROID_DEVICE, ANDROID_DIALOG, ANDROID_DIMENSIONS, ANDROID_DOCUMENT_PICKER,
     ANDROID_GEOLOCATION, ANDROID_GEOLOCATION_BRIDGE, ANDROID_HAPTICS, ANDROID_IMAGE_PICKER,
-    ANDROID_KEYBOARD, ANDROID_LOCAL_NOTIFICATIONS, ANDROID_NETWORK, ANDROID_PHOTO_LIBRARY,
-    ANDROID_PREFERENCES, ANDROID_SCREEN_ORIENTATION, ANDROID_SECURE_STORAGE, ANDROID_SENSORS,
-    ANDROID_SENSORS_BRIDGE, ANDROID_SETTINGS, ANDROID_SHARE, IOS_ACCESSIBILITY_INFO,
-    IOS_ACTION_SHEET, IOS_ACTION_SHEET_BRIDGE, IOS_APP, IOS_APPEARANCE, IOS_APP_STATE, IOS_BATTERY,
-    IOS_BIOMETRICS, IOS_BLUETOOTH, IOS_BLUETOOTH_BRIDGE, IOS_BROWSER, IOS_CAMERA,
-    IOS_CAMERA_BRIDGE, IOS_CLIPBOARD, IOS_CLIPBOARD_BRIDGE, IOS_DEVICE, IOS_DIALOG,
-    IOS_DIALOG_BRIDGE, IOS_DIMENSIONS, IOS_DOCUMENT_PICKER, IOS_GEOLOCATION,
-    IOS_GEOLOCATION_BRIDGE, IOS_HAPTICS, IOS_IMAGE_PICKER, IOS_IMAGE_PICKER_BRIDGE, IOS_KEYBOARD,
-    IOS_LOCAL_NOTIFICATIONS, IOS_NETWORK, IOS_PHOTO_LIBRARY, IOS_PHOTO_LIBRARY_BRIDGE,
-    IOS_PREFERENCES, IOS_SCREEN_ORIENTATION, IOS_SECURE_STORAGE, IOS_SENSORS, IOS_SENSORS_BRIDGE,
-    IOS_SETTINGS, IOS_SHARE,
+    ANDROID_IN_APP_BROWSER, ANDROID_KEYBOARD, ANDROID_LOCAL_NOTIFICATIONS, ANDROID_NETWORK,
+    ANDROID_PERMISSIONS, ANDROID_PHOTO_LIBRARY, ANDROID_PREFERENCES, ANDROID_SCREEN_ORIENTATION,
+    ANDROID_SECURE_STORAGE, ANDROID_SENSORS, ANDROID_SENSORS_BRIDGE, ANDROID_SETTINGS,
+    ANDROID_SHARE, ANDROID_SYSTEM_BARS, IOS_ACCESSIBILITY_INFO, IOS_ACTION_SHEET,
+    IOS_ACTION_SHEET_BRIDGE, IOS_APP, IOS_APPEARANCE, IOS_APP_STATE, IOS_BATTERY, IOS_BIOMETRICS,
+    IOS_BLUETOOTH, IOS_BLUETOOTH_BRIDGE, IOS_BROWSER, IOS_CAMERA, IOS_CAMERA_BRIDGE, IOS_CLIPBOARD,
+    IOS_CLIPBOARD_BRIDGE, IOS_DEVICE, IOS_DIALOG, IOS_DIALOG_BRIDGE, IOS_DIMENSIONS,
+    IOS_DOCUMENT_PICKER, IOS_GEOLOCATION, IOS_GEOLOCATION_BRIDGE, IOS_HAPTICS, IOS_IMAGE_PICKER,
+    IOS_IMAGE_PICKER_BRIDGE, IOS_IN_APP_BROWSER, IOS_KEYBOARD, IOS_LOCAL_NOTIFICATIONS,
+    IOS_NETWORK, IOS_PERMISSIONS, IOS_PHOTO_LIBRARY, IOS_PHOTO_LIBRARY_BRIDGE, IOS_PREFERENCES,
+    IOS_SCREEN_ORIENTATION, IOS_SECURE_STORAGE, IOS_SENSORS, IOS_SENSORS_BRIDGE, IOS_SETTINGS,
+    IOS_SHARE, IOS_SYSTEM_BARS,
 };
 use serde::Deserialize;
 use serde_json::Value;
@@ -110,6 +111,7 @@ const CAPABILITIES: &[CapabilitySpec] = &[
     },
     CapabilitySpec { name: "clipboard", aliases: &[], cargo_feature: "clipboard", android_manifest: "", ios_project: "" },
     CapabilitySpec { name: "browser", aliases: &["linking", "app-launcher", "applauncher", "phone", "sms"], cargo_feature: "browser", android_manifest: "", ios_project: "" },
+    CapabilitySpec { name: "in-app-browser", aliases: &["inappbrowser", "web-browser"], cargo_feature: "in-app-browser", android_manifest: "", ios_project: "" },
     CapabilitySpec { name: "share", aliases: &[], cargo_feature: "share", android_manifest: "", ios_project: "" },
     CapabilitySpec {
         name: "documentpicker",
@@ -154,6 +156,7 @@ const CAPABILITIES: &[CapabilitySpec] = &[
     CapabilitySpec { name: "local-notifications", aliases: &["localnotifications", "notifications"], cargo_feature: "local-notifications", android_manifest: "    <uses-permission android:name=\"android.permission.POST_NOTIFICATIONS\" />\n", ios_project: "" },
     CapabilitySpec { name: "secure-storage", aliases: &["securestorage"], cargo_feature: "secure-storage", android_manifest: "", ios_project: "" },
     CapabilitySpec { name: "biometrics", aliases: &["authentication"], cargo_feature: "biometrics", android_manifest: "", ios_project: "" },
+    CapabilitySpec { name: "permissions", aliases: &["permission"], cargo_feature: "permissions", android_manifest: "", ios_project: "" },
     CapabilitySpec {
         name: "filesystem",
         aliases: &["files"],
@@ -170,6 +173,7 @@ const CAPABILITIES: &[CapabilitySpec] = &[
     },
     CapabilitySpec { name: "battery", aliases: &[], cargo_feature: "battery", android_manifest: "", ios_project: "" },
     CapabilitySpec { name: "appearance", aliases: &[], cargo_feature: "appearance", android_manifest: "", ios_project: "" },
+    CapabilitySpec { name: "system-bars", aliases: &["systembars", "status-bar", "statusbar"], cargo_feature: "system-bars", android_manifest: "", ios_project: "" },
 ];
 
 fn add_capability(capability: &str, root: &Path) -> Result<(), String> {
@@ -241,6 +245,9 @@ fn add_capability(capability: &str, root: &Path) -> Result<(), String> {
     if spec.name == "browser" {
         add_browser_host(root)?;
     }
+    if spec.name == "in-app-browser" {
+        add_in_app_browser_host(root)?;
+    }
     if spec.name == "share" {
         add_share_host(root)?;
     }
@@ -301,6 +308,9 @@ fn add_capability(capability: &str, root: &Path) -> Result<(), String> {
     if spec.name == "biometrics" {
         add_biometrics_host(root)?;
     }
+    if spec.name == "permissions" {
+        add_permissions_host(root)?;
+    }
     if spec.name == "bluetooth" {
         add_bluetooth_host(root)?;
     }
@@ -313,11 +323,44 @@ fn add_capability(capability: &str, root: &Path) -> Result<(), String> {
     if spec.name == "appearance" {
         add_appearance_host(root)?;
     }
+    if spec.name == "system-bars" {
+        add_system_bars_host(root)?;
+    }
     ui::success(&format!(
         "added native capability '{}' to '{}'",
         spec.name,
         root.display()
     ));
+    Ok(())
+}
+
+fn add_system_bars_host(root: &Path) -> Result<(), String> {
+    let android = android_actions_path(root)?;
+    let mut source =
+        fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
+    if !source.contains("systemBarsValue") {
+        source = source.replace("import android.content.ClipData\n", "import android.content.ClipData\nimport android.graphics.Color\nimport android.os.Build\nimport android.view.View\n");
+        source = source.replace(
+            "        when (capability) {\n",
+            "        when (capability) {\n            \"systemBars\" -> systemBarsValue(method, payload)\n",
+        );
+        source = source.replace(
+            "\n}\n\nobject CrepusActionState",
+            &format!("{ANDROID_SYSTEM_BARS}\n}}\n\nobject CrepusActionState"),
+        );
+        fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))?;
+    }
+    let ios = root.join("ios/Sources/NativeShell/CrepusRustActions.swift");
+    let mut source =
+        fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
+    if !source.contains("systemBarsValue") {
+        source = source.replace("        switch capability {\n", "        switch capability {\n        case \"systemBars\":\n            return try systemBarsValue(method: method, payload: payload)\n");
+        source = source.replace(
+            "\n    fileprivate static func emit",
+            &format!("{IOS_SYSTEM_BARS}\n\n    fileprivate static func emit"),
+        );
+        fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
+    }
     Ok(())
 }
 
@@ -633,6 +676,52 @@ fn add_browser_host(root: &Path) -> Result<(), String> {
         source = source.replace(
             "\n    private static func dispatchHostAction",
             &format!("{IOS_BROWSER}\n\n    private static func dispatchHostAction"),
+        );
+        fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
+    }
+    Ok(())
+}
+
+fn add_in_app_browser_host(root: &Path) -> Result<(), String> {
+    let gradle = root.join("android/app/build.gradle.kts");
+    add_once(
+        &gradle,
+        "    implementation(\"androidx.browser:browser:1.8.0\")\n",
+        "dependencies {\n",
+    )?;
+    let android = android_actions_path(root)?;
+    let mut source =
+        fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
+    if !source.contains("inAppBrowserValue") {
+        source = source.replace(
+            "import androidx.activity.ComponentActivity\n",
+            "import androidx.activity.ComponentActivity\nimport androidx.browser.customtabs.CustomTabsIntent\n",
+        );
+        source = source.replace(
+            "        when (capability) {\n",
+            "        when (capability) {\n            \"inAppBrowser\" -> inAppBrowserValue(method, payload)\n",
+        );
+        source = source.replace(
+            "\n    private fun dispatchHostAction",
+            &format!("{ANDROID_IN_APP_BROWSER}\n    private fun dispatchHostAction"),
+        );
+        fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))?;
+    }
+    let ios = root.join("ios/Sources/NativeShell/CrepusRustActions.swift");
+    let mut source =
+        fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
+    if !source.contains("inAppBrowserValue") {
+        source = source.replace(
+            "import Foundation\n",
+            "import Foundation\nimport SafariServices\n",
+        );
+        source = source.replace(
+            "        switch capability {\n",
+            "        switch capability {\n        case \"inAppBrowser\":\n            return try inAppBrowserValue(method: method, payload: payload)\n",
+        );
+        source = source.replace(
+            "\n    private static func dispatchHostAction",
+            &format!("{IOS_IN_APP_BROWSER}\n\n    private static func dispatchHostAction"),
         );
         fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
     }
@@ -1381,6 +1470,42 @@ fn add_biometrics_host(root: &Path) -> Result<(), String> {
         source = source.replace(
             "\n    private static func dispatchHostAction",
             &format!("{IOS_BIOMETRICS}\n\n    private static func dispatchHostAction"),
+        );
+        fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
+    }
+    Ok(())
+}
+
+fn add_permissions_host(root: &Path) -> Result<(), String> {
+    let android = android_actions_path(root)?;
+    let mut source =
+        fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
+    if !source.contains("permissionsValue") {
+        source = source.replace(
+            "        when (capability) {\n",
+            "        when (capability) {\n            \"permissions\" -> permissionsValue(method, payload)\n",
+        );
+        source = source.replace(
+            "\n    private fun dispatchHostAction",
+            &format!("{ANDROID_PERMISSIONS}\n    private fun dispatchHostAction"),
+        );
+        fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))?;
+    }
+    let ios = root.join("ios/Sources/NativeShell/CrepusRustActions.swift");
+    let mut source =
+        fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
+    if !source.contains("permissionsValue") {
+        source = source.replace(
+            "import Foundation\n",
+            "import Foundation\nimport AVFoundation\nimport CoreLocation\nimport Photos\n",
+        );
+        source = source.replace(
+            "        switch capability {\n",
+            "        switch capability {\n        case \"permissions\":\n            return try permissionsValue(method: method, payload: payload)\n",
+        );
+        source = source.replace(
+            "\n    private static func dispatchHostAction",
+            &format!("{IOS_PERMISSIONS}\n\n    private static func dispatchHostAction"),
         );
         fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
     }

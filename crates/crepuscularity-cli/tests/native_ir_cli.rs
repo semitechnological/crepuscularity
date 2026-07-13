@@ -454,6 +454,12 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(!default_ios.contains("appStateValue"));
     assert!(!default_android.contains("screenOrientationValue"));
     assert!(!default_ios.contains("screenOrientationValue"));
+    assert!(!default_android.contains("permissionsValue"));
+    assert!(!default_ios.contains("permissionsValue"));
+    assert!(!default_android.contains("inAppBrowserValue"));
+    assert!(!default_ios.contains("inAppBrowserValue"));
+    assert!(!default_android.contains("systemBarsValue"));
+    assert!(!default_ios.contains("systemBarsValue"));
     assert!(crepus()
         .args(["native", "add", "share", "--dir"])
         .arg(&root)
@@ -888,6 +894,54 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(biometrics_android.contains("BiometricPrompt"));
     assert!(biometrics_ios.contains("LAContext"));
     assert!(crepus()
+        .args(["native", "add", "permissions", "--dir"])
+        .arg(&root)
+        .output()
+        .expect("add permissions")
+        .status
+        .success());
+    let permissions_android = std::fs::read_to_string(
+        root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusRustActions.kt"),
+    )
+    .expect("read Android permissions bridge");
+    let permissions_ios =
+        std::fs::read_to_string(root.join("ios/Sources/NativeShell/CrepusRustActions.swift"))
+            .expect("read iOS permissions bridge");
+    assert!(permissions_android.contains("android.Manifest.permission.CAMERA"));
+    assert!(permissions_ios.contains("AVCaptureDevice.authorizationStatus"));
+    assert!(crepus()
+        .args(["native", "add", "in-app-browser", "--dir"])
+        .arg(&root)
+        .output()
+        .expect("add in-app-browser")
+        .status
+        .success());
+    let in_app_browser_android = std::fs::read_to_string(
+        root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusRustActions.kt"),
+    )
+    .expect("read Android in-app-browser bridge");
+    let in_app_browser_ios =
+        std::fs::read_to_string(root.join("ios/Sources/NativeShell/CrepusRustActions.swift"))
+            .expect("read iOS in-app-browser bridge");
+    assert!(in_app_browser_android.contains("CustomTabsIntent"));
+    assert!(in_app_browser_ios.contains("SFSafariViewController"));
+    assert!(crepus()
+        .args(["native", "add", "system-bars", "--dir"])
+        .arg(&root)
+        .output()
+        .expect("add system-bars")
+        .status
+        .success());
+    let system_bars_android = std::fs::read_to_string(
+        root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusRustActions.kt"),
+    )
+    .expect("read Android system-bars bridge");
+    let system_bars_ios =
+        std::fs::read_to_string(root.join("ios/Sources/NativeShell/CrepusRustActions.swift"))
+            .expect("read iOS system-bars bridge");
+    assert!(system_bars_android.contains("statusBarColor"));
+    assert!(system_bars_ios.contains("overrideUserInterfaceStyle"));
+    assert!(crepus()
         .args(["native", "add", "filesystem", "--dir"])
         .arg(&root)
         .output()
@@ -918,6 +972,7 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(cargo.contains("local-notifications = []"));
     assert!(cargo.contains("secure-storage = []"));
     assert!(cargo.contains("biometrics = []"));
+    assert!(cargo.contains("permissions = []"));
     assert!(haptics_android.contains("\"haptics\", \"vibration\""));
     assert!(haptics_ios.contains("case \"haptics\", \"vibration\":"));
     assert!(cargo.contains("filesystem = []"));

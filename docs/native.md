@@ -105,6 +105,9 @@ Android and iOS, plus only the required platform declarations. It supports `stat
 | `local-notifications` (`notifications`) | `status`, `requestPermission`, `post` | Android notification channel and iOS UserNotifications; Android permission is added only for this capability |
 | `secure-storage` | `get`, `set`, `remove`, `clear` | Android Keystore-encrypted values and iOS Keychain values |
 | `biometrics` (`authentication`) | `status`, `authenticate` | AndroidX BiometricPrompt or iOS LocalAuthentication, streaming the authentication result |
+| `permissions` (`permission`) | `status`, `check`, `request` | Checks or requests `camera`, `location`, and `photoLibrary`/`photos` after the related capability has added its platform declarations; Android also supports `notifications` and `bluetooth` when those capabilities are installed |
+| `in-app-browser` (`inappbrowser`, `web-browser`) | `open` | Android Custom Tabs or iOS Safari View Controller |
+| `system-bars` (`systembars`, `status-bar`) | `status`, `set` | Android status/navigation colors and light-icon flags; iOS supported window appearance style |
 
 `filesystem` enables its scoped Rust backend only after `crepus native add filesystem`; the
 default app shell and share-extension builds exclude it. It supports `readText`, `writeText`,

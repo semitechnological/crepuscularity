@@ -417,6 +417,33 @@ pub const IOS_BROWSER: &str = r#"
     }
 "#;
 
+pub const ANDROID_IN_APP_BROWSER: &str = r#"
+    private fun inAppBrowserValue(method: String, payload: JSONObject?): JSONObject {
+        if (method != "open") error("unsupported inAppBrowser method: $method")
+        val url = payload?.optString("url", null) ?: error("inAppBrowser.open requires payload.url")
+        CustomTabsIntent.Builder().build().launchUrl(activity, Uri.parse(url))
+        return JSONObject().put("url", url).put("opened", true)
+    }
+"#;
+
+pub const IOS_IN_APP_BROWSER: &str = r#"
+    private static func inAppBrowserValue(method: String, payload: [String: Any]?) throws -> Any {
+        guard method == "open" else {
+            throw HostActionError("unsupported inAppBrowser method: \(method)")
+        }
+        guard let rawUrl = payload?["url"] as? String, let url = URL(string: rawUrl) else {
+            throw HostActionError("inAppBrowser.open requires payload.url")
+        }
+        #if canImport(UIKit)
+        Task { @MainActor in
+            guard let root = topViewController() else { return }
+            root.present(SFSafariViewController(url: url), animated: true)
+        }
+        #endif
+        return ["url": rawUrl, "opened": true]
+    }
+"#;
+
 pub const ANDROID_SHARE: &str = r#"
     private fun shareValue(method: String, payload: JSONObject?): JSONObject {
         if (method != "share") error("unsupported share method: $method")
@@ -1453,6 +1480,98 @@ pub const IOS_BIOMETRICS: &str = r#"
     }
 "#;
 
+pub const ANDROID_PERMISSIONS: &str = r#"
+    private fun permissionsValue(method: String, payload: JSONObject?): JSONObject {
+        val permission = payload?.optString("permission")?.takeIf { it.isNotBlank() }
+            ?: error("permissions.$method requires payload.permission")
+        val permissions = when (permission) {
+            "camera" -> arrayOf(android.Manifest.permission.CAMERA)
+            "location" -> arrayOf(android.Manifest.permission.ACCESS_FINE_LOCATION, android.Manifest.permission.ACCESS_COARSE_LOCATION)
+            "photoLibrary", "photos" -> if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                arrayOf(android.Manifest.permission.READ_MEDIA_IMAGES, android.Manifest.permission.READ_MEDIA_VIDEO)
+            } else {
+                arrayOf(android.Manifest.permission.READ_EXTERNAL_STORAGE)
+            }
+            "notifications" -> if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                arrayOf(android.Manifest.permission.POST_NOTIFICATIONS)
+            } else {
+                emptyArray()
+            }
+            "bluetooth" -> if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                arrayOf(android.Manifest.permission.BLUETOOTH_SCAN, android.Manifest.permission.BLUETOOTH_CONNECT)
+            } else {
+                arrayOf(android.Manifest.permission.ACCESS_FINE_LOCATION)
+            }
+            else -> error("unsupported permission: $permission")
+        }
+        @Suppress("DEPRECATION")
+        val declared = appContext.packageManager
+            .getPackageInfo(appContext.packageName, android.content.pm.PackageManager.GET_PERMISSIONS)
+            .requestedPermissions
+            ?.toSet()
+            ?: emptySet()
+        val configured = permissions.all(declared::contains)
+        val granted = configured && permissions.all { activity.checkSelfPermission(it) == android.content.pm.PackageManager.PERMISSION_GRANTED }
+        if (method == "status" || method == "check") {
+            return JSONObject().put("permission", permission).put("configured", configured).put("granted", granted)
+        }
+        if (method != "request") error("unsupported permissions method: $method")
+        if (!configured) return JSONObject().put("permission", permission).put("configured", false).put("granted", false)
+        if (permissions.isEmpty() || granted) return JSONObject().put("permission", permission).put("configured", true).put("granted", true)
+        activity.requestPermissions(permissions, 4771)
+        return JSONObject().put("permission", permission).put("configured", true).put("requested", true).put("pending", true)
+    }
+"#;
+
+pub const IOS_PERMISSIONS: &str = r#"
+    private static let permissionsLocation = CLLocationManager()
+
+    private static func permissionsValue(method: String, payload: [String: Any]?) throws -> Any {
+        guard let permission = payload?["permission"] as? String, !permission.isEmpty else {
+            throw HostActionError("permissions.\(method) requires payload.permission")
+        }
+        let configured = switch permission {
+        case "camera": Bundle.main.object(forInfoDictionaryKey: "NSCameraUsageDescription") != nil
+        case "location": Bundle.main.object(forInfoDictionaryKey: "NSLocationWhenInUseUsageDescription") != nil
+        case "photoLibrary", "photos": Bundle.main.object(forInfoDictionaryKey: "NSPhotoLibraryUsageDescription") != nil
+        default: throw HostActionError("unsupported permission: \(permission)")
+        }
+        let status: String = switch permission {
+        case "camera":
+            switch AVCaptureDevice.authorizationStatus(for: .video) {
+            case .authorized: "granted"
+            case .notDetermined: "prompt"
+            default: "denied"
+            }
+        case "location":
+            switch permissionsLocation.authorizationStatus {
+            case .authorizedAlways, .authorizedWhenInUse: "granted"
+            case .notDetermined: "prompt"
+            default: "denied"
+            }
+        case "photoLibrary", "photos":
+            switch PHPhotoLibrary.authorizationStatus(for: .readWrite) {
+            case .authorized, .limited: "granted"
+            case .notDetermined: "prompt"
+            default: "denied"
+            }
+        default: "denied"
+        }
+        if method == "status" || method == "check" {
+            return ["permission": permission, "configured": configured, "status": configured ? status : "notConfigured", "granted": configured && status == "granted"]
+        }
+        guard method == "request" else { throw HostActionError("unsupported permissions method: \(method)") }
+        guard configured else { return ["permission": permission, "configured": false, "status": "notConfigured", "granted": false] }
+        switch permission {
+        case "camera": AVCaptureDevice.requestAccess(for: .video) { _ in }
+        case "location": permissionsLocation.requestWhenInUseAuthorization()
+        case "photoLibrary", "photos": Task { _ = await PHPhotoLibrary.requestAuthorization(for: .readWrite) }
+        default: break
+        }
+        return ["permission": permission, "configured": true, "requested": true, "pending": status == "prompt"]
+    }
+"#;
+
 pub const ANDROID_APP: &str = r#"
     private fun appValue(method: String): JSONObject {
         if (method != "getInfo") error("unsupported app method: $method")
@@ -1589,6 +1708,61 @@ pub const IOS_APPEARANCE: &str = r#"
         return ["colorScheme": UITraitCollection.current.userInterfaceStyle == .dark ? "dark" : "light"]
         #else
         return ["colorScheme": "light"]
+        #endif
+    }
+"#;
+
+pub const ANDROID_SYSTEM_BARS: &str = r##"
+    private fun systemBarsValue(method: String, payload: JSONObject?): JSONObject {
+        val window = activity.window
+        fun color(name: String, current: Int): Int = payload?.optString(name)?.takeIf { it.isNotEmpty() }?.let(Color::parseColor) ?: current
+        fun light(flag: Int): Boolean = window.decorView.systemUiVisibility and flag != 0
+        when (method) {
+            "status" -> return JSONObject()
+                .put("statusBarColor", String.format("#%08X", window.statusBarColor))
+                .put("navigationBarColor", String.format("#%08X", window.navigationBarColor))
+                .put("lightStatusBar", Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && light(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR))
+                .put("lightNavigationBar", Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && light(View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR))
+            "set" -> {
+                window.statusBarColor = color("statusBarColor", window.statusBarColor)
+                window.navigationBarColor = color("navigationBarColor", window.navigationBarColor)
+                var flags = window.decorView.systemUiVisibility
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && payload?.has("lightStatusBar") == true) {
+                    flags = if (payload.optBoolean("lightStatusBar")) flags or View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR else flags and View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR.inv()
+                }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && payload?.has("lightNavigationBar") == true) {
+                    flags = if (payload.optBoolean("lightNavigationBar")) flags or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR else flags and View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR.inv()
+                }
+                window.decorView.systemUiVisibility = flags
+                return systemBarsValue("status", null)
+            }
+            else -> error("unsupported systemBars method: $method")
+        }
+    }
+"##;
+
+pub const IOS_SYSTEM_BARS: &str = r#"
+    private static func systemBarsValue(method: String, payload: [String: Any]?) throws -> Any {
+        #if canImport(UIKit)
+        let windows = UIApplication.shared.connectedScenes.compactMap { ($0 as? UIWindowScene)?.keyWindow }
+        let style = windows.first?.overrideUserInterfaceStyle ?? .unspecified
+        if method == "status" {
+            return ["style": style == .dark ? "dark" : style == .light ? "light" : "system"]
+        }
+        guard method == "set" else { throw HostActionError("unsupported systemBars method: \(method)") }
+        let requested = payload?["style"] as? String ?? "system"
+        let override: UIUserInterfaceStyle
+        switch requested {
+        case "dark": override = .dark
+        case "light": override = .light
+        case "system": override = .unspecified
+        default: throw HostActionError("unsupported systemBars style: \(requested)")
+        }
+        windows.forEach { $0.overrideUserInterfaceStyle = override }
+        return ["style": requested]
+        #else
+        if method == "status" { return ["style": "system"] }
+        throw HostActionError("system bars are unavailable")
         #endif
     }
 "#;

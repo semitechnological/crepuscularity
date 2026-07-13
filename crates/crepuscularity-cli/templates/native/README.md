@@ -66,6 +66,9 @@ crepus native add settings --dir .
 crepus native add local-notifications --dir .
 crepus native add secure-storage --dir .
 crepus native add biometrics --dir .
+crepus native add permissions --dir .
+crepus native add in-app-browser --dir .
+crepus native add system-bars --dir .
 ```
 
 `sensors` installs real gyro and accelerometer bridges. `bluetooth` installs Android and iOS BLE scan
@@ -97,6 +100,9 @@ metadata for each asset it can access.
 `localNotifications` requests notification permission and posts immediate local notifications.
 `secureStorage` persists values with Android Keystore encryption or the iOS Keychain.
 `biometrics.authenticate` opens the system biometric/device-credential prompt.
+`permissions.status`, `permissions.check`, and `permissions.request` operate on a named permission after its related capability has installed the required declarations.
+`inAppBrowser.open` presents Android Custom Tabs or iOS Safari View Controller.
+`systemBars.status` and `systemBars.set` inspect or update Android bar colors and icon contrast; iOS controls the supported window appearance style.
 
 ## Regenerating the fixture from a template
 
