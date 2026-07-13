@@ -91,6 +91,7 @@ Android and iOS, plus only the required platform declarations. It supports `stat
 | `photo-library` (`photolibrary`, `media-library`) | `scan`, `getRecentMedia` | Android MediaStore and iOS PhotoKit, each requesting media access only when called; emits one cached-file result per asset |
 | `camera` | `takePhoto` | Android system camera preview and iOS camera picker; emits one cached JPEG result |
 | `dimensions` | `get`, `getWindow` | Current Android window metrics or iOS screen bounds, expressed in display points |
+| `dialog` | `show` | Android alert dialog and iOS alert controller; accepts optional `title`, `message`, and `button`, then streams `ok` or `cancel` |
 
 `filesystem` enables its scoped Rust backend only after `crepus native add filesystem`; the
 default app shell and share-extension builds exclude it. It supports `readText`, `writeText`,

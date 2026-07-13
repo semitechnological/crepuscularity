@@ -916,6 +916,83 @@ pub const IOS_DIMENSIONS: &str = r#"
     }
 "#;
 
+pub const ANDROID_DIALOG: &str = r#"
+    private fun dialogValue(method: String, payload: JSONObject?): JSONObject {
+        if (method != "show") error("unsupported dialog method: $method")
+        val action = "dialog.show"
+        val title = payload?.optString("title") ?: ""
+        val message = payload?.optString("message") ?: ""
+        val button = payload?.optString("button", "OK") ?: "OK"
+        activity.runOnUiThread {
+            AlertDialog.Builder(activity)
+                .setTitle(title)
+                .setMessage(message)
+                .setPositiveButton(button) { _, _ -> emit(dialogResultJson(action, "ok")) }
+                .setOnCancelListener { emit(dialogResultJson(action, "cancel")) }
+                .show()
+        }
+        return JSONObject().put("opening", true)
+    }
+
+    private fun dialogResultJson(action: String, selection: String): String =
+        JSONObject()
+            .put("ok", true)
+            .put("action", action)
+            .put("value", JSONObject().put("selection", selection))
+            .toString()
+"#;
+
+pub const IOS_DIALOG: &str = r#"
+    private static func dialogValue(method: String, payload: [String: Any]?) throws -> Any {
+        guard method == "show" else {
+            throw HostActionError("unsupported dialog method: \(method)")
+        }
+        presentDialog(
+            action: "dialog.show",
+            title: payload?["title"] as? String ?? "",
+            message: payload?["message"] as? String ?? "",
+            button: payload?["button"] as? String ?? "OK"
+        )
+        return ["opening": true]
+    }
+"#;
+
+pub const IOS_DIALOG_BRIDGE: &str = r#"
+
+#if canImport(UIKit)
+private func presentDialog(action: String, title: String, message: String, button: String) {
+    Task { @MainActor in
+        guard let root = topViewController() else {
+            CrepusRustActions.emit("{\"ok\":false,\"action\":\"\(action)\",\"error\":\"missing root view controller\"}")
+            return
+        }
+        let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: button, style: .default) { _ in
+            CrepusRustActions.emit(dialogResultJson(action: action, selection: "ok"))
+        })
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel) { _ in
+            CrepusRustActions.emit(dialogResultJson(action: action, selection: "cancel"))
+        })
+        root.present(alert, animated: true)
+    }
+}
+
+private func dialogResultJson(action: String, selection: String) -> String {
+    if let data = try? JSONSerialization.data(withJSONObject: ["ok": true, "action": action, "value": ["selection": selection]]),
+       let json = String(data: data, encoding: .utf8) {
+        return json
+    }
+    return "{\"ok\":false,\"action\":\"\(action)\",\"error\":\"json encode failure\"}"
+}
+#elseif canImport(AppKit)
+private func presentDialog(action: String, title: String, message: String, button: String) {
+    Task { @MainActor in
+        CrepusRustActions.emit("{\"ok\":false,\"action\":\"\(action)\",\"error\":\"dialog unavailable on AppKit shell\"}")
+    }
+}
+#endif
+"#;
+
 pub const ANDROID_GEOLOCATION: &str = r#"
     private val geolocation by lazy { GeolocationBridge(activity) }
 

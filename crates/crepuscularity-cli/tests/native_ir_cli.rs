@@ -446,6 +446,8 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(!default_ios.contains("cameraValue"));
     assert!(!default_android.contains("dimensionsValue"));
     assert!(!default_ios.contains("dimensionsValue"));
+    assert!(!default_android.contains("dialogValue"));
+    assert!(!default_ios.contains("dialogValue"));
     assert!(crepus()
         .args(["native", "add", "share", "--dir"])
         .arg(&root)
@@ -646,6 +648,22 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(dimensions_android.contains("currentWindowMetrics"));
     assert!(dimensions_ios.contains("UIScreen.main"));
     assert!(crepus()
+        .args(["native", "add", "dialog", "--dir"])
+        .arg(&root)
+        .output()
+        .expect("add dialog")
+        .status
+        .success());
+    let dialog_android = std::fs::read_to_string(
+        root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusRustActions.kt"),
+    )
+    .expect("read Android dialog bridge");
+    let dialog_ios =
+        std::fs::read_to_string(root.join("ios/Sources/NativeShell/CrepusRustActions.swift"))
+            .expect("read iOS dialog bridge");
+    assert!(dialog_android.contains("AlertDialog.Builder"));
+    assert!(dialog_ios.contains("UIAlertController"));
+    assert!(crepus()
         .args(["native", "add", "filesystem", "--dir"])
         .arg(&root)
         .output()
@@ -662,6 +680,7 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(cargo.contains("photo-library = []"));
     assert!(cargo.contains("camera = []"));
     assert!(cargo.contains("dimensions = []"));
+    assert!(cargo.contains("dialog = []"));
     assert!(cargo.contains("filesystem = []"));
     assert!(cargo.contains("default = [\"filesystem\"]"));
     assert!(

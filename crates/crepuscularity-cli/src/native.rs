@@ -24,13 +24,14 @@ use crepuscularity_native::{
     generate_native_source, render_component_file_to_ir, render_from_files, render_template_to_ir,
     to_json, to_json_pretty, NativeCodegenTarget, ANDROID_APPEARANCE, ANDROID_BATTERY,
     ANDROID_BLUETOOTH, ANDROID_BLUETOOTH_BRIDGE, ANDROID_BROWSER, ANDROID_CAMERA,
-    ANDROID_CLIPBOARD, ANDROID_DIMENSIONS, ANDROID_DOCUMENT_PICKER, ANDROID_GEOLOCATION,
-    ANDROID_GEOLOCATION_BRIDGE, ANDROID_HAPTICS, ANDROID_IMAGE_PICKER, ANDROID_PHOTO_LIBRARY,
-    ANDROID_SENSORS, ANDROID_SENSORS_BRIDGE, ANDROID_SHARE, IOS_APPEARANCE, IOS_BATTERY,
-    IOS_BLUETOOTH, IOS_BLUETOOTH_BRIDGE, IOS_BROWSER, IOS_CAMERA, IOS_CAMERA_BRIDGE, IOS_CLIPBOARD,
-    IOS_CLIPBOARD_BRIDGE, IOS_DIMENSIONS, IOS_DOCUMENT_PICKER, IOS_GEOLOCATION,
-    IOS_GEOLOCATION_BRIDGE, IOS_HAPTICS, IOS_IMAGE_PICKER, IOS_IMAGE_PICKER_BRIDGE,
-    IOS_PHOTO_LIBRARY, IOS_PHOTO_LIBRARY_BRIDGE, IOS_SENSORS, IOS_SENSORS_BRIDGE, IOS_SHARE,
+    ANDROID_CLIPBOARD, ANDROID_DIALOG, ANDROID_DIMENSIONS, ANDROID_DOCUMENT_PICKER,
+    ANDROID_GEOLOCATION, ANDROID_GEOLOCATION_BRIDGE, ANDROID_HAPTICS, ANDROID_IMAGE_PICKER,
+    ANDROID_PHOTO_LIBRARY, ANDROID_SENSORS, ANDROID_SENSORS_BRIDGE, ANDROID_SHARE, IOS_APPEARANCE,
+    IOS_BATTERY, IOS_BLUETOOTH, IOS_BLUETOOTH_BRIDGE, IOS_BROWSER, IOS_CAMERA, IOS_CAMERA_BRIDGE,
+    IOS_CLIPBOARD, IOS_CLIPBOARD_BRIDGE, IOS_DIALOG, IOS_DIALOG_BRIDGE, IOS_DIMENSIONS,
+    IOS_DOCUMENT_PICKER, IOS_GEOLOCATION, IOS_GEOLOCATION_BRIDGE, IOS_HAPTICS, IOS_IMAGE_PICKER,
+    IOS_IMAGE_PICKER_BRIDGE, IOS_PHOTO_LIBRARY, IOS_PHOTO_LIBRARY_BRIDGE, IOS_SENSORS,
+    IOS_SENSORS_BRIDGE, IOS_SHARE,
 };
 use serde::Deserialize;
 use serde_json::Value;
@@ -133,6 +134,7 @@ const CAPABILITIES: &[CapabilitySpec] = &[
         ios_project: "        INFOPLIST_KEY_NSCameraUsageDescription: \"$(PRODUCT_NAME) uses the camera when you ask it to.\"\n",
     },
     CapabilitySpec { name: "dimensions", aliases: &[], cargo_feature: "dimensions", android_manifest: "", ios_project: "" },
+    CapabilitySpec { name: "dialog", aliases: &[], cargo_feature: "dialog", android_manifest: "", ios_project: "" },
     CapabilitySpec {
         name: "filesystem",
         aliases: &["files"],
@@ -237,6 +239,9 @@ fn add_capability(capability: &str, root: &Path) -> Result<(), String> {
     }
     if spec.name == "dimensions" {
         add_dimensions_host(root)?;
+    }
+    if spec.name == "dialog" {
+        add_dialog_host(root)?;
     }
     if spec.name == "bluetooth" {
         add_bluetooth_host(root)?;
@@ -821,6 +826,47 @@ fn add_dimensions_host(root: &Path) -> Result<(), String> {
             "\n    private static func dispatchHostAction",
             &format!("{IOS_DIMENSIONS}\n\n    private static func dispatchHostAction"),
         );
+        fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
+    }
+    Ok(())
+}
+
+fn add_dialog_host(root: &Path) -> Result<(), String> {
+    let android = android_actions_path(root)?;
+    let mut source =
+        fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
+    if !source.contains("dialogValue") {
+        source = source.replace(
+            "import android.content.Context\n",
+            "import android.content.Context\nimport android.app.AlertDialog\n",
+        );
+        source = source.replace(
+            "        when (capability) {\n",
+            "        when (capability) {\n            \"dialog\" -> dialogValue(method, payload)\n",
+        );
+        source = source.replace(
+            "\n    private fun dispatchHostAction",
+            &format!("{ANDROID_DIALOG}\n    private fun dispatchHostAction"),
+        );
+        fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))?;
+    }
+    let ios = root.join("ios/Sources/NativeShell/CrepusRustActions.swift");
+    let mut source =
+        fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
+    if !source.contains("dialogValue") {
+        source = source.replace(
+            "        switch capability {\n",
+            "        switch capability {\n        case \"dialog\":\n            return try dialogValue(method: method, payload: payload)\n",
+        );
+        source = source.replace(
+            "    private static func emit(_ result: String)",
+            "    fileprivate static func emit(_ result: String)",
+        );
+        source = source.replace(
+            "\n    private static func dispatchHostAction",
+            &format!("{IOS_DIALOG}\n\n    private static func dispatchHostAction"),
+        );
+        source.push_str(IOS_DIALOG_BRIDGE);
         fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
     }
     Ok(())
