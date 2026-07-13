@@ -856,6 +856,22 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(secure_storage_android.contains("AndroidKeyStore"));
     assert!(secure_storage_ios.contains("SecItemAdd"));
     assert!(crepus()
+        .args(["native", "add", "biometrics", "--dir"])
+        .arg(&root)
+        .output()
+        .expect("add biometrics")
+        .status
+        .success());
+    let biometrics_android = std::fs::read_to_string(
+        root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusRustActions.kt"),
+    )
+    .expect("read Android biometrics bridge");
+    let biometrics_ios =
+        std::fs::read_to_string(root.join("ios/Sources/NativeShell/CrepusRustActions.swift"))
+            .expect("read iOS biometrics bridge");
+    assert!(biometrics_android.contains("BiometricPrompt"));
+    assert!(biometrics_ios.contains("LAContext"));
+    assert!(crepus()
         .args(["native", "add", "filesystem", "--dir"])
         .arg(&root)
         .output()
@@ -884,6 +900,7 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(cargo.contains("settings = []"));
     assert!(cargo.contains("local-notifications = []"));
     assert!(cargo.contains("secure-storage = []"));
+    assert!(cargo.contains("biometrics = []"));
     assert!(haptics_android.contains("\"haptics\", \"vibration\""));
     assert!(haptics_ios.contains("case \"haptics\", \"vibration\":"));
     assert!(cargo.contains("filesystem = []"));

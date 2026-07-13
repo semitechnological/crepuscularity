@@ -65,6 +65,7 @@ crepus native add keyboard --dir .
 crepus native add settings --dir .
 crepus native add local-notifications --dir .
 crepus native add secure-storage --dir .
+crepus native add biometrics --dir .
 ```
 
 `sensors` installs real gyro and accelerometer bridges. `bluetooth` installs Android and iOS BLE scan
@@ -94,6 +95,7 @@ metadata for each asset it can access.
 `settings.open` opens the operating system's page for this app.
 `localNotifications` requests notification permission and posts immediate local notifications.
 `secureStorage` persists values with Android Keystore encryption or the iOS Keychain.
+`biometrics.authenticate` opens the system biometric/device-credential prompt.
 
 ## Regenerating the fixture from a template
 

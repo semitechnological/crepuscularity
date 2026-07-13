@@ -1408,6 +1408,51 @@ pub const IOS_SECURE_STORAGE: &str = r#"
     }
 "#;
 
+pub const ANDROID_BIOMETRICS: &str = r#"
+    private fun biometricsValue(method: String, payload: JSONObject?): JSONObject {
+        val manager = BiometricManager.from(activity)
+        if (method == "status") {
+            return JSONObject().put("available", manager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL) == BiometricManager.BIOMETRIC_SUCCESS)
+        }
+        if (method != "authenticate") error("unsupported biometrics method: $method")
+        val prompt = BiometricPrompt(activity, ContextCompat.getMainExecutor(activity), object : BiometricPrompt.AuthenticationCallback() {
+            override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                emit(JSONObject().put("ok", true).put("capability", "biometrics").put("method", "authenticate").put("value", JSONObject().put("authenticated", true)).toString())
+            }
+            override fun onAuthenticationError(code: Int, message: CharSequence) {
+                emit(JSONObject().put("ok", false).put("capability", "biometrics").put("method", "authenticate").put("error", message.toString()).toString())
+            }
+        })
+        val info = BiometricPrompt.PromptInfo.Builder()
+            .setTitle(payload?.optString("title", "Authenticate") ?: "Authenticate")
+            .setSubtitle(payload?.optString("subtitle", "") ?: "")
+            .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL)
+            .build()
+        prompt.authenticate(info)
+        return JSONObject().put("opening", true)
+    }
+"#;
+
+pub const IOS_BIOMETRICS: &str = r#"
+    private static func biometricsValue(method: String, payload: [String: Any]?) throws -> Any {
+        let context = LAContext()
+        var failure: NSError?
+        let available = context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &failure)
+        if method == "status" { return ["available": available] }
+        guard method == "authenticate" else { throw HostActionError("unsupported biometrics method: \(method)") }
+        guard available else { return ["available": false] }
+        context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: payload?["reason"] as? String ?? "Authenticate") { success, error in
+            let result: [String: Any] = success
+                ? ["ok": true, "capability": "biometrics", "method": "authenticate", "value": ["authenticated": true]]
+                : ["ok": false, "capability": "biometrics", "method": "authenticate", "error": error?.localizedDescription ?? "authentication failed"]
+            if let data = try? JSONSerialization.data(withJSONObject: result), let json = String(data: data, encoding: .utf8) {
+                CrepusRustActions.emit(json)
+            }
+        }
+        return ["opening": true]
+    }
+"#;
+
 pub const ANDROID_GEOLOCATION: &str = r#"
     private val geolocation by lazy { GeolocationBridge(activity) }
 

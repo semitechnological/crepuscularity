@@ -103,6 +103,7 @@ Android and iOS, plus only the required platform declarations. It supports `stat
 | `settings` (`app-settings`) | `open` | Opens the app's Android or iOS settings page |
 | `local-notifications` (`notifications`) | `status`, `requestPermission`, `post` | Android notification channel and iOS UserNotifications; Android permission is added only for this capability |
 | `secure-storage` | `get`, `set`, `remove`, `clear` | Android Keystore-encrypted values and iOS Keychain values |
+| `biometrics` (`authentication`) | `status`, `authenticate` | AndroidX BiometricPrompt or iOS LocalAuthentication, streaming the authentication result |
 
 `filesystem` enables its scoped Rust backend only after `crepus native add filesystem`; the
 default app shell and share-extension builds exclude it. It supports `readText`, `writeText`,

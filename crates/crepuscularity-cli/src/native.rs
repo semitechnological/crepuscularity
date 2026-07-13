@@ -23,15 +23,15 @@ use crepuscularity_core::{DriverCache, Fingerprint};
 use crepuscularity_native::{
     generate_native_source, render_component_file_to_ir, render_from_files, render_template_to_ir,
     to_json, to_json_pretty, NativeCodegenTarget, ANDROID_ACCESSIBILITY_INFO, ANDROID_ACTION_SHEET,
-    ANDROID_APPEARANCE, ANDROID_APP_STATE, ANDROID_BATTERY, ANDROID_BLUETOOTH,
+    ANDROID_APPEARANCE, ANDROID_APP_STATE, ANDROID_BATTERY, ANDROID_BIOMETRICS, ANDROID_BLUETOOTH,
     ANDROID_BLUETOOTH_BRIDGE, ANDROID_BROWSER, ANDROID_CAMERA, ANDROID_CLIPBOARD, ANDROID_DEVICE,
     ANDROID_DIALOG, ANDROID_DIMENSIONS, ANDROID_DOCUMENT_PICKER, ANDROID_GEOLOCATION,
     ANDROID_GEOLOCATION_BRIDGE, ANDROID_HAPTICS, ANDROID_IMAGE_PICKER, ANDROID_KEYBOARD,
     ANDROID_LOCAL_NOTIFICATIONS, ANDROID_NETWORK, ANDROID_PHOTO_LIBRARY, ANDROID_PREFERENCES,
     ANDROID_SCREEN_ORIENTATION, ANDROID_SECURE_STORAGE, ANDROID_SENSORS, ANDROID_SENSORS_BRIDGE,
     ANDROID_SETTINGS, ANDROID_SHARE, IOS_ACCESSIBILITY_INFO, IOS_ACTION_SHEET,
-    IOS_ACTION_SHEET_BRIDGE, IOS_APPEARANCE, IOS_APP_STATE, IOS_BATTERY, IOS_BLUETOOTH,
-    IOS_BLUETOOTH_BRIDGE, IOS_BROWSER, IOS_CAMERA, IOS_CAMERA_BRIDGE, IOS_CLIPBOARD,
+    IOS_ACTION_SHEET_BRIDGE, IOS_APPEARANCE, IOS_APP_STATE, IOS_BATTERY, IOS_BIOMETRICS,
+    IOS_BLUETOOTH, IOS_BLUETOOTH_BRIDGE, IOS_BROWSER, IOS_CAMERA, IOS_CAMERA_BRIDGE, IOS_CLIPBOARD,
     IOS_CLIPBOARD_BRIDGE, IOS_DEVICE, IOS_DIALOG, IOS_DIALOG_BRIDGE, IOS_DIMENSIONS,
     IOS_DOCUMENT_PICKER, IOS_GEOLOCATION, IOS_GEOLOCATION_BRIDGE, IOS_HAPTICS, IOS_IMAGE_PICKER,
     IOS_IMAGE_PICKER_BRIDGE, IOS_KEYBOARD, IOS_LOCAL_NOTIFICATIONS, IOS_NETWORK, IOS_PHOTO_LIBRARY,
@@ -151,6 +151,7 @@ const CAPABILITIES: &[CapabilitySpec] = &[
     CapabilitySpec { name: "settings", aliases: &["app-settings"], cargo_feature: "settings", android_manifest: "", ios_project: "" },
     CapabilitySpec { name: "local-notifications", aliases: &["localnotifications", "notifications"], cargo_feature: "local-notifications", android_manifest: "    <uses-permission android:name=\"android.permission.POST_NOTIFICATIONS\" />\n", ios_project: "" },
     CapabilitySpec { name: "secure-storage", aliases: &["securestorage"], cargo_feature: "secure-storage", android_manifest: "", ios_project: "" },
+    CapabilitySpec { name: "biometrics", aliases: &["authentication"], cargo_feature: "biometrics", android_manifest: "", ios_project: "" },
     CapabilitySpec {
         name: "filesystem",
         aliases: &["files"],
@@ -291,6 +292,9 @@ fn add_capability(capability: &str, root: &Path) -> Result<(), String> {
     }
     if spec.name == "secure-storage" {
         add_secure_storage_host(root)?;
+    }
+    if spec.name == "biometrics" {
+        add_biometrics_host(root)?;
     }
     if spec.name == "bluetooth" {
         add_bluetooth_host(root)?;
@@ -1294,6 +1298,52 @@ fn add_secure_storage_host(root: &Path) -> Result<(), String> {
         source = source.replace(
             "\n    private static func dispatchHostAction",
             &format!("{IOS_SECURE_STORAGE}\n\n    private static func dispatchHostAction"),
+        );
+        fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
+    }
+    Ok(())
+}
+
+fn add_biometrics_host(root: &Path) -> Result<(), String> {
+    let gradle = root.join("android/app/build.gradle.kts");
+    add_once(
+        &gradle,
+        "    implementation(\"androidx.biometric:biometric:1.1.0\")\n",
+        "dependencies {\n",
+    )?;
+    let android = android_actions_path(root)?;
+    let mut source =
+        fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
+    if !source.contains("biometricsValue") {
+        source = source.replace(
+            "import androidx.activity.ComponentActivity\n",
+            "import androidx.activity.ComponentActivity\nimport androidx.biometric.BiometricManager\nimport androidx.biometric.BiometricPrompt\nimport androidx.core.content.ContextCompat\n",
+        );
+        source = source.replace(
+            "        when (capability) {\n",
+            "        when (capability) {\n            \"biometrics\", \"authentication\" -> biometricsValue(method, payload)\n",
+        );
+        source = source.replace(
+            "\n    private fun dispatchHostAction",
+            &format!("{ANDROID_BIOMETRICS}\n    private fun dispatchHostAction"),
+        );
+        fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))?;
+    }
+    let ios = root.join("ios/Sources/NativeShell/CrepusRustActions.swift");
+    let mut source =
+        fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
+    if !source.contains("biometricsValue") {
+        source = source.replace(
+            "import Foundation\n",
+            "import Foundation\nimport LocalAuthentication\n",
+        );
+        source = source.replace(
+            "        switch capability {\n",
+            "        switch capability {\n        case \"biometrics\", \"authentication\":\n            return try biometricsValue(method: method, payload: payload)\n",
+        );
+        source = source.replace(
+            "\n    private static func dispatchHostAction",
+            &format!("{IOS_BIOMETRICS}\n\n    private static func dispatchHostAction"),
         );
         fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
     }
