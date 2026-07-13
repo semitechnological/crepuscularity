@@ -68,6 +68,7 @@ vendored Bluetooth Java or Bluetooth permission. Add platform capabilities per a
 crepus native add sensors --dir .
 crepus native add bluetooth --dir .
 crepus native add image-picker --dir .
+crepus native add photo-library --dir .
 ```
 
 Sensors installs real gyro/accelerometer bridges. Bluetooth installs BLE central scan bridges on
@@ -87,6 +88,7 @@ Android and iOS, plus only the required platform declarations. It supports `stat
 | `share` | `share` | Android chooser; iOS activity sheet; accepts `text`, `url`, and optional `title` |
 | `image-picker` (`imagepicker`, `media-picker`) | `pick` | Android system picker; iOS PHPicker; results stream as `imagePicker.pick`. The named `pick_media` action is installed with this capability. |
 | `documentPicker` (`documents`) | `pick` | Android/iOS multiple-document picker; emits imported cached-file metadata |
+| `photo-library` (`photolibrary`, `media-library`) | `scan`, `getRecentMedia` | Android MediaStore and iOS PhotoKit, each requesting media access only when called; emits one cached-file result per asset |
 
 `filesystem` enables its scoped Rust backend only after `crepus native add filesystem`; the
 default app shell and share-extension builds exclude it. It supports `readText`, `writeText`,

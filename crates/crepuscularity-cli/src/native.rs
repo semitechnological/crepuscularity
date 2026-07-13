@@ -25,11 +25,11 @@ use crepuscularity_native::{
     to_json, to_json_pretty, NativeCodegenTarget, ANDROID_APPEARANCE, ANDROID_BATTERY,
     ANDROID_BLUETOOTH, ANDROID_BLUETOOTH_BRIDGE, ANDROID_BROWSER, ANDROID_CLIPBOARD,
     ANDROID_DOCUMENT_PICKER, ANDROID_GEOLOCATION, ANDROID_GEOLOCATION_BRIDGE, ANDROID_HAPTICS,
-    ANDROID_IMAGE_PICKER, ANDROID_SENSORS, ANDROID_SENSORS_BRIDGE, ANDROID_SHARE, IOS_APPEARANCE,
-    IOS_BATTERY, IOS_BLUETOOTH, IOS_BLUETOOTH_BRIDGE, IOS_BROWSER, IOS_CLIPBOARD,
-    IOS_CLIPBOARD_BRIDGE, IOS_DOCUMENT_PICKER, IOS_GEOLOCATION, IOS_GEOLOCATION_BRIDGE,
-    IOS_HAPTICS, IOS_IMAGE_PICKER, IOS_IMAGE_PICKER_BRIDGE, IOS_SENSORS, IOS_SENSORS_BRIDGE,
-    IOS_SHARE,
+    ANDROID_IMAGE_PICKER, ANDROID_PHOTO_LIBRARY, ANDROID_SENSORS, ANDROID_SENSORS_BRIDGE,
+    ANDROID_SHARE, IOS_APPEARANCE, IOS_BATTERY, IOS_BLUETOOTH, IOS_BLUETOOTH_BRIDGE, IOS_BROWSER,
+    IOS_CLIPBOARD, IOS_CLIPBOARD_BRIDGE, IOS_DOCUMENT_PICKER, IOS_GEOLOCATION,
+    IOS_GEOLOCATION_BRIDGE, IOS_HAPTICS, IOS_IMAGE_PICKER, IOS_IMAGE_PICKER_BRIDGE,
+    IOS_PHOTO_LIBRARY, IOS_PHOTO_LIBRARY_BRIDGE, IOS_SENSORS, IOS_SENSORS_BRIDGE, IOS_SHARE,
 };
 use serde::Deserialize;
 use serde_json::Value;
@@ -118,6 +118,13 @@ const CAPABILITIES: &[CapabilitySpec] = &[
         ios_project: "",
     },
     CapabilitySpec {
+        name: "photo-library",
+        aliases: &["photolibrary", "media-library"],
+        cargo_feature: "photo-library",
+        android_manifest: "    <uses-permission android:name=\"android.permission.READ_MEDIA_IMAGES\" />\n    <uses-permission android:name=\"android.permission.READ_MEDIA_VIDEO\" />\n    <uses-permission android:name=\"android.permission.READ_EXTERNAL_STORAGE\" android:maxSdkVersion=\"32\" />\n",
+        ios_project: "        INFOPLIST_KEY_NSPhotoLibraryUsageDescription: \"$(PRODUCT_NAME) accesses your media library when you ask it to.\"\n",
+    },
+    CapabilitySpec {
         name: "filesystem",
         aliases: &["files"],
         cargo_feature: "filesystem",
@@ -168,8 +175,10 @@ fn add_capability(capability: &str, root: &Path) -> Result<(), String> {
     if !spec.ios_project.is_empty() {
         let mut source = fs::read_to_string(&project)
             .map_err(|e| format!("read '{}': {e}", project.display()))?;
-        if spec.name == "geolocation"
-            && !source.contains("INFOPLIST_KEY_NSLocationWhenInUseUsageDescription")
+        if (spec.name == "geolocation"
+            && !source.contains("INFOPLIST_KEY_NSLocationWhenInUseUsageDescription"))
+            || (spec.name == "photo-library"
+                && !source.contains("INFOPLIST_KEY_NSPhotoLibraryUsageDescription"))
         {
             source = source.replace(
                 "        INFOPLIST_KEY_UILaunchScreen_Generation: YES\n",
@@ -210,6 +219,9 @@ fn add_capability(capability: &str, root: &Path) -> Result<(), String> {
     if spec.name == "image-picker" {
         add_image_picker_host(root)?;
     }
+    if spec.name == "photo-library" {
+        add_photo_library_host(root)?;
+    }
     if spec.name == "bluetooth" {
         add_bluetooth_host(root)?;
     }
@@ -239,7 +251,10 @@ fn add_appearance_host(root: &Path) -> Result<(), String> {
             "import android.content.ClipData\n",
             "import android.content.ClipData\nimport android.content.res.Configuration\n",
         );
-        source = source.replace("            \"photoLibrary\" -> photoLibraryValue(method)\n", "            \"photoLibrary\" -> photoLibraryValue(method)\n            \"appearance\" -> appearanceValue(method)\n");
+        source = source.replace(
+            "        when (capability) {\n",
+            "        when (capability) {\n            \"appearance\" -> appearanceValue(method)\n",
+        );
         source = source.replace(
             "\n}\n\nobject CrepusActionState",
             &format!("{ANDROID_APPEARANCE}\n}}\n\nobject CrepusActionState"),
@@ -250,7 +265,7 @@ fn add_appearance_host(root: &Path) -> Result<(), String> {
     let mut source =
         fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
     if !source.contains("appearanceValue") {
-        source = source.replace("        case \"photoLibrary\":\n            return try photoLibraryValue(method: method)\n", "        case \"photoLibrary\":\n            return try photoLibraryValue(method: method)\n        case \"appearance\":\n            return try appearanceValue(method: method)\n");
+        source = source.replace("        switch capability {\n", "        switch capability {\n        case \"appearance\":\n            return try appearanceValue(method: method)\n");
         source = source.replace(
             "\n    fileprivate static func emit",
             &format!("{IOS_APPEARANCE}\n\n    fileprivate static func emit"),
@@ -266,7 +281,10 @@ fn add_battery_host(root: &Path) -> Result<(), String> {
         fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
     if !source.contains("batteryValue") {
         source = source.replace("import android.content.ClipData\n", "import android.content.ClipData\nimport android.content.Intent\nimport android.content.IntentFilter\nimport android.os.BatteryManager\n");
-        source = source.replace("            \"photoLibrary\" -> photoLibraryValue(method)\n", "            \"photoLibrary\" -> photoLibraryValue(method)\n            \"battery\" -> batteryValue(method)\n");
+        source = source.replace(
+            "        when (capability) {\n",
+            "        when (capability) {\n            \"battery\" -> batteryValue(method)\n",
+        );
         source = source.replace(
             "\n}\n\nobject CrepusActionState",
             &format!("{ANDROID_BATTERY}\n}}\n\nobject CrepusActionState"),
@@ -277,7 +295,7 @@ fn add_battery_host(root: &Path) -> Result<(), String> {
     let mut source =
         fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
     if !source.contains("batteryValue") {
-        source = source.replace("        case \"photoLibrary\":\n            return try photoLibraryValue(method: method)\n", "        case \"photoLibrary\":\n            return try photoLibraryValue(method: method)\n        case \"battery\":\n            return try batteryValue(method: method)\n");
+        source = source.replace("        switch capability {\n", "        switch capability {\n        case \"battery\":\n            return try batteryValue(method: method)\n");
         source = source.replace(
             "\n    fileprivate static func emit",
             &format!("{IOS_BATTERY}\n\n    fileprivate static func emit"),
@@ -299,8 +317,8 @@ fn add_geolocation_ios_host(root: &Path) -> Result<(), String> {
         "import Foundation\nimport CoreLocation\n",
     );
     source = source.replace(
-        "        case \"photoLibrary\":\n            return try photoLibraryValue(method: method)\n",
-        "        case \"photoLibrary\":\n            return try photoLibraryValue(method: method)\n        case \"geolocation\":\n            return try geolocationValue(method: method)\n",
+        "        switch capability {\n",
+        "        switch capability {\n        case \"geolocation\":\n            return try geolocationValue(method: method)\n",
     );
     source = source.replace(
         "\n    fileprivate static func emit",
@@ -326,8 +344,8 @@ fn add_geolocation_host(root: &Path) -> Result<(), String> {
         "import android.content.ClipData\nimport android.Manifest\nimport android.content.pm.PackageManager\nimport android.location.LocationManager\n",
     );
     source = source.replace(
-        "            \"photoLibrary\" -> photoLibraryValue(method)\n",
-        "            \"photoLibrary\" -> photoLibraryValue(method)\n            \"geolocation\" -> geolocationValue(method)\n",
+        "        when (capability) {\n",
+        "        when (capability) {\n            \"geolocation\" -> geolocationValue(method)\n",
     );
     source = source.replace(
         "\n}\n\nobject CrepusActionState",
@@ -394,8 +412,8 @@ fn add_bluetooth_host(root: &Path) -> Result<(), String> {
         "import android.content.ClipData\nimport android.Manifest\nimport android.bluetooth.BluetoothAdapter\nimport android.bluetooth.le.ScanCallback\nimport android.bluetooth.le.ScanResult\nimport android.content.pm.PackageManager\n",
     );
     source = source.replace(
-        "            \"photoLibrary\" -> photoLibraryValue(method)\n",
-        "            \"photoLibrary\" -> photoLibraryValue(method)\n            \"bluetooth\" -> bluetoothValue(method)\n",
+        "        when (capability) {\n",
+        "        when (capability) {\n            \"bluetooth\" -> bluetoothValue(method)\n",
     );
     source = source.replace(
         "\n}\n\nobject CrepusActionState",
@@ -422,8 +440,8 @@ fn add_bluetooth_ios_host(root: &Path) -> Result<(), String> {
         "import Foundation\nimport CoreBluetooth\n",
     );
     source = source.replace(
-        "        case \"photoLibrary\":\n            return try photoLibraryValue(method: method)\n",
-        "        case \"photoLibrary\":\n            return try photoLibraryValue(method: method)\n        case \"bluetooth\":\n            return try bluetoothValue(method: method)\n",
+        "        switch capability {\n",
+        "        switch capability {\n        case \"bluetooth\":\n            return try bluetoothValue(method: method)\n",
     );
     source = source.replace(
         "    private static func successJson",
@@ -447,8 +465,8 @@ fn add_haptics_host(root: &Path) -> Result<(), String> {
             "import android.net.Uri\nimport android.os.Build\nimport android.os.VibrationEffect\nimport android.os.Vibrator\nimport android.os.VibratorManager\n",
         );
         source = source.replace(
-            "            \"photoLibrary\" -> photoLibraryValue(method)\n",
-            "            \"photoLibrary\" -> photoLibraryValue(method)\n            \"haptics\" -> hapticsValue(method, payload)\n",
+            "        when (capability) {\n",
+            "        when (capability) {\n            \"haptics\" -> hapticsValue(method, payload)\n",
         );
         source = source.replace(
             "\n}\n\nobject CrepusActionState",
@@ -461,8 +479,8 @@ fn add_haptics_host(root: &Path) -> Result<(), String> {
         fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
     if !source.contains("hapticsValue") {
         source = source.replace(
-            "        case \"photoLibrary\":\n            return try photoLibraryValue(method: method)\n",
-            "        case \"photoLibrary\":\n            return try photoLibraryValue(method: method)\n        case \"haptics\":\n            return try hapticsValue(method: method, payload: payload)\n",
+            "        switch capability {\n",
+            "        switch capability {\n        case \"haptics\":\n            return try hapticsValue(method: method, payload: payload)\n",
         );
         source = source.replace(
             "\n    fileprivate static func emit",
@@ -520,8 +538,8 @@ fn add_browser_host(root: &Path) -> Result<(), String> {
             "        when (capability) {\n            \"browser\", \"linking\" -> openUrlValue(capability, method, payload)\n",
         );
         source = source.replace(
-            "\n    private fun photoLibraryValue",
-            &format!("{ANDROID_BROWSER}\n    private fun photoLibraryValue"),
+            "\n    private fun dispatchHostAction",
+            &format!("{ANDROID_BROWSER}\n    private fun dispatchHostAction"),
         );
         fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))?;
     }
@@ -534,8 +552,8 @@ fn add_browser_host(root: &Path) -> Result<(), String> {
             "        switch capability {\n        case \"browser\", \"linking\":\n            return try openUrlValue(capability: capability, method: method, payload: payload)\n",
         );
         source = source.replace(
-            "\n    private static func photoLibraryValue",
-            &format!("{IOS_BROWSER}\n    private static func photoLibraryValue"),
+            "\n    private static func dispatchHostAction",
+            &format!("{IOS_BROWSER}\n\n    private static func dispatchHostAction"),
         );
         fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
     }
@@ -548,12 +566,12 @@ fn add_share_host(root: &Path) -> Result<(), String> {
         fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
     if !source.contains("shareValue") {
         source = source.replace(
-            "            \"photoLibrary\" -> photoLibraryValue(method)\n",
-            "            \"photoLibrary\" -> photoLibraryValue(method)\n            \"share\" -> shareValue(method, payload)\n",
+            "        when (capability) {\n",
+            "        when (capability) {\n            \"share\" -> shareValue(method, payload)\n",
         );
         source = source.replace(
-            "\n    private fun photoLibraryValue",
-            &format!("{ANDROID_SHARE}\n    private fun photoLibraryValue"),
+            "\n    private fun dispatchHostAction",
+            &format!("{ANDROID_SHARE}\n    private fun dispatchHostAction"),
         );
         fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))?;
     }
@@ -562,12 +580,12 @@ fn add_share_host(root: &Path) -> Result<(), String> {
         fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
     if !source.contains("shareValue") {
         source = source.replace(
-            "        case \"photoLibrary\":\n            return try photoLibraryValue(method: method)\n",
-            "        case \"photoLibrary\":\n            return try photoLibraryValue(method: method)\n        case \"share\":\n            return try shareValue(method: method, payload: payload)\n",
+            "        switch capability {\n",
+            "        switch capability {\n        case \"share\":\n            return try shareValue(method: method, payload: payload)\n",
         );
         source = source.replace(
-            "\n    private static func photoLibraryValue",
-            &format!("{IOS_SHARE}\n    private static func photoLibraryValue"),
+            "\n    private static func dispatchHostAction",
+            &format!("{IOS_SHARE}\n\n    private static func dispatchHostAction"),
         );
         fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
     }
@@ -580,12 +598,12 @@ fn add_document_picker_host(root: &Path) -> Result<(), String> {
         fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
     if !source.contains("documentPickerValue") {
         source = source.replace(
-            "            \"photoLibrary\" -> photoLibraryValue(method)\n",
-            "            \"documentPicker\" -> documentPickerValue(method)\n            \"photoLibrary\" -> photoLibraryValue(method)\n",
+            "        when (capability) {\n",
+            "        when (capability) {\n            \"documentPicker\" -> documentPickerValue(method)\n",
         );
         source = source.replace(
-            "\n    private fun photoLibraryValue",
-            &format!("{ANDROID_DOCUMENT_PICKER}\n    private fun photoLibraryValue"),
+            "\n    private fun dispatchHostAction",
+            &format!("{ANDROID_DOCUMENT_PICKER}\n    private fun dispatchHostAction"),
         );
         fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))?;
     }
@@ -594,12 +612,12 @@ fn add_document_picker_host(root: &Path) -> Result<(), String> {
         fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
     if !source.contains("documentPickerValue") {
         source = source.replace(
-            "        case \"photoLibrary\":\n            return try photoLibraryValue(method: method)\n",
-            "        case \"documentPicker\":\n            return try documentPickerValue(method: method)\n        case \"photoLibrary\":\n            return try photoLibraryValue(method: method)\n",
+            "        switch capability {\n",
+            "        switch capability {\n        case \"documentPicker\":\n            return try documentPickerValue(method: method)\n",
         );
         source = source.replace(
-            "\n    private static func photoLibraryValue",
-            &format!("{IOS_DOCUMENT_PICKER}\n    private static func photoLibraryValue"),
+            "\n    private static func dispatchHostAction",
+            &format!("{IOS_DOCUMENT_PICKER}\n\n    private static func dispatchHostAction"),
         );
         fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
     }
@@ -620,16 +638,16 @@ fn add_image_picker_host(root: &Path) -> Result<(), String> {
             "        openDocuments = { filePicker.launch(arrayOf(\"*/*\")) }\n        openMedia = { filePicker.launch(arrayOf(\"image/*\", \"video/*\")) }\n",
         );
         source = source.replace(
-            "            \"photoLibrary\" -> photoLibraryValue(method)\n",
-            "            \"imagePicker\" -> imagePickerValue(method)\n            \"photoLibrary\" -> photoLibraryValue(method)\n",
+            "        when (capability) {\n",
+            "        when (capability) {\n            \"imagePicker\" -> imagePickerValue(method)\n",
         );
         source = source.replace(
             "        when (action) {\n            \"import_files\" -> {\n",
             "        when (action) {\n            \"pick_media\" -> {\n                pendingPickerAction = action\n                openMedia?.invoke() ?: emit(errorJson(action, \"media picker unavailable\"))\n                pendingJson(action)\n            }\n            \"import_files\" -> {\n",
         );
         source = source.replace(
-            "    private fun photoLibraryValue",
-            &format!("{ANDROID_IMAGE_PICKER}\n    private fun photoLibraryValue"),
+            "    private fun dispatchHostAction",
+            &format!("{ANDROID_IMAGE_PICKER}\n    private fun dispatchHostAction"),
         );
         fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))?;
     }
@@ -637,20 +655,79 @@ fn add_image_picker_host(root: &Path) -> Result<(), String> {
     let mut source =
         fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
     if !source.contains("imagePickerValue") {
-        source = source.replace("import Photos\n", "import Photos\nimport PhotosUI\n");
+        source = source.replace("import UIKit\n", "import PhotosUI\nimport UIKit\n");
         source = source.replace(
             "        switch action {\n        case \"import_files\":\n",
             "        switch action {\n        case \"pick_media\":\n            presentMediaPicker(action: action)\n            return pendingJson(action: action)\n        case \"import_files\":\n",
         );
         source = source.replace(
-            "        switch capability {\n        case \"photoLibrary\":\n",
-            "        switch capability {\n        case \"imagePicker\":\n            return try imagePickerValue(method: method)\n        case \"photoLibrary\":\n",
+            "        switch capability {\n",
+            "        switch capability {\n        case \"imagePicker\":\n            return try imagePickerValue(method: method)\n",
         );
         source = source.replace(
-            "    private static func photoLibraryValue",
-            &format!("{IOS_IMAGE_PICKER}\n    private static func photoLibraryValue"),
+            "    private static func dispatchHostAction",
+            &format!("{IOS_IMAGE_PICKER}\n\n    private static func dispatchHostAction"),
         );
         source.push_str(IOS_IMAGE_PICKER_BRIDGE);
+        fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
+    }
+    Ok(())
+}
+
+fn add_photo_library_host(root: &Path) -> Result<(), String> {
+    let android = android_actions_path(root)?;
+    let mut source =
+        fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
+    if !source.contains("photoLibraryValue") {
+        source = source.replace(
+            "import android.content.Context\n",
+            "import android.content.Context\nimport android.content.pm.PackageManager\nimport android.os.Build\n",
+        );
+        source = source.replace(
+            "import android.net.Uri\n",
+            "import android.net.Uri\nimport android.provider.MediaStore\n",
+        );
+        source = source.replace(
+            "import java.io.File\n",
+            "import java.io.File\nimport java.time.Instant\n",
+        );
+        source = source.replace(
+            "    private var openDocuments: (() -> Unit)? = null\n",
+            "    private var openDocuments: (() -> Unit)? = null\n    private var pendingPhotoAction: String? = null\n    private var requestPhotoAccess: ((String) -> Unit)? = null\n",
+        );
+        source = source.replace(
+            "        openDocuments = { filePicker.launch(arrayOf(\"*/*\")) }\n",
+            "        openDocuments = { filePicker.launch(arrayOf(\"*/*\")) }\n        val photoPermissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) arrayOf(android.Manifest.permission.READ_MEDIA_IMAGES, android.Manifest.permission.READ_MEDIA_VIDEO) else arrayOf(android.Manifest.permission.READ_EXTERNAL_STORAGE)\n        val photoAccess = activity.registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->\n            val action = pendingPhotoAction ?: return@registerForActivityResult\n            pendingPhotoAction = null\n            if (grants.values.any { it }) scanPhotoLibrary(action) else emit(errorJson(action, \"photo access denied\"))\n        }\n        requestPhotoAccess = { action ->\n            if (photoPermissions.any { activity.checkSelfPermission(it) == PackageManager.PERMISSION_GRANTED }) scanPhotoLibrary(action)\n            else {\n                pendingPhotoAction = action\n                photoAccess.launch(photoPermissions)\n            }\n        }\n",
+        );
+        source = source.replace(
+            "        when (capability) {\n",
+            "        when (capability) {\n            \"photoLibrary\" -> photoLibraryValue(method)\n",
+        );
+        source = source.replace(
+            "\n    private fun dispatchHostAction",
+            &format!("{ANDROID_PHOTO_LIBRARY}\n    private fun dispatchHostAction"),
+        );
+        fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))?;
+    }
+    let ios = root.join("ios/Sources/NativeShell/CrepusRustActions.swift");
+    let mut source =
+        fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
+    if !source.contains("photoLibraryValue") {
+        source = source.replace("import Foundation\n", "import Foundation\n");
+        source = source.replace("import SwiftUI\n", "import SwiftUI\n");
+        source = source.replace(
+            "#if canImport(UIKit)\n",
+            "#if canImport(UIKit)\nimport Photos\n",
+        );
+        source = source.replace(
+            "        switch capability {\n",
+            "        switch capability {\n        case \"photoLibrary\":\n            return try photoLibraryValue(method: method)\n",
+        );
+        source = source.replace(
+            "\n    private static func dispatchHostAction",
+            &format!("{IOS_PHOTO_LIBRARY}\n\n    private static func dispatchHostAction"),
+        );
+        source.push_str(IOS_PHOTO_LIBRARY_BRIDGE);
         fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
     }
     Ok(())
@@ -667,8 +744,8 @@ fn add_sensors_host(root: &Path) -> Result<(), String> {
             "import android.net.Uri\nimport android.hardware.Sensor\nimport android.hardware.SensorEvent\nimport android.hardware.SensorEventListener\nimport android.hardware.SensorManager\n",
         );
         android_source = android_source.replace(
-            "            \"photoLibrary\" -> photoLibraryValue(method)\n",
-            "            \"photoLibrary\" -> photoLibraryValue(method)\n            \"sensors\", \"motion\" -> sensorsValue(method)\n",
+            "        when (capability) {\n",
+            "        when (capability) {\n            \"sensors\", \"motion\" -> sensorsValue(method)\n",
         );
         android_source = android_source.replace(
             "\n}\n\nobject CrepusActionState",
@@ -686,8 +763,8 @@ fn add_sensors_host(root: &Path) -> Result<(), String> {
             "import Foundation\nimport CoreMotion\n",
         );
         ios_source = ios_source.replace(
-            "        case \"photoLibrary\":\n            return try photoLibraryValue(method: method)\n",
-            "        case \"photoLibrary\":\n            return try photoLibraryValue(method: method)\n        case \"sensors\", \"motion\":\n            return try sensorsValue(method: method)\n",
+            "        switch capability {\n",
+            "        switch capability {\n        case \"sensors\", \"motion\":\n            return try sensorsValue(method: method)\n",
         );
         ios_source = ios_source.replace(
             "\n    fileprivate static func emit",

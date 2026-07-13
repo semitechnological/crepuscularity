@@ -440,6 +440,8 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(!default_ios.contains("import PhotosUI"));
     assert!(!default_android.contains("documentPickerValue"));
     assert!(!default_ios.contains("documentPickerValue"));
+    assert!(!default_android.contains("photoLibraryValue"));
+    assert!(!default_ios.contains("photoLibraryValue"));
     assert!(crepus()
         .args(["native", "add", "share", "--dir"])
         .arg(&root)
@@ -589,6 +591,24 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(document_picker_android.contains("\"documentPicker\" -> documentPickerValue(method)"));
     assert!(document_picker_ios.contains("case \"documentPicker\":"));
     assert!(crepus()
+        .args(["native", "add", "photo-library", "--dir"])
+        .arg(&root)
+        .output()
+        .expect("add photo library")
+        .status
+        .success());
+    let photo_library_android = std::fs::read_to_string(
+        root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusRustActions.kt"),
+    )
+    .expect("read Android photo library bridge");
+    let photo_library_ios =
+        std::fs::read_to_string(root.join("ios/Sources/NativeShell/CrepusRustActions.swift"))
+            .expect("read iOS photo library bridge");
+    assert!(photo_library_android.contains("RequestMultiplePermissions"));
+    assert!(photo_library_android.contains("MediaStore.Images.Media.EXTERNAL_CONTENT_URI"));
+    assert!(photo_library_ios.contains("PHPhotoLibrary.requestAuthorization"));
+    assert!(photo_library_ios.contains("case \"photoLibrary\":"));
+    assert!(crepus()
         .args(["native", "add", "filesystem", "--dir"])
         .arg(&root)
         .output()
@@ -602,12 +622,18 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(cargo.contains("share = []"));
     assert!(cargo.contains("image-picker = []"));
     assert!(cargo.contains("documentpicker = []"));
+    assert!(cargo.contains("photo-library = []"));
     assert!(cargo.contains("filesystem = []"));
     assert!(cargo.contains("default = [\"filesystem\"]"));
     assert!(
         std::fs::read_to_string(root.join("android/app/src/main/AndroidManifest.xml"))
             .expect("read manifest")
             .contains("android.permission.VIBRATE")
+    );
+    assert!(
+        std::fs::read_to_string(root.join("android/app/src/main/AndroidManifest.xml"))
+            .expect("read manifest")
+            .contains("android.permission.READ_MEDIA_IMAGES")
     );
 }
 

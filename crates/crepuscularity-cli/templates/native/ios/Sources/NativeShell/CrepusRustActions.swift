@@ -2,7 +2,6 @@ import Darwin
 import Foundation
 import SwiftUI
 #if canImport(UIKit)
-import Photos
 import UIKit
 import UniformTypeIdentifiers
 #elseif canImport(AppKit)
@@ -190,19 +189,9 @@ public enum CrepusRustActions {
 
     private static func hostPluginValue(capability: String, method: String, payload: [String: Any]?) throws -> Any {
         switch capability {
-        case "photoLibrary":
-            return try photoLibraryValue(method: method)
         default:
             throw HostActionError("unsupported host capability: \(capability)")
         }
-    }
-
-    private static func photoLibraryValue(method: String) throws -> Any {
-        guard method == "scan" || method == "getRecentMedia" else {
-            throw HostActionError("unsupported photoLibrary method: \(method)")
-        }
-        scanPhotoLibrary(action: "photoLibrary.\(method)")
-        return ["opening": true]
     }
 
     private static func successJson(action: String, capability: String, method: String, value: Any) -> String {
@@ -417,33 +406,6 @@ private final class CrepusHostPicker {
     }
 }
 
-private func scanPhotoLibrary(action: String) {
-    Task.detached {
-        let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
-        var allowed = status == .authorized || status == .limited
-        if !allowed {
-            let requested = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
-            allowed = requested == .authorized || requested == .limited
-        }
-        guard allowed else {
-            await MainActor.run {
-                CrepusRustActions.emit("{\"ok\":false,\"action\":\"\(action)\",\"error\":\"photo access denied\"}")
-            }
-            return
-        }
-        let options = PHFetchOptions()
-        options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: true)]
-        let assets = PHAsset.fetchAssets(with: options)
-        for index in 0..<assets.count {
-            if let file = await assetPayload(assets.object(at: index)) {
-                await MainActor.run {
-                    CrepusRustActions.emit(mediaResultJson(action: action, files: [file]))
-                }
-            }
-        }
-    }
-}
-
 private func presentFilePicker(action: String, contentTypes: [UTType], allowsMultiple: Bool) {
     Task { @MainActor in
         guard let root = topViewController() else {
@@ -500,45 +462,6 @@ private func copyToCache(from url: URL, name: String) throws -> URL {
     return path
 }
 
-private func assetPayload(_ asset: PHAsset) async -> [String: Any]? {
-    guard let resource = PHAssetResource.assetResources(for: asset).first else {
-        return nil
-    }
-    let name = resource.originalFilename
-    let ext = (name as NSString).pathExtension
-    let path = FileManager.default.temporaryDirectory
-        .appendingPathComponent(UUID().uuidString)
-        .appendingPathExtension(ext.isEmpty ? "jpg" : ext)
-    do {
-        try await writeResource(resource, to: path)
-        let attributes = try FileManager.default.attributesOfItem(atPath: path.path)
-        return [
-            "name": name,
-            "mimeType": mimeType(path.pathExtension),
-            "bytes": (attributes[.size] as? NSNumber)?.intValue ?? 0,
-            "filePath": path.path,
-            "importSource": "ios-photo-library",
-            "mediaKind": asset.mediaType == .video ? "video" : "photo",
-            "createdTime": asset.creationDate.map { ISO8601DateFormatter().string(from: $0) } ?? "",
-            "localIdentifier": asset.localIdentifier,
-        ]
-    } catch {
-        return nil
-    }
-}
-
-private func writeResource(_ resource: PHAssetResource, to path: URL) async throws {
-    try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-        PHAssetResourceManager.default().writeData(for: resource, toFile: path, options: nil) { error in
-            if let error {
-                continuation.resume(throwing: error)
-            } else {
-                continuation.resume()
-            }
-        }
-    }
-}
-
 private func filePickerResultJson(action: String, files: [[String: Any]]) -> String {
     if let data = try? JSONSerialization.data(withJSONObject: [
         "ok": true,
@@ -587,12 +510,6 @@ private func mimeType(_ type: String) -> String {
 private func presentFilePicker(action: String, contentTypes: [Any], allowsMultiple: Bool) {
     Task { @MainActor in
         CrepusRustActions.emit("{\"ok\":false,\"action\":\"\(action)\",\"error\":\"file picker unavailable on AppKit shell\"}")
-    }
-}
-
-private func scanPhotoLibrary(action: String) {
-    Task { @MainActor in
-        CrepusRustActions.emit("{\"ok\":false,\"action\":\"\(action)\",\"error\":\"photo library unavailable on AppKit shell\"}")
     }
 }
 

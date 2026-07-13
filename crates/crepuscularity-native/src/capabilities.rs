@@ -621,6 +621,155 @@ private func presentMediaPicker(action: String) {
 #endif
 "#;
 
+pub const ANDROID_PHOTO_LIBRARY: &str = r#"
+    private fun photoLibraryValue(method: String): JSONObject {
+        if (method != "scan" && method != "getRecentMedia") error("unsupported photoLibrary method: $method")
+        val action = "photoLibrary.$method"
+        requestPhotoAccess?.invoke(action) ?: emit(errorJson(action, "photo library unavailable"))
+        return JSONObject().put("opening", true)
+    }
+
+    private fun scanPhotoLibrary(action: String) {
+        Thread {
+            runCatching {
+                for (uri in listOf(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, MediaStore.Video.Media.EXTERNAL_CONTENT_URI)) {
+                    scanMediaUri(uri, action)
+                }
+            }.onFailure {
+                emit(errorJson(action, "photo library scan failed"))
+            }
+        }.start()
+    }
+
+    private fun scanMediaUri(uri: Uri, action: String) {
+        val projection = arrayOf(
+            MediaStore.MediaColumns._ID,
+            MediaStore.MediaColumns.DISPLAY_NAME,
+            MediaStore.MediaColumns.MIME_TYPE,
+            MediaStore.MediaColumns.SIZE,
+            MediaStore.MediaColumns.DATE_ADDED,
+        )
+        appContext.contentResolver.query(uri, projection, null, null, "${MediaStore.MediaColumns.DATE_ADDED} ASC")?.use { cursor ->
+            val idColumn = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns._ID)
+            val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.DISPLAY_NAME)
+            val mimeColumn = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.MIME_TYPE)
+            val sizeColumn = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.SIZE)
+            val createdColumn = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.DATE_ADDED)
+            while (cursor.moveToNext()) {
+                val id = cursor.getLong(idColumn)
+                val itemUri = android.content.ContentUris.withAppendedId(uri, id)
+                val mime = cursor.getString(mimeColumn) ?: "application/octet-stream"
+                val name = cursor.getString(nameColumn) ?: "Media"
+                val file = runCatching { copyToCache(itemUri, name, mime) }.getOrNull() ?: continue
+                val item = JSONObject()
+                    .put("name", name)
+                    .put("mimeType", mime)
+                    .put("bytes", cursor.getLong(sizeColumn))
+                    .put("filePath", file.absolutePath)
+                    .put("importSource", "android-photo-library")
+                    .put("mediaKind", if (mime.startsWith("video/")) "video" else "photo")
+                    .put("createdTime", cursor.getLong(createdColumn).takeIf { it > 0 }?.let { Instant.ofEpochSecond(it).toString() })
+                    .put("localIdentifier", id.toString())
+                emit(mediaResultJson(action, listOf(item)))
+            }
+        }
+    }
+
+    private fun mediaResultJson(action: String, files: List<JSONObject>): String =
+        JSONObject()
+            .put("ok", true)
+            .put("action", action)
+            .put("value", JSONObject().put("files", JSONArray(files)))
+            .toString()
+"#;
+
+pub const IOS_PHOTO_LIBRARY: &str = r#"
+    private static func photoLibraryValue(method: String) throws -> Any {
+        guard method == "scan" || method == "getRecentMedia" else {
+            throw HostActionError("unsupported photoLibrary method: \(method)")
+        }
+        scanPhotoLibrary(action: "photoLibrary.\(method)")
+        return ["opening": true]
+    }
+"#;
+
+pub const IOS_PHOTO_LIBRARY_BRIDGE: &str = r#"
+
+#if canImport(UIKit)
+private func scanPhotoLibrary(action: String) {
+    Task.detached {
+        let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+        var allowed = status == .authorized || status == .limited
+        if !allowed {
+            let requested = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
+            allowed = requested == .authorized || requested == .limited
+        }
+        guard allowed else {
+            await MainActor.run {
+                CrepusRustActions.emit("{\"ok\":false,\"action\":\"\(action)\",\"error\":\"photo access denied\"}")
+            }
+            return
+        }
+        let options = PHFetchOptions()
+        options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: true)]
+        let assets = PHAsset.fetchAssets(with: options)
+        for index in 0..<assets.count {
+            if let file = await assetPayload(assets.object(at: index)) {
+                await MainActor.run {
+                    CrepusRustActions.emit(mediaResultJson(action: action, files: [file]))
+                }
+            }
+        }
+    }
+}
+
+private func assetPayload(_ asset: PHAsset) async -> [String: Any]? {
+    guard let resource = PHAssetResource.assetResources(for: asset).first else {
+        return nil
+    }
+    let name = resource.originalFilename
+    let ext = (name as NSString).pathExtension
+    let path = FileManager.default.temporaryDirectory
+        .appendingPathComponent(UUID().uuidString)
+        .appendingPathExtension(ext.isEmpty ? "jpg" : ext)
+    do {
+        try await writeResource(resource, to: path)
+        let attributes = try FileManager.default.attributesOfItem(atPath: path.path)
+        return [
+            "name": name,
+            "mimeType": mimeType(path.pathExtension),
+            "bytes": (attributes[.size] as? NSNumber)?.intValue ?? 0,
+            "filePath": path.path,
+            "importSource": "ios-photo-library",
+            "mediaKind": asset.mediaType == .video ? "video" : "photo",
+            "createdTime": asset.creationDate.map { ISO8601DateFormatter().string(from: $0) } ?? "",
+            "localIdentifier": asset.localIdentifier,
+        ]
+    } catch {
+        return nil
+    }
+}
+
+private func writeResource(_ resource: PHAssetResource, to path: URL) async throws {
+    try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+        PHAssetResourceManager.default().writeData(for: resource, toFile: path, options: nil) { error in
+            if let error {
+                continuation.resume(throwing: error)
+            } else {
+                continuation.resume()
+            }
+        }
+    }
+}
+#elseif canImport(AppKit)
+private func scanPhotoLibrary(action: String) {
+    Task { @MainActor in
+        CrepusRustActions.emit("{\"ok\":false,\"action\":\"\(action)\",\"error\":\"photo library unavailable on AppKit shell\"}")
+    }
+}
+#endif
+"#;
+
 pub const ANDROID_GEOLOCATION: &str = r#"
     private val geolocation by lazy { GeolocationBridge(activity) }
 

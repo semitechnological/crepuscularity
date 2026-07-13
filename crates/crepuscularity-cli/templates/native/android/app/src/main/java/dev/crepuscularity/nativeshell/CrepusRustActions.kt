@@ -3,7 +3,6 @@ package dev.crepuscularity.nativeshell
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.provider.MediaStore
 import android.webkit.MimeTypeMap
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
@@ -18,7 +17,6 @@ import kotlinx.serialization.json.jsonArray
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
-import java.time.Instant
 
 object CrepusStateStore {
     private val json = Json { ignoreUnknownKeys = true }
@@ -123,7 +121,6 @@ object CrepusRustActions {
 
     private fun hostPluginValue(capability: String, method: String, payload: JSONObject?): Any =
         when (capability) {
-            "photoLibrary" -> photoLibraryValue(method)
             else -> error("unsupported host capability: $capability")
         }
 
@@ -136,21 +133,6 @@ object CrepusRustActions {
             }
             else -> null
         }
-
-    private fun photoLibraryValue(method: String): JSONObject {
-        if (method != "scan" && method != "getRecentMedia") error("unsupported photoLibrary method: $method")
-        val action = "photoLibrary.$method"
-        Thread {
-            runCatching {
-                for (uri in listOf(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, MediaStore.Video.Media.EXTERNAL_CONTENT_URI)) {
-                    scanMediaUri(uri, action)
-                }
-            }.onFailure {
-                emit(errorJson(action, "photo library scan failed"))
-            }
-        }.start()
-        return JSONObject().put("opening", true)
-    }
 
     private fun emit(result: String) {
         CrepusActions.resultSink(result)
@@ -191,47 +173,6 @@ object CrepusRustActions {
             .put("value", JSONObject().put("files", files))
             .toString()
     }
-
-    private fun scanMediaUri(uri: Uri, action: String) {
-        val projection = arrayOf(
-            MediaStore.MediaColumns._ID,
-            MediaStore.MediaColumns.DISPLAY_NAME,
-            MediaStore.MediaColumns.MIME_TYPE,
-            MediaStore.MediaColumns.SIZE,
-            MediaStore.MediaColumns.DATE_ADDED,
-        )
-        appContext.contentResolver.query(uri, projection, null, null, "${MediaStore.MediaColumns.DATE_ADDED} ASC")?.use { cursor ->
-            val idColumn = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns._ID)
-            val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.DISPLAY_NAME)
-            val mimeColumn = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.MIME_TYPE)
-            val sizeColumn = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.SIZE)
-            val createdColumn = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.DATE_ADDED)
-            while (cursor.moveToNext()) {
-                val id = cursor.getLong(idColumn)
-                val itemUri = android.content.ContentUris.withAppendedId(uri, id)
-                val mime = cursor.getString(mimeColumn) ?: "application/octet-stream"
-                val name = cursor.getString(nameColumn) ?: "Media"
-                val file = runCatching { copyToCache(itemUri, name, mime) }.getOrNull() ?: continue
-                val item = JSONObject()
-                    .put("name", name)
-                    .put("mimeType", mime)
-                    .put("bytes", cursor.getLong(sizeColumn))
-                    .put("filePath", file.absolutePath)
-                    .put("importSource", "android-photo-library")
-                    .put("mediaKind", if (mime.startsWith("video/")) "video" else "photo")
-                    .put("createdTime", cursor.getLong(createdColumn).takeIf { it > 0 }?.let { Instant.ofEpochSecond(it).toString() })
-                    .put("localIdentifier", id.toString())
-                emit(mediaResultJson(action, listOf(item)))
-            }
-        }
-    }
-
-    private fun mediaResultJson(action: String, files: List<JSONObject>): String =
-        JSONObject()
-            .put("ok", true)
-            .put("action", action)
-            .put("value", JSONObject().put("files", JSONArray(files)))
-            .toString()
 
     private fun copyToCache(uri: Uri, name: String, mime: String): File {
         val ext = MimeTypeMap.getSingleton().getExtensionFromMimeType(mime)

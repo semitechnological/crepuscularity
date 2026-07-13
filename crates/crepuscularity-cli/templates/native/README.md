@@ -50,6 +50,7 @@ Install on-demand capabilities into the app instead:
 ```bash
 crepus native add sensors --dir .
 crepus native add bluetooth --dir .
+crepus native add photo-library --dir .
 ```
 
 `sensors` installs real gyro and accelerometer bridges. `bluetooth` installs Android and iOS BLE scan
@@ -63,6 +64,8 @@ cached: Android returns the most recent GPS/network fix and iOS returns the loca
 named `import_files` action remains available for built-in UI actions and uses the same picker lifecycle.
 `imagePicker.pick` opens the system image/video picker and emits imported cached-file metadata; it also enables
 the named `pick_media` action.
+`photo-library` requests platform media permission only for `scan` and `getRecentMedia`, then emits cached-file
+metadata for each asset it can access.
 
 ## Regenerating the fixture from a template
 
