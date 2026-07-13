@@ -105,7 +105,9 @@ Android and iOS, plus only the required platform declarations. It supports `stat
 | `local-notifications` (`notifications`) | `status`, `requestPermission`, `post` | Android notification channel and iOS UserNotifications; Android permission is added only for this capability |
 | `secure-storage` | `get`, `set`, `remove`, `clear` | Android Keystore-encrypted values and iOS Keychain values |
 | `biometrics` (`authentication`) | `status`, `authenticate` | AndroidX BiometricPrompt or iOS LocalAuthentication, streaming the authentication result |
-| `permissions` (`permission`) | `status`, `check`, `request` | Checks or requests `camera`, `location`, and `photoLibrary`/`photos` after the related capability has added its platform declarations; Android also supports `notifications` and `bluetooth` when those capabilities are installed |
+| `permissions` (`permission`) | `status`, `check`, `request` | Checks or requests `camera`, `location`, `photoLibrary`/`photos`, and `contacts` after the related capability has added its platform declarations; Android also supports `notifications` and `bluetooth` when those capabilities are installed |
+| `contacts` | `status`, `requestPermission`, `list` | Android ContactsContract or iOS CNContactStore; access is declared only when installed |
+| `calendar` (`calendars`) | `status`, `check`, `request`, `list`, `create` | Android CalendarContract and iOS EventKit; `create` accepts `title`, optional Unix-millisecond `start`, `end`, `calendarId`, and `notes` |
 | `in-app-browser` (`inappbrowser`, `web-browser`) | `open` | Android Custom Tabs or iOS Safari View Controller |
 | `system-bars` (`systembars`, `status-bar`) | `status`, `set` | Android status/navigation colors and light-icon flags; iOS supported window appearance style |
 
@@ -118,7 +120,7 @@ default app shell and share-extension builds exclude it. It supports `readText`,
 Capabilities installed by `crepus native add` stay local to the app and add only their required
 platform declarations. Push delivery needs an APNs/FCM project and server credentials; payments,
 wallets, Google Maps, cloud sync, and authentication need the app's own provider configuration.
-Contacts, calendar, health, NFC, background execution, widgets, and media services also require
+Health, NFC, background execution, widgets, and media services also require
 their platform-specific entitlement or user permission before an app can use them. They are not
 included in the default scaffold or represented as successful no-op bridges.
 

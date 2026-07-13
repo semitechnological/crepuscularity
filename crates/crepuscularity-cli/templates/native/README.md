@@ -67,6 +67,8 @@ crepus native add local-notifications --dir .
 crepus native add secure-storage --dir .
 crepus native add biometrics --dir .
 crepus native add permissions --dir .
+crepus native add contacts --dir .
+crepus native add calendar --dir .
 crepus native add in-app-browser --dir .
 crepus native add system-bars --dir .
 ```
@@ -101,6 +103,8 @@ metadata for each asset it can access.
 `secureStorage` persists values with Android Keystore encryption or the iOS Keychain.
 `biometrics.authenticate` opens the system biometric/device-credential prompt.
 `permissions.status`, `permissions.check`, and `permissions.request` operate on a named permission after its related capability has installed the required declarations.
+`contacts.status`, `contacts.requestPermission`, and `contacts.list` use the Android contacts provider or iOS Contacts framework after explicit access is granted.
+`calendar` requests access, lists calendars, and creates events using the platform calendar service.
 `inAppBrowser.open` presents Android Custom Tabs or iOS Safari View Controller.
 `systemBars.status` and `systemBars.set` inspect or update Android bar colors and icon contrast; iOS controls the supported window appearance style.
 

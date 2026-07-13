@@ -456,6 +456,8 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(!default_ios.contains("screenOrientationValue"));
     assert!(!default_android.contains("permissionsValue"));
     assert!(!default_ios.contains("permissionsValue"));
+    assert!(!default_android.contains("contactsValue"));
+    assert!(!default_ios.contains("contactsValue"));
     assert!(!default_android.contains("inAppBrowserValue"));
     assert!(!default_ios.contains("inAppBrowserValue"));
     assert!(!default_android.contains("systemBarsValue"));
@@ -910,6 +912,22 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(permissions_android.contains("android.Manifest.permission.CAMERA"));
     assert!(permissions_ios.contains("AVCaptureDevice.authorizationStatus"));
     assert!(crepus()
+        .args(["native", "add", "contacts", "--dir"])
+        .arg(&root)
+        .output()
+        .expect("add contacts")
+        .status
+        .success());
+    let contacts_android = std::fs::read_to_string(
+        root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusRustActions.kt"),
+    )
+    .expect("read Android contacts bridge");
+    let contacts_ios =
+        std::fs::read_to_string(root.join("ios/Sources/NativeShell/CrepusRustActions.swift"))
+            .expect("read iOS contacts bridge");
+    assert!(contacts_android.contains("ContactsContract.CommonDataKinds.Phone"));
+    assert!(contacts_ios.contains("CNContactStore"));
+    assert!(crepus()
         .args(["native", "add", "in-app-browser", "--dir"])
         .arg(&root)
         .output()
@@ -942,6 +960,22 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(system_bars_android.contains("statusBarColor"));
     assert!(system_bars_ios.contains("overrideUserInterfaceStyle"));
     assert!(crepus()
+        .args(["native", "add", "calendar", "--dir"])
+        .arg(&root)
+        .output()
+        .expect("add calendar")
+        .status
+        .success());
+    let calendar_android = std::fs::read_to_string(
+        root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusRustActions.kt"),
+    )
+    .expect("read Android calendar bridge");
+    let calendar_ios =
+        std::fs::read_to_string(root.join("ios/Sources/NativeShell/CrepusRustActions.swift"))
+            .expect("read iOS calendar bridge");
+    assert!(calendar_android.contains("CalendarContract.Events.CONTENT_URI"));
+    assert!(calendar_ios.contains("EKEventStore"));
+    assert!(crepus()
         .args(["native", "add", "filesystem", "--dir"])
         .arg(&root)
         .output()
@@ -973,6 +1007,8 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(cargo.contains("secure-storage = []"));
     assert!(cargo.contains("biometrics = []"));
     assert!(cargo.contains("permissions = []"));
+    assert!(cargo.contains("calendar = []"));
+    assert!(cargo.contains("contacts = []"));
     assert!(haptics_android.contains("\"haptics\", \"vibration\""));
     assert!(haptics_ios.contains("case \"haptics\", \"vibration\":"));
     assert!(cargo.contains("filesystem = []"));
@@ -991,6 +1027,16 @@ fn native_add_capability_updates_only_the_scaffold() {
         std::fs::read_to_string(root.join("android/app/src/main/AndroidManifest.xml"))
             .expect("read manifest")
             .contains("android.permission.CAMERA")
+    );
+    assert!(
+        std::fs::read_to_string(root.join("android/app/src/main/AndroidManifest.xml"))
+            .expect("read manifest")
+            .contains("android.permission.READ_CONTACTS")
+    );
+    assert!(
+        std::fs::read_to_string(root.join("android/app/src/main/AndroidManifest.xml"))
+            .expect("read manifest")
+            .contains("android.permission.READ_CALENDAR")
     );
 }
 

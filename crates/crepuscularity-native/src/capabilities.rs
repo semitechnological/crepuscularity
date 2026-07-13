@@ -1480,6 +1480,92 @@ pub const IOS_BIOMETRICS: &str = r#"
     }
 "#;
 
+pub const ANDROID_CALENDAR: &str = r#"
+    private fun calendarValue(method: String, payload: JSONObject?): JSONObject {
+        val readGranted = activity.checkSelfPermission(android.Manifest.permission.READ_CALENDAR) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        val writeGranted = activity.checkSelfPermission(android.Manifest.permission.WRITE_CALENDAR) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        if (method == "status" || method == "check") return JSONObject().put("readGranted", readGranted).put("writeGranted", writeGranted)
+        if (method == "request") {
+            if (!readGranted || !writeGranted) activity.requestPermissions(arrayOf(android.Manifest.permission.READ_CALENDAR, android.Manifest.permission.WRITE_CALENDAR), 4772)
+            return JSONObject().put("requested", !readGranted || !writeGranted).put("readGranted", readGranted).put("writeGranted", writeGranted)
+        }
+        if (method == "list") {
+            if (!readGranted) return JSONObject().put("calendars", JSONArray()).put("permissionRequired", true)
+            val calendars = JSONArray()
+            appContext.contentResolver.query(CalendarContract.Calendars.CONTENT_URI, arrayOf(CalendarContract.Calendars._ID, CalendarContract.Calendars.CALENDAR_DISPLAY_NAME, CalendarContract.Calendars.ACCOUNT_NAME), null, null, CalendarContract.Calendars.CALENDAR_DISPLAY_NAME + " ASC")?.use { cursor ->
+                while (cursor.moveToNext()) calendars.put(JSONObject().put("id", cursor.getLong(0)).put("name", cursor.getString(1)).put("account", cursor.getString(2)))
+            }
+            return JSONObject().put("calendars", calendars)
+        }
+        if (method != "create") error("unsupported calendar method: $method")
+        if (!writeGranted) return JSONObject().put("created", false).put("permissionRequired", true)
+        val title = payload?.optString("title")?.takeIf { it.isNotBlank() } ?: error("calendar.create requires payload.title")
+        val start = payload?.optLong("start", System.currentTimeMillis()) ?: System.currentTimeMillis()
+        val end = payload?.optLong("end", start + 3_600_000) ?: start + 3_600_000
+        if (end <= start) error("calendar.create payload.end must be after payload.start")
+        var calendarId = payload?.optLong("calendarId", -1) ?: -1
+        if (calendarId < 0) appContext.contentResolver.query(CalendarContract.Calendars.CONTENT_URI, arrayOf(CalendarContract.Calendars._ID), CalendarContract.Calendars.VISIBLE + "=1", null, CalendarContract.Calendars.IS_PRIMARY + " DESC")?.use { cursor -> if (cursor.moveToFirst()) calendarId = cursor.getLong(0) }
+        if (calendarId < 0) return JSONObject().put("created", false).put("calendarAvailable", false)
+        val event = ContentValues().apply {
+            put(CalendarContract.Events.CALENDAR_ID, calendarId)
+            put(CalendarContract.Events.TITLE, title)
+            put(CalendarContract.Events.DESCRIPTION, payload?.optString("notes", ""))
+            put(CalendarContract.Events.DTSTART, start)
+            put(CalendarContract.Events.DTEND, end)
+            put(CalendarContract.Events.EVENT_TIMEZONE, TimeZone.getDefault().id)
+        }
+        val uri = appContext.contentResolver.insert(CalendarContract.Events.CONTENT_URI, event) ?: return JSONObject().put("created", false)
+        return JSONObject().put("created", true).put("id", uri.lastPathSegment).put("calendarId", calendarId)
+    }
+"#;
+
+pub const IOS_CALENDAR: &str = r#"
+    private static func calendarValue(method: String, payload: [String: Any]?) throws -> Any {
+        let store = EKEventStore()
+        let status = EKEventStore.authorizationStatus(for: .event)
+        let canRead = status == .fullAccess
+        let canWrite = status == .fullAccess || status == .writeOnly
+        if method == "status" || method == "check" { return ["status": calendarAuthorizationName(status), "readGranted": canRead, "writeGranted": canWrite] }
+        if method == "request" {
+            store.requestFullAccessToEvents { granted, error in
+                let result: [String: Any] = error == nil ? ["ok": true, "capability": "calendar", "method": "request", "value": ["granted": granted]] : ["ok": false, "capability": "calendar", "method": "request", "error": error!.localizedDescription]
+                if let data = try? JSONSerialization.data(withJSONObject: result), let json = String(data: data, encoding: .utf8) { CrepusRustActions.emit(json) }
+            }
+            return ["requested": true, "pending": true]
+        }
+        if method == "list" {
+            guard canRead else { return ["calendars": [], "permissionRequired": true] }
+            return ["calendars": store.calendars(for: .event).map { ["id": $0.calendarIdentifier, "title": $0.title, "source": $0.source.title] }]
+        }
+        guard method == "create" else { throw HostActionError("unsupported calendar method: \(method)") }
+        guard canWrite else { return ["created": false, "permissionRequired": true] }
+        guard let title = payload?["title"] as? String, !title.isEmpty else { throw HostActionError("calendar.create requires payload.title") }
+        let startMilliseconds = (payload?["start"] as? NSNumber)?.doubleValue ?? Date().timeIntervalSince1970 * 1_000
+        let endMilliseconds = (payload?["end"] as? NSNumber)?.doubleValue ?? startMilliseconds + 3_600_000
+        guard endMilliseconds > startMilliseconds else { throw HostActionError("calendar.create payload.end must be after payload.start") }
+        let event = EKEvent(eventStore: store)
+        event.title = title
+        event.notes = payload?["notes"] as? String
+        event.startDate = Date(timeIntervalSince1970: startMilliseconds / 1_000)
+        event.endDate = Date(timeIntervalSince1970: endMilliseconds / 1_000)
+        event.calendar = (payload?["calendarId"] as? String).flatMap(store.calendar(withIdentifier:)) ?? store.defaultCalendarForNewEvents
+        guard event.calendar != nil else { return ["created": false, "calendarAvailable": false] }
+        try store.save(event, span: .thisEvent)
+        return ["created": true, "id": event.eventIdentifier as Any, "calendarId": event.calendar.calendarIdentifier]
+    }
+
+    private static func calendarAuthorizationName(_ status: EKAuthorizationStatus) -> String {
+        switch status {
+        case .notDetermined: return "notDetermined"
+        case .restricted: return "restricted"
+        case .denied: return "denied"
+        case .writeOnly: return "writeOnly"
+        case .fullAccess: return "fullAccess"
+        @unknown default: return "unknown"
+        }
+    }
+"#;
+
 pub const ANDROID_PERMISSIONS: &str = r#"
     private fun permissionsValue(method: String, payload: JSONObject?): JSONObject {
         val permission = payload?.optString("permission")?.takeIf { it.isNotBlank() }
@@ -1502,6 +1588,7 @@ pub const ANDROID_PERMISSIONS: &str = r#"
             } else {
                 arrayOf(android.Manifest.permission.ACCESS_FINE_LOCATION)
             }
+            "contacts" -> arrayOf(android.Manifest.permission.READ_CONTACTS)
             else -> error("unsupported permission: $permission")
         }
         @Suppress("DEPRECATION")
@@ -1534,6 +1621,7 @@ pub const IOS_PERMISSIONS: &str = r#"
         case "camera": Bundle.main.object(forInfoDictionaryKey: "NSCameraUsageDescription") != nil
         case "location": Bundle.main.object(forInfoDictionaryKey: "NSLocationWhenInUseUsageDescription") != nil
         case "photoLibrary", "photos": Bundle.main.object(forInfoDictionaryKey: "NSPhotoLibraryUsageDescription") != nil
+        case "contacts": Bundle.main.object(forInfoDictionaryKey: "NSContactsUsageDescription") != nil
         default: throw HostActionError("unsupported permission: \(permission)")
         }
         let status: String = switch permission {
@@ -1555,6 +1643,12 @@ pub const IOS_PERMISSIONS: &str = r#"
             case .notDetermined: "prompt"
             default: "denied"
             }
+        case "contacts":
+            switch CNContactStore.authorizationStatus(for: .contacts) {
+            case .authorized: "granted"
+            case .notDetermined: "prompt"
+            default: "denied"
+            }
         default: "denied"
         }
         if method == "status" || method == "check" {
@@ -1566,9 +1660,68 @@ pub const IOS_PERMISSIONS: &str = r#"
         case "camera": AVCaptureDevice.requestAccess(for: .video) { _ in }
         case "location": permissionsLocation.requestWhenInUseAuthorization()
         case "photoLibrary", "photos": Task { _ = await PHPhotoLibrary.requestAuthorization(for: .readWrite) }
+        case "contacts": CNContactStore().requestAccess(for: .contacts) { _, _ in }
         default: break
         }
         return ["permission": permission, "configured": true, "requested": true, "pending": status == "prompt"]
+    }
+"#;
+
+pub const ANDROID_CONTACTS: &str = r#"
+    private fun contactsValue(method: String, payload: JSONObject?): Any {
+        val permission = android.Manifest.permission.READ_CONTACTS
+        val granted = activity.checkSelfPermission(permission) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        if (method == "status") return JSONObject().put("granted", granted)
+        if (method == "requestPermission") {
+            if (!granted) activity.requestPermissions(arrayOf(permission), 4773)
+            return JSONObject().put("granted", granted).put("requested", !granted).put("pending", !granted)
+        }
+        if (method != "list") error("unsupported contacts method: $method")
+        if (!granted) return JSONObject().put("granted", false).put("contacts", JSONArray())
+        val limit = payload?.optInt("limit", 100)?.coerceIn(1, 1000) ?: 100
+        val contacts = JSONArray()
+        val projection = arrayOf(
+            android.provider.ContactsContract.CommonDataKinds.Phone.CONTACT_ID,
+            android.provider.ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
+            android.provider.ContactsContract.CommonDataKinds.Phone.NUMBER,
+        )
+        appContext.contentResolver.query(
+            android.provider.ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+            projection,
+            null,
+            null,
+            android.provider.ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME + " ASC",
+        )?.use { cursor ->
+            val id = cursor.getColumnIndexOrThrow(android.provider.ContactsContract.CommonDataKinds.Phone.CONTACT_ID)
+            val name = cursor.getColumnIndexOrThrow(android.provider.ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME)
+            val number = cursor.getColumnIndexOrThrow(android.provider.ContactsContract.CommonDataKinds.Phone.NUMBER)
+            while (cursor.moveToNext() && contacts.length() < limit) {
+                contacts.put(JSONObject().put("id", cursor.getString(id)).put("name", cursor.getString(name) ?: "").put("phoneNumber", cursor.getString(number) ?: ""))
+            }
+        }
+        return JSONObject().put("granted", true).put("contacts", contacts)
+    }
+"#;
+
+pub const IOS_CONTACTS: &str = r#"
+    private static func contactsValue(method: String, payload: [String: Any]?) throws -> Any {
+        let store = CNContactStore()
+        let granted = CNContactStore.authorizationStatus(for: .contacts) == .authorized
+        if method == "status" { return ["granted": granted] }
+        if method == "requestPermission" {
+            if !granted { store.requestAccess(for: .contacts) { _, _ in } }
+            return ["granted": granted, "requested": !granted, "pending": !granted]
+        }
+        guard method == "list" else { throw HostActionError("unsupported contacts method: \(method)") }
+        guard granted else { return ["granted": false, "contacts": [[String: Any]]()] }
+        let limit = min(max(payload?["limit"] as? Int ?? 100, 1), 1000)
+        let keys: [CNKeyDescriptor] = [CNContactIdentifierKey as CNKeyDescriptor, CNContactGivenNameKey as CNKeyDescriptor, CNContactFamilyNameKey as CNKeyDescriptor, CNContactPhoneNumbersKey as CNKeyDescriptor]
+        let values = try store.unifiedContacts(matching: NSPredicate(value: true), keysToFetch: keys)
+            .prefix(limit)
+            .map { contact in
+                ["id": contact.identifier, "name": "\(contact.givenName) \(contact.familyName)".trimmingCharacters(in: .whitespaces), "phoneNumbers": contact.phoneNumbers.map { $0.value.stringValue }]
+            }
+        return ["granted": true, "contacts": values]
     }
 "#;
 
