@@ -189,7 +189,7 @@ fn add_capability(capability: &str, root: &Path) -> Result<(), String> {
 }
 
 fn add_appearance_host(root: &Path) -> Result<(), String> {
-    let android = root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusRustActions.kt");
+    let android = android_actions_path(root)?;
     let mut source = fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
     if !source.contains("appearanceValue") {
         source = source.replace("import android.content.ClipData\n", "import android.content.ClipData\nimport android.content.res.Configuration\n");
@@ -208,7 +208,7 @@ fn add_appearance_host(root: &Path) -> Result<(), String> {
 }
 
 fn add_battery_host(root: &Path) -> Result<(), String> {
-    let android = root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusRustActions.kt");
+    let android = android_actions_path(root)?;
     let mut source = fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
     if !source.contains("batteryValue") {
         source = source.replace("import android.content.ClipData\n", "import android.content.ClipData\nimport android.content.Intent\nimport android.content.IntentFilter\nimport android.os.BatteryManager\n");
@@ -254,8 +254,7 @@ fn add_geolocation_ios_host(root: &Path) -> Result<(), String> {
 }
 
 fn add_geolocation_host(root: &Path) -> Result<(), String> {
-    let android =
-        root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusRustActions.kt");
+    let android = android_actions_path(root)?;
     let mut source =
         fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
     if source.contains("GeolocationBridge") {
@@ -296,8 +295,7 @@ fn add_feature(path: &Path, feature: &str) -> Result<(), String> {
 }
 
 fn add_bluetooth_host(root: &Path) -> Result<(), String> {
-    let android =
-        root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusRustActions.kt");
+    let android = android_actions_path(root)?;
     let mut source =
         fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
     if source.contains("BluetoothBridge") {
@@ -324,8 +322,7 @@ fn add_bluetooth_host(root: &Path) -> Result<(), String> {
 }
 
 fn add_sensors_host(root: &Path) -> Result<(), String> {
-    let android =
-        root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusRustActions.kt");
+    let android = android_actions_path(root)?;
     let ios = root.join("ios/Sources/NativeShell/CrepusRustActions.swift");
     let mut android_source =
         fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
@@ -365,6 +362,16 @@ fn add_sensors_host(root: &Path) -> Result<(), String> {
         fs::write(&ios, ios_source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
     }
     Ok(())
+}
+
+fn android_actions_path(root: &Path) -> Result<PathBuf, String> {
+    let packages = root.join("android/app/src/main/java/dev/crepuscularity");
+    fs::read_dir(&packages)
+        .map_err(|e| format!("read '{}': {e}", packages.display()))?
+        .filter_map(Result::ok)
+        .map(|entry| entry.path().join("CrepusRustActions.kt"))
+        .find(|path| path.is_file())
+        .ok_or_else(|| format!("Android Rust actions not found under '{}'", packages.display()))
 }
 
 fn add_once(path: &Path, addition: &str, anchor: &str) -> Result<(), String> {
