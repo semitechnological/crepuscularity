@@ -1756,7 +1756,7 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-cli"
-version = "0.10.2"
+version = "0.10.3"
 dependencies = [
  "axum",
  "clap",
@@ -1974,7 +1974,7 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-web"
-version = "0.4.13"
+version = "0.4.14"
 dependencies = [
  "ammonia",
  "axum",
