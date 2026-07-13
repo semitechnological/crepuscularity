@@ -244,3 +244,26 @@ private final class GeolocationBridge: NSObject, CLLocationManagerDelegate {
     }
 }
 "#;
+
+pub const ANDROID_BATTERY: &str = r#"
+    private fun batteryValue(method: String): JSONObject {
+        if (method != "status") error("unsupported battery method: $method")
+        val state = registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        val level = state?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
+        val scale = state?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
+        return JSONObject().put("level", if (level >= 0 && scale > 0) level.toDouble() / scale else JSONObject.NULL)
+            .put("charging", state?.getIntExtra(BatteryManager.EXTRA_STATUS, 0) == BatteryManager.BATTERY_STATUS_CHARGING)
+    }
+"#;
+
+pub const IOS_BATTERY: &str = r#"
+    private static func batteryValue(method: String) throws -> Any {
+        guard method == "status" else { throw HostActionError("unsupported battery method: \(method)") }
+        #if canImport(UIKit)
+        UIDevice.current.isBatteryMonitoringEnabled = true
+        return ["level": UIDevice.current.batteryLevel < 0 ? NSNull() : UIDevice.current.batteryLevel, "charging": UIDevice.current.batteryState == .charging || UIDevice.current.batteryState == .full]
+        #else
+        return ["level": NSNull(), "charging": false]
+        #endif
+    }
+"#;
