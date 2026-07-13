@@ -448,6 +448,8 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(!default_ios.contains("dimensionsValue"));
     assert!(!default_android.contains("dialogValue"));
     assert!(!default_ios.contains("dialogValue"));
+    assert!(!default_android.contains("actionSheetValue"));
+    assert!(!default_ios.contains("actionSheetValue"));
     assert!(crepus()
         .args(["native", "add", "share", "--dir"])
         .arg(&root)
@@ -664,6 +666,22 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(dialog_android.contains("AlertDialog.Builder"));
     assert!(dialog_ios.contains("UIAlertController"));
     assert!(crepus()
+        .args(["native", "add", "action-sheet", "--dir"])
+        .arg(&root)
+        .output()
+        .expect("add action sheet")
+        .status
+        .success());
+    let action_sheet_android = std::fs::read_to_string(
+        root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusRustActions.kt"),
+    )
+    .expect("read Android action sheet bridge");
+    let action_sheet_ios =
+        std::fs::read_to_string(root.join("ios/Sources/NativeShell/CrepusRustActions.swift"))
+            .expect("read iOS action sheet bridge");
+    assert!(action_sheet_android.contains("setItems(labels)"));
+    assert!(action_sheet_ios.contains("preferredStyle: .actionSheet"));
+    assert!(crepus()
         .args(["native", "add", "filesystem", "--dir"])
         .arg(&root)
         .output()
@@ -681,6 +699,7 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(cargo.contains("camera = []"));
     assert!(cargo.contains("dimensions = []"));
     assert!(cargo.contains("dialog = []"));
+    assert!(cargo.contains("action-sheet = []"));
     assert!(cargo.contains("filesystem = []"));
     assert!(cargo.contains("default = [\"filesystem\"]"));
     assert!(

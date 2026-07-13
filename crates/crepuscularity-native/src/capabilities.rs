@@ -993,6 +993,70 @@ private func presentDialog(action: String, title: String, message: String, butto
 #endif
 "#;
 
+pub const ANDROID_ACTION_SHEET: &str = r#"
+    private fun actionSheetValue(method: String, payload: JSONObject?): JSONObject {
+        if (method != "show") error("unsupported actionSheet method: $method")
+        val action = "actionSheet.show"
+        val options = payload?.optJSONArray("options") ?: JSONArray().put("OK")
+        val labels = Array(options.length()) { index -> options.optString(index, "Option") }
+        activity.runOnUiThread {
+            AlertDialog.Builder(activity)
+                .setTitle(payload?.optString("title") ?: "")
+                .setItems(labels) { _, index -> emit(actionSheetResultJson(action, labels[index], index)) }
+                .setOnCancelListener { emit(actionSheetResultJson(action, "cancel", -1)) }
+                .show()
+        }
+        return JSONObject().put("opening", true)
+    }
+
+    private fun actionSheetResultJson(action: String, selection: String, index: Int): String =
+        JSONObject().put("ok", true).put("action", action)
+            .put("value", JSONObject().put("selection", selection).put("index", index)).toString()
+"#;
+
+pub const IOS_ACTION_SHEET: &str = r#"
+    private static func actionSheetValue(method: String, payload: [String: Any]?) throws -> Any {
+        guard method == "show" else { throw HostActionError("unsupported actionSheet method: \(method)") }
+        let options = payload?["options"] as? [String] ?? ["OK"]
+        presentActionSheet(action: "actionSheet.show", title: payload?["title"] as? String ?? "", options: options)
+        return ["opening": true]
+    }
+"#;
+
+pub const IOS_ACTION_SHEET_BRIDGE: &str = r#"
+
+#if canImport(UIKit)
+private func presentActionSheet(action: String, title: String, options: [String]) {
+    Task { @MainActor in
+        guard let root = topViewController() else {
+            CrepusRustActions.emit("{\"ok\":false,\"action\":\"\(action)\",\"error\":\"missing root view controller\"}")
+            return
+        }
+        let alert = UIAlertController(title: title, message: nil, preferredStyle: .actionSheet)
+        for (index, option) in options.enumerated() {
+            alert.addAction(UIAlertAction(title: option, style: .default) { _ in
+                CrepusRustActions.emit(actionSheetResultJson(action: action, selection: option, index: index))
+            })
+        }
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel) { _ in
+            CrepusRustActions.emit(actionSheetResultJson(action: action, selection: "cancel", index: -1))
+        })
+        if let popover = alert.popoverPresentationController {
+            popover.sourceView = root.view
+            popover.sourceRect = root.view.bounds
+        }
+        root.present(alert, animated: true)
+    }
+}
+
+private func actionSheetResultJson(action: String, selection: String, index: Int) -> String {
+    if let data = try? JSONSerialization.data(withJSONObject: ["ok": true, "action": action, "value": ["selection": selection, "index": index]]),
+       let json = String(data: data, encoding: .utf8) { return json }
+    return "{\"ok\":false,\"action\":\"\(action)\",\"error\":\"json encode failure\"}"
+}
+#endif
+"#;
+
 pub const ANDROID_GEOLOCATION: &str = r#"
     private val geolocation by lazy { GeolocationBridge(activity) }
 

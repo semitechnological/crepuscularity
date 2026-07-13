@@ -54,6 +54,7 @@ crepus native add photo-library --dir .
 crepus native add camera --dir .
 crepus native add dimensions --dir .
 crepus native add dialog --dir .
+crepus native add action-sheet --dir .
 ```
 
 `sensors` installs real gyro and accelerometer bridges. `bluetooth` installs Android and iOS BLE scan
@@ -72,6 +73,7 @@ metadata for each asset it can access.
 `camera.takePhoto` opens the system camera and emits one cached JPEG result.
 `dimensions.get` returns the current display width, height, and scale.
 `dialog.show` presents a native alert and streams whether it was accepted or cancelled.
+`actionSheet.show` presents native choices and streams the selected label and index.
 
 ## Regenerating the fixture from a template
 
