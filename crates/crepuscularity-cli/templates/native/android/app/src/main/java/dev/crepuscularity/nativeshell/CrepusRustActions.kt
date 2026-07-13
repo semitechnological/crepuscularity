@@ -62,7 +62,6 @@ object CrepusRustActions {
     private lateinit var activity: ComponentActivity
     private var pendingPickerAction: String? = null
     private var openDocuments: (() -> Unit)? = null
-    private var openMedia: (() -> Unit)? = null
 
     external fun dispatchAction(action: String): Boolean
     external fun dispatchActionJson(action: String): String
@@ -89,7 +88,6 @@ object CrepusRustActions {
                 emit(filePickerResultJson(action, uris))
             }
         openDocuments = { filePicker.launch(arrayOf("*/*")) }
-        openMedia = { filePicker.launch(arrayOf("image/*", "video/*")) }
         CrepusActions.dispatch = { action -> dispatchHostAction(action) ?: dispatchAndStoreJson(action) }
         CrepusActions.resultSink = { result -> CrepusActions.applyResult(result) }
     }
@@ -125,19 +123,12 @@ object CrepusRustActions {
 
     private fun hostPluginValue(capability: String, method: String, payload: JSONObject?): Any =
         when (capability) {
-            "imagePicker" -> imagePickerValue(method)
-            "documentPicker" -> documentPickerValue(method)
             "photoLibrary" -> photoLibraryValue(method)
             else -> error("unsupported host capability: $capability")
         }
 
     private fun dispatchNamedHostAction(action: String): String? =
         when (action) {
-            "pick_media" -> {
-                pendingPickerAction = action
-                openMedia?.invoke() ?: emit(errorJson(action, "media picker unavailable"))
-                pendingJson(action)
-            }
             "import_files" -> {
                 pendingPickerAction = action
                 openDocuments?.invoke() ?: emit(errorJson(action, "file picker unavailable"))
@@ -145,20 +136,6 @@ object CrepusRustActions {
             }
             else -> null
         }
-
-    private fun imagePickerValue(method: String): JSONObject {
-        if (method != "pick") error("unsupported imagePicker method: $method")
-        pendingPickerAction = "imagePicker.pick"
-        openMedia?.invoke() ?: emit(errorJson("imagePicker.pick", "media picker unavailable"))
-        return JSONObject().put("opening", true)
-    }
-
-    private fun documentPickerValue(method: String): JSONObject {
-        if (method != "pick") error("unsupported documentPicker method: $method")
-        pendingPickerAction = "documentPicker.pick"
-        openDocuments?.invoke() ?: emit(errorJson("documentPicker.pick", "document picker unavailable"))
-        return JSONObject().put("opening", true)
-    }
 
     private fun photoLibraryValue(method: String): JSONObject {
         if (method != "scan" && method != "getRecentMedia") error("unsupported photoLibrary method: $method")

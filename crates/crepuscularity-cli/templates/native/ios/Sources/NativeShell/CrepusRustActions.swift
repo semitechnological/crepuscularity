@@ -3,7 +3,6 @@ import Foundation
 import SwiftUI
 #if canImport(UIKit)
 import Photos
-import PhotosUI
 import UIKit
 import UniformTypeIdentifiers
 #elseif canImport(AppKit)
@@ -181,9 +180,6 @@ public enum CrepusRustActions {
 
     private static func dispatchNamedHostAction(_ action: String) -> String? {
         switch action {
-        case "pick_media":
-            presentMediaPicker(action: action)
-            return pendingJson(action: action)
         case "import_files":
             presentFilePicker(action: action, contentTypes: [], allowsMultiple: true)
             return pendingJson(action: action)
@@ -194,31 +190,11 @@ public enum CrepusRustActions {
 
     private static func hostPluginValue(capability: String, method: String, payload: [String: Any]?) throws -> Any {
         switch capability {
-        case "imagePicker":
-            return try imagePickerValue(method: method)
-        case "documentPicker":
-            return try documentPickerValue(method: method)
         case "photoLibrary":
             return try photoLibraryValue(method: method)
         default:
             throw HostActionError("unsupported host capability: \(capability)")
         }
-    }
-
-    private static func imagePickerValue(method: String) throws -> Any {
-        guard method == "pick" else {
-            throw HostActionError("unsupported imagePicker method: \(method)")
-        }
-        presentMediaPicker(action: "imagePicker.pick")
-        return ["opening": true]
-    }
-
-    private static func documentPickerValue(method: String) throws -> Any {
-        guard method == "pick" else {
-            throw HostActionError("unsupported documentPicker method: \(method)")
-        }
-        presentFilePicker(action: "documentPicker.pick", contentTypes: [], allowsMultiple: true)
-        return ["opening": true]
     }
 
     private static func photoLibraryValue(method: String) throws -> Any {
@@ -409,35 +385,6 @@ private struct HostActionError: LocalizedError {
 }
 
 #if canImport(UIKit)
-private final class MediaPickerDelegate: NSObject, PHPickerViewControllerDelegate {
-    let action: String
-
-    init(action: String) {
-        self.action = action
-    }
-
-    func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
-        picker.dismiss(animated: true)
-        guard !results.isEmpty else {
-            CrepusRustActions.emit(mediaResultJson(action: action, files: []))
-            CrepusMediaPicker.shared.clear(delegate: self)
-            return
-        }
-        Task.detached {
-            var files: [[String: Any]] = []
-            for result in results {
-                if let file = await mediaPayload(result) {
-                    files.append(file)
-                }
-            }
-            await MainActor.run {
-                CrepusRustActions.emit(mediaResultJson(action: self.action, files: files))
-                CrepusMediaPicker.shared.clear(delegate: self)
-            }
-        }
-    }
-}
-
 private final class FilePickerDelegate: NSObject, UIDocumentPickerDelegate {
     let action: String
 
@@ -467,36 +414,6 @@ private final class CrepusHostPicker {
 
     func clear(delegate: FilePickerDelegate) {
         delegates.removeAll { $0 === delegate }
-    }
-}
-
-private final class CrepusMediaPicker {
-    static let shared = CrepusMediaPicker()
-    private var delegates: [MediaPickerDelegate] = []
-
-    func retain(delegate: MediaPickerDelegate) {
-        delegates.append(delegate)
-    }
-
-    func clear(delegate: MediaPickerDelegate) {
-        delegates.removeAll { $0 === delegate }
-    }
-}
-
-private func presentMediaPicker(action: String) {
-    Task { @MainActor in
-        guard let root = topViewController() else {
-            CrepusRustActions.emit("{\"ok\":false,\"action\":\"\(action)\",\"error\":\"missing root view controller\"}")
-            return
-        }
-        var configuration = PHPickerConfiguration(photoLibrary: .shared())
-        configuration.filter = .any(of: [.images, .videos])
-        configuration.selectionLimit = 0
-        let picker = PHPickerViewController(configuration: configuration)
-        let delegate = MediaPickerDelegate(action: action)
-        picker.delegate = delegate
-        CrepusMediaPicker.shared.retain(delegate: delegate)
-        root.present(picker, animated: true)
     }
 }
 
@@ -566,35 +483,6 @@ private func pickedFileJson(url: URL) -> [String: Any]? {
         "filePath": path.path,
         "importSource": "ios-document-picker",
     ]
-}
-
-private func mediaPayload(_ result: PHPickerResult) async -> [String: Any]? {
-    let provider = result.itemProvider
-    let type = provider.registeredTypeIdentifiers.first ?? "public.data"
-    let name = provider.suggestedName ?? "Media"
-    guard let path = await copyFileRepresentation(provider, type: type, name: name)
-    else {
-        return nil
-    }
-    return [
-        "name": name,
-        "mimeType": mimeType(type),
-        "bytes": (try? path.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0,
-        "filePath": path.path,
-        "importSource": "ios-photo-picker",
-    ]
-}
-
-private func copyFileRepresentation(_ provider: NSItemProvider, type: String, name: String) async -> URL? {
-    await withCheckedContinuation { continuation in
-        provider.loadFileRepresentation(forTypeIdentifier: type) { url, _ in
-            guard let url, let path = try? copyToCache(from: url, name: name) else {
-                continuation.resume(returning: nil)
-                return
-            }
-            continuation.resume(returning: path)
-        }
-    }
 }
 
 private func copyToCache(from url: URL, name: String) throws -> URL {
@@ -699,12 +587,6 @@ private func mimeType(_ type: String) -> String {
 private func presentFilePicker(action: String, contentTypes: [Any], allowsMultiple: Bool) {
     Task { @MainActor in
         CrepusRustActions.emit("{\"ok\":false,\"action\":\"\(action)\",\"error\":\"file picker unavailable on AppKit shell\"}")
-    }
-}
-
-private func presentMediaPicker(action: String) {
-    Task { @MainActor in
-        CrepusRustActions.emit("{\"ok\":false,\"action\":\"\(action)\",\"error\":\"media picker unavailable on AppKit shell\"}")
     }
 }
 

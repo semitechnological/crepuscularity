@@ -375,7 +375,7 @@ fn mobile_new_scaffolds_runtime_files() {
     assert!(android_actions.contains("external fun storeResultJson"));
     assert!(android_actions.contains("external fun evalText"));
     assert!(android_actions.contains("external fun lastResult"));
-    assert!(android_actions.contains("\"documentPicker\" -> documentPickerValue(method)"));
+    assert!(!android_actions.contains("documentPickerValue"));
     assert!(!android_actions.contains("getSharedPreferences(\"crepus_preferences\""));
     assert!(!android_actions.contains("Build.MANUFACTURER"));
     assert!(!android_actions.contains("packageManager.getPackageInfo"));
@@ -383,7 +383,7 @@ fn mobile_new_scaffolds_runtime_files() {
     let ios_actions =
         std::fs::read_to_string(root.join("ios/Sources/NativeShell/CrepusRustActions.swift"))
             .expect("read iOS actions");
-    assert!(ios_actions.contains("case \"documentPicker\":"));
+    assert!(!ios_actions.contains("documentPickerValue"));
 
     let project_yml =
         std::fs::read_to_string(root.join("ios/project.yml")).expect("read project.yml");
@@ -435,6 +435,11 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(!default_ios.contains("openUrlValue"));
     assert!(!default_android.contains("shareValue"));
     assert!(!default_ios.contains("shareValue"));
+    assert!(!default_android.contains("imagePickerValue"));
+    assert!(!default_ios.contains("imagePickerValue"));
+    assert!(!default_ios.contains("import PhotosUI"));
+    assert!(!default_android.contains("documentPickerValue"));
+    assert!(!default_ios.contains("documentPickerValue"));
     assert!(crepus()
         .args(["native", "add", "share", "--dir"])
         .arg(&root)
@@ -451,6 +456,24 @@ fn native_add_capability_updates_only_the_scaffold() {
             .expect("read iOS share bridge");
     assert!(share_android.contains("Intent.createChooser"));
     assert!(share_ios.contains("UIActivityViewController"));
+    assert!(crepus()
+        .args(["native", "add", "image-picker", "--dir"])
+        .arg(&root)
+        .output()
+        .expect("add image picker")
+        .status
+        .success());
+    let image_picker_android = std::fs::read_to_string(
+        root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusRustActions.kt"),
+    )
+    .expect("read Android image picker bridge");
+    let image_picker_ios =
+        std::fs::read_to_string(root.join("ios/Sources/NativeShell/CrepusRustActions.swift"))
+            .expect("read iOS image picker bridge");
+    assert!(image_picker_android.contains("filePicker.launch(arrayOf(\"image/*\", \"video/*\"))"));
+    assert!(image_picker_android.contains("\"pick_media\" ->"));
+    assert!(image_picker_ios.contains("PHPickerViewController"));
+    assert!(image_picker_ios.contains("case \"pick_media\":"));
     assert!(crepus()
         .args(["native", "add", "sensors", "--dir"])
         .arg(&root)
@@ -550,6 +573,22 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(browser_android.contains("Intent.ACTION_VIEW"));
     assert!(browser_ios.contains("UIApplication.shared.open"));
     assert!(crepus()
+        .args(["native", "add", "documents", "--dir"])
+        .arg(&root)
+        .output()
+        .expect("add document picker")
+        .status
+        .success());
+    let document_picker_android = std::fs::read_to_string(
+        root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusRustActions.kt"),
+    )
+    .expect("read Android document picker bridge");
+    let document_picker_ios =
+        std::fs::read_to_string(root.join("ios/Sources/NativeShell/CrepusRustActions.swift"))
+            .expect("read iOS document picker bridge");
+    assert!(document_picker_android.contains("\"documentPicker\" -> documentPickerValue(method)"));
+    assert!(document_picker_ios.contains("case \"documentPicker\":"));
+    assert!(crepus()
         .args(["native", "add", "filesystem", "--dir"])
         .arg(&root)
         .output()
@@ -561,6 +600,8 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(cargo.contains("clipboard = []"));
     assert!(cargo.contains("browser = []"));
     assert!(cargo.contains("share = []"));
+    assert!(cargo.contains("image-picker = []"));
+    assert!(cargo.contains("documentpicker = []"));
     assert!(cargo.contains("filesystem = []"));
     assert!(cargo.contains("default = [\"filesystem\"]"));
     assert!(

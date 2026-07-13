@@ -485,6 +485,142 @@ pub const IOS_SHARE: &str = r#"
     }
 "#;
 
+pub const ANDROID_DOCUMENT_PICKER: &str = r#"
+    private fun documentPickerValue(method: String): JSONObject {
+        if (method != "pick") error("unsupported documentPicker method: $method")
+        pendingPickerAction = "documentPicker.pick"
+        openDocuments?.invoke() ?: emit(errorJson("documentPicker.pick", "document picker unavailable"))
+        return JSONObject().put("opening", true)
+    }
+"#;
+
+pub const IOS_DOCUMENT_PICKER: &str = r#"
+    private static func documentPickerValue(method: String) throws -> Any {
+        guard method == "pick" else {
+            throw HostActionError("unsupported documentPicker method: \(method)")
+        }
+        presentFilePicker(action: "documentPicker.pick", contentTypes: [], allowsMultiple: true)
+        return ["opening": true]
+    }
+"#;
+
+pub const ANDROID_IMAGE_PICKER: &str = r#"
+    private fun imagePickerValue(method: String): JSONObject {
+        if (method != "pick") error("unsupported imagePicker method: $method")
+        pendingPickerAction = "imagePicker.pick"
+        openMedia?.invoke() ?: emit(errorJson("imagePicker.pick", "media picker unavailable"))
+        return JSONObject().put("opening", true)
+    }
+"#;
+
+pub const IOS_IMAGE_PICKER: &str = r#"
+    private static func imagePickerValue(method: String) throws -> Any {
+        guard method == "pick" else {
+            throw HostActionError("unsupported imagePicker method: \(method)")
+        }
+        presentMediaPicker(action: "imagePicker.pick")
+        return ["opening": true]
+    }
+"#;
+
+pub const IOS_IMAGE_PICKER_BRIDGE: &str = r#"
+
+#if canImport(UIKit)
+private final class MediaPickerDelegate: NSObject, PHPickerViewControllerDelegate {
+    let action: String
+
+    init(action: String) {
+        self.action = action
+    }
+
+    func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
+        picker.dismiss(animated: true)
+        guard !results.isEmpty else {
+            CrepusRustActions.emit(mediaResultJson(action: action, files: []))
+            CrepusMediaPicker.shared.clear(delegate: self)
+            return
+        }
+        Task.detached {
+            var files: [[String: Any]] = []
+            for result in results {
+                if let file = await mediaPayload(result) {
+                    files.append(file)
+                }
+            }
+            await MainActor.run {
+                CrepusRustActions.emit(mediaResultJson(action: self.action, files: files))
+                CrepusMediaPicker.shared.clear(delegate: self)
+            }
+        }
+    }
+}
+
+private final class CrepusMediaPicker {
+    static let shared = CrepusMediaPicker()
+    private var delegates: [MediaPickerDelegate] = []
+
+    func retain(delegate: MediaPickerDelegate) {
+        delegates.append(delegate)
+    }
+
+    func clear(delegate: MediaPickerDelegate) {
+        delegates.removeAll { $0 === delegate }
+    }
+}
+
+private func presentMediaPicker(action: String) {
+    Task { @MainActor in
+        guard let root = topViewController() else {
+            CrepusRustActions.emit("{\"ok\":false,\"action\":\"\(action)\",\"error\":\"missing root view controller\"}")
+            return
+        }
+        var configuration = PHPickerConfiguration(photoLibrary: .shared())
+        configuration.filter = .any(of: [.images, .videos])
+        configuration.selectionLimit = 0
+        let picker = PHPickerViewController(configuration: configuration)
+        let delegate = MediaPickerDelegate(action: action)
+        picker.delegate = delegate
+        CrepusMediaPicker.shared.retain(delegate: delegate)
+        root.present(picker, animated: true)
+    }
+}
+
+private func mediaPayload(_ result: PHPickerResult) async -> [String: Any]? {
+    let provider = result.itemProvider
+    let type = provider.registeredTypeIdentifiers.first ?? "public.data"
+    let name = provider.suggestedName ?? "Media"
+    guard let path = await copyFileRepresentation(provider, type: type, name: name) else {
+        return nil
+    }
+    return [
+        "name": name,
+        "mimeType": mimeType(type),
+        "bytes": (try? path.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0,
+        "filePath": path.path,
+        "importSource": "ios-photo-picker",
+    ]
+}
+
+private func copyFileRepresentation(_ provider: NSItemProvider, type: String, name: String) async -> URL? {
+    await withCheckedContinuation { continuation in
+        provider.loadFileRepresentation(forTypeIdentifier: type) { url, _ in
+            guard let url, let path = try? copyToCache(from: url, name: name) else {
+                continuation.resume(returning: nil)
+                return
+            }
+            continuation.resume(returning: path)
+        }
+    }
+}
+#elseif canImport(AppKit)
+private func presentMediaPicker(action: String) {
+    Task { @MainActor in
+        CrepusRustActions.emit("{\"ok\":false,\"action\":\"\(action)\",\"error\":\"media picker unavailable on AppKit shell\"}")
+    }
+}
+#endif
+"#;
+
 pub const ANDROID_GEOLOCATION: &str = r#"
     private val geolocation by lazy { GeolocationBridge(activity) }
 

@@ -24,10 +24,12 @@ use crepuscularity_native::{
     generate_native_source, render_component_file_to_ir, render_from_files, render_template_to_ir,
     to_json, to_json_pretty, NativeCodegenTarget, ANDROID_APPEARANCE, ANDROID_BATTERY,
     ANDROID_BLUETOOTH, ANDROID_BLUETOOTH_BRIDGE, ANDROID_BROWSER, ANDROID_CLIPBOARD,
-    ANDROID_GEOLOCATION, ANDROID_GEOLOCATION_BRIDGE, ANDROID_HAPTICS, ANDROID_SENSORS,
-    ANDROID_SENSORS_BRIDGE, ANDROID_SHARE, IOS_APPEARANCE, IOS_BATTERY, IOS_BLUETOOTH,
-    IOS_BLUETOOTH_BRIDGE, IOS_BROWSER, IOS_CLIPBOARD, IOS_CLIPBOARD_BRIDGE, IOS_GEOLOCATION,
-    IOS_GEOLOCATION_BRIDGE, IOS_HAPTICS, IOS_SENSORS, IOS_SENSORS_BRIDGE, IOS_SHARE,
+    ANDROID_DOCUMENT_PICKER, ANDROID_GEOLOCATION, ANDROID_GEOLOCATION_BRIDGE, ANDROID_HAPTICS,
+    ANDROID_IMAGE_PICKER, ANDROID_SENSORS, ANDROID_SENSORS_BRIDGE, ANDROID_SHARE, IOS_APPEARANCE,
+    IOS_BATTERY, IOS_BLUETOOTH, IOS_BLUETOOTH_BRIDGE, IOS_BROWSER, IOS_CLIPBOARD,
+    IOS_CLIPBOARD_BRIDGE, IOS_DOCUMENT_PICKER, IOS_GEOLOCATION, IOS_GEOLOCATION_BRIDGE,
+    IOS_HAPTICS, IOS_IMAGE_PICKER, IOS_IMAGE_PICKER_BRIDGE, IOS_SENSORS, IOS_SENSORS_BRIDGE,
+    IOS_SHARE,
 };
 use serde::Deserialize;
 use serde_json::Value;
@@ -101,6 +103,20 @@ const CAPABILITIES: &[CapabilitySpec] = &[
     CapabilitySpec { name: "clipboard", aliases: &[], cargo_feature: "clipboard", android_manifest: "", ios_project: "" },
     CapabilitySpec { name: "browser", aliases: &["linking"], cargo_feature: "browser", android_manifest: "", ios_project: "" },
     CapabilitySpec { name: "share", aliases: &[], cargo_feature: "share", android_manifest: "", ios_project: "" },
+    CapabilitySpec {
+        name: "documentpicker",
+        aliases: &["document-picker", "documents"],
+        cargo_feature: "documentpicker",
+        android_manifest: "",
+        ios_project: "",
+    },
+    CapabilitySpec {
+        name: "image-picker",
+        aliases: &["imagepicker", "media-picker"],
+        cargo_feature: "image-picker",
+        android_manifest: "",
+        ios_project: "",
+    },
     CapabilitySpec {
         name: "filesystem",
         aliases: &["files"],
@@ -187,6 +203,12 @@ fn add_capability(capability: &str, root: &Path) -> Result<(), String> {
     }
     if spec.name == "share" {
         add_share_host(root)?;
+    }
+    if spec.name == "documentpicker" {
+        add_document_picker_host(root)?;
+    }
+    if spec.name == "image-picker" {
+        add_image_picker_host(root)?;
     }
     if spec.name == "bluetooth" {
         add_bluetooth_host(root)?;
@@ -498,8 +520,8 @@ fn add_browser_host(root: &Path) -> Result<(), String> {
             "        when (capability) {\n            \"browser\", \"linking\" -> openUrlValue(capability, method, payload)\n",
         );
         source = source.replace(
-            "\n    private fun imagePickerValue",
-            &format!("{ANDROID_BROWSER}\n    private fun imagePickerValue"),
+            "\n    private fun photoLibraryValue",
+            &format!("{ANDROID_BROWSER}\n    private fun photoLibraryValue"),
         );
         fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))?;
     }
@@ -512,8 +534,8 @@ fn add_browser_host(root: &Path) -> Result<(), String> {
             "        switch capability {\n        case \"browser\", \"linking\":\n            return try openUrlValue(capability: capability, method: method, payload: payload)\n",
         );
         source = source.replace(
-            "\n    private static func imagePickerValue",
-            &format!("{IOS_BROWSER}\n    private static func imagePickerValue"),
+            "\n    private static func photoLibraryValue",
+            &format!("{IOS_BROWSER}\n    private static func photoLibraryValue"),
         );
         fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
     }
@@ -530,8 +552,8 @@ fn add_share_host(root: &Path) -> Result<(), String> {
             "            \"photoLibrary\" -> photoLibraryValue(method)\n            \"share\" -> shareValue(method, payload)\n",
         );
         source = source.replace(
-            "\n    private fun imagePickerValue",
-            &format!("{ANDROID_SHARE}\n    private fun imagePickerValue"),
+            "\n    private fun photoLibraryValue",
+            &format!("{ANDROID_SHARE}\n    private fun photoLibraryValue"),
         );
         fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))?;
     }
@@ -544,9 +566,91 @@ fn add_share_host(root: &Path) -> Result<(), String> {
             "        case \"photoLibrary\":\n            return try photoLibraryValue(method: method)\n        case \"share\":\n            return try shareValue(method: method, payload: payload)\n",
         );
         source = source.replace(
-            "\n    private static func imagePickerValue",
-            &format!("{IOS_SHARE}\n    private static func imagePickerValue"),
+            "\n    private static func photoLibraryValue",
+            &format!("{IOS_SHARE}\n    private static func photoLibraryValue"),
         );
+        fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
+    }
+    Ok(())
+}
+
+fn add_document_picker_host(root: &Path) -> Result<(), String> {
+    let android = android_actions_path(root)?;
+    let mut source =
+        fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
+    if !source.contains("documentPickerValue") {
+        source = source.replace(
+            "            \"photoLibrary\" -> photoLibraryValue(method)\n",
+            "            \"documentPicker\" -> documentPickerValue(method)\n            \"photoLibrary\" -> photoLibraryValue(method)\n",
+        );
+        source = source.replace(
+            "\n    private fun photoLibraryValue",
+            &format!("{ANDROID_DOCUMENT_PICKER}\n    private fun photoLibraryValue"),
+        );
+        fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))?;
+    }
+    let ios = root.join("ios/Sources/NativeShell/CrepusRustActions.swift");
+    let mut source =
+        fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
+    if !source.contains("documentPickerValue") {
+        source = source.replace(
+            "        case \"photoLibrary\":\n            return try photoLibraryValue(method: method)\n",
+            "        case \"documentPicker\":\n            return try documentPickerValue(method: method)\n        case \"photoLibrary\":\n            return try photoLibraryValue(method: method)\n",
+        );
+        source = source.replace(
+            "\n    private static func photoLibraryValue",
+            &format!("{IOS_DOCUMENT_PICKER}\n    private static func photoLibraryValue"),
+        );
+        fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
+    }
+    Ok(())
+}
+
+fn add_image_picker_host(root: &Path) -> Result<(), String> {
+    let android = android_actions_path(root)?;
+    let mut source =
+        fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
+    if !source.contains("imagePickerValue") {
+        source = source.replace(
+            "    private var openDocuments: (() -> Unit)? = null\n",
+            "    private var openDocuments: (() -> Unit)? = null\n    private var openMedia: (() -> Unit)? = null\n",
+        );
+        source = source.replace(
+            "        openDocuments = { filePicker.launch(arrayOf(\"*/*\")) }\n",
+            "        openDocuments = { filePicker.launch(arrayOf(\"*/*\")) }\n        openMedia = { filePicker.launch(arrayOf(\"image/*\", \"video/*\")) }\n",
+        );
+        source = source.replace(
+            "            \"photoLibrary\" -> photoLibraryValue(method)\n",
+            "            \"imagePicker\" -> imagePickerValue(method)\n            \"photoLibrary\" -> photoLibraryValue(method)\n",
+        );
+        source = source.replace(
+            "        when (action) {\n            \"import_files\" -> {\n",
+            "        when (action) {\n            \"pick_media\" -> {\n                pendingPickerAction = action\n                openMedia?.invoke() ?: emit(errorJson(action, \"media picker unavailable\"))\n                pendingJson(action)\n            }\n            \"import_files\" -> {\n",
+        );
+        source = source.replace(
+            "    private fun photoLibraryValue",
+            &format!("{ANDROID_IMAGE_PICKER}\n    private fun photoLibraryValue"),
+        );
+        fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))?;
+    }
+    let ios = root.join("ios/Sources/NativeShell/CrepusRustActions.swift");
+    let mut source =
+        fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
+    if !source.contains("imagePickerValue") {
+        source = source.replace("import Photos\n", "import Photos\nimport PhotosUI\n");
+        source = source.replace(
+            "        switch action {\n        case \"import_files\":\n",
+            "        switch action {\n        case \"pick_media\":\n            presentMediaPicker(action: action)\n            return pendingJson(action: action)\n        case \"import_files\":\n",
+        );
+        source = source.replace(
+            "        switch capability {\n        case \"photoLibrary\":\n",
+            "        switch capability {\n        case \"imagePicker\":\n            return try imagePickerValue(method: method)\n        case \"photoLibrary\":\n",
+        );
+        source = source.replace(
+            "    private static func photoLibraryValue",
+            &format!("{IOS_IMAGE_PICKER}\n    private static func photoLibraryValue"),
+        );
+        source.push_str(IOS_IMAGE_PICKER_BRIDGE);
         fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
     }
     Ok(())
