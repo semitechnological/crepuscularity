@@ -1229,6 +1229,25 @@ pub const IOS_NETWORK: &str = r#"
     }
 "#;
 
+pub const ANDROID_KEYBOARD: &str = r#"
+    private fun keyboardValue(method: String): JSONObject {
+        if (method != "dismiss") error("unsupported keyboard method: $method")
+        val manager = appContext.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+        manager.hideSoftInputFromWindow(activity.currentFocus?.windowToken ?: activity.window.decorView.windowToken, 0)
+        return JSONObject().put("dismissed", true)
+    }
+"#;
+
+pub const IOS_KEYBOARD: &str = r#"
+    private static func keyboardValue(method: String) throws -> Any {
+        guard method == "dismiss" else { throw HostActionError("unsupported keyboard method: \(method)") }
+        #if canImport(UIKit)
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+        #endif
+        return ["dismissed": true]
+    }
+"#;
+
 pub const ANDROID_GEOLOCATION: &str = r#"
     private val geolocation by lazy { GeolocationBridge(activity) }
 

@@ -782,6 +782,22 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(network_android.contains("NetworkCapabilities.NET_CAPABILITY_VALIDATED"));
     assert!(network_ios.contains("NWPathMonitor"));
     assert!(crepus()
+        .args(["native", "add", "keyboard", "--dir"])
+        .arg(&root)
+        .output()
+        .expect("add keyboard")
+        .status
+        .success());
+    let keyboard_android = std::fs::read_to_string(
+        root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusRustActions.kt"),
+    )
+    .expect("read Android keyboard bridge");
+    let keyboard_ios =
+        std::fs::read_to_string(root.join("ios/Sources/NativeShell/CrepusRustActions.swift"))
+            .expect("read iOS keyboard bridge");
+    assert!(keyboard_android.contains("hideSoftInputFromWindow"));
+    assert!(keyboard_ios.contains("resignFirstResponder"));
+    assert!(crepus()
         .args(["native", "add", "filesystem", "--dir"])
         .arg(&root)
         .output()
@@ -806,6 +822,7 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(cargo.contains("device = []"));
     assert!(cargo.contains("preferences = []"));
     assert!(cargo.contains("network = []"));
+    assert!(cargo.contains("keyboard = []"));
     assert!(cargo.contains("filesystem = []"));
     assert!(cargo.contains("default = [\"filesystem\"]"));
     assert!(

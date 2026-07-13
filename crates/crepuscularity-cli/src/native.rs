@@ -26,15 +26,16 @@ use crepuscularity_native::{
     ANDROID_APPEARANCE, ANDROID_APP_STATE, ANDROID_BATTERY, ANDROID_BLUETOOTH,
     ANDROID_BLUETOOTH_BRIDGE, ANDROID_BROWSER, ANDROID_CAMERA, ANDROID_CLIPBOARD, ANDROID_DEVICE,
     ANDROID_DIALOG, ANDROID_DIMENSIONS, ANDROID_DOCUMENT_PICKER, ANDROID_GEOLOCATION,
-    ANDROID_GEOLOCATION_BRIDGE, ANDROID_HAPTICS, ANDROID_IMAGE_PICKER, ANDROID_NETWORK,
-    ANDROID_PHOTO_LIBRARY, ANDROID_PREFERENCES, ANDROID_SCREEN_ORIENTATION, ANDROID_SENSORS,
-    ANDROID_SENSORS_BRIDGE, ANDROID_SHARE, IOS_ACCESSIBILITY_INFO, IOS_ACTION_SHEET,
-    IOS_ACTION_SHEET_BRIDGE, IOS_APPEARANCE, IOS_APP_STATE, IOS_BATTERY, IOS_BLUETOOTH,
-    IOS_BLUETOOTH_BRIDGE, IOS_BROWSER, IOS_CAMERA, IOS_CAMERA_BRIDGE, IOS_CLIPBOARD,
+    ANDROID_GEOLOCATION_BRIDGE, ANDROID_HAPTICS, ANDROID_IMAGE_PICKER, ANDROID_KEYBOARD,
+    ANDROID_NETWORK, ANDROID_PHOTO_LIBRARY, ANDROID_PREFERENCES, ANDROID_SCREEN_ORIENTATION,
+    ANDROID_SENSORS, ANDROID_SENSORS_BRIDGE, ANDROID_SHARE, IOS_ACCESSIBILITY_INFO,
+    IOS_ACTION_SHEET, IOS_ACTION_SHEET_BRIDGE, IOS_APPEARANCE, IOS_APP_STATE, IOS_BATTERY,
+    IOS_BLUETOOTH, IOS_BLUETOOTH_BRIDGE, IOS_BROWSER, IOS_CAMERA, IOS_CAMERA_BRIDGE, IOS_CLIPBOARD,
     IOS_CLIPBOARD_BRIDGE, IOS_DEVICE, IOS_DIALOG, IOS_DIALOG_BRIDGE, IOS_DIMENSIONS,
     IOS_DOCUMENT_PICKER, IOS_GEOLOCATION, IOS_GEOLOCATION_BRIDGE, IOS_HAPTICS, IOS_IMAGE_PICKER,
-    IOS_IMAGE_PICKER_BRIDGE, IOS_NETWORK, IOS_PHOTO_LIBRARY, IOS_PHOTO_LIBRARY_BRIDGE,
-    IOS_PREFERENCES, IOS_SCREEN_ORIENTATION, IOS_SENSORS, IOS_SENSORS_BRIDGE, IOS_SHARE,
+    IOS_IMAGE_PICKER_BRIDGE, IOS_KEYBOARD, IOS_NETWORK, IOS_PHOTO_LIBRARY,
+    IOS_PHOTO_LIBRARY_BRIDGE, IOS_PREFERENCES, IOS_SCREEN_ORIENTATION, IOS_SENSORS,
+    IOS_SENSORS_BRIDGE, IOS_SHARE,
 };
 use serde::Deserialize;
 use serde_json::Value;
@@ -145,6 +146,7 @@ const CAPABILITIES: &[CapabilitySpec] = &[
     CapabilitySpec { name: "device", aliases: &["device-info", "deviceinfo"], cargo_feature: "device", android_manifest: "", ios_project: "" },
     CapabilitySpec { name: "preferences", aliases: &["storage", "async-storage"], cargo_feature: "preferences", android_manifest: "", ios_project: "" },
     CapabilitySpec { name: "network", aliases: &["net-info", "netinfo"], cargo_feature: "network", android_manifest: "", ios_project: "" },
+    CapabilitySpec { name: "keyboard", aliases: &[], cargo_feature: "keyboard", android_manifest: "", ios_project: "" },
     CapabilitySpec {
         name: "filesystem",
         aliases: &["files"],
@@ -273,6 +275,9 @@ fn add_capability(capability: &str, root: &Path) -> Result<(), String> {
     }
     if spec.name == "network" {
         add_network_host(root)?;
+    }
+    if spec.name == "keyboard" {
+        add_keyboard_host(root)?;
     }
     if spec.name == "bluetooth" {
         add_bluetooth_host(root)?;
@@ -1128,6 +1133,42 @@ fn add_network_host(root: &Path) -> Result<(), String> {
         source = source.replace(
             "\n    private static func dispatchHostAction",
             &format!("{IOS_NETWORK}\n\n    private static func dispatchHostAction"),
+        );
+        fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
+    }
+    Ok(())
+}
+
+fn add_keyboard_host(root: &Path) -> Result<(), String> {
+    let android = android_actions_path(root)?;
+    let mut source =
+        fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
+    if !source.contains("keyboardValue") {
+        source = source.replace(
+            "import android.net.Uri\n",
+            "import android.net.Uri\nimport android.view.inputmethod.InputMethodManager\n",
+        );
+        source = source.replace(
+            "        when (capability) {\n",
+            "        when (capability) {\n            \"keyboard\" -> keyboardValue(method)\n",
+        );
+        source = source.replace(
+            "\n    private fun dispatchHostAction",
+            &format!("{ANDROID_KEYBOARD}\n    private fun dispatchHostAction"),
+        );
+        fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))?;
+    }
+    let ios = root.join("ios/Sources/NativeShell/CrepusRustActions.swift");
+    let mut source =
+        fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
+    if !source.contains("keyboardValue") {
+        source = source.replace(
+            "        switch capability {\n",
+            "        switch capability {\n        case \"keyboard\":\n            return try keyboardValue(method: method)\n",
+        );
+        source = source.replace(
+            "\n    private static func dispatchHostAction",
+            &format!("{IOS_KEYBOARD}\n\n    private static func dispatchHostAction"),
         );
         fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
     }
