@@ -527,7 +527,7 @@ fn add_haptics_host(root: &Path) -> Result<(), String> {
         );
         source = source.replace(
             "        when (capability) {\n",
-            "        when (capability) {\n            \"haptics\" -> hapticsValue(method, payload)\n",
+            "        when (capability) {\n            \"haptics\", \"vibration\" -> hapticsValue(method, payload)\n",
         );
         source = source.replace(
             "\n}\n\nobject CrepusActionState",
@@ -541,7 +541,7 @@ fn add_haptics_host(root: &Path) -> Result<(), String> {
     if !source.contains("hapticsValue") {
         source = source.replace(
             "        switch capability {\n",
-            "        switch capability {\n        case \"haptics\":\n            return try hapticsValue(method: method, payload: payload)\n",
+            "        switch capability {\n        case \"haptics\", \"vibration\":\n            return try hapticsValue(method: method, payload: payload)\n",
         );
         source = source.replace(
             "\n    fileprivate static func emit",

@@ -840,6 +840,8 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(cargo.contains("network = []"));
     assert!(cargo.contains("keyboard = []"));
     assert!(cargo.contains("settings = []"));
+    assert!(haptics_android.contains("\"haptics\", \"vibration\""));
+    assert!(haptics_ios.contains("case \"haptics\", \"vibration\":"));
     assert!(cargo.contains("filesystem = []"));
     assert!(cargo.contains("default = [\"filesystem\"]"));
     assert!(
