@@ -203,3 +203,44 @@ private class GeolocationBridge(private val activity: ComponentActivity) {
     }
 }
 "#;
+
+pub const IOS_GEOLOCATION: &str = r#"
+    private static let geolocation = GeolocationBridge()
+
+    private static func geolocationValue(method: String) throws -> Any {
+        switch method {
+        case "status": return geolocation.status()
+        case "requestPermission": return geolocation.requestPermission()
+        case "getCurrentPosition": return geolocation.currentPosition()
+        default: throw HostActionError("unsupported geolocation method: \(method)")
+        }
+    }
+"#;
+
+pub const IOS_GEOLOCATION_BRIDGE: &str = r#"
+private final class GeolocationBridge: NSObject, CLLocationManagerDelegate {
+    private let manager = CLLocationManager()
+
+    override init() {
+        super.init()
+        manager.delegate = self
+    }
+
+    func status() -> [String: Any] {
+        ["authorization": manager.authorizationStatus.rawValue, "servicesEnabled": CLLocationManager.locationServicesEnabled()]
+    }
+
+    func requestPermission() -> [String: Any] {
+        manager.requestWhenInUseAuthorization()
+        return ["requested": true]
+    }
+
+    func currentPosition() -> [String: Any] {
+        guard manager.authorizationStatus == .authorizedAlways || manager.authorizationStatus == .authorizedWhenInUse else {
+            return requestPermission().merging(["pending": true]) { _, new in new }
+        }
+        guard let location = manager.location else { return ["available": false] }
+        return ["available": true, "latitude": location.coordinate.latitude, "longitude": location.coordinate.longitude, "accuracy": location.horizontalAccuracy, "timestampMs": location.timestamp.timeIntervalSince1970 * 1000]
+    }
+}
+"#;

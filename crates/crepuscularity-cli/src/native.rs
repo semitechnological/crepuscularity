@@ -24,7 +24,7 @@ use crepuscularity_native::{
     generate_native_source, render_component_file_to_ir, render_from_files, render_template_to_ir,
     to_json, to_json_pretty, NativeCodegenTarget, ANDROID_BLUETOOTH, ANDROID_BLUETOOTH_BRIDGE,
     ANDROID_GEOLOCATION, ANDROID_GEOLOCATION_BRIDGE, ANDROID_SENSORS, ANDROID_SENSORS_BRIDGE,
-    IOS_SENSORS, IOS_SENSORS_BRIDGE,
+    IOS_GEOLOCATION, IOS_GEOLOCATION_BRIDGE, IOS_SENSORS, IOS_SENSORS_BRIDGE,
 };
 use serde::Deserialize;
 use serde_json::Value;
@@ -179,6 +179,33 @@ fn add_capability(capability: &str, root: &Path) -> Result<(), String> {
     Ok(())
 }
 
+fn add_geolocation_ios_host(root: &Path) -> Result<(), String> {
+    let ios = root.join("ios/Sources/NativeShell/CrepusRustActions.swift");
+    let mut source =
+        fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
+    if source.contains("GeolocationBridge") {
+        return Ok(());
+    }
+    source = source.replace(
+        "import Foundation\n",
+        "import Foundation\nimport CoreLocation\n",
+    );
+    source = source.replace(
+        "        case \"share\":\n            return try shareValue(method: method, payload: payload)\n",
+        "        case \"share\":\n            return try shareValue(method: method, payload: payload)\n        case \"geolocation\":\n            return try geolocationValue(method: method)\n",
+    );
+    source = source.replace(
+        "\n}\n\nprivate struct HostActionError",
+        &format!("{IOS_GEOLOCATION}\n}}\n\nprivate struct HostActionError"),
+    );
+    source = source.replace(
+        "    private static func emit(_ result: String)",
+        "    static func emit(_ result: String)",
+    );
+    source.push_str(IOS_GEOLOCATION_BRIDGE);
+    fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))
+}
+
 fn add_geolocation_host(root: &Path) -> Result<(), String> {
     let android =
         root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusRustActions.kt");
@@ -200,7 +227,8 @@ fn add_geolocation_host(root: &Path) -> Result<(), String> {
         &format!("{ANDROID_GEOLOCATION}\n}}\n\nobject CrepusActionState"),
     );
     source.push_str(ANDROID_GEOLOCATION_BRIDGE);
-    fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))
+    fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))?;
+    add_geolocation_ios_host(root)
 }
 
 fn add_feature(path: &Path, feature: &str) -> Result<(), String> {
