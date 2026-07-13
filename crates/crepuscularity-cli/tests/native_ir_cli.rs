@@ -750,6 +750,24 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(orientation_android.contains("SCREEN_ORIENTATION_UNSPECIFIED"));
     assert!(orientation_ios.contains("requestGeometryUpdate"));
     assert!(crepus()
+        .args(["native", "add", "geolocation", "--dir"])
+        .arg(&root)
+        .output()
+        .expect("add geolocation")
+        .status
+        .success());
+    let geolocation_android = std::fs::read_to_string(
+        root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusRustActions.kt"),
+    )
+    .expect("read Android geolocation bridge");
+    let geolocation_ios =
+        std::fs::read_to_string(root.join("ios/Sources/NativeShell/CrepusRustActions.swift"))
+            .expect("read iOS geolocation bridge");
+    assert!(geolocation_android.contains("requestLocationUpdates"));
+    assert!(geolocation_android.contains("geolocation.update"));
+    assert!(geolocation_ios.contains("startUpdatingLocation"));
+    assert!(geolocation_ios.contains("geolocation.update"));
+    assert!(crepus()
         .args(["native", "add", "accessibility-info", "--dir"])
         .arg(&root)
         .output()

@@ -615,6 +615,10 @@ fn add_geolocation_ios_host(root: &Path) -> Result<(), String> {
         "    private static func emit(_ result: String)",
         "    static func emit(_ result: String)",
     );
+    source = source.replace(
+        "    private static func successJson(action: String, capability: String, method: String, value: Any) -> String",
+        "    static func successJson(action: String, capability: String, method: String, value: Any) -> String",
+    );
     source.push_str(IOS_GEOLOCATION_BRIDGE);
     fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))
 }
@@ -628,7 +632,7 @@ fn add_geolocation_host(root: &Path) -> Result<(), String> {
     }
     source = source.replace(
         "import android.content.ClipData\n",
-        "import android.content.ClipData\nimport android.Manifest\nimport android.content.pm.PackageManager\nimport android.location.LocationManager\n",
+        "import android.content.ClipData\nimport android.Manifest\nimport android.content.pm.PackageManager\nimport android.location.Location\nimport android.location.LocationListener\nimport android.location.LocationManager\n",
     );
     source = source.replace(
         "        when (capability) {\n",

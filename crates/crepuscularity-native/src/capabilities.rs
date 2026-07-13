@@ -1979,17 +1979,21 @@ pub const ANDROID_GEOLOCATION: &str = r#"
             "status" -> geolocation.status()
             "requestPermission" -> geolocation.requestPermission()
             "getCurrentPosition" -> geolocation.currentPosition()
+            "startWatch" -> geolocation.startWatch()
+            "stopWatch" -> geolocation.stopWatch()
             else -> error("unsupported geolocation method: $method")
         }
 "#;
 
 pub const ANDROID_GEOLOCATION_BRIDGE: &str = r#"
-private class GeolocationBridge(private val activity: ComponentActivity) {
+private class GeolocationBridge(private val activity: ComponentActivity) : LocationListener {
     private val manager = activity.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+    private var watching = false
 
     fun status(): JSONObject = JSONObject()
         .put("enabled", manager.isProviderEnabled(LocationManager.GPS_PROVIDER) || manager.isProviderEnabled(LocationManager.NETWORK_PROVIDER))
-        .put("permissionGranted", activity.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED)
+        .put("permissionGranted", permitted())
+        .put("watching", watching)
 
     fun requestPermission(): JSONObject {
         activity.requestPermissions(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION), 4769)
@@ -1997,7 +2001,7 @@ private class GeolocationBridge(private val activity: ComponentActivity) {
     }
 
     fun currentPosition(): JSONObject {
-        if (activity.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+        if (!permitted()) {
             return requestPermission().put("pending", true)
         }
         val location = manager.getLastKnownLocation(LocationManager.GPS_PROVIDER)
@@ -2007,6 +2011,31 @@ private class GeolocationBridge(private val activity: ComponentActivity) {
             .put("longitude", location.longitude).put("accuracy", location.accuracy)
             .put("timestampMs", location.time)
     }
+
+    fun startWatch(): JSONObject {
+        if (!permitted()) return requestPermission().put("pending", true)
+        if (!watching) {
+            manager.getProviders(true).forEach { manager.requestLocationUpdates(it, 1000L, 0f, this) }
+            watching = true
+        }
+        return status()
+    }
+
+    fun stopWatch(): JSONObject {
+        manager.removeUpdates(this)
+        watching = false
+        return status()
+    }
+
+    override fun onLocationChanged(location: Location) {
+        val value = JSONObject().put("available", true).put("latitude", location.latitude)
+            .put("longitude", location.longitude).put("accuracy", location.accuracy)
+            .put("timestampMs", location.time)
+        CrepusRustActions.emit(JSONObject().put("ok", true).put("action", "geolocation.update")
+            .put("value", value).toString())
+    }
+
+    private fun permitted(): Boolean = activity.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED || activity.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
 }
 "#;
 
@@ -2018,6 +2047,8 @@ pub const IOS_GEOLOCATION: &str = r#"
         case "status": return geolocation.status()
         case "requestPermission": return geolocation.requestPermission()
         case "getCurrentPosition": return geolocation.currentPosition()
+        case "startWatch": return geolocation.startWatch()
+        case "stopWatch": return geolocation.stopWatch()
         default: throw HostActionError("unsupported geolocation method: \(method)")
         }
     }
@@ -2026,6 +2057,7 @@ pub const IOS_GEOLOCATION: &str = r#"
 pub const IOS_GEOLOCATION_BRIDGE: &str = r#"
 private final class GeolocationBridge: NSObject, CLLocationManagerDelegate {
     private let manager = CLLocationManager()
+    private var watching = false
 
     override init() {
         super.init()
@@ -2033,7 +2065,7 @@ private final class GeolocationBridge: NSObject, CLLocationManagerDelegate {
     }
 
     func status() -> [String: Any] {
-        ["authorization": manager.authorizationStatus.rawValue, "servicesEnabled": CLLocationManager.locationServicesEnabled()]
+        ["authorization": manager.authorizationStatus.rawValue, "servicesEnabled": CLLocationManager.locationServicesEnabled(), "watching": watching]
     }
 
     func requestPermission() -> [String: Any] {
@@ -2047,6 +2079,29 @@ private final class GeolocationBridge: NSObject, CLLocationManagerDelegate {
         }
         guard let location = manager.location else { return ["available": false] }
         return ["available": true, "latitude": location.coordinate.latitude, "longitude": location.coordinate.longitude, "accuracy": location.horizontalAccuracy, "timestampMs": location.timestamp.timeIntervalSince1970 * 1000]
+    }
+
+    func startWatch() -> [String: Any] {
+        guard manager.authorizationStatus == .authorizedAlways || manager.authorizationStatus == .authorizedWhenInUse else {
+            return requestPermission().merging(["pending": true]) { _, new in new }
+        }
+        manager.startUpdatingLocation()
+        watching = true
+        return status()
+    }
+
+    func stopWatch() -> [String: Any] {
+        manager.stopUpdatingLocation()
+        watching = false
+        return status()
+    }
+
+    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        guard let location = locations.last else { return }
+        let value: [String: Any] = ["available": true, "latitude": location.coordinate.latitude, "longitude": location.coordinate.longitude, "accuracy": location.horizontalAccuracy, "timestampMs": location.timestamp.timeIntervalSince1970 * 1000]
+        Task { @MainActor in
+            if let data = try? JSONSerialization.data(withJSONObject: ["ok": true, "action": "geolocation.update", "value": value]), let json = String(data: data, encoding: .utf8) { CrepusRustActions.emit(json) }
+        }
     }
 }
 "#;
