@@ -325,14 +325,13 @@ pub const IOS_HAPTICS: &str = r#"
 "#;
 
 pub const ANDROID_CLIPBOARD: &str = r#"
+    private var clipboardListener: ClipboardManager.OnPrimaryClipChangedListener? = null
+
     private fun clipboardValue(method: String, payload: JSONObject?): JSONObject {
         val clipboard =
             appContext.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         return when (method) {
-            "get" -> {
-                val text = clipboard.primaryClip?.getItemAt(0)?.coerceToText(appContext)?.toString()
-                JSONObject().put("text", text)
-            }
+            "get" -> clipboardStatus(clipboard)
             "set" -> {
                 val text = payload?.optString("text", null)
                     ?: error("clipboard.set requires payload.text")
@@ -343,8 +342,31 @@ pub const ANDROID_CLIPBOARD: &str = r#"
                 clipboard.setPrimaryClip(ClipData.newPlainText("", ""))
                 JSONObject().put("cleared", true)
             }
+            "startWatch" -> startClipboardWatch(clipboard)
+            "stopWatch" -> stopClipboardWatch(clipboard)
             else -> error("unsupported clipboard method: $method")
         }
+    }
+
+    private fun clipboardStatus(clipboard: ClipboardManager): JSONObject {
+        val text = clipboard.primaryClip?.getItemAt(0)?.coerceToText(appContext)?.toString()
+        return JSONObject().put("text", text)
+    }
+
+    private fun startClipboardWatch(clipboard: ClipboardManager): JSONObject {
+        if (clipboardListener == null) {
+            clipboardListener = ClipboardManager.OnPrimaryClipChangedListener {
+                emit(JSONObject().put("ok", true).put("action", "clipboard.change").put("value", clipboardStatus(clipboard)).toString())
+            }
+            clipboard.addPrimaryClipChangedListener(clipboardListener!!)
+        }
+        return clipboardStatus(clipboard).put("watching", true)
+    }
+
+    private fun stopClipboardWatch(clipboard: ClipboardManager): JSONObject {
+        clipboardListener?.let(clipboard::removePrimaryClipChangedListener)
+        clipboardListener = null
+        return clipboardStatus(clipboard).put("watching", false)
     }
 "#;
 
@@ -362,10 +384,43 @@ pub const IOS_CLIPBOARD: &str = r#"
         case "clear":
             clearClipboard()
             return ["cleared": true]
+        case "startWatch":
+            return startClipboardWatch()
+        case "stopWatch":
+            return stopClipboardWatch()
         default:
             throw HostActionError("unsupported clipboard method: \(method)")
         }
     }
+
+    #if canImport(UIKit)
+    private static var clipboardObserver: NSObjectProtocol?
+
+    private static func startClipboardWatch() -> [String: Any] {
+        guard clipboardObserver == nil else { return ["text": currentClipboardText() as Any, "watching": true] }
+        clipboardObserver = NotificationCenter.default.addObserver(forName: UIPasteboard.changedNotification, object: UIPasteboard.general, queue: .main) { _ in
+            let result: [String: Any] = ["ok": true, "action": "clipboard.change", "value": ["text": currentClipboardText() as Any]]
+            if let data = try? JSONSerialization.data(withJSONObject: result), let json = String(data: data, encoding: .utf8) {
+                CrepusRustActions.emit(json)
+            }
+        }
+        return ["text": currentClipboardText() as Any, "watching": true]
+    }
+
+    private static func stopClipboardWatch() -> [String: Any] {
+        clipboardObserver.map(NotificationCenter.default.removeObserver)
+        clipboardObserver = nil
+        return ["text": currentClipboardText() as Any, "watching": false]
+    }
+    #else
+    private static func startClipboardWatch() -> [String: Any] {
+        ["text": currentClipboardText() as Any, "watching": false]
+    }
+
+    private static func stopClipboardWatch() -> [String: Any] {
+        ["text": currentClipboardText() as Any, "watching": false]
+    }
+    #endif
 "#;
 
 pub const IOS_CLIPBOARD_BRIDGE: &str = r#"

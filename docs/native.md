@@ -83,7 +83,7 @@ Android and iOS, plus only the required platform declarations. It supports `stat
 | `battery` | `status`, `startWatch`, `stopWatch` | Android battery broadcast and iOS battery notifications; watch changes stream as `battery.change` |
 | `appearance` | `status`, `startWatch`, `stopWatch` | Current light/dark scheme on Android and iOS; watch changes stream as `appearance.change` |
 | `haptics` | `impact`, `selection`, `notification` | Android vibrator; iOS UIKit feedback generators |
-| `clipboard` | `get`, `set`, `clear` | Android clipboard manager; iOS system pasteboard |
+| `clipboard` | `get`, `set`, `clear`, `startWatch`, `stopWatch` | Android clipboard manager and iOS system pasteboard; watch changes stream as `clipboard.change` |
 | `browser` (`linking`, `app-launcher`, `phone`, `sms`) | `open` | Android `ACTION_VIEW`; iOS `UIApplication.open`, including custom app, `tel:`, and `sms:` schemes |
 | `share` | `share` | Android chooser; iOS activity sheet; accepts `text`, `url`, and optional `title` |
 | `image-picker` (`imagepicker`, `media-picker`) | `pick` | Android system picker; iOS PHPicker; results stream as `imagePicker.pick`. The named `pick_media` action is installed with this capability. |

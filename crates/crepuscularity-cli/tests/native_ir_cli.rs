@@ -584,7 +584,11 @@ fn native_add_capability_updates_only_the_scaffold() {
         std::fs::read_to_string(root.join("ios/Sources/NativeShell/CrepusRustActions.swift"))
             .expect("read iOS clipboard bridge");
     assert!(clipboard_android.contains("ClipboardManager"));
+    assert!(clipboard_android.contains("addPrimaryClipChangedListener"));
+    assert!(clipboard_android.contains("clipboard.change"));
     assert!(clipboard_ios.contains("UIPasteboard.general"));
+    assert!(clipboard_ios.contains("UIPasteboard.changedNotification"));
+    assert!(clipboard_ios.contains("clipboard.change"));
     assert!(crepus()
         .args(["native", "add", "linking", "--dir"])
         .arg(&root)

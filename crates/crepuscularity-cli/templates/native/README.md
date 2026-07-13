@@ -83,6 +83,7 @@ battery status, color-scheme status, feedback generators, and clipboard access r
 cached: Android returns the most recent GPS/network fix and iOS returns the location manager's current location.
 `battery.startWatch` and `battery.stopWatch` stream level or charging changes as `battery.change`.
 `appearance.startWatch` and `appearance.stopWatch` stream system color-scheme changes as `appearance.change`.
+`clipboard.startWatch` and `clipboard.stopWatch` stream pasteboard changes as `clipboard.change`.
 
 `documentPicker.pick` opens the platform multiple-document picker and emits imported cached-file metadata. The
 named `import_files` action remains available for built-in UI actions and uses the same picker lifecycle.
