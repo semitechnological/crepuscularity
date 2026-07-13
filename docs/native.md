@@ -95,7 +95,7 @@ Android and iOS, plus only the required platform declarations. It supports `stat
 | `action-sheet` (`actionsheet`) | `show` | Android choices dialog and iOS action sheet; accepts `title` and `options`, then streams the selected label and index |
 | `app-state` (`appstate`) | `get` | Current Android lifecycle or iOS application foreground/background state |
 | `screen-orientation` (`screenorientation`) | `get` | Current Android configuration or iOS screen orientation |
-| `accessibility-info` (`accessibilityinfo`) | `get`, `status` | Reduce-motion and screen-reader state from Android accessibility settings or iOS UIAccessibility |
+| `accessibility-info` (`accessibilityinfo`, `screen-reader`) | `get`, `status` | Reduce-motion and screen-reader state from Android accessibility settings or iOS UIAccessibility |
 | `device` (`device-info`, `deviceinfo`) | `get`, `info` | Platform, manufacturer, model, and operating-system version from Android Build or iOS UIDevice |
 | `preferences` (`storage`, `async-storage`) | `get`, `set`, `remove`, `clear` | String values in Android SharedPreferences or iOS UserDefaults; `key` is required except for `clear` |
 | `network` (`net-info`, `netinfo`) | `status` | Validated Android network or app-lifetime iOS NWPathMonitor status, including active transport |

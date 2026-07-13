@@ -733,6 +733,8 @@ fn native_add_capability_updates_only_the_scaffold() {
             .expect("read iOS accessibility bridge");
     assert!(accessibility_android.contains("Settings.Global.ANIMATOR_DURATION_SCALE"));
     assert!(accessibility_ios.contains("UIAccessibility.isReduceMotionEnabled"));
+    assert!(accessibility_android.contains("\"accessibilityInfo\", \"screenReader\""));
+    assert!(accessibility_ios.contains("case \"accessibilityInfo\", \"screenReader\":"));
     assert!(crepus()
         .args(["native", "add", "device", "--dir"])
         .arg(&root)

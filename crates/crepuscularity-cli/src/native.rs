@@ -142,7 +142,7 @@ const CAPABILITIES: &[CapabilitySpec] = &[
     CapabilitySpec { name: "action-sheet", aliases: &["actionsheet"], cargo_feature: "action-sheet", android_manifest: "", ios_project: "" },
     CapabilitySpec { name: "app-state", aliases: &["appstate"], cargo_feature: "app-state", android_manifest: "", ios_project: "" },
     CapabilitySpec { name: "screen-orientation", aliases: &["screenorientation"], cargo_feature: "screen-orientation", android_manifest: "", ios_project: "" },
-    CapabilitySpec { name: "accessibility-info", aliases: &["accessibilityinfo"], cargo_feature: "accessibility-info", android_manifest: "", ios_project: "" },
+    CapabilitySpec { name: "accessibility-info", aliases: &["accessibilityinfo", "screen-reader", "screenreader"], cargo_feature: "accessibility-info", android_manifest: "", ios_project: "" },
     CapabilitySpec { name: "device", aliases: &["device-info", "deviceinfo"], cargo_feature: "device", android_manifest: "", ios_project: "" },
     CapabilitySpec { name: "preferences", aliases: &["storage", "async-storage"], cargo_feature: "preferences", android_manifest: "", ios_project: "" },
     CapabilitySpec { name: "network", aliases: &["net-info", "netinfo"], cargo_feature: "network", android_manifest: "", ios_project: "" },
@@ -1013,7 +1013,7 @@ fn add_accessibility_info_host(root: &Path) -> Result<(), String> {
         );
         source = source.replace(
             "        when (capability) {\n",
-            "        when (capability) {\n            \"accessibilityInfo\" -> accessibilityInfoValue(method)\n",
+            "        when (capability) {\n            \"accessibilityInfo\", \"screenReader\" -> accessibilityInfoValue(method)\n",
         );
         source = source.replace(
             "\n    private fun dispatchHostAction",
@@ -1027,7 +1027,7 @@ fn add_accessibility_info_host(root: &Path) -> Result<(), String> {
     if !source.contains("accessibilityInfoValue") {
         source = source.replace(
             "        switch capability {\n",
-            "        switch capability {\n        case \"accessibilityInfo\":\n            return try accessibilityInfoValue(method: method)\n",
+            "        switch capability {\n        case \"accessibilityInfo\", \"screenReader\":\n            return try accessibilityInfoValue(method: method)\n",
         );
         source = source.replace(
             "\n    private static func dispatchHostAction",
