@@ -219,7 +219,9 @@ fn add_capability(capability: &str, root: &Path) -> Result<(), String> {
     if !spec.ios_project.is_empty() {
         let mut source = fs::read_to_string(&project)
             .map_err(|e| format!("read '{}': {e}", project.display()))?;
-        if (spec.name == "geolocation"
+        if source.contains("INFOPLIST_FILE: App/Info.plist") {
+            add_ios_info_plist_key(root, spec.ios_project)?;
+        } else if (spec.name == "geolocation"
             && !source.contains("INFOPLIST_KEY_NSLocationWhenInUseUsageDescription"))
             || (spec.name == "photo-library"
                 && !source.contains("INFOPLIST_KEY_NSPhotoLibraryUsageDescription"))
@@ -435,17 +437,59 @@ fn add_deep_links_host(root: &Path) -> Result<(), String> {
             "        GENERATE_INFOPLIST_FILE: YES\n",
             "        GENERATE_INFOPLIST_FILE: NO\n        INFOPLIST_FILE: App/Info.plist\n",
         );
-        fs::write(&project, source).map_err(|e| format!("write '{}': {e}", project.display()))?;
+        fs::write(&project, &source).map_err(|e| format!("write '{}': {e}", project.display()))?;
     }
     let info = root.join("ios/App/Info.plist");
     if !info.exists() {
         fs::write(
             &info,
-            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\">\n<dict>\n    <key>CFBundleURLTypes</key>\n    <array>\n        <dict>\n            <key>CFBundleTypeRole</key>\n            <string>Editor</string>\n            <key>CFBundleURLName</key>\n            <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>\n            <key>CFBundleURLSchemes</key>\n            <array>\n                <string>crepus</string>\n            </array>\n        </dict>\n    </array>\n    <key>UILaunchScreen</key>\n    <dict/>\n</dict>\n</plist>\n",
+            &format!("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\">\n<dict>\n    <key>CFBundleURLTypes</key>\n    <array>\n        <dict>\n            <key>CFBundleTypeRole</key>\n            <string>Editor</string>\n            <key>CFBundleURLName</key>\n            <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>\n            <key>CFBundleURLSchemes</key>\n            <array>\n                <string>crepus</string>\n            </array>\n        </dict>\n    </array>\n{}    <key>UILaunchScreen</key>\n    <dict/>\n</dict>\n</plist>\n", ios_info_plist_keys(&source)),
         )
         .map_err(|e| format!("write '{}': {e}", info.display()))?;
     }
     Ok(())
+}
+
+fn add_ios_info_plist_key(root: &Path, setting: &str) -> Result<(), String> {
+    let keys = setting
+        .lines()
+        .filter_map(ios_info_plist_key)
+        .collect::<Vec<_>>();
+    if keys.is_empty() {
+        return Ok(());
+    }
+    let path = root.join("ios/App/Info.plist");
+    let mut source =
+        fs::read_to_string(&path).map_err(|e| format!("read '{}': {e}", path.display()))?;
+    let mut changed = false;
+    for (key, value) in keys {
+        if !source.contains(&format!("<key>{key}</key>")) {
+            source = source.replace(
+                "    <key>UILaunchScreen</key>",
+                &format!("    <key>{key}</key>\n    <string>{value}</string>\n    <key>UILaunchScreen</key>"),
+            );
+            changed = true;
+        }
+    }
+    if changed {
+        fs::write(&path, source).map_err(|e| format!("write '{}': {e}", path.display()))?;
+    }
+    Ok(())
+}
+
+fn ios_info_plist_keys(project: &str) -> String {
+    project
+        .lines()
+        .filter_map(|line| ios_info_plist_key(line))
+        .map(|(key, value)| format!("    <key>{key}</key>\n    <string>{value}</string>\n"))
+        .collect()
+}
+
+fn ios_info_plist_key(setting: &str) -> Option<(String, &str)> {
+    let setting = setting.trim();
+    let (key, value) = setting.split_once(": ")?;
+    let key = key.strip_prefix("INFOPLIST_KEY_NS")?;
+    Some((format!("NS{key}"), value.trim_matches('"')))
 }
 
 fn add_system_bars_host(root: &Path) -> Result<(), String> {
@@ -998,8 +1042,8 @@ fn add_photo_library_host(root: &Path) -> Result<(), String> {
         source = source.replace("import Foundation\n", "import Foundation\n");
         source = source.replace("import SwiftUI\n", "import SwiftUI\n");
         source = source.replace(
-            "#if canImport(UIKit)\n",
-            "#if canImport(UIKit)\nimport Photos\n",
+            "import SwiftUI\n#if canImport(UIKit)\n",
+            "import SwiftUI\n#if canImport(UIKit)\nimport Photos\n",
         );
         source = source.replace(
             "        switch capability {\n",

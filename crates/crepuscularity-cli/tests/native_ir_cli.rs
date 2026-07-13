@@ -1016,6 +1016,10 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(app.contains(".onOpenURL"));
     assert!(manifest.contains("android:scheme=\"crepus\""));
     assert!(info.contains("CFBundleURLSchemes"));
+    assert!(info.contains("NSCameraUsageDescription"));
+    assert!(info.contains("NSPhotoLibraryUsageDescription"));
+    assert!(info.contains("NSContactsUsageDescription"));
+    assert!(info.contains("NSCalendarsFullAccessUsageDescription"));
     assert!(crepus()
         .args(["native", "add", "filesystem", "--dir"])
         .arg(&root)
@@ -1080,6 +1084,32 @@ fn native_add_capability_updates_only_the_scaffold() {
             .expect("read manifest")
             .contains("android.permission.READ_CALENDAR")
     );
+}
+
+#[test]
+fn native_add_deep_links_keeps_later_ios_privacy_keys() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let root = tmp.path().join("fixture");
+    assert!(crepus()
+        .args(["native", "new", "fixture"])
+        .current_dir(tmp.path())
+        .output()
+        .expect("scaffold native app")
+        .status
+        .success());
+    for capability in ["deep-links", "camera", "contacts"] {
+        assert!(crepus()
+            .args(["native", "add", capability, "--dir"])
+            .arg(&root)
+            .output()
+            .expect("add native capability")
+            .status
+            .success());
+    }
+    let info = std::fs::read_to_string(root.join("ios/App/Info.plist"))
+        .expect("read deep-links info plist");
+    assert!(info.contains("NSCameraUsageDescription"));
+    assert!(info.contains("NSContactsUsageDescription"));
 }
 
 #[test]
