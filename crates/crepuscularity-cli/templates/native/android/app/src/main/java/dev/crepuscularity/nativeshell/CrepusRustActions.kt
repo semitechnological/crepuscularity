@@ -87,7 +87,7 @@ object CrepusRustActions {
             }
         openDocuments = { filePicker.launch(arrayOf("*/*")) }
         CrepusActions.dispatch = { action -> dispatchHostAction(action) ?: dispatchAndStoreJson(action) }
-        CrepusActions.resultSink = { result -> CrepusActions.applyResult(result) }
+        CrepusActions.resultSink = { result -> CrepusStateStore.applyResult(result) }
     }
 
     private fun dispatchHostAction(action: String): String? {
