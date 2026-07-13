@@ -202,6 +202,8 @@ public enum CrepusRustActions {
             return try openUrlValue(capability: capability, method: method, payload: payload)
         case "imagePicker":
             return try imagePickerValue(method: method)
+        case "documentPicker":
+            return try documentPickerValue(method: method)
         case "photoLibrary":
             return try photoLibraryValue(method: method)
         case "share":
@@ -345,6 +347,14 @@ public enum CrepusRustActions {
             throw HostActionError("unsupported imagePicker method: \(method)")
         }
         presentMediaPicker(action: "imagePicker.pick")
+        return ["opening": true]
+    }
+
+    private static func documentPickerValue(method: String) throws -> Any {
+        guard method == "pick" else {
+            throw HostActionError("unsupported documentPicker method: \(method)")
+        }
+        presentFilePicker(action: "documentPicker.pick", contentTypes: [], allowsMultiple: true)
         return ["opening": true]
     }
 

@@ -375,10 +375,15 @@ fn mobile_new_scaffolds_runtime_files() {
     assert!(android_actions.contains("external fun storeResultJson"));
     assert!(android_actions.contains("external fun evalText"));
     assert!(android_actions.contains("external fun lastResult"));
+    assert!(android_actions.contains("\"documentPicker\" -> documentPickerValue(method)"));
     assert!(!android_actions.contains("getSharedPreferences(\"crepus_preferences\""));
     assert!(!android_actions.contains("Build.MANUFACTURER"));
     assert!(!android_actions.contains("packageManager.getPackageInfo"));
     assert!(android_actions.contains("VibrationEffect.createOneShot"));
+    let ios_actions =
+        std::fs::read_to_string(root.join("ios/Sources/NativeShell/CrepusRustActions.swift"))
+            .expect("read iOS actions");
+    assert!(ios_actions.contains("case \"documentPicker\":"));
 
     let project_yml =
         std::fs::read_to_string(root.join("ios/project.yml")).expect("read project.yml");

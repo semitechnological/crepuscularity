@@ -135,6 +135,7 @@ object CrepusRustActions {
             "haptics" -> hapticsValue(method, payload)
             "browser", "linking" -> openUrlValue(capability, method, payload)
             "imagePicker" -> imagePickerValue(method)
+            "documentPicker" -> documentPickerValue(method)
             "photoLibrary" -> photoLibraryValue(method)
             "share" -> shareValue(method, payload)
             else -> error("unsupported host capability: $capability")
@@ -248,6 +249,13 @@ object CrepusRustActions {
         if (method != "pick") error("unsupported imagePicker method: $method")
         pendingPickerAction = "imagePicker.pick"
         openMedia?.invoke() ?: emit(errorJson("imagePicker.pick", "media picker unavailable"))
+        return JSONObject().put("opening", true)
+    }
+
+    private fun documentPickerValue(method: String): JSONObject {
+        if (method != "pick") error("unsupported documentPicker method: $method")
+        pendingPickerAction = "documentPicker.pick"
+        openDocuments?.invoke() ?: emit(errorJson("documentPicker.pick", "document picker unavailable"))
         return JSONObject().put("opening", true)
     }
 
