@@ -766,6 +766,22 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(preferences_android.contains("getSharedPreferences"));
     assert!(preferences_ios.contains("UserDefaults.standard"));
     assert!(crepus()
+        .args(["native", "add", "network", "--dir"])
+        .arg(&root)
+        .output()
+        .expect("add network")
+        .status
+        .success());
+    let network_android = std::fs::read_to_string(
+        root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusRustActions.kt"),
+    )
+    .expect("read Android network bridge");
+    let network_ios =
+        std::fs::read_to_string(root.join("ios/Sources/NativeShell/CrepusRustActions.swift"))
+            .expect("read iOS network bridge");
+    assert!(network_android.contains("NetworkCapabilities.NET_CAPABILITY_VALIDATED"));
+    assert!(network_ios.contains("NWPathMonitor"));
+    assert!(crepus()
         .args(["native", "add", "filesystem", "--dir"])
         .arg(&root)
         .output()
@@ -789,6 +805,7 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(cargo.contains("accessibility-info = []"));
     assert!(cargo.contains("device = []"));
     assert!(cargo.contains("preferences = []"));
+    assert!(cargo.contains("network = []"));
     assert!(cargo.contains("filesystem = []"));
     assert!(cargo.contains("default = [\"filesystem\"]"));
     assert!(

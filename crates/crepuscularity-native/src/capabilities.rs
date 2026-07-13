@@ -1197,6 +1197,38 @@ pub const IOS_PREFERENCES: &str = r#"
     }
 "#;
 
+pub const ANDROID_NETWORK: &str = r#"
+    private fun networkValue(method: String): JSONObject {
+        if (method != "status") error("unsupported network method: $method")
+        val manager = appContext.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val capabilities = manager.activeNetwork?.let(manager::getNetworkCapabilities)
+        val connected = capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) == true
+        val transport = when {
+            capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true -> "wifi"
+            capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) == true -> "cellular"
+            capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) == true -> "ethernet"
+            connected -> "other"
+            else -> "none"
+        }
+        return JSONObject().put("connected", connected).put("transport", transport)
+    }
+"#;
+
+pub const IOS_NETWORK: &str = r#"
+    private static let networkMonitor: NWPathMonitor = {
+        let monitor = NWPathMonitor()
+        monitor.start(queue: DispatchQueue(label: "dev.crepuscularity.network"))
+        return monitor
+    }()
+
+    private static func networkValue(method: String) throws -> Any {
+        guard method == "status" else { throw HostActionError("unsupported network method: \(method)") }
+        let path = networkMonitor.currentPath
+        let transport = path.usesInterfaceType(.wifi) ? "wifi" : path.usesInterfaceType(.cellular) ? "cellular" : path.usesInterfaceType(.wiredEthernet) ? "ethernet" : path.status == .satisfied ? "other" : "none"
+        return ["connected": path.status == .satisfied, "transport": transport]
+    }
+"#;
+
 pub const ANDROID_GEOLOCATION: &str = r#"
     private val geolocation by lazy { GeolocationBridge(activity) }
 
