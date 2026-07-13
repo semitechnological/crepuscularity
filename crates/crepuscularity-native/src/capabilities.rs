@@ -324,6 +324,70 @@ pub const IOS_HAPTICS: &str = r#"
     }
 "#;
 
+pub const ANDROID_CLIPBOARD: &str = r#"
+    private fun clipboardValue(method: String, payload: JSONObject?): JSONObject {
+        val clipboard =
+            appContext.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        return when (method) {
+            "get" -> {
+                val text = clipboard.primaryClip?.getItemAt(0)?.coerceToText(appContext)?.toString()
+                JSONObject().put("text", text)
+            }
+            "set" -> {
+                val text = payload?.optString("text", null)
+                    ?: error("clipboard.set requires payload.text")
+                clipboard.setPrimaryClip(ClipData.newPlainText("Crepus", text))
+                JSONObject().put("text", text)
+            }
+            "clear" -> {
+                clipboard.setPrimaryClip(ClipData.newPlainText("", ""))
+                JSONObject().put("cleared", true)
+            }
+            else -> error("unsupported clipboard method: $method")
+        }
+    }
+"#;
+
+pub const IOS_CLIPBOARD: &str = r#"
+    private static func clipboardValue(method: String, payload: [String: Any]?) throws -> Any {
+        switch method {
+        case "get":
+            return ["text": currentClipboardText() as Any]
+        case "set":
+            guard let text = payload?["text"] as? String else {
+                throw HostActionError("clipboard.set requires payload.text")
+            }
+            setClipboardText(text)
+            return ["text": text]
+        case "clear":
+            clearClipboard()
+            return ["cleared": true]
+        default:
+            throw HostActionError("unsupported clipboard method: \(method)")
+        }
+    }
+"#;
+
+pub const IOS_CLIPBOARD_BRIDGE: &str = r#"
+#if canImport(UIKit)
+private func currentClipboardText() -> String? { UIPasteboard.general.string }
+private func setClipboardText(_ text: String) { UIPasteboard.general.string = text }
+private func clearClipboard() { UIPasteboard.general.items = [] }
+#elseif canImport(AppKit)
+private func currentClipboardText() -> String? { NSPasteboard.general.string(forType: .string) }
+private func setClipboardText(_ text: String) {
+    let pasteboard = NSPasteboard.general
+    pasteboard.clearContents()
+    pasteboard.setString(text, forType: .string)
+}
+private func clearClipboard() { NSPasteboard.general.clearContents() }
+#else
+private func currentClipboardText() -> String? { nil }
+private func setClipboardText(_ text: String) {}
+private func clearClipboard() {}
+#endif
+"#;
+
 pub const ANDROID_GEOLOCATION: &str = r#"
     private val geolocation by lazy { GeolocationBridge(activity) }
 

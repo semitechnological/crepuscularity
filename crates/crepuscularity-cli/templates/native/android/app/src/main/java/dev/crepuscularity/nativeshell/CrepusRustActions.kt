@@ -1,7 +1,5 @@
 package dev.crepuscularity.nativeshell
 
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -127,7 +125,6 @@ object CrepusRustActions {
 
     private fun hostPluginValue(capability: String, method: String, payload: JSONObject?): Any =
         when (capability) {
-            "clipboard" -> clipboardValue(method, payload)
             "browser", "linking" -> openUrlValue(capability, method, payload)
             "imagePicker" -> imagePickerValue(method)
             "documentPicker" -> documentPickerValue(method)
@@ -150,28 +147,6 @@ object CrepusRustActions {
             }
             else -> null
         }
-
-    private fun clipboardValue(method: String, payload: JSONObject?): JSONObject {
-        val clipboard =
-            appContext.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        return when (method) {
-            "get" -> {
-                val text = clipboard.primaryClip?.getItemAt(0)?.coerceToText(appContext)?.toString()
-                JSONObject().put("text", text)
-            }
-            "set" -> {
-                val text = payload?.optString("text", null)
-                    ?: error("clipboard.set requires payload.text")
-                clipboard.setPrimaryClip(ClipData.newPlainText("Crepus", text))
-                JSONObject().put("text", text)
-            }
-            "clear" -> {
-                clipboard.setPrimaryClip(ClipData.newPlainText("", ""))
-                JSONObject().put("cleared", true)
-            }
-            else -> error("unsupported clipboard method: $method")
-        }
-    }
 
     private fun openUrlValue(capability: String, method: String, payload: JSONObject?): JSONObject {
         if (method != "open") error("unsupported $capability method: $method")

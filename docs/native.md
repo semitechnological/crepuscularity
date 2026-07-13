@@ -81,6 +81,7 @@ Android and iOS, plus only the required platform declarations. It supports `stat
 | `battery` | `status` | Android battery broadcast; iOS battery monitor |
 | `appearance` | `status` | Current light/dark scheme on Android and iOS |
 | `haptics` | `impact`, `selection`, `notification` | Android vibrator; iOS UIKit feedback generators |
+| `clipboard` | `get`, `set`, `clear` | Android clipboard manager; iOS system pasteboard |
 
 `filesystem` is accepted by the installer, but its Rust handler predates the opt-in surface and
 remains in the baseline shell. It is not yet a minimal-scaffold capability gate.

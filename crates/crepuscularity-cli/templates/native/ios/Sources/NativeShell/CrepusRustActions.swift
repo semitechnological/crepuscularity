@@ -194,8 +194,6 @@ public enum CrepusRustActions {
 
     private static func hostPluginValue(capability: String, method: String, payload: [String: Any]?) throws -> Any {
         switch capability {
-        case "clipboard":
-            return try clipboardValue(method: method, payload: payload)
         case "browser", "linking":
             return try openUrlValue(capability: capability, method: method, payload: payload)
         case "imagePicker":
@@ -208,24 +206,6 @@ public enum CrepusRustActions {
             return try shareValue(method: method, payload: payload)
         default:
             throw HostActionError("unsupported host capability: \(capability)")
-        }
-    }
-
-    private static func clipboardValue(method: String, payload: [String: Any]?) throws -> Any {
-        switch method {
-        case "get":
-            return ["text": currentClipboardText() as Any]
-        case "set":
-            guard let text = payload?["text"] as? String else {
-                throw HostActionError("clipboard.set requires payload.text")
-            }
-            setClipboardText(text)
-            return ["text": text]
-        case "clear":
-            clearClipboard()
-            return ["cleared": true]
-        default:
-            throw HostActionError("unsupported clipboard method: \(method)")
         }
     }
 
@@ -779,17 +759,6 @@ private func mimeType(_ type: String) -> String {
     return "image/jpeg"
 }
 
-private func currentClipboardText() -> String? {
-    UIPasteboard.general.string
-}
-
-private func setClipboardText(_ text: String) {
-    UIPasteboard.general.string = text
-}
-
-private func clearClipboard() {
-    UIPasteboard.general.items = []
-}
 #elseif canImport(AppKit)
 private func presentFilePicker(action: String, contentTypes: [Any], allowsMultiple: Bool) {
     Task { @MainActor in
@@ -809,25 +778,7 @@ private func scanPhotoLibrary(action: String) {
     }
 }
 
-private func currentClipboardText() -> String? {
-    NSPasteboard.general.string(forType: .string)
-}
-
-private func setClipboardText(_ text: String) {
-    let pasteboard = NSPasteboard.general
-    pasteboard.clearContents()
-    pasteboard.setString(text, forType: .string)
-}
-
-private func clearClipboard() {
-    NSPasteboard.general.clearContents()
-}
 #else
-private func currentClipboardText() -> String? { nil }
-
-private func setClipboardText(_ text: String) {}
-
-private func clearClipboard() {}
 #endif
 
 @MainActor
