@@ -202,8 +202,6 @@ public enum CrepusRustActions {
             return try documentPickerValue(method: method)
         case "photoLibrary":
             return try photoLibraryValue(method: method)
-        case "share":
-            return try shareValue(method: method, payload: payload)
         default:
             throw HostActionError("unsupported host capability: \(capability)")
         }
@@ -224,49 +222,6 @@ public enum CrepusRustActions {
         NSWorkspace.shared.open(url)
         #endif
         return ["url": rawUrl, "opened": true]
-    }
-
-    private static func shareValue(method: String, payload: [String: Any]?) throws -> Any {
-        guard method == "share" else {
-            throw HostActionError("unsupported share method: \(method)")
-        }
-        let text = payload?["text"] as? String
-        let rawUrl = payload?["url"] as? String
-        let title = payload?["title"] as? String
-        guard text != nil || rawUrl != nil else {
-            throw HostActionError("share.share requires payload.text or payload.url")
-        }
-        #if canImport(UIKit)
-        Task { @MainActor in
-            guard let root = topViewController() else {
-                CrepusRustActions.emit(errorJson(action: "share.share", error: "missing root view controller"))
-                return
-            }
-            var items: [Any] = []
-            if let text {
-                items.append(text)
-            }
-            if let rawUrl, let url = URL(string: rawUrl) {
-                items.append(url)
-            }
-            let controller = UIActivityViewController(activityItems: items, applicationActivities: nil)
-            if let title {
-                controller.setValue(title, forKey: "subject")
-            }
-            root.present(controller, animated: true)
-        }
-        #endif
-        var value: [String: Any] = ["shared": true]
-        if let text {
-            value["text"] = text
-        }
-        if let rawUrl {
-            value["url"] = rawUrl
-        }
-        if let title {
-            value["title"] = title
-        }
-        return value
     }
 
     private static func imagePickerValue(method: String) throws -> Any {

@@ -431,6 +431,24 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(!default_ios.contains("hapticsValue"));
     assert!(!default_android.contains("clipboardValue"));
     assert!(!default_ios.contains("clipboardValue"));
+    assert!(!default_android.contains("shareValue"));
+    assert!(!default_ios.contains("shareValue"));
+    assert!(crepus()
+        .args(["native", "add", "share", "--dir"])
+        .arg(&root)
+        .output()
+        .expect("add share")
+        .status
+        .success());
+    let share_android = std::fs::read_to_string(
+        root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusRustActions.kt"),
+    )
+    .expect("read Android share bridge");
+    let share_ios =
+        std::fs::read_to_string(root.join("ios/Sources/NativeShell/CrepusRustActions.swift"))
+            .expect("read iOS share bridge");
+    assert!(share_android.contains("Intent.createChooser"));
+    assert!(share_ios.contains("UIActivityViewController"));
     assert!(crepus()
         .args(["native", "add", "sensors", "--dir"])
         .arg(&root)
@@ -523,6 +541,7 @@ fn native_add_capability_updates_only_the_scaffold() {
     let cargo = std::fs::read_to_string(root.join("rust/Cargo.toml")).expect("read Cargo.toml");
     assert!(cargo.contains("haptics = []"));
     assert!(cargo.contains("clipboard = []"));
+    assert!(cargo.contains("share = []"));
     assert!(cargo.contains("filesystem = []"));
     assert!(
         std::fs::read_to_string(root.join("android/app/src/main/AndroidManifest.xml"))

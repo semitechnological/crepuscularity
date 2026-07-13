@@ -388,6 +388,74 @@ private func clearClipboard() {}
 #endif
 "#;
 
+pub const ANDROID_SHARE: &str = r#"
+    private fun shareValue(method: String, payload: JSONObject?): JSONObject {
+        if (method != "share") error("unsupported share method: $method")
+        val text = payload?.optString("text", null)
+        val url = payload?.optString("url", null)
+        val title = payload?.optString("title", null)
+        if (text == null && url == null) error("share.share requires payload.text or payload.url")
+        val body = listOfNotNull(text, url).joinToString(separator = "\n").ifBlank {
+            error("share.share requires payload.text or payload.url")
+        }
+        val intent =
+            Intent(Intent.ACTION_SEND)
+                .setType("text/plain")
+                .putExtra(Intent.EXTRA_TEXT, body)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        if (title != null) {
+            intent.putExtra(Intent.EXTRA_SUBJECT, title)
+        }
+        activity.startActivity(Intent.createChooser(intent, title ?: "Share"))
+        return JSONObject().put("shared", true).put("text", text).put("url", url).put("title", title)
+    }
+"#;
+
+pub const IOS_SHARE: &str = r#"
+    private static func shareValue(method: String, payload: [String: Any]?) throws -> Any {
+        guard method == "share" else {
+            throw HostActionError("unsupported share method: \(method)")
+        }
+        let text = payload?["text"] as? String
+        let rawUrl = payload?["url"] as? String
+        let title = payload?["title"] as? String
+        guard text != nil || rawUrl != nil else {
+            throw HostActionError("share.share requires payload.text or payload.url")
+        }
+        #if canImport(UIKit)
+        Task { @MainActor in
+            guard let root = topViewController() else {
+                CrepusRustActions.emit(errorJson(action: "share.share", error: "missing root view controller"))
+                return
+            }
+            var items: [Any] = []
+            if let text {
+                items.append(text)
+            }
+            if let rawUrl, let url = URL(string: rawUrl) {
+                items.append(url)
+            }
+            let controller = UIActivityViewController(activityItems: items, applicationActivities: nil)
+            if let title {
+                controller.setValue(title, forKey: "subject")
+            }
+            root.present(controller, animated: true)
+        }
+        #endif
+        var value: [String: Any] = ["shared": true]
+        if let text {
+            value["text"] = text
+        }
+        if let rawUrl {
+            value["url"] = rawUrl
+        }
+        if let title {
+            value["title"] = title
+        }
+        return value
+    }
+"#;
+
 pub const ANDROID_GEOLOCATION: &str = r#"
     private val geolocation by lazy { GeolocationBridge(activity) }
 

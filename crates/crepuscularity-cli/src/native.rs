@@ -23,10 +23,11 @@ use crepuscularity_core::{DriverCache, Fingerprint};
 use crepuscularity_native::{
     generate_native_source, render_component_file_to_ir, render_from_files, render_template_to_ir,
     to_json, to_json_pretty, NativeCodegenTarget, ANDROID_APPEARANCE, ANDROID_BATTERY,
-    ANDROID_BLUETOOTH, ANDROID_BLUETOOTH_BRIDGE, ANDROID_GEOLOCATION, ANDROID_GEOLOCATION_BRIDGE,
-    ANDROID_CLIPBOARD, ANDROID_HAPTICS, ANDROID_SENSORS, ANDROID_SENSORS_BRIDGE, IOS_APPEARANCE, IOS_BATTERY,
-    IOS_BLUETOOTH, IOS_BLUETOOTH_BRIDGE, IOS_CLIPBOARD, IOS_CLIPBOARD_BRIDGE, IOS_GEOLOCATION,
-    IOS_GEOLOCATION_BRIDGE, IOS_HAPTICS, IOS_SENSORS, IOS_SENSORS_BRIDGE,
+    ANDROID_BLUETOOTH, ANDROID_BLUETOOTH_BRIDGE, ANDROID_CLIPBOARD, ANDROID_GEOLOCATION,
+    ANDROID_GEOLOCATION_BRIDGE, ANDROID_HAPTICS, ANDROID_SENSORS, ANDROID_SENSORS_BRIDGE,
+    ANDROID_SHARE, IOS_APPEARANCE, IOS_BATTERY, IOS_BLUETOOTH, IOS_BLUETOOTH_BRIDGE, IOS_CLIPBOARD,
+    IOS_CLIPBOARD_BRIDGE, IOS_GEOLOCATION, IOS_GEOLOCATION_BRIDGE, IOS_HAPTICS, IOS_SENSORS,
+    IOS_SENSORS_BRIDGE, IOS_SHARE,
 };
 use serde::Deserialize;
 use serde_json::Value;
@@ -98,6 +99,7 @@ const CAPABILITIES: &[CapabilitySpec] = &[
         ios_project: "",
     },
     CapabilitySpec { name: "clipboard", aliases: &[], cargo_feature: "clipboard", android_manifest: "", ios_project: "" },
+    CapabilitySpec { name: "share", aliases: &[], cargo_feature: "share", android_manifest: "", ios_project: "" },
     CapabilitySpec {
         name: "filesystem",
         aliases: &["files"],
@@ -176,6 +178,9 @@ fn add_capability(capability: &str, root: &Path) -> Result<(), String> {
     if spec.name == "clipboard" {
         add_clipboard_host(root)?;
     }
+    if spec.name == "share" {
+        add_share_host(root)?;
+    }
     if spec.name == "bluetooth" {
         add_bluetooth_host(root)?;
     }
@@ -198,17 +203,25 @@ fn add_capability(capability: &str, root: &Path) -> Result<(), String> {
 
 fn add_appearance_host(root: &Path) -> Result<(), String> {
     let android = android_actions_path(root)?;
-    let mut source = fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
+    let mut source =
+        fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
     if !source.contains("appearanceValue") {
-        source = source.replace("import android.content.ClipData\n", "import android.content.ClipData\nimport android.content.res.Configuration\n");
-        source = source.replace("            \"share\" -> shareValue(method, payload)\n", "            \"share\" -> shareValue(method, payload)\n            \"appearance\" -> appearanceValue(method)\n");
-        source = source.replace("\n}\n\nobject CrepusActionState", &format!("{ANDROID_APPEARANCE}\n}}\n\nobject CrepusActionState"));
+        source = source.replace(
+            "import android.content.ClipData\n",
+            "import android.content.ClipData\nimport android.content.res.Configuration\n",
+        );
+        source = source.replace("            \"photoLibrary\" -> photoLibraryValue(method)\n", "            \"photoLibrary\" -> photoLibraryValue(method)\n            \"appearance\" -> appearanceValue(method)\n");
+        source = source.replace(
+            "\n}\n\nobject CrepusActionState",
+            &format!("{ANDROID_APPEARANCE}\n}}\n\nobject CrepusActionState"),
+        );
         fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))?;
     }
     let ios = root.join("ios/Sources/NativeShell/CrepusRustActions.swift");
-    let mut source = fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
+    let mut source =
+        fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
     if !source.contains("appearanceValue") {
-        source = source.replace("        case \"share\":\n            return try shareValue(method: method, payload: payload)\n", "        case \"share\":\n            return try shareValue(method: method, payload: payload)\n        case \"appearance\":\n            return try appearanceValue(method: method)\n");
+        source = source.replace("        case \"photoLibrary\":\n            return try photoLibraryValue(method: method)\n", "        case \"photoLibrary\":\n            return try photoLibraryValue(method: method)\n        case \"appearance\":\n            return try appearanceValue(method: method)\n");
         source = source.replace(
             "\n    fileprivate static func emit",
             &format!("{IOS_APPEARANCE}\n\n    fileprivate static func emit"),
@@ -220,17 +233,22 @@ fn add_appearance_host(root: &Path) -> Result<(), String> {
 
 fn add_battery_host(root: &Path) -> Result<(), String> {
     let android = android_actions_path(root)?;
-    let mut source = fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
+    let mut source =
+        fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
     if !source.contains("batteryValue") {
         source = source.replace("import android.content.ClipData\n", "import android.content.ClipData\nimport android.content.Intent\nimport android.content.IntentFilter\nimport android.os.BatteryManager\n");
-        source = source.replace("            \"share\" -> shareValue(method, payload)\n", "            \"share\" -> shareValue(method, payload)\n            \"battery\" -> batteryValue(method)\n");
-        source = source.replace("\n}\n\nobject CrepusActionState", &format!("{ANDROID_BATTERY}\n}}\n\nobject CrepusActionState"));
+        source = source.replace("            \"photoLibrary\" -> photoLibraryValue(method)\n", "            \"photoLibrary\" -> photoLibraryValue(method)\n            \"battery\" -> batteryValue(method)\n");
+        source = source.replace(
+            "\n}\n\nobject CrepusActionState",
+            &format!("{ANDROID_BATTERY}\n}}\n\nobject CrepusActionState"),
+        );
         fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))?;
     }
     let ios = root.join("ios/Sources/NativeShell/CrepusRustActions.swift");
-    let mut source = fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
+    let mut source =
+        fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
     if !source.contains("batteryValue") {
-        source = source.replace("        case \"share\":\n            return try shareValue(method: method, payload: payload)\n", "        case \"share\":\n            return try shareValue(method: method, payload: payload)\n        case \"battery\":\n            return try batteryValue(method: method)\n");
+        source = source.replace("        case \"photoLibrary\":\n            return try photoLibraryValue(method: method)\n", "        case \"photoLibrary\":\n            return try photoLibraryValue(method: method)\n        case \"battery\":\n            return try batteryValue(method: method)\n");
         source = source.replace(
             "\n    fileprivate static func emit",
             &format!("{IOS_BATTERY}\n\n    fileprivate static func emit"),
@@ -252,8 +270,8 @@ fn add_geolocation_ios_host(root: &Path) -> Result<(), String> {
         "import Foundation\nimport CoreLocation\n",
     );
     source = source.replace(
-        "        case \"share\":\n            return try shareValue(method: method, payload: payload)\n",
-        "        case \"share\":\n            return try shareValue(method: method, payload: payload)\n        case \"geolocation\":\n            return try geolocationValue(method: method)\n",
+        "        case \"photoLibrary\":\n            return try photoLibraryValue(method: method)\n",
+        "        case \"photoLibrary\":\n            return try photoLibraryValue(method: method)\n        case \"geolocation\":\n            return try geolocationValue(method: method)\n",
     );
     source = source.replace(
         "\n    fileprivate static func emit",
@@ -279,8 +297,8 @@ fn add_geolocation_host(root: &Path) -> Result<(), String> {
         "import android.content.ClipData\nimport android.Manifest\nimport android.content.pm.PackageManager\nimport android.location.LocationManager\n",
     );
     source = source.replace(
-        "            \"share\" -> shareValue(method, payload)\n",
-        "            \"share\" -> shareValue(method, payload)\n            \"geolocation\" -> geolocationValue(method)\n",
+        "            \"photoLibrary\" -> photoLibraryValue(method)\n",
+        "            \"photoLibrary\" -> photoLibraryValue(method)\n            \"geolocation\" -> geolocationValue(method)\n",
     );
     source = source.replace(
         "\n}\n\nobject CrepusActionState",
@@ -320,8 +338,8 @@ fn add_bluetooth_host(root: &Path) -> Result<(), String> {
         "import android.content.ClipData\nimport android.Manifest\nimport android.bluetooth.BluetoothAdapter\nimport android.bluetooth.le.ScanCallback\nimport android.bluetooth.le.ScanResult\nimport android.content.pm.PackageManager\n",
     );
     source = source.replace(
-        "            \"share\" -> shareValue(method, payload)\n",
-        "            \"share\" -> shareValue(method, payload)\n            \"bluetooth\" -> bluetoothValue(method)\n",
+        "            \"photoLibrary\" -> photoLibraryValue(method)\n",
+        "            \"photoLibrary\" -> photoLibraryValue(method)\n            \"bluetooth\" -> bluetoothValue(method)\n",
     );
     source = source.replace(
         "\n}\n\nobject CrepusActionState",
@@ -348,8 +366,8 @@ fn add_bluetooth_ios_host(root: &Path) -> Result<(), String> {
         "import Foundation\nimport CoreBluetooth\n",
     );
     source = source.replace(
-        "        case \"share\":\n            return try shareValue(method: method, payload: payload)\n",
-        "        case \"share\":\n            return try shareValue(method: method, payload: payload)\n        case \"bluetooth\":\n            return try bluetoothValue(method: method)\n",
+        "        case \"photoLibrary\":\n            return try photoLibraryValue(method: method)\n",
+        "        case \"photoLibrary\":\n            return try photoLibraryValue(method: method)\n        case \"bluetooth\":\n            return try bluetoothValue(method: method)\n",
     );
     source = source.replace(
         "    private static func successJson",
@@ -373,8 +391,8 @@ fn add_haptics_host(root: &Path) -> Result<(), String> {
             "import android.net.Uri\nimport android.os.Build\nimport android.os.VibrationEffect\nimport android.os.Vibrator\nimport android.os.VibratorManager\n",
         );
         source = source.replace(
-            "            \"clipboard\" -> clipboardValue(method, payload)\n",
-            "            \"clipboard\" -> clipboardValue(method, payload)\n            \"haptics\" -> hapticsValue(method, payload)\n",
+            "            \"photoLibrary\" -> photoLibraryValue(method)\n",
+            "            \"photoLibrary\" -> photoLibraryValue(method)\n            \"haptics\" -> hapticsValue(method, payload)\n",
         );
         source = source.replace(
             "\n}\n\nobject CrepusActionState",
@@ -387,8 +405,8 @@ fn add_haptics_host(root: &Path) -> Result<(), String> {
         fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
     if !source.contains("hapticsValue") {
         source = source.replace(
-            "        case \"clipboard\":\n            return try clipboardValue(method: method, payload: payload)\n",
-            "        case \"clipboard\":\n            return try clipboardValue(method: method, payload: payload)\n        case \"haptics\":\n            return try hapticsValue(method: method, payload: payload)\n",
+            "        case \"photoLibrary\":\n            return try photoLibraryValue(method: method)\n",
+            "        case \"photoLibrary\":\n            return try photoLibraryValue(method: method)\n        case \"haptics\":\n            return try hapticsValue(method: method, payload: payload)\n",
         );
         source = source.replace(
             "\n    fileprivate static func emit",
@@ -436,6 +454,38 @@ fn add_clipboard_host(root: &Path) -> Result<(), String> {
     Ok(())
 }
 
+fn add_share_host(root: &Path) -> Result<(), String> {
+    let android = android_actions_path(root)?;
+    let mut source =
+        fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
+    if !source.contains("shareValue") {
+        source = source.replace(
+            "            \"photoLibrary\" -> photoLibraryValue(method)\n",
+            "            \"photoLibrary\" -> photoLibraryValue(method)\n            \"share\" -> shareValue(method, payload)\n",
+        );
+        source = source.replace(
+            "\n    private fun imagePickerValue",
+            &format!("{ANDROID_SHARE}\n    private fun imagePickerValue"),
+        );
+        fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))?;
+    }
+    let ios = root.join("ios/Sources/NativeShell/CrepusRustActions.swift");
+    let mut source =
+        fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
+    if !source.contains("shareValue") {
+        source = source.replace(
+            "        case \"photoLibrary\":\n            return try photoLibraryValue(method: method)\n",
+            "        case \"photoLibrary\":\n            return try photoLibraryValue(method: method)\n        case \"share\":\n            return try shareValue(method: method, payload: payload)\n",
+        );
+        source = source.replace(
+            "\n    private static func imagePickerValue",
+            &format!("{IOS_SHARE}\n    private static func imagePickerValue"),
+        );
+        fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
+    }
+    Ok(())
+}
+
 fn add_sensors_host(root: &Path) -> Result<(), String> {
     let android = android_actions_path(root)?;
     let ios = root.join("ios/Sources/NativeShell/CrepusRustActions.swift");
@@ -447,8 +497,8 @@ fn add_sensors_host(root: &Path) -> Result<(), String> {
             "import android.net.Uri\nimport android.hardware.Sensor\nimport android.hardware.SensorEvent\nimport android.hardware.SensorEventListener\nimport android.hardware.SensorManager\n",
         );
         android_source = android_source.replace(
-            "            \"share\" -> shareValue(method, payload)\n",
-            "            \"share\" -> shareValue(method, payload)\n            \"sensors\", \"motion\" -> sensorsValue(method)\n",
+            "            \"photoLibrary\" -> photoLibraryValue(method)\n",
+            "            \"photoLibrary\" -> photoLibraryValue(method)\n            \"sensors\", \"motion\" -> sensorsValue(method)\n",
         );
         android_source = android_source.replace(
             "\n}\n\nobject CrepusActionState",
@@ -466,8 +516,8 @@ fn add_sensors_host(root: &Path) -> Result<(), String> {
             "import Foundation\nimport CoreMotion\n",
         );
         ios_source = ios_source.replace(
-            "        case \"share\":\n            return try shareValue(method: method, payload: payload)\n",
-            "        case \"share\":\n            return try shareValue(method: method, payload: payload)\n        case \"sensors\", \"motion\":\n            return try sensorsValue(method: method)\n",
+            "        case \"photoLibrary\":\n            return try photoLibraryValue(method: method)\n",
+            "        case \"photoLibrary\":\n            return try photoLibraryValue(method: method)\n        case \"sensors\", \"motion\":\n            return try sensorsValue(method: method)\n",
         );
         ios_source = ios_source.replace(
             "\n    fileprivate static func emit",
@@ -486,7 +536,12 @@ fn android_actions_path(root: &Path) -> Result<PathBuf, String> {
         .filter_map(Result::ok)
         .map(|entry| entry.path().join("CrepusRustActions.kt"))
         .find(|path| path.is_file())
-        .ok_or_else(|| format!("Android Rust actions not found under '{}'", packages.display()))
+        .ok_or_else(|| {
+            format!(
+                "Android Rust actions not found under '{}'",
+                packages.display()
+            )
+        })
 }
 
 fn add_once(path: &Path, addition: &str, anchor: &str) -> Result<(), String> {

@@ -129,7 +129,6 @@ object CrepusRustActions {
             "imagePicker" -> imagePickerValue(method)
             "documentPicker" -> documentPickerValue(method)
             "photoLibrary" -> photoLibraryValue(method)
-            "share" -> shareValue(method, payload)
             else -> error("unsupported host capability: $capability")
         }
 
@@ -154,27 +153,6 @@ object CrepusRustActions {
         val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         activity.startActivity(intent)
         return JSONObject().put("url", url).put("opened", true)
-    }
-
-    private fun shareValue(method: String, payload: JSONObject?): JSONObject {
-        if (method != "share") error("unsupported share method: $method")
-        val text = payload?.optString("text", null)
-        val url = payload?.optString("url", null)
-        val title = payload?.optString("title", null)
-        if (text == null && url == null) error("share.share requires payload.text or payload.url")
-        val body = listOfNotNull(text, url).joinToString(separator = "\n").ifBlank {
-            error("share.share requires payload.text or payload.url")
-        }
-        val intent =
-            Intent(Intent.ACTION_SEND)
-                .setType("text/plain")
-                .putExtra(Intent.EXTRA_TEXT, body)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        if (title != null) {
-            intent.putExtra(Intent.EXTRA_SUBJECT, title)
-        }
-        activity.startActivity(Intent.createChooser(intent, title ?: "Share"))
-        return JSONObject().put("shared", true).put("text", text).put("url", url).put("title", title)
     }
 
     private fun imagePickerValue(method: String): JSONObject {
