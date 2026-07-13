@@ -105,7 +105,8 @@ Android and iOS, plus only the required platform declarations. It supports `stat
 | `local-notifications` (`notifications`) | `status`, `requestPermission`, `post` | Android notification channel and iOS UserNotifications; `status` reports current OS authorization asynchronously |
 | `secure-storage` | `get`, `set`, `remove`, `clear` | Android Keystore-encrypted values and iOS Keychain values |
 | `biometrics` (`authentication`) | `status`, `authenticate` | AndroidX BiometricPrompt or iOS LocalAuthentication, streaming the authentication result |
-| `permissions` (`permission`) | `status`, `check`, `request` | Checks or requests `camera`, `location`, `photoLibrary`/`photos`, `contacts`, `notifications`, and `bluetooth`; notification checks report current iOS OS authorization asynchronously |
+| `permissions` (`permission`) | `status`, `check`, `request` | Checks or requests `camera`, `microphone`, `location`, `photoLibrary`/`photos`, `contacts`, `notifications`, and `bluetooth`; notification checks report current iOS OS authorization asynchronously |
+| `microphone` (`audio`) | `status`, `requestPermission` | Android `RECORD_AUDIO` or iOS `AVAudioSession` recording authorization |
 | `contacts` | `status`, `requestPermission`, `list` | Android ContactsContract or iOS CNContactStore; access is declared only when installed |
 | `calendar` (`calendars`) | `status`, `check`, `request`, `list`, `create` | Android CalendarContract and iOS EventKit; `create` accepts `title`, optional Unix-millisecond `start`, `end`, `calendarId`, and `notes` |
 | `in-app-browser` (`inappbrowser`, `web-browser`) | `open` | Android Custom Tabs or iOS Safari View Controller |

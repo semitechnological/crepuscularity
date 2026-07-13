@@ -458,6 +458,8 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(!default_ios.contains("screenOrientationValue"));
     assert!(!default_android.contains("permissionsValue"));
     assert!(!default_ios.contains("permissionsValue"));
+    assert!(!default_android.contains("microphoneValue"));
+    assert!(!default_ios.contains("microphoneValue"));
     assert!(!default_android.contains("contactsValue"));
     assert!(!default_ios.contains("contactsValue"));
     assert!(!default_android.contains("inAppBrowserValue"));
@@ -923,6 +925,25 @@ fn native_add_capability_updates_only_the_scaffold() {
         .expect("read iOS project")
         .contains("NSBluetoothAlwaysUsageDescription"));
     assert!(crepus()
+        .args(["native", "add", "microphone", "--dir"])
+        .arg(&root)
+        .output()
+        .expect("add microphone")
+        .status
+        .success());
+    let microphone_android = std::fs::read_to_string(
+        root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusRustActions.kt"),
+    )
+    .expect("read Android microphone bridge");
+    let microphone_ios =
+        std::fs::read_to_string(root.join("ios/Sources/NativeShell/CrepusRustActions.swift"))
+            .expect("read iOS microphone bridge");
+    assert!(microphone_android.contains("android.Manifest.permission.RECORD_AUDIO"));
+    assert!(microphone_ios.contains("AVAudioSession.sharedInstance().requestRecordPermission"));
+    assert!(std::fs::read_to_string(root.join("ios/project.yml"))
+        .expect("read iOS project")
+        .contains("NSMicrophoneUsageDescription"));
+    assert!(crepus()
         .args(["native", "add", "contacts", "--dir"])
         .arg(&root)
         .output()
@@ -1052,6 +1073,7 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(cargo.contains("secure-storage = []"));
     assert!(cargo.contains("biometrics = []"));
     assert!(cargo.contains("permissions = []"));
+    assert!(cargo.contains("microphone = []"));
     assert!(cargo.contains("calendar = []"));
     assert!(cargo.contains("contacts = []"));
     assert!(cargo.contains("deep-links = []"));
@@ -1073,6 +1095,11 @@ fn native_add_capability_updates_only_the_scaffold() {
         std::fs::read_to_string(root.join("android/app/src/main/AndroidManifest.xml"))
             .expect("read manifest")
             .contains("android.permission.CAMERA")
+    );
+    assert!(
+        std::fs::read_to_string(root.join("android/app/src/main/AndroidManifest.xml"))
+            .expect("read manifest")
+            .contains("android.permission.RECORD_AUDIO")
     );
     assert!(
         std::fs::read_to_string(root.join("android/app/src/main/AndroidManifest.xml"))

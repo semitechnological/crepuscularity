@@ -1636,6 +1636,7 @@ pub const IOS_PERMISSIONS: &str = r#"
         }
         let configured = switch permission {
         case "camera": Bundle.main.object(forInfoDictionaryKey: "NSCameraUsageDescription") != nil
+        case "microphone": Bundle.main.object(forInfoDictionaryKey: "NSMicrophoneUsageDescription") != nil
         case "location": Bundle.main.object(forInfoDictionaryKey: "NSLocationWhenInUseUsageDescription") != nil
         case "photoLibrary", "photos": Bundle.main.object(forInfoDictionaryKey: "NSPhotoLibraryUsageDescription") != nil
         case "contacts": Bundle.main.object(forInfoDictionaryKey: "NSContactsUsageDescription") != nil
@@ -1667,6 +1668,12 @@ pub const IOS_PERMISSIONS: &str = r#"
             switch AVCaptureDevice.authorizationStatus(for: .video) {
             case .authorized: "granted"
             case .notDetermined: "prompt"
+            default: "denied"
+            }
+        case "microphone":
+            switch AVAudioSession.sharedInstance().recordPermission {
+            case .granted: "granted"
+            case .undetermined: "prompt"
             default: "denied"
             }
         case "location":
@@ -1702,6 +1709,7 @@ pub const IOS_PERMISSIONS: &str = r#"
         guard configured else { return ["permission": permission, "configured": false, "status": "notConfigured", "granted": false] }
         switch permission {
         case "camera": AVCaptureDevice.requestAccess(for: .video) { _ in }
+        case "microphone": AVAudioSession.sharedInstance().requestRecordPermission { _ in }
         case "location": permissionsLocation.requestWhenInUseAuthorization()
         case "photoLibrary", "photos": Task { _ = await PHPhotoLibrary.requestAuthorization(for: .readWrite) }
         case "contacts": CNContactStore().requestAccess(for: .contacts) { _, _ in }
@@ -1718,6 +1726,40 @@ pub const IOS_PERMISSIONS: &str = r#"
         default: "denied"
         }
         return ["permission": permission, "configured": true, "status": status, "granted": status == "granted"]
+    }
+"#;
+
+pub const ANDROID_MICROPHONE: &str = r#"
+    private fun microphoneValue(method: String): JSONObject {
+        val permission = android.Manifest.permission.RECORD_AUDIO
+        val granted = activity.checkSelfPermission(permission) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        if (method == "status") return JSONObject().put("granted", granted)
+        if (method != "requestPermission") error("unsupported microphone method: $method")
+        if (!granted) activity.requestPermissions(arrayOf(permission), 4774)
+        return JSONObject().put("granted", granted).put("requested", !granted).put("pending", !granted)
+    }
+"#;
+
+pub const IOS_MICROPHONE: &str = r#"
+    private static func microphoneValue(method: String) throws -> Any {
+        let status: String = switch AVAudioSession.sharedInstance().recordPermission {
+        case .granted: "granted"
+        case .undetermined: "prompt"
+        default: "denied"
+        }
+        if method == "status" {
+            return ["status": status, "granted": status == "granted"]
+        }
+        guard method == "requestPermission" else {
+            throw HostActionError("unsupported microphone method: \(method)")
+        }
+        guard status == "prompt" else {
+            return ["status": status, "granted": status == "granted"]
+        }
+        AVAudioSession.sharedInstance().requestRecordPermission { granted in
+            CrepusRustActions.emit(CrepusRustActions.successJson(action: "microphone.requestPermission", capability: "microphone", method: "requestPermission", value: ["granted": granted]))
+        }
+        return ["status": status, "granted": false, "requested": true, "pending": true]
     }
 "#;
 

@@ -67,6 +67,7 @@ crepus native add local-notifications --dir .
 crepus native add secure-storage --dir .
 crepus native add biometrics --dir .
 crepus native add permissions --dir .
+crepus native add microphone --dir .
 crepus native add contacts --dir .
 crepus native add calendar --dir .
 crepus native add in-app-browser --dir .
@@ -103,7 +104,8 @@ metadata for each asset it can access.
 `localNotifications.status` reports current notification authorization; `localNotifications` requests notification permission and posts immediate local notifications.
 `secureStorage` persists values with Android Keystore encryption or the iOS Keychain.
 `biometrics.authenticate` opens the system biometric/device-credential prompt.
-`permissions.status`, `permissions.check`, and `permissions.request` operate on camera, location, photos, contacts, notifications, or Bluetooth; iOS notification checks emit the current OS authorization asynchronously.
+`permissions.status`, `permissions.check`, and `permissions.request` operate on camera, microphone, location, photos, contacts, notifications, or Bluetooth; iOS notification checks emit the current OS authorization asynchronously.
+`microphone.status` and `microphone.requestPermission` use Android `RECORD_AUDIO` or iOS `AVAudioSession` authorization.
 `contacts.status`, `contacts.requestPermission`, and `contacts.list` use the Android contacts provider or iOS Contacts framework after explicit access is granted.
 `calendar` requests access, lists calendars, and creates events using the platform calendar service.
 `inAppBrowser.open` presents Android Custom Tabs or iOS Safari View Controller.

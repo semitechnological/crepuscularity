@@ -28,18 +28,18 @@ use crepuscularity_native::{
     ANDROID_CLIPBOARD, ANDROID_CONTACTS, ANDROID_DEEP_LINKS, ANDROID_DEVICE, ANDROID_DIALOG,
     ANDROID_DIMENSIONS, ANDROID_DOCUMENT_PICKER, ANDROID_GEOLOCATION, ANDROID_GEOLOCATION_BRIDGE,
     ANDROID_HAPTICS, ANDROID_IMAGE_PICKER, ANDROID_IN_APP_BROWSER, ANDROID_KEYBOARD,
-    ANDROID_LOCAL_NOTIFICATIONS, ANDROID_NETWORK, ANDROID_PERMISSIONS, ANDROID_PHOTO_LIBRARY,
-    ANDROID_PREFERENCES, ANDROID_SCREEN_ORIENTATION, ANDROID_SECURE_STORAGE, ANDROID_SENSORS,
-    ANDROID_SENSORS_BRIDGE, ANDROID_SETTINGS, ANDROID_SHARE, ANDROID_SYSTEM_BARS,
+    ANDROID_LOCAL_NOTIFICATIONS, ANDROID_MICROPHONE, ANDROID_NETWORK, ANDROID_PERMISSIONS,
+    ANDROID_PHOTO_LIBRARY, ANDROID_PREFERENCES, ANDROID_SCREEN_ORIENTATION, ANDROID_SECURE_STORAGE,
+    ANDROID_SENSORS, ANDROID_SENSORS_BRIDGE, ANDROID_SETTINGS, ANDROID_SHARE, ANDROID_SYSTEM_BARS,
     IOS_ACCESSIBILITY_INFO, IOS_ACTION_SHEET, IOS_ACTION_SHEET_BRIDGE, IOS_APP, IOS_APPEARANCE,
     IOS_APP_STATE, IOS_BATTERY, IOS_BIOMETRICS, IOS_BLUETOOTH, IOS_BLUETOOTH_BRIDGE, IOS_BROWSER,
     IOS_CALENDAR, IOS_CAMERA, IOS_CAMERA_BRIDGE, IOS_CLIPBOARD, IOS_CLIPBOARD_BRIDGE, IOS_CONTACTS,
     IOS_DEEP_LINKS, IOS_DEVICE, IOS_DIALOG, IOS_DIALOG_BRIDGE, IOS_DIMENSIONS, IOS_DOCUMENT_PICKER,
     IOS_GEOLOCATION, IOS_GEOLOCATION_BRIDGE, IOS_HAPTICS, IOS_IMAGE_PICKER,
     IOS_IMAGE_PICKER_BRIDGE, IOS_IN_APP_BROWSER, IOS_KEYBOARD, IOS_LOCAL_NOTIFICATIONS,
-    IOS_NETWORK, IOS_PERMISSIONS, IOS_PHOTO_LIBRARY, IOS_PHOTO_LIBRARY_BRIDGE, IOS_PREFERENCES,
-    IOS_SCREEN_ORIENTATION, IOS_SECURE_STORAGE, IOS_SENSORS, IOS_SENSORS_BRIDGE, IOS_SETTINGS,
-    IOS_SHARE, IOS_SYSTEM_BARS,
+    IOS_MICROPHONE, IOS_NETWORK, IOS_PERMISSIONS, IOS_PHOTO_LIBRARY, IOS_PHOTO_LIBRARY_BRIDGE,
+    IOS_PREFERENCES, IOS_SCREEN_ORIENTATION, IOS_SECURE_STORAGE, IOS_SENSORS, IOS_SENSORS_BRIDGE,
+    IOS_SETTINGS, IOS_SHARE, IOS_SYSTEM_BARS,
 };
 use serde::Deserialize;
 use serde_json::Value;
@@ -158,6 +158,7 @@ const CAPABILITIES: &[CapabilitySpec] = &[
     CapabilitySpec { name: "secure-storage", aliases: &["securestorage"], cargo_feature: "secure-storage", android_manifest: "", ios_project: "" },
     CapabilitySpec { name: "biometrics", aliases: &["authentication"], cargo_feature: "biometrics", android_manifest: "", ios_project: "" },
     CapabilitySpec { name: "permissions", aliases: &["permission"], cargo_feature: "permissions", android_manifest: "", ios_project: "        OTHER_LDFLAGS: \"-lcrepus_mobile_actions -framework CoreBluetooth\"\n        INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription: \"$(PRODUCT_NAME) uses Bluetooth when you ask it to.\"\n" },
+    CapabilitySpec { name: "microphone", aliases: &["audio"], cargo_feature: "microphone", android_manifest: "    <uses-permission android:name=\"android.permission.RECORD_AUDIO\" />\n", ios_project: "        INFOPLIST_KEY_NSMicrophoneUsageDescription: \"$(PRODUCT_NAME) uses the microphone when you ask it to.\"\n" },
     CapabilitySpec { name: "calendar", aliases: &["calendars"], cargo_feature: "calendar", android_manifest: "    <uses-permission android:name=\"android.permission.READ_CALENDAR\" />\n    <uses-permission android:name=\"android.permission.WRITE_CALENDAR\" />\n", ios_project: "        INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription: \"$(PRODUCT_NAME) accesses your calendar when you ask it to.\"\n" },
     CapabilitySpec {
         name: "contacts",
@@ -226,6 +227,8 @@ fn add_capability(capability: &str, root: &Path) -> Result<(), String> {
             || (spec.name == "photo-library"
                 && !source.contains("INFOPLIST_KEY_NSPhotoLibraryUsageDescription"))
             || (spec.name == "camera" && !source.contains("INFOPLIST_KEY_NSCameraUsageDescription"))
+            || (spec.name == "microphone"
+                && !source.contains("INFOPLIST_KEY_NSMicrophoneUsageDescription"))
             || (spec.name == "calendar"
                 && !source.contains("INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription"))
             || (spec.name == "contacts"
@@ -328,6 +331,9 @@ fn add_capability(capability: &str, root: &Path) -> Result<(), String> {
     }
     if spec.name == "permissions" {
         add_permissions_host(root)?;
+    }
+    if spec.name == "microphone" {
+        add_microphone_host(root)?;
     }
     if spec.name == "calendar" {
         add_calendar_host(root)?;
@@ -1664,6 +1670,44 @@ fn add_permissions_host(root: &Path) -> Result<(), String> {
         source = source.replace(
             "\n    private static func dispatchHostAction",
             &format!("{IOS_PERMISSIONS}\n\n    private static func dispatchHostAction"),
+        );
+        fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
+    }
+    Ok(())
+}
+
+fn add_microphone_host(root: &Path) -> Result<(), String> {
+    let android = android_actions_path(root)?;
+    let mut source =
+        fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
+    if !source.contains("microphoneValue") {
+        source = source.replace(
+            "        when (capability) {\n",
+            "        when (capability) {\n            \"microphone\" -> microphoneValue(method)\n",
+        );
+        source = source.replace(
+            "\n    private fun dispatchHostAction",
+            &format!("{ANDROID_MICROPHONE}\n    private fun dispatchHostAction"),
+        );
+        fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))?;
+    }
+    let ios = root.join("ios/Sources/NativeShell/CrepusRustActions.swift");
+    let mut source =
+        fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
+    if !source.contains("microphoneValue") {
+        if !source.contains("import AVFoundation\n") {
+            source = source.replace(
+                "import Foundation\n",
+                "import Foundation\nimport AVFoundation\n",
+            );
+        }
+        source = source.replace(
+            "        switch capability {\n",
+            "        switch capability {\n        case \"microphone\":\n            return try microphoneValue(method: method)\n",
+        );
+        source = source.replace(
+            "\n    private static func dispatchHostAction",
+            &format!("{IOS_MICROPHONE}\n\n    private static func dispatchHostAction"),
         );
         fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
     }
