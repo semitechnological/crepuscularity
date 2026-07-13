@@ -1267,6 +1267,55 @@ pub const IOS_SETTINGS: &str = r#"
     }
 "#;
 
+pub const ANDROID_LOCAL_NOTIFICATIONS: &str = r#"
+    private fun localNotificationsValue(method: String, payload: JSONObject?): JSONObject {
+        if (method == "status") {
+            return JSONObject().put("granted", Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU || activity.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED)
+        }
+        if (method == "requestPermission") {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) activity.requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 4770)
+            return JSONObject().put("requested", true)
+        }
+        if (method != "post") error("unsupported localNotifications method: $method")
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && activity.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            activity.requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 4770)
+            return JSONObject().put("requested", true).put("pending", true)
+        }
+        val manager = appContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        manager.createNotificationChannel(NotificationChannel("crepus", appContext.applicationInfo.loadLabel(appContext.packageManager), NotificationManager.IMPORTANCE_DEFAULT))
+        val notification = Notification.Builder(appContext, "crepus")
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentTitle(payload?.optString("title", appContext.applicationInfo.loadLabel(appContext.packageManager).toString()))
+            .setContentText(payload?.optString("body", "") ?: "")
+            .setAutoCancel(true)
+            .build()
+        manager.notify(payload?.optInt("id", 0) ?: 0, notification)
+        return JSONObject().put("posted", true)
+    }
+"#;
+
+pub const IOS_LOCAL_NOTIFICATIONS: &str = r#"
+    private static func localNotificationsValue(method: String, payload: [String: Any]?) throws -> Any {
+        let center = UNUserNotificationCenter.current()
+        switch method {
+        case "status":
+            return ["available": true]
+        case "requestPermission":
+            center.requestAuthorization(options: [.alert, .badge, .sound]) { _, _ in }
+            return ["requested": true]
+        case "post":
+            let content = UNMutableNotificationContent()
+            content.title = payload?["title"] as? String ?? ""
+            content.body = payload?["body"] as? String ?? ""
+            content.sound = .default
+            center.add(UNNotificationRequest(identifier: payload?["id"] as? String ?? UUID().uuidString, content: content, trigger: nil))
+            return ["posted": true]
+        default:
+            throw HostActionError("unsupported localNotifications method: \(method)")
+        }
+    }
+"#;
+
 pub const ANDROID_GEOLOCATION: &str = r#"
     private val geolocation by lazy { GeolocationBridge(activity) }
 

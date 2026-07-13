@@ -63,6 +63,7 @@ crepus native add preferences --dir .
 crepus native add network --dir .
 crepus native add keyboard --dir .
 crepus native add settings --dir .
+crepus native add local-notifications --dir .
 ```
 
 `sensors` installs real gyro and accelerometer bridges. `bluetooth` installs Android and iOS BLE scan
@@ -90,6 +91,7 @@ metadata for each asset it can access.
 `network.status` returns whether the device has a validated connection and its transport.
 `keyboard.dismiss` closes the active system keyboard.
 `settings.open` opens the operating system's page for this app.
+`localNotifications` requests notification permission and posts immediate local notifications.
 
 ## Regenerating the fixture from a template
 

@@ -101,6 +101,7 @@ Android and iOS, plus only the required platform declarations. It supports `stat
 | `network` (`net-info`, `netinfo`) | `status` | Validated Android network or app-lifetime iOS NWPathMonitor status, including active transport |
 | `keyboard` | `dismiss` | Hides Android's active input method or resigns iOS's current first responder |
 | `settings` (`app-settings`) | `open` | Opens the app's Android or iOS settings page |
+| `local-notifications` (`notifications`) | `status`, `requestPermission`, `post` | Android notification channel and iOS UserNotifications; Android permission is added only for this capability |
 
 `filesystem` enables its scoped Rust backend only after `crepus native add filesystem`; the
 default app shell and share-extension builds exclude it. It supports `readText`, `writeText`,

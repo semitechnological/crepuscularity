@@ -824,6 +824,22 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(settings_android.contains("ACTION_APPLICATION_DETAILS_SETTINGS"));
     assert!(settings_ios.contains("openSettingsURLString"));
     assert!(crepus()
+        .args(["native", "add", "local-notifications", "--dir"])
+        .arg(&root)
+        .output()
+        .expect("add local notifications")
+        .status
+        .success());
+    let notifications_android = std::fs::read_to_string(
+        root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusRustActions.kt"),
+    )
+    .expect("read Android notifications bridge");
+    let notifications_ios =
+        std::fs::read_to_string(root.join("ios/Sources/NativeShell/CrepusRustActions.swift"))
+            .expect("read iOS notifications bridge");
+    assert!(notifications_android.contains("NotificationChannel"));
+    assert!(notifications_ios.contains("UNUserNotificationCenter"));
+    assert!(crepus()
         .args(["native", "add", "filesystem", "--dir"])
         .arg(&root)
         .output()
@@ -850,6 +866,7 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(cargo.contains("network = []"));
     assert!(cargo.contains("keyboard = []"));
     assert!(cargo.contains("settings = []"));
+    assert!(cargo.contains("local-notifications = []"));
     assert!(haptics_android.contains("\"haptics\", \"vibration\""));
     assert!(haptics_ios.contains("case \"haptics\", \"vibration\":"));
     assert!(cargo.contains("filesystem = []"));
