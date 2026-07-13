@@ -89,6 +89,7 @@ Android and iOS, plus only the required platform declarations. It supports `stat
 | `image-picker` (`imagepicker`, `media-picker`) | `pick` | Android system picker; iOS PHPicker; results stream as `imagePicker.pick`. The named `pick_media` action is installed with this capability. |
 | `documentPicker` (`documents`) | `pick` | Android/iOS multiple-document picker; emits imported cached-file metadata |
 | `photo-library` (`photolibrary`, `media-library`) | `scan`, `getRecentMedia` | Android MediaStore and iOS PhotoKit, each requesting media access only when called; emits one cached-file result per asset |
+| `camera` | `takePhoto` | Android system camera preview and iOS camera picker; emits one cached JPEG result |
 
 `filesystem` enables its scoped Rust backend only after `crepus native add filesystem`; the
 default app shell and share-extension builds exclude it. It supports `readText`, `writeText`,

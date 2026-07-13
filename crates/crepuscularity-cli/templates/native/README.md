@@ -51,6 +51,7 @@ Install on-demand capabilities into the app instead:
 crepus native add sensors --dir .
 crepus native add bluetooth --dir .
 crepus native add photo-library --dir .
+crepus native add camera --dir .
 ```
 
 `sensors` installs real gyro and accelerometer bridges. `bluetooth` installs Android and iOS BLE scan
@@ -66,6 +67,7 @@ named `import_files` action remains available for built-in UI actions and uses t
 the named `pick_media` action.
 `photo-library` requests platform media permission only for `scan` and `getRecentMedia`, then emits cached-file
 metadata for each asset it can access.
+`camera.takePhoto` opens the system camera and emits one cached JPEG result.
 
 ## Regenerating the fixture from a template
 

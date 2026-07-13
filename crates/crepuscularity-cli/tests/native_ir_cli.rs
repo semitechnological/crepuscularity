@@ -442,6 +442,8 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(!default_ios.contains("documentPickerValue"));
     assert!(!default_android.contains("photoLibraryValue"));
     assert!(!default_ios.contains("photoLibraryValue"));
+    assert!(!default_android.contains("cameraValue"));
+    assert!(!default_ios.contains("cameraValue"));
     assert!(crepus()
         .args(["native", "add", "share", "--dir"])
         .arg(&root)
@@ -609,6 +611,23 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(photo_library_ios.contains("PHPhotoLibrary.requestAuthorization"));
     assert!(photo_library_ios.contains("case \"photoLibrary\":"));
     assert!(crepus()
+        .args(["native", "add", "camera", "--dir"])
+        .arg(&root)
+        .output()
+        .expect("add camera")
+        .status
+        .success());
+    let camera_android = std::fs::read_to_string(
+        root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusRustActions.kt"),
+    )
+    .expect("read Android camera bridge");
+    let camera_ios =
+        std::fs::read_to_string(root.join("ios/Sources/NativeShell/CrepusRustActions.swift"))
+            .expect("read iOS camera bridge");
+    assert!(camera_android.contains("TakePicturePreview"));
+    assert!(camera_ios.contains("UIImagePickerController"));
+    assert!(camera_ios.contains("case \"camera\":"));
+    assert!(crepus()
         .args(["native", "add", "filesystem", "--dir"])
         .arg(&root)
         .output()
@@ -623,6 +642,7 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(cargo.contains("image-picker = []"));
     assert!(cargo.contains("documentpicker = []"));
     assert!(cargo.contains("photo-library = []"));
+    assert!(cargo.contains("camera = []"));
     assert!(cargo.contains("filesystem = []"));
     assert!(cargo.contains("default = [\"filesystem\"]"));
     assert!(
@@ -634,6 +654,11 @@ fn native_add_capability_updates_only_the_scaffold() {
         std::fs::read_to_string(root.join("android/app/src/main/AndroidManifest.xml"))
             .expect("read manifest")
             .contains("android.permission.READ_MEDIA_IMAGES")
+    );
+    assert!(
+        std::fs::read_to_string(root.join("android/app/src/main/AndroidManifest.xml"))
+            .expect("read manifest")
+            .contains("android.permission.CAMERA")
     );
 }
 
