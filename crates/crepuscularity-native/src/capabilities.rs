@@ -1248,6 +1248,25 @@ pub const IOS_KEYBOARD: &str = r#"
     }
 "#;
 
+pub const ANDROID_SETTINGS: &str = r#"
+    private fun settingsValue(method: String): JSONObject {
+        if (method != "open") error("unsupported settings method: $method")
+        activity.startActivity(Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", appContext.packageName, null)))
+        return JSONObject().put("opened", true)
+    }
+"#;
+
+pub const IOS_SETTINGS: &str = r#"
+    private static func settingsValue(method: String) throws -> Any {
+        guard method == "open" else { throw HostActionError("unsupported settings method: \(method)") }
+        #if canImport(UIKit)
+        guard let url = URL(string: UIApplication.openSettingsURLString) else { throw HostActionError("invalid settings URL") }
+        UIApplication.shared.open(url)
+        #endif
+        return ["opened": true]
+    }
+"#;
+
 pub const ANDROID_GEOLOCATION: &str = r#"
     private val geolocation by lazy { GeolocationBridge(activity) }
 

@@ -62,6 +62,7 @@ crepus native add device --dir .
 crepus native add preferences --dir .
 crepus native add network --dir .
 crepus native add keyboard --dir .
+crepus native add settings --dir .
 ```
 
 `sensors` installs real gyro and accelerometer bridges. `bluetooth` installs Android and iOS BLE scan
@@ -88,6 +89,7 @@ metadata for each asset it can access.
 `preferences` stores string values with `get`, `set`, `remove`, and `clear`.
 `network.status` returns whether the device has a validated connection and its transport.
 `keyboard.dismiss` closes the active system keyboard.
+`settings.open` opens the operating system's page for this app.
 
 ## Regenerating the fixture from a template
 
