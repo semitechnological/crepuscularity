@@ -96,6 +96,7 @@ Android and iOS, plus only the required platform declarations. It supports `stat
 | `app-state` (`appstate`) | `get` | Current Android lifecycle or iOS application foreground/background state |
 | `screen-orientation` (`screenorientation`) | `get` | Current Android configuration or iOS screen orientation |
 | `accessibility-info` (`accessibilityinfo`) | `get`, `status` | Reduce-motion and screen-reader state from Android accessibility settings or iOS UIAccessibility |
+| `device` (`device-info`, `deviceinfo`) | `get`, `info` | Platform, manufacturer, model, and operating-system version from Android Build or iOS UIDevice |
 
 `filesystem` enables its scoped Rust backend only after `crepus native add filesystem`; the
 default app shell and share-extension builds exclude it. It supports `readText`, `writeText`,

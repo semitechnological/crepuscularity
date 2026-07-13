@@ -1117,6 +1117,32 @@ pub const IOS_ACCESSIBILITY_INFO: &str = r#"
     }
 "#;
 
+pub const ANDROID_DEVICE: &str = r#"
+    private fun deviceValue(method: String): JSONObject {
+        if (method != "get" && method != "info") error("unsupported device method: $method")
+        return JSONObject()
+            .put("platform", "android")
+            .put("manufacturer", Build.MANUFACTURER)
+            .put("model", Build.MODEL)
+            .put("osVersion", Build.VERSION.RELEASE)
+            .put("apiLevel", Build.VERSION.SDK_INT)
+    }
+"#;
+
+pub const IOS_DEVICE: &str = r#"
+    private static func deviceValue(method: String) throws -> Any {
+        guard method == "get" || method == "info" else {
+            throw HostActionError("unsupported device method: \(method)")
+        }
+        #if canImport(UIKit)
+        let device = UIDevice.current
+        return ["platform": "ios", "manufacturer": "Apple", "model": device.model, "osVersion": device.systemVersion, "apiLevel": 0]
+        #else
+        return ["platform": "macos", "manufacturer": "Apple", "model": "Mac", "osVersion": ProcessInfo.processInfo.operatingSystemVersionString, "apiLevel": 0]
+        #endif
+    }
+"#;
+
 pub const ANDROID_GEOLOCATION: &str = r#"
     private val geolocation by lazy { GeolocationBridge(activity) }
 

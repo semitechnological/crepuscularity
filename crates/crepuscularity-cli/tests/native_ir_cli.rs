@@ -734,6 +734,22 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(accessibility_android.contains("Settings.Global.ANIMATOR_DURATION_SCALE"));
     assert!(accessibility_ios.contains("UIAccessibility.isReduceMotionEnabled"));
     assert!(crepus()
+        .args(["native", "add", "device", "--dir"])
+        .arg(&root)
+        .output()
+        .expect("add device")
+        .status
+        .success());
+    let device_android = std::fs::read_to_string(
+        root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusRustActions.kt"),
+    )
+    .expect("read Android device bridge");
+    let device_ios =
+        std::fs::read_to_string(root.join("ios/Sources/NativeShell/CrepusRustActions.swift"))
+            .expect("read iOS device bridge");
+    assert!(device_android.contains("Build.MANUFACTURER"));
+    assert!(device_ios.contains("UIDevice.current"));
+    assert!(crepus()
         .args(["native", "add", "filesystem", "--dir"])
         .arg(&root)
         .output()
@@ -755,6 +771,7 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(cargo.contains("app-state = []"));
     assert!(cargo.contains("screen-orientation = []"));
     assert!(cargo.contains("accessibility-info = []"));
+    assert!(cargo.contains("device = []"));
     assert!(cargo.contains("filesystem = []"));
     assert!(cargo.contains("default = [\"filesystem\"]"));
     assert!(
