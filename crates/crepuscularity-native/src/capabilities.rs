@@ -1310,8 +1310,8 @@ pub const ANDROID_LOCAL_NOTIFICATIONS: &str = r#"
         if (method == "schedule") {
             val id = payload?.optString("id")?.takeIf { it.isNotBlank() } ?: error("localNotifications.schedule requires id")
             val at = when {
-                payload.has("at") -> payload.optLong("at")
-                payload.has("seconds") -> System.currentTimeMillis() + payload.optLong("seconds") * 1_000
+                payload?.has("at") == true -> payload.optLong("at")
+                payload?.has("seconds") == true -> System.currentTimeMillis() + payload.optLong("seconds") * 1_000
                 else -> error("localNotifications.schedule requires at or seconds")
             }
             if (at <= System.currentTimeMillis()) error("localNotifications.schedule must be in the future")
