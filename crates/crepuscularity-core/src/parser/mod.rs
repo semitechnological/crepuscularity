@@ -470,4 +470,49 @@ div
             Some("\"sandboxed\"".to_string())
         );
     }
+
+    #[test]
+    fn split_frontmatter_parts_basic() {
+        let content = "+++\nfoo = 'bar'\n+++\nbody content";
+        let (toml, rest, offset) = split_frontmatter_parts(content);
+        assert_eq!(toml, Some("\nfoo = 'bar'"));
+        assert_eq!(rest, "\nbody content");
+        assert_eq!(offset, 19);
+    }
+
+    #[test]
+    fn split_frontmatter_parts_with_leading_whitespace() {
+        let content = "  \n\n+++\nfoo = 'bar'\n+++\nbody content";
+        let (toml, rest, offset) = split_frontmatter_parts(content);
+        assert_eq!(toml, Some("\nfoo = 'bar'"));
+        assert_eq!(rest, "\nbody content");
+        assert_eq!(offset, 23);
+    }
+
+    #[test]
+    fn split_frontmatter_parts_no_frontmatter() {
+        let content = "just some text";
+        let (toml, rest, offset) = split_frontmatter_parts(content);
+        assert_eq!(toml, None);
+        assert_eq!(rest, "just some text");
+        assert_eq!(offset, 0);
+    }
+
+    #[test]
+    fn split_frontmatter_parts_missing_closing_tag() {
+        let content = "+++\nfoo = 'bar'\nbody content";
+        let (toml, rest, offset) = split_frontmatter_parts(content);
+        assert_eq!(toml, None);
+        assert_eq!(rest, "+++\nfoo = 'bar'\nbody content");
+        assert_eq!(offset, 0);
+    }
+
+    #[test]
+    fn split_frontmatter_parts_empty() {
+        let content = "+++\n+++\nbody";
+        let (toml, rest, offset) = split_frontmatter_parts(content);
+        assert_eq!(toml, Some(""));
+        assert_eq!(rest, "\nbody");
+        assert_eq!(offset, 7);
+    }
 }
