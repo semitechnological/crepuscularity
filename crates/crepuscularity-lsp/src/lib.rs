@@ -286,7 +286,7 @@ fn class_completions(source: &str) -> Vec<CompletionItem> {
     // local addition we can make.
     for (name, expansion) in document_class_aliases(source) {
         items.push(CompletionItem {
-            label: name.clone(),
+            label: name,
             kind: Some(CompletionItemKind::CLASS),
             detail: Some("Class alias (this file)".to_string()),
             documentation: Some(Documentation::MarkupContent(MarkupContent {
