@@ -114,10 +114,7 @@ pub fn doctor_java17() -> bool {
             eprintln!("{} Java 17 java on PATH", "✓");
             true
         } else {
-            eprintln!(
-                "{} Java 17: JAVA_HOME does not point to Java 17+",
-                "✗"
-            );
+            eprintln!("{} Java 17: JAVA_HOME does not point to Java 17+", "✗");
             false
         }
     } else {
@@ -175,10 +172,7 @@ pub fn doctor_java_home() -> bool {
                 eprintln!("{} JAVA_HOME {}", "✓", path.display());
                 true
             } else if Path::new("java").exists() || java_version_at_least(Path::new("java"), 17) {
-                eprintln!(
-                    "{} JAVA_HOME invalid; Gradle will use java from PATH",
-                    "✓"
-                );
+                eprintln!("{} JAVA_HOME invalid; Gradle will use java from PATH", "✓");
                 true
             } else {
                 eprintln!(
@@ -190,10 +184,7 @@ pub fn doctor_java_home() -> bool {
             }
         }
         Err(_) => {
-            eprintln!(
-                "{} JAVA_HOME not set; Gradle will use java from PATH",
-                "✓"
-            );
+            eprintln!("{} JAVA_HOME not set; Gradle will use java from PATH", "✓");
             true
         }
     }
@@ -210,18 +201,11 @@ pub fn doctor_android_sdk() -> bool {
             true
         }
         Some(path) => {
-            eprintln!(
-                "{} Android SDK {} missing platforms/",
-                "✗",
-                path.display()
-            );
+            eprintln!("{} Android SDK {} missing platforms/", "✗", path.display());
             false
         }
         None => {
-            eprintln!(
-                "{} Android SDK: set ANDROID_HOME or ANDROID_SDK_ROOT",
-                "✗"
-            );
+            eprintln!("{} Android SDK: set ANDROID_HOME or ANDROID_SDK_ROOT", "✗");
             false
         }
     }
@@ -278,4 +262,3 @@ pub fn android_ndk_clang(ndk: &Path) -> Option<PathBuf> {
         })
         .find(|path| path.exists())
 }
-
