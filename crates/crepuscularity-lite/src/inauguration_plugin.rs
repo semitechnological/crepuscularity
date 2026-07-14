@@ -72,9 +72,17 @@ fn which_in() -> Result<Value, BridgeError> {
 
 fn process_run(payload: &Value) -> Result<Value, BridgeError> {
     let command = require_str(payload, "command")?;
-    let output = Command::new("sh")
-        .arg("-c")
-        .arg(&command)
+
+    let args = shlex::split(&command).ok_or_else(|| {
+        BridgeError::new("invalid_argument", "failed to parse command string".to_string())
+    })?;
+
+    if args.is_empty() {
+        return Err(BridgeError::new("invalid_argument", "command string is empty".to_string()));
+    }
+
+    let output = Command::new(&args[0])
+        .args(&args[1..])
         .output()
         .map_err(|e| BridgeError::new("spawn_failed", e.to_string()))?;
     let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
@@ -114,5 +122,12 @@ mod tests {
             out.get("plugin").and_then(|v| v.as_str()),
             Some("inauguration")
         );
+    }
+
+    #[test]
+    fn process_run_rejects_unbalanced_quotes() {
+        let p = InaugurationPlugin::new();
+        let payload = json!({ "command": "echo \"unbalanced" });
+        let _err = p.invoke("processRun", &payload).err().unwrap();
     }
 }
