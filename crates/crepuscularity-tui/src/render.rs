@@ -409,14 +409,13 @@ fn build_content_element(
     style: Style,
 ) -> WidgetChild {
     let mut child_ctx = ctx.clone();
-    let mut lines: Vec<Line<'static>> = Vec::new();
 
-    for child in &el.children {
-        match child {
-            Node::Text(parts) => lines.push(build_line(parts, &child_ctx)),
-            Node::RawText(expr) => {
-                lines.push(Line::raw(value_to_str(&eval_value(expr, &child_ctx))))
-            }
+    let lines: Vec<Line<'static>> = el
+        .children
+        .iter()
+        .filter_map(|child| match child {
+            Node::Text(parts) => Some(build_line(parts, &child_ctx)),
+            Node::RawText(expr) => Some(Line::raw(value_to_str(&eval_value(expr, &child_ctx)))),
             Node::LetDecl(decl) => {
                 let val = eval_value(&decl.expr, &child_ctx);
                 if decl.is_default {
@@ -430,10 +429,11 @@ fn build_content_element(
                         child_ctx.vars.insert(decl.name.clone(), val);
                     }
                 }
+                None
             }
-            _ => {}
-        }
-    }
+            _ => None,
+        })
+        .collect();
 
     WidgetChild {
         node: WidgetNode::Content {
