@@ -544,9 +544,10 @@ impl ManifestV3 {
         let mut resource_matches = manifest.web_accessible_resources.matches.clone();
         if resource_matches.is_empty() {
             resource_matches = host_permissions.to_vec();
+            let mut seen: std::collections::HashSet<&str> = host_permissions.iter().map(|s| s.as_str()).collect();
             for content_script in content_scripts {
                 for pattern in &content_script.matches {
-                    if !resource_matches.contains(pattern) {
+                    if seen.insert(pattern.as_str()) {
                         resource_matches.push(pattern.clone());
                     }
                 }
