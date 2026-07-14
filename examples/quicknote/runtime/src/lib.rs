@@ -41,13 +41,13 @@ fn json_to_template(v: Value) -> TemplateValue {
 }
 
 /// Render a named component from ui.crepus with the given props.
-fn render_component(
+fn render_component<'a>(
     component_name: &str,
-    props: &[(&str, TemplateValue)],
+    props: impl IntoIterator<Item = (&'a str, TemplateValue)>,
 ) -> Result<String, String> {
     let mut ctx = TemplateContext::new();
     for (k, v) in props {
-        ctx.set(*k, v.clone());
+        ctx.set(k, v);
     }
     render_component_file_to_html(UI_CREPUS, component_name, &ctx).map_err(|e| e.to_string())
 }
@@ -76,7 +76,7 @@ pub fn render_popup(state: JsValue) -> Result<JsValue, JsValue> {
 
     let html = render_component(
         "NoteList",
-        &[
+        [
             ("notes", json_to_template(json!(notes))),
             ("note_count", TemplateValue::Int(note_count)),
             ("empty", TemplateValue::Bool(empty)),
