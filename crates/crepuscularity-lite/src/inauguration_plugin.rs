@@ -74,11 +74,17 @@ fn process_run(payload: &Value) -> Result<Value, BridgeError> {
     let command = require_str(payload, "command")?;
 
     let args = shlex::split(&command).ok_or_else(|| {
-        BridgeError::new("invalid_argument", "failed to parse command string".to_string())
+        BridgeError::new(
+            "invalid_argument",
+            "failed to parse command string".to_string(),
+        )
     })?;
 
     if args.is_empty() {
-        return Err(BridgeError::new("invalid_argument", "command string is empty".to_string()));
+        return Err(BridgeError::new(
+            "invalid_argument",
+            "command string is empty".to_string(),
+        ));
     }
 
     let output = Command::new(&args[0])
