@@ -4,7 +4,7 @@
 
 use crate::color::Color;
 use crate::document::{Align, EmbeddedStyle, FlexDir, Justify, SizeHint};
-use crate::palette::lookup_named_color;
+use crepuscularity_core::tailwind::lookup_named_color;
 
 #[cfg(feature = "std")]
 use crepuscularity_core::context::TemplateContext;
@@ -15,7 +15,7 @@ use crepuscularity_core::tailwind::parse::{
 
 #[cfg(not(feature = "std"))]
 mod tailwind_parse {
-    use crate::palette::lookup_named_color;
+    use crepuscularity_core::tailwind::lookup_named_color;
 
     pub enum SizeToken {
         Full,

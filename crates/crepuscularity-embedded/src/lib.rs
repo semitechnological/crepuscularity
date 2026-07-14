@@ -63,7 +63,7 @@ pub(crate) mod font_data;
 pub mod framebuffer;
 pub mod layout;
 pub mod paint;
-pub mod palette;
+
 pub mod panel;
 pub mod screen;
 pub mod style;
