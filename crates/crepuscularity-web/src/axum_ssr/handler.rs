@@ -71,7 +71,7 @@ impl SsrHandler {
     ///
     /// ```rust,no_run
     /// use axum::{routing::get, Router};
-    /// use crepuscularity_web::{SsrHandler, SsrOptions};
+    /// use crate::{SsrHandler, SsrOptions};
     /// use std::sync::Arc;
     ///
     /// let handler = SsrHandler::new(SsrOptions::new(r#"div "Hello""#, "Title"));

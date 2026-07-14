@@ -32,7 +32,7 @@ pub struct RouteEntry {
 ///
 /// # Example
 /// ```rust,no_run
-    /// use crepuscularity_web::SsrRouter;
+/// use crate::SsrRouter;
 ///
 /// let router = SsrRouter::new()
 ///     .route("/", r#"div "Home""#, "Home")
