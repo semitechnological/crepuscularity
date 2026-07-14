@@ -467,7 +467,7 @@ fn add_deep_links_host(root: &Path) -> Result<(), String> {
     if !info.exists() {
         fs::write(
             &info,
-            &format!("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\">\n<dict>\n    <key>CFBundleURLTypes</key>\n    <array>\n        <dict>\n            <key>CFBundleTypeRole</key>\n            <string>Editor</string>\n            <key>CFBundleURLName</key>\n            <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>\n            <key>CFBundleURLSchemes</key>\n            <array>\n                <string>crepus</string>\n            </array>\n        </dict>\n    </array>\n{}    <key>UILaunchScreen</key>\n    <dict/>\n</dict>\n</plist>\n", ios_info_plist_keys(&source)),
+            format!("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\">\n<dict>\n    <key>CFBundleURLTypes</key>\n    <array>\n        <dict>\n            <key>CFBundleTypeRole</key>\n            <string>Editor</string>\n            <key>CFBundleURLName</key>\n            <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>\n            <key>CFBundleURLSchemes</key>\n            <array>\n                <string>crepus</string>\n            </array>\n        </dict>\n    </array>\n{}    <key>UILaunchScreen</key>\n    <dict/>\n</dict>\n</plist>\n", ios_info_plist_keys(&source)),
         )
         .map_err(|e| format!("write '{}': {e}", info.display()))?;
     }
