@@ -159,9 +159,7 @@ impl CapabilitySet {
 
     /// Merge another capability set into this one.
     pub fn merge(&mut self, other: &CapabilitySet) {
-        for cap in &other.capabilities {
-            self.capabilities.insert(cap.clone());
-        }
+        self.capabilities.extend(other.capabilities.iter().cloned());
     }
 
     /// Number of capabilities.
