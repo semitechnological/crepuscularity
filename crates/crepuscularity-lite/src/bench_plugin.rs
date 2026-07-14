@@ -57,7 +57,10 @@ impl NativePlugin for BenchPlugin {
     fn invoke(&self, method: &str, _payload: &Value) -> Result<Value, BridgeError> {
         match method {
             "runSuites" => Ok(run_all_suites()),
-            _ => unreachable!("method allowlist enforced by bridge"),
+            _ => Err(BridgeError::new(
+                "method_not_found",
+                format!("unknown bench method `{method}`"),
+            )),
         }
     }
 }
