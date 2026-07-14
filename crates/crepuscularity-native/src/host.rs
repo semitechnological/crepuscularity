@@ -85,9 +85,7 @@ pub fn doctor_rust_target(target: &str) -> bool {
                 eprintln!("✓ rust target {target}");
                 true
             } else {
-                eprintln!(
-                    "✗ rust target {target}: install with `rustup target add {target}`"
-                );
+                eprintln!("✗ rust target {target}: install with `rustup target add {target}`");
                 false
             }
         }
@@ -131,9 +129,7 @@ pub fn doctor_java17() -> bool {
                 true
             }
             _ => {
-                eprintln!(
-                    "✗ Java 17: install openjdk@17 and expose it to Gradle"
-                );
+                eprintln!("✗ Java 17: install openjdk@17 and expose it to Gradle");
                 false
             }
         }
@@ -173,10 +169,7 @@ pub fn doctor_java_home() -> bool {
                 eprintln!("✓ JAVA_HOME invalid; Gradle will use java from PATH");
                 true
             } else {
-                eprintln!(
-                    "✗ JAVA_HOME {} does not contain bin/java",
-                    path.display()
-                );
+                eprintln!("✗ JAVA_HOME {} does not contain bin/java", path.display());
                 false
             }
         }
@@ -226,9 +219,7 @@ pub fn doctor_android_ndk() -> bool {
             return true;
         }
     }
-    eprintln!(
-        "✗ Android NDK: install via Android Studio SDK Manager or set ANDROID_NDK_HOME"
-    );
+    eprintln!("✗ Android NDK: install via Android Studio SDK Manager or set ANDROID_NDK_HOME");
     false
 }
 
