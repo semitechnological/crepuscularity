@@ -621,6 +621,8 @@ fn config_uses(config: &Value, config_path: &Path) -> Vec<ApiUse> {
 
 fn collect_project_uses(root: &Path, uses: &mut Vec<ApiUse>) {
     let mut pending = vec![root.to_path_buf()];
+    let mut files_to_scan = Vec::new();
+
     while let Some(dir) = pending.pop() {
         let Ok(entries) = fs::read_dir(&dir) else {
             continue;
@@ -636,46 +638,72 @@ fn collect_project_uses(root: &Path, uses: &mut Vec<ApiUse>) {
                 }
                 continue;
             }
-            let Some(extension) = path.extension().and_then(|extension| extension.to_str()) else {
+            let Some(extension) = path.extension().and_then(|ext| ext.to_str()).map(String::from) else {
                 continue;
             };
-            let source = path.display().to_string();
-            match extension {
-                "rs" => {
-                    if let Ok(text) = fs::read_to_string(&path) {
-                        if text.contains("#[tauri::command]") || text.contains("#[command]") {
-                            uses.push(api_use(&source, "command", Coverage::Backend));
-                        }
-                        if text.contains(".emit(") || text.contains(".listen(") {
-                            uses.push(api_use(&source, "event", Coverage::Backend));
-                        }
-                    }
-                }
-                "js" | "jsx" | "ts" | "tsx" => {
-                    if let Ok(text) = fs::read_to_string(&path) {
-                        for api in frontend_apis(&text) {
-                            uses.push(api_use(&source, api, frontend_coverage(api)));
-                        }
-                    }
-                }
-                "toml" if path.file_name().and_then(|name| name.to_str()) == Some("Cargo.toml") => {
-                    if let Ok(text) = fs::read_to_string(&path) {
-                        for line in text.lines() {
-                            let name = line.split('=').next().unwrap_or("").trim();
-                            if let Some(plugin) = name.strip_prefix("tauri-plugin-") {
-                                uses.push(api_use(
-                                    &source,
-                                    &format!("plugin.{plugin}"),
-                                    plugin_coverage(plugin),
-                                ));
-                            }
-                        }
-                    }
-                }
-                _ => {}
+            if matches!(extension.as_str(), "rs" | "js" | "jsx" | "ts" | "tsx")
+                || (extension == "toml" && path.file_name().and_then(|n| n.to_str()) == Some("Cargo.toml"))
+            {
+                let source = path.display().to_string();
+                files_to_scan.push((path, extension, source));
             }
         }
     }
+
+    let mut thread_results = Vec::new();
+    std::thread::scope(|s| {
+        let num_threads = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4);
+        let mut chunks = vec![vec![]; num_threads];
+        for (i, file) in files_to_scan.into_iter().enumerate() {
+            chunks[i % num_threads].push(file);
+        }
+
+        let mut handles = Vec::new();
+        for chunk in chunks {
+            handles.push(s.spawn(move || {
+                let mut local_uses = Vec::new();
+                for (path, extension, source) in chunk {
+                    if let Ok(text) = fs::read_to_string(&path) {
+                        match extension.as_str() {
+                            "rs" => {
+                                if text.contains("#[tauri::command]") || text.contains("#[command]") {
+                                    local_uses.push(api_use(&source, "command", Coverage::Backend));
+                                }
+                                if text.contains(".emit(") || text.contains(".listen(") {
+                                    local_uses.push(api_use(&source, "event", Coverage::Backend));
+                                }
+                            }
+                            "js" | "jsx" | "ts" | "tsx" => {
+                                for api in frontend_apis(&text) {
+                                    local_uses.push(api_use(&source, api, frontend_coverage(api)));
+                                }
+                            }
+                            "toml" => {
+                                for line in text.lines() {
+                                    let name = line.split('=').next().unwrap_or("").trim();
+                                    if let Some(plugin) = name.strip_prefix("tauri-plugin-") {
+                                        local_uses.push(api_use(
+                                            &source,
+                                            &format!("plugin.{plugin}"),
+                                            plugin_coverage(plugin),
+                                        ));
+                                    }
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+                local_uses
+            }));
+        }
+
+        for handle in handles {
+            thread_results.extend(handle.join().unwrap());
+        }
+    });
+
+    uses.extend(thread_results);
 }
 
 fn frontend_apis(text: &str) -> Vec<&'static str> {
