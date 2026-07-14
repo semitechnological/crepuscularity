@@ -4,7 +4,7 @@
   "domain": "crepuscularity.dev",
   "seo": {
     "title": "Crepuscularity — .crepus templates for GPUI, WASM, and browser extensions",
-    "description": "Write UI once in .crepus: native GPUI apps with hot reload, static WASM sites (this page), and MV3 extensions. Docs, CLI, and crates on crates.io.",
+    "description": "Write UI once in .crepus: native GPUI apps with hot reload, static WASM sites (this page), MV3 extensions, and native iOS/Android apps. Docs, CLI, and crates on crates.io.",
     "ogImage": null
   },
   "theme": {

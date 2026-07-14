@@ -15,6 +15,6 @@
   <text x="124" y="174" fill="#ffb070" font-family="Inter, Arial, sans-serif" font-size="30" font-weight="700" letter-spacing="4">CREPUSCULARITY</text>
   <text x="124" y="275" fill="#f4ebff" font-family="Inter, Arial, sans-serif" font-size="78" font-weight="800">UI templates that</text>
   <text x="124" y="362" fill="#f4ebff" font-family="Inter, Arial, sans-serif" font-size="78" font-weight="800">compile everywhere</text>
-  <text x="128" y="438" fill="#cbbbe2" font-family="Inter, Arial, sans-serif" font-size="30">GPUI · Web · Manifest V3 · Ratatui · Embedded · LVGL</text>
+  <text x="128" y="438" fill="#cbbbe2" font-family="Inter, Arial, sans-serif" font-size="30">GPUI · Web · Manifest V3 · Mobile · Ratatui · Embedded · LVGL</text>
   <rect x="124" y="478" width="366" height="10" rx="5" fill="url(#accent)"/>
 </svg>

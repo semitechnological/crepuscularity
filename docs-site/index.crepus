@@ -20,7 +20,7 @@ div min-h-screen overflow-x-hidden antialiased crepus-twilight-page
 						code text-sm sm:text-base crepus-t-text opacity-90
 							".crepus"
 						span
-							" — indentation or JSX-style input, same AST — and target native GPUI, static WASM sites, HTML, Manifest V3 extensions, RGB565 embedded displays, or LVGL Pro XML from one CLI."
+							" — indentation or JSX-style input, same AST — and target native GPUI, static WASM sites, HTML, Manifest V3 extensions, native iOS and Android apps, RGB565 embedded displays, or LVGL Pro XML from one CLI."
 					div flex flex-wrap gap-3 items-start flex-col sm:flex-row sm:items-center mb-6 sm:mb-0
 						a href="./docs/index.html" no-underline inline-flex items-center gap-2 px-5 py-2.5 rounded-lg crepus-t-btn-primary text-sm font-semibold
 							"Browse documentation"
@@ -88,66 +88,12 @@ $ crepus web new my-web && crepus web dev
 # Browser extension
 $ crepus webext new my-ext && crepus webext dev
 
+# Native mobile apps (iOS / Android)
+$ crepus native new my-app && crepus native build
+
 # SwiftUI apps (macOS / iOS)
 $ crepus aurora new my-ios && crepus aurora dev
 "
-
-		section py-10 sm:py-14 border-t crepus-t-border crepus-entrance crepus-e3
-			div flex flex-col lg:flex-row lg:items-stretch gap-5 sm:gap-6 lg:gap-8
-				div flex-1 rounded-xl p-5 sm:p-8 crepus-t-card
-					p text-xs font-semibold uppercase tracking-widest crepus-t-muted mb-3 sm:mb-4
-						"Native UI from one source"
-					p text-lg sm:text-xl font-medium crepus-t-text leading-relaxed mb-4 sm:mb-5
-						"Aurorality transforms .crepus templates into native SwiftUI views for macOS and iOS — no WebView, no JavaScript bridge."
-					p text-sm crepus-t-muted m-0 leading-relaxed
-						"Semantic tags like navigationstack, sidebar, list, and menu compile to their SwiftUI equivalents. Add eventSink callbacks for app-state integration, wire Rust backends through UniFFI, and hot-reload through the same crepus dev pipeline that serves GPUI and WASM targets."
-				div flex-1 rounded-xl p-5 sm:p-8 crepus-t-card
-					p text-xs font-semibold uppercase tracking-widest crepus-t-muted mb-3 sm:mb-4
-						"SwiftUI Engine"
-					pre font-mono text-sm m-0 leading-relaxed crepus-t-pre p-4 sm:p-5 rounded-lg whitespace-pre-wrap overflow-x-auto
-						"navigationsplitview\n  sidebar\n    section header=\"Conversations\"\n      for conv in {conversations}\n        item @click=\"select:{conv.id}\"\n          span \"{conv.title}\"\n  detail\n    vstack gap-3 p-4\n      textfield bind=draft placeholder=\"Message\"\n      button button-prominent @click=\"send\"\n        \"Send\""
-				div flex-1 rounded-xl p-5 sm:p-8 crepus-t-card
-					p text-xs font-semibold uppercase tracking-widest crepus-t-muted mb-3 sm:mb-4
-						"Capabilities"
-					div flex flex-col gap-3
-						div flex items-start gap-3
-							span text-xs crepus-t-muted leading-snug mt-0.5
-								"•"
-							div
-								p text-sm font-medium crepus-t-text m-0
-									"Semantic native tags"
-								p text-xs crepus-t-muted m-0 leading-relaxed
-									"navigationstack, sidebar, form, picker, sf-*, and more — all compile to direct SwiftUI views."
-						div flex items-start gap-3
-							span text-xs crepus-t-muted leading-snug mt-0.5
-								"•"
-							div
-								p text-sm font-medium crepus-t-text m-0
-									"macOS chrome"
-								p text-xs crepus-t-muted m-0 leading-relaxed
-									"Root-level menubar and dockbadge for native menu commands and dock badges."
-						div flex items-start gap-3
-							span text-xs crepus-t-muted leading-snug mt-0.5
-								"•"
-							div
-								p text-sm font-medium crepus-t-text m-0
-									"Hot-reload IR & swiftgen"
-								p text-xs crepus-t-muted m-0 leading-relaxed
-									"crepus dev pushes JSON IR updates or re-runs swiftgen on save — same dev loop as every other target."
-						div flex items-start gap-3
-							span text-xs crepus-t-muted leading-snug mt-0.5
-								"•"
-							div
-								p text-sm font-medium crepus-t-text m-0
-									"Rust ↔ Swift bridge"
-								p text-xs crepus-t-muted m-0 leading-relaxed
-									"Plug Rust backends through UniFFI with eventSink wiring for shared state models."
-					div mt-4 sm:mt-5
-						a href="./docs/aurorality.html" no-underline text-sm font-medium crepus-t-text guide-link
-							span
-								"Aurorality guide"
-							span guide-link-arrow
-								"→"
 
 		section py-10 sm:py-14 border-t crepus-t-border crepus-entrance crepus-e4
 			div flex flex-col lg:flex-row lg:items-stretch gap-5 sm:gap-6 lg:gap-8
@@ -272,6 +218,63 @@ $ crepus aurora new my-ios && crepus aurora dev
 				p text-xs crepus-t-muted mt-5 mb-0 data-downloads-status="true"
 					"Loading live crates.io download history…"
 
+
+		section py-10 sm:py-14 border-t crepus-t-border crepus-entrance crepus-e5
+			div flex flex-col lg:flex-row lg:items-stretch gap-5 sm:gap-6 lg:gap-8
+				div flex-1 rounded-xl p-5 sm:p-8 crepus-t-card
+					p text-xs font-semibold uppercase tracking-widest crepus-t-muted mb-3 sm:mb-4
+						"Native UI from one source"
+					p text-lg sm:text-xl font-medium crepus-t-text leading-relaxed mb-4 sm:mb-5
+						"Aurorality transforms .crepus templates into native SwiftUI views for macOS and iOS — no WebView, no JavaScript bridge."
+					p text-sm crepus-t-muted m-0 leading-relaxed
+						"Semantic tags like navigationstack, sidebar, list, and menu compile to their SwiftUI equivalents. Add eventSink callbacks for app-state integration, wire Rust backends through UniFFI, and hot-reload through the same crepus dev pipeline that serves GPUI and WASM targets."
+				div flex-1 rounded-xl p-5 sm:p-8 crepus-t-card
+					p text-xs font-semibold uppercase tracking-widest crepus-t-muted mb-3 sm:mb-4
+						"SwiftUI Engine"
+					pre font-mono text-sm m-0 leading-relaxed crepus-t-pre p-4 sm:p-5 rounded-lg whitespace-pre-wrap overflow-x-auto
+						"navigationsplitview\n  sidebar\n    section header=\"Conversations\"\n      for conv in {conversations}\n        item @click=\"select:{conv.id}\"\n          span \"{conv.title}\"\n  detail\n    vstack gap-3 p-4\n      textfield bind=draft placeholder=\"Message\"\n      button button-prominent @click=\"send\"\n        \"Send\""
+				div flex-1 rounded-xl p-5 sm:p-8 crepus-t-card
+					p text-xs font-semibold uppercase tracking-widest crepus-t-muted mb-3 sm:mb-4
+						"Capabilities"
+					div flex flex-col gap-3
+						div flex items-start gap-3
+							span text-xs crepus-t-muted leading-snug mt-0.5
+								"•"
+							div
+								p text-sm font-medium crepus-t-text m-0
+									"Semantic native tags"
+								p text-xs crepus-t-muted m-0 leading-relaxed
+									"navigationstack, sidebar, form, picker, sf-*, and more — all compile to direct SwiftUI views."
+						div flex items-start gap-3
+							span text-xs crepus-t-muted leading-snug mt-0.5
+								"•"
+							div
+								p text-sm font-medium crepus-t-text m-0
+									"macOS chrome"
+								p text-xs crepus-t-muted m-0 leading-relaxed
+									"Root-level menubar and dockbadge for native menu commands and dock badges."
+						div flex items-start gap-3
+							span text-xs crepus-t-muted leading-snug mt-0.5
+								"•"
+							div
+								p text-sm font-medium crepus-t-text m-0
+									"Hot-reload IR & swiftgen"
+								p text-xs crepus-t-muted m-0 leading-relaxed
+									"crepus dev pushes JSON IR updates or re-runs swiftgen on save — same dev loop as every other target."
+						div flex items-start gap-3
+							span text-xs crepus-t-muted leading-snug mt-0.5
+								"•"
+							div
+								p text-sm font-medium crepus-t-text m-0
+									"Rust ↔ Swift bridge"
+								p text-xs crepus-t-muted m-0 leading-relaxed
+									"Plug Rust backends through UniFFI with eventSink wiring for shared state models."
+					div mt-4 sm:mt-5
+						a href="./docs/aurorality.html" no-underline text-sm font-medium crepus-t-text guide-link
+							span
+								"Aurorality guide"
+							span guide-link-arrow
+								"→"
 
 		section py-16 sm:py-20 border-t crepus-t-border
 			div flex flex-col md:flex-row md:items-end md:justify-between gap-5 sm:gap-6 mb-7 sm:mb-10
