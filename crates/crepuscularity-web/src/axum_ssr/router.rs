@@ -3,7 +3,6 @@ use std::cell::Cell;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use crate::{render_ssr_document_with_nodes, SsrDocument};
 use axum::{
     extract::{Path, State},
     response::Html,
@@ -12,6 +11,7 @@ use axum::{
 };
 use crepuscularity_core::ast::Node;
 use crepuscularity_core::TemplateContext;
+use crate::{render_ssr_document_with_nodes, SsrDocument};
 
 use super::escape_html_error;
 

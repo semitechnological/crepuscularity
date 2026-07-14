@@ -161,7 +161,10 @@ fn launch_viewer(
         .to_string();
 
     eprintln!("crepus inspect: watching {:?}", template_path);
-    eprintln!("crepus inspect: window {}x{}", width as u32, height as u32);
+    eprintln!(
+        "crepus inspect: window {}x{}",
+        width as u32, height as u32
+    );
     eprintln!("crepus inspect: edit and save to hot-reload");
 
     Application::new().run(move |cx: &mut gpui::App| {

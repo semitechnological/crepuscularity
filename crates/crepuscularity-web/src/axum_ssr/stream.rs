@@ -3,11 +3,11 @@
 //! The HTML5 document shell (`<!DOCTYPE html>` + `<head>` section) is rendered and flushed
 //! immediately so the browser can start loading external resources (fonts, CSS, etc.)
 //! while the body is still rendering. The rendered body content follows as a second chunk.
-use crate::{render_nodes_ssr, BindMap, SsrDocument};
 use axum::body::Body;
 use axum::response::{IntoResponse, Response};
 use crepuscularity_core::ast::Node;
 use crepuscularity_core::TemplateContext;
+use crate::{render_nodes_ssr, BindMap, SsrDocument};
 use http::StatusCode;
 use std::cell::Cell;
 use std::sync::Arc;

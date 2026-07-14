@@ -71,7 +71,6 @@ impl TargetBuilder for WebBuilder<'_> {
             .clone()
             .unwrap_or_else(|| self.target.dir.join("dist"))
     }
-
 }
 
 impl TargetBuilder for WebextBuilder<'_> {
@@ -92,7 +91,6 @@ impl TargetBuilder for WebextBuilder<'_> {
     fn output_path(&self, _options: &BuildOptions) -> PathBuf {
         self.target.dir.join("dist").join("unpacked")
     }
-
 }
 
 impl TargetBuilder for LvglBuilder<'_> {
@@ -140,7 +138,6 @@ impl TargetBuilder for LvglBuilder<'_> {
                 .join(format!("{}.xml", self.target.id))
         })
     }
-
 }
 
 impl TargetBuilder for NativeBuilder<'_> {
@@ -180,7 +177,6 @@ impl TargetBuilder for NativeBuilder<'_> {
                 .join(format!("{}.json", self.target.id))
         })
     }
-
 }
 
 impl TargetBuilder for EmbeddedBuilder<'_> {
@@ -233,7 +229,6 @@ impl TargetBuilder for EmbeddedBuilder<'_> {
                 .join(format!("{}.ppm", self.target.id))
         })
     }
-
 }
 
 fn resolve_template_path(target: &ResolvedTarget) -> PathBuf {
