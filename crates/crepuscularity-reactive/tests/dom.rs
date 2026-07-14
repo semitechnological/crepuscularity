@@ -1,7 +1,7 @@
 #[cfg(all(target_arch = "wasm32", feature = "dom"))]
 mod tests {
+    use crepuscularity_reactive::{bind_attr, bind_class, bind_text, Signal};
     use wasm_bindgen_test::*;
-    use crepuscularity_reactive::{bind_text, bind_class, bind_attr, Signal};
 
     // Since we're running tests in Node.js via wasm-bindgen-test without a JSDOM polyfill
     // configured natively, the `window().document()` check returns `None`.
