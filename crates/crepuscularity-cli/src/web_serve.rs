@@ -477,6 +477,7 @@ fn start_watcher(
 
     // Debounce thread: batch events within 50 ms then apply.
     std::thread::spawn(move || {
+        let rt = tokio::runtime::Runtime::new().expect("tokio runtime");
         let mut pending_crepus: Vec<PathBuf> = Vec::new();
         let mut runtime_dirty = false;
         let mut last_event = Instant::now();
@@ -503,21 +504,35 @@ fn start_watcher(
                     let mut last_crepus_path: Option<PathBuf> = None;
 
                     if !pending_crepus.is_empty() {
+                        let results = rt.block_on(async {
+                            let mut futures = Vec::new();
+                            for path in pending_crepus.drain(..) {
+                                let site_dir = site_dir.clone();
+                                futures.push(tokio::task::spawn(async move {
+                                    let key = relative_key(&site_dir, &path);
+                                    let res = tokio::fs::read_to_string(&path).await;
+                                    (key, path, res)
+                                }));
+                            }
+                            futures_util::future::join_all(futures).await
+                        });
+
                         let mut map = vfm
                             .write()
                             .unwrap_or_else(std::sync::PoisonError::into_inner);
-                        for path in pending_crepus.drain(..) {
-                            let key = relative_key(&site_dir, &path);
-                            match std::fs::read_to_string(&path) {
-                                Ok(content) => {
-                                    map.insert(key, content);
-                                    changed += 1;
-                                    last_crepus_path = Some(path);
-                                }
-                                Err(_) => {
-                                    map.remove(&key);
-                                    changed += 1;
-                                    last_crepus_path = Some(path);
+                        for res in results {
+                            if let Ok((key, path, result)) = res {
+                                match result {
+                                    Ok(content) => {
+                                        map.insert(key, content);
+                                        changed += 1;
+                                        last_crepus_path = Some(path);
+                                    }
+                                    Err(_) => {
+                                        map.remove(&key);
+                                        changed += 1;
+                                        last_crepus_path = Some(path);
+                                    }
                                 }
                             }
                         }
