@@ -18,8 +18,6 @@ use crate::ui;
 pub(crate) trait TargetBuilder {
     fn build(&self, options: &BuildOptions) -> Result<(), String>;
     fn output_path(&self, options: &BuildOptions) -> PathBuf;
-    #[allow(dead_code)]
-    fn target_triple(&self) -> Option<&str>;
 }
 
 pub(crate) struct WebBuilder<'a> {
@@ -73,10 +71,6 @@ impl TargetBuilder for WebBuilder<'_> {
             .clone()
             .unwrap_or_else(|| self.target.dir.join("dist"))
     }
-
-    fn target_triple(&self) -> Option<&str> {
-        Some("wasm32-unknown-unknown")
-    }
 }
 
 impl TargetBuilder for WebextBuilder<'_> {
@@ -96,10 +90,6 @@ impl TargetBuilder for WebextBuilder<'_> {
 
     fn output_path(&self, _options: &BuildOptions) -> PathBuf {
         self.target.dir.join("dist").join("unpacked")
-    }
-
-    fn target_triple(&self) -> Option<&str> {
-        Some("wasm32-unknown-unknown")
     }
 }
 
@@ -148,10 +138,6 @@ impl TargetBuilder for LvglBuilder<'_> {
                 .join(format!("{}.xml", self.target.id))
         })
     }
-
-    fn target_triple(&self) -> Option<&str> {
-        None
-    }
 }
 
 impl TargetBuilder for NativeBuilder<'_> {
@@ -190,10 +176,6 @@ impl TargetBuilder for NativeBuilder<'_> {
                 .join("dist")
                 .join(format!("{}.json", self.target.id))
         })
-    }
-
-    fn target_triple(&self) -> Option<&str> {
-        None
     }
 }
 
@@ -246,10 +228,6 @@ impl TargetBuilder for EmbeddedBuilder<'_> {
                 .join("dist")
                 .join(format!("{}.ppm", self.target.id))
         })
-    }
-
-    fn target_triple(&self) -> Option<&str> {
-        None
     }
 }
 
