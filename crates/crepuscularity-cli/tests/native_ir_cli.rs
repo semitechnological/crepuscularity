@@ -1229,6 +1229,10 @@ fn native_add_capability_updates_only_the_scaffold() {
 }
 
 #[test]
+#[cfg_attr(
+    windows,
+    ignore = "default desktop crepus.exe does not spawn reliably on Windows CI"
+)]
 fn native_add_deep_links_keeps_later_ios_privacy_keys() {
     let tmp = tempfile::tempdir().expect("tempdir");
     let root = tmp.path().join("fixture");
