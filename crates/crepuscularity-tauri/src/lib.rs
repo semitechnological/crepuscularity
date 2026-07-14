@@ -1,3 +1,4 @@
+use rayon::prelude::*;
 use std::any::{Any, TypeId};
 use std::collections::{BTreeMap, HashMap};
 use std::fs;
@@ -625,6 +626,8 @@ fn collect_project_uses(root: &Path, uses: &mut Vec<ApiUse>) {
         let Ok(entries) = fs::read_dir(&dir) else {
             continue;
         };
+
+        let mut files = Vec::new();
         for entry in entries.flatten() {
             let path = entry.path();
             if path.is_dir() {
@@ -636,45 +639,60 @@ fn collect_project_uses(root: &Path, uses: &mut Vec<ApiUse>) {
                 }
                 continue;
             }
-            let Some(extension) = path.extension().and_then(|extension| extension.to_str()) else {
-                continue;
-            };
-            let source = path.display().to_string();
-            match extension {
-                "rs" => {
-                    if let Ok(text) = fs::read_to_string(&path) {
-                        if text.contains("#[tauri::command]") || text.contains("#[command]") {
-                            uses.push(api_use(&source, "command", Coverage::Backend));
-                        }
-                        if text.contains(".emit(") || text.contains(".listen(") {
-                            uses.push(api_use(&source, "event", Coverage::Backend));
-                        }
-                    }
-                }
-                "js" | "jsx" | "ts" | "tsx" => {
-                    if let Ok(text) = fs::read_to_string(&path) {
-                        for api in frontend_apis(&text) {
-                            uses.push(api_use(&source, api, frontend_coverage(api)));
-                        }
-                    }
-                }
-                "toml" if path.file_name().and_then(|name| name.to_str()) == Some("Cargo.toml") => {
-                    if let Ok(text) = fs::read_to_string(&path) {
-                        for line in text.lines() {
-                            let name = line.split('=').next().unwrap_or("").trim();
-                            if let Some(plugin) = name.strip_prefix("tauri-plugin-") {
-                                uses.push(api_use(
-                                    &source,
-                                    &format!("plugin.{plugin}"),
-                                    plugin_coverage(plugin),
-                                ));
+            files.push(path);
+        }
+
+        let mut new_uses: Vec<ApiUse> = files
+            .into_par_iter()
+            .flat_map(|path| {
+                let mut local_uses = Vec::new();
+                let Some(extension) = path.extension().and_then(|extension| extension.to_str())
+                else {
+                    return local_uses;
+                };
+                let source = path.display().to_string();
+                match extension {
+                    "rs" => {
+                        if let Ok(text) = fs::read_to_string(&path) {
+                            if text.contains("#[tauri::command]") || text.contains("#[command]") {
+                                local_uses.push(api_use(&source, "command", Coverage::Backend));
+                            }
+                            if text.contains(".emit(") || text.contains(".listen(") {
+                                local_uses.push(api_use(&source, "event", Coverage::Backend));
                             }
                         }
                     }
+                    "js" | "jsx" | "ts" | "tsx" => {
+                        if let Ok(text) = fs::read_to_string(&path) {
+                            for api in frontend_apis(&text) {
+                                local_uses.push(api_use(&source, api, frontend_coverage(api)));
+                            }
+                        }
+                    }
+                    "toml"
+                        if path.file_name().and_then(|name| name.to_str())
+                            == Some("Cargo.toml") =>
+                    {
+                        if let Ok(text) = fs::read_to_string(&path) {
+                            for line in text.lines() {
+                                let name = line.split('=').next().unwrap_or("").trim();
+                                if let Some(plugin) = name.strip_prefix("tauri-plugin-") {
+                                    local_uses.push(api_use(
+                                        &source,
+                                        &format!("plugin.{plugin}"),
+                                        plugin_coverage(plugin),
+                                    ));
+                                }
+                            }
+                        }
+                    }
+                    _ => {}
                 }
-                _ => {}
-            }
-        }
+                local_uses
+            })
+            .collect();
+
+        uses.append(&mut new_uses);
     }
 }
 
