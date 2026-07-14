@@ -1758,6 +1758,7 @@ dependencies = [
 name = "crepuscularity-cli"
 version = "0.10.4"
 dependencies = [
+ "aho-corasick",
  "axum",
  "clap",
  "console",

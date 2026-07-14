@@ -200,22 +200,28 @@ fn scaffold_mobile_app(name: &str) {
     .unwrap_or_else(|e| ui::error(&e));
 
     // Step 3: replace generic names with app-specific ones (after codegen).
-    let replacements: &[(&str, &str)] = &[
-        ("crepus_mobile_actions", &format!("{name_snake}_actions")),
-        (
-            "dev.crepuscularity.nativeshell",
-            &format!("dev.crepuscularity.{name_snake}"),
-        ),
-        (
-            "dev.crepuscularity.mobile",
-            &format!("dev.crepuscularity.{name_snake}"),
-        ),
-        (
-            "dev_crepuscularity_nativeshell",
-            &format!("dev_crepuscularity_{name_snake}"),
-        ),
-        ("CrepusMobileApp", &format!("{name_pascal}App")),
+    let r_0 = format!("{name_snake}_actions");
+    let r_1 = format!("dev.crepuscularity.{name_snake}");
+    let r_2 = format!("dev.crepuscularity.{name_snake}");
+    let r_3 = format!("dev_crepuscularity_{name_snake}");
+    let r_4 = format!("{name_pascal}App");
+
+    let patterns = &[
+        "crepus_mobile_actions",
+        "dev.crepuscularity.nativeshell",
+        "dev.crepuscularity.mobile",
+        "dev_crepuscularity_nativeshell",
+        "CrepusMobileApp",
     ];
+    let replace_with = &[
+        r_0.as_str(),
+        r_1.as_str(),
+        r_2.as_str(),
+        r_3.as_str(),
+        r_4.as_str(),
+    ];
+
+    let ac = aho_corasick::AhoCorasick::new(patterns).expect("failed to build aho-corasick");
 
     let rewrite_paths: &[&str] = &[
         "crepus.toml",
@@ -234,10 +240,7 @@ fn scaffold_mobile_app(name: &str) {
     for rel in rewrite_paths {
         let path = root.join(rel);
         if let Ok(content) = fs::read_to_string(&path) {
-            let mut updated = content.clone();
-            for (from, to) in replacements {
-                updated = updated.replace(from, to);
-            }
+            let updated = ac.replace_all(&content, replace_with);
             if updated != content {
                 let _ = fs::write(&path, updated);
             }
