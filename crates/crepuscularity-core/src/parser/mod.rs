@@ -470,4 +470,73 @@ div
             Some("\"sandboxed\"".to_string())
         );
     }
+
+    #[test]
+    fn split_component_body_sections_basic() {
+        let sections = split_component_body_sections("--- Comp1\nline1\nline2");
+        assert_eq!(sections.len(), 1);
+        assert_eq!(sections[0].0, "Comp1");
+        assert_eq!(sections[0].1, "line1\nline2");
+        assert_eq!(sections[0].2, 10);
+    }
+
+    #[test]
+    fn split_component_body_sections_multiple() {
+        let sections = split_component_body_sections("--- Comp1\nline1\n--- Comp2\nline2");
+        assert_eq!(sections.len(), 2);
+        assert_eq!(sections[0].0, "Comp1");
+        assert_eq!(sections[0].1, "line1");
+        assert_eq!(sections[0].2, 10);
+        assert_eq!(sections[1].0, "Comp2");
+        assert_eq!(sections[1].1, "line2");
+        assert_eq!(sections[1].2, 26);
+    }
+
+    #[test]
+    fn split_component_body_sections_empty_body() {
+        let sections = split_component_body_sections("--- Comp1\n");
+        assert_eq!(sections.len(), 1);
+        assert_eq!(sections[0].0, "Comp1");
+        assert_eq!(sections[0].1, "");
+        assert_eq!(sections[0].2, 10);
+    }
+
+    #[test]
+    fn split_component_body_sections_ignored_text() {
+        let sections = split_component_body_sections("ignored text\n--- Comp1\nline1");
+        assert_eq!(sections.len(), 1);
+        assert_eq!(sections[0].0, "Comp1");
+        assert_eq!(sections[0].1, "line1");
+        assert_eq!(sections[0].2, 23);
+    }
+
+    #[test]
+    fn split_component_body_sections_trimmed_name() {
+        let sections = split_component_body_sections("---   Comp1  \nline1");
+        assert_eq!(sections.len(), 1);
+        assert_eq!(sections[0].0, "Comp1");
+        assert_eq!(sections[0].1, "line1");
+        assert_eq!(sections[0].2, 14);
+    }
+
+    #[test]
+    fn split_component_body_sections_crlf() {
+        let sections = split_component_body_sections("--- Comp1\r\nline1\r\n--- Comp2\r\nline2");
+        assert_eq!(sections.len(), 2);
+        assert_eq!(sections[0].0, "Comp1");
+        assert_eq!(sections[0].1, "line1");
+        assert_eq!(sections[0].2, 11);
+        assert_eq!(sections[1].0, "Comp2");
+        assert_eq!(sections[1].1, "line2");
+        assert_eq!(sections[1].2, 29);
+    }
+
+    #[test]
+    fn split_component_body_sections_no_newline_at_end() {
+        let sections = split_component_body_sections("--- Comp1");
+        assert_eq!(sections.len(), 1);
+        assert_eq!(sections[0].0, "Comp1");
+        assert_eq!(sections[0].1, "");
+        assert_eq!(sections[0].2, 9);
+    }
 }
