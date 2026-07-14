@@ -1,6 +1,6 @@
 [package]
 name = "crepuscularity-cli"
-version = "0.10.4"
+version = "0.10.5"
 edition = "2021"
 license = "MPL-2.0"
 description = "crepus CLI — scaffolding and builds for Crepuscularity (UNSTABLE; in active development)."
@@ -51,16 +51,16 @@ full = ["desktop", "tui", "aurora"]
 
 [dependencies]
 gpui                   = { version = "=0.2.2", default-features = false, features = ["font-kit"], optional = true }
-crepuscularity-core = { path = "../crepuscularity-core", version = "0.4.19" }
-crepuscularity-runtime = { path = "../crepuscularity-runtime", version = "0.4.12", optional = true }
-crepuscularity-tui = { path = "../crepuscularity-tui", version = "0.4.12", optional = true }
-crepuscularity-web = { path = "../crepuscularity-web", version = "0.4.14", features = ["parallel", "ssr", "axum"] }
-crepuscularity-plugin-bindgen = { path = "../crepuscularity-plugin-bindgen", version = "0.1.0" }
-crepuscularity-webext  = { path = "../crepuscularity-webext", version = "0.3.0" }
-crepuscularity-tauri = { path = "../crepuscularity-tauri", version = "0.1.0", features = ["native"] }
-crepuscularity-native = { path = "../crepuscularity-native", version = "0.5.9" }
-crepuscularity-embedded = { path = "../crepuscularity-embedded", version = "0.1.16" }
-crepuscularity-lvgl = { path = "../crepuscularity-lvgl", version = "0.1.5" }
+crepuscularity-core = { path = "../crepuscularity-core", version = "0.4.21" }
+crepuscularity-runtime = { path = "../crepuscularity-runtime", version = "0.4.13", optional = true }
+crepuscularity-tui = { path = "../crepuscularity-tui", version = "0.4.13", optional = true }
+crepuscularity-web = { path = "../crepuscularity-web", version = "0.4.15", features = ["parallel", "ssr", "axum"] }
+crepuscularity-plugin-bindgen = { path = "../crepuscularity-plugin-bindgen", version = "0.1.1" }
+crepuscularity-webext  = { path = "../crepuscularity-webext", version = "0.3.1" }
+crepuscularity-tauri = { path = "../crepuscularity-tauri", version = "0.1.9", features = ["native"] }
+crepuscularity-native = { path = "../crepuscularity-native", version = "0.5.10" }
+crepuscularity-embedded = { path = "../crepuscularity-embedded", version = "0.1.17" }
+crepuscularity-lvgl = { path = "../crepuscularity-lvgl", version = "0.1.6" }
 notify                 = { workspace = true }
 serde                  = { workspace = true }
 serde_json             = { workspace = true }
@@ -78,6 +78,7 @@ ctrlc = "3"
 pulldown-cmark = "0.11"
 clap = { version = "4.5", features = ["derive"] }
 shlex = "1.3.0"
+aho-corasick = "1.1.4"
 
 [dev-dependencies]
 tempfile = { workspace = true }

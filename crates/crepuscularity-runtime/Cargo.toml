@@ -1,6 +1,6 @@
 [package]
 name = "crepuscularity-runtime"
-version = "0.4.12"
+version = "0.4.13"
 edition = "2021"
 license = "MPL-2.0"
 description = "Runtime parser, GPUI renderer, and hot-reload engine for Crepuscularity (UNSTABLE; in active development)."
@@ -14,7 +14,7 @@ default = []
 gpui_text_run_styles = []
 
 [dependencies]
-crepuscularity-core = { path = "../crepuscularity-core", version = "0.4.15", features = ["notify"] }
+crepuscularity-core = { path = "../crepuscularity-core", version = "0.4.21", features = ["notify"] }
 # Pinned: `cargo publish` widens inherited `0.2.2` to `0.2`, which resolves to 0.2.1 (no `Div::hidden`).
 gpui = { version = "=0.2.2", default-features = false, features = ["font-kit"] }
 notify = { workspace = true }
