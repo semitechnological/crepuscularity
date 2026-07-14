@@ -10,11 +10,15 @@ use serde_json::{json, Value};
 
 use crate::bridge::{BridgeError, Capability, NativePlugin};
 
-pub struct InaugurationPlugin;
+pub struct InaugurationPlugin {
+    sandbox_root: std::path::PathBuf,
+}
 
 impl InaugurationPlugin {
     pub fn new() -> Self {
-        Self
+        let root = std::env::current_dir().unwrap_or_else(|_| std::env::temp_dir());
+        let root = std::fs::canonicalize(&root).unwrap_or(root);
+        Self { sandbox_root: root }
     }
 }
 
@@ -42,8 +46,8 @@ impl NativePlugin for InaugurationPlugin {
             "ping" => Ok(json!({ "ok": true, "plugin": "inauguration" })),
             "whichIn" => which_in(),
             "processRun" => process_run(payload),
-            "readFile" => read_file(payload),
-            "writeFile" => write_file(payload),
+            "readFile" => read_file(payload, &self.sandbox_root),
+            "writeFile" => write_file(payload, &self.sandbox_root),
             _ => Err(BridgeError::new(
                 "internal",
                 "method routed but not handled",
@@ -87,17 +91,19 @@ fn process_run(payload: &Value) -> Result<Value, BridgeError> {
     }))
 }
 
-fn read_file(payload: &Value) -> Result<Value, BridgeError> {
+fn read_file(payload: &Value, sandbox_root: &std::path::Path) -> Result<Value, BridgeError> {
     let path = require_str(payload, "path")?;
-    let text = std::fs::read_to_string(&path)
+    let resolved = crate::fs_paths::resolve_under_sandbox(sandbox_root, &path)?;
+    let text = std::fs::read_to_string(&resolved)
         .map_err(|e| BridgeError::new("io_error", format!("read `{path}`: {e}")))?;
     Ok(json!({ "path": path, "text": text }))
 }
 
-fn write_file(payload: &Value) -> Result<Value, BridgeError> {
+fn write_file(payload: &Value, sandbox_root: &std::path::Path) -> Result<Value, BridgeError> {
     let path = require_str(payload, "path")?;
     let text = require_str(payload, "text")?;
-    std::fs::write(&path, text.as_bytes())
+    let resolved = crate::fs_paths::resolve_under_sandbox(sandbox_root, &path)?;
+    std::fs::write(&resolved, text.as_bytes())
         .map_err(|e| BridgeError::new("io_error", format!("write `{path}`: {e}")))?;
     Ok(json!({ "path": path, "bytes": text.len() }))
 }
@@ -114,5 +120,15 @@ mod tests {
             out.get("plugin").and_then(|v| v.as_str()),
             Some("inauguration")
         );
+    }
+
+    #[test]
+    fn rejects_path_traversal() {
+        let p = InaugurationPlugin::new();
+        let payload = json!({ "path": "../etc/passwd" });
+        let res = p.invoke("readFile", &payload);
+        assert!(res.is_err());
+        let err = res.err().unwrap();
+        assert_eq!(err.code, "path_escape");
     }
 }
