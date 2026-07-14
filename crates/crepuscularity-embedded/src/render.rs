@@ -119,8 +119,12 @@ fn render_nodes_list(
     for node in nodes {
         if let Node::LetDecl(decl) = node {
             if !(decl.is_default && ctx.vars.contains_key(&decl.name)) {
-                ctx.vars
-                    .insert(decl.name.clone(), eval_expr(&decl.expr, &ctx)?);
+                let val = eval_expr(&decl.expr, &ctx)?;
+                if let Some(v) = ctx.vars.get_mut(&decl.name) {
+                    *v = val;
+                } else {
+                    ctx.vars.insert(decl.name.clone(), val);
+                }
             }
             continue;
         }
