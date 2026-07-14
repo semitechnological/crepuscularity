@@ -638,11 +638,16 @@ fn collect_project_uses(root: &Path, uses: &mut Vec<ApiUse>) {
                 }
                 continue;
             }
-            let Some(extension) = path.extension().and_then(|ext| ext.to_str()).map(String::from) else {
+            let Some(extension) = path
+                .extension()
+                .and_then(|ext| ext.to_str())
+                .map(String::from)
+            else {
                 continue;
             };
             if matches!(extension.as_str(), "rs" | "js" | "jsx" | "ts" | "tsx")
-                || (extension == "toml" && path.file_name().and_then(|n| n.to_str()) == Some("Cargo.toml"))
+                || (extension == "toml"
+                    && path.file_name().and_then(|n| n.to_str()) == Some("Cargo.toml"))
             {
                 let source = path.display().to_string();
                 files_to_scan.push((path, extension, source));
@@ -652,7 +657,9 @@ fn collect_project_uses(root: &Path, uses: &mut Vec<ApiUse>) {
 
     let mut thread_results = Vec::new();
     std::thread::scope(|s| {
-        let num_threads = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4);
+        let num_threads = std::thread::available_parallelism()
+            .map(|n| n.get())
+            .unwrap_or(4);
         let mut chunks = vec![vec![]; num_threads];
         for (i, file) in files_to_scan.into_iter().enumerate() {
             chunks[i % num_threads].push(file);
@@ -666,7 +673,8 @@ fn collect_project_uses(root: &Path, uses: &mut Vec<ApiUse>) {
                     if let Ok(text) = fs::read_to_string(&path) {
                         match extension.as_str() {
                             "rs" => {
-                                if text.contains("#[tauri::command]") || text.contains("#[command]") {
+                                if text.contains("#[tauri::command]") || text.contains("#[command]")
+                                {
                                     local_uses.push(api_use(&source, "command", Coverage::Backend));
                                 }
                                 if text.contains(".emit(") || text.contains(".listen(") {
