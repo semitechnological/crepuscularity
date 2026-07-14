@@ -245,7 +245,8 @@ impl CrepusLiteConfig {
             let path = base.join(rel);
             if path.exists() {
                 let path = path.canonicalize().unwrap_or(path);
-                if path.starts_with(&canonical_base) && seen.insert(path.clone()) {
+                if path.starts_with(&canonical_base) && !seen.contains(&path) {
+                    seen.insert(path.clone());
                     paths.push(path);
                 }
             }
@@ -254,7 +255,8 @@ impl CrepusLiteConfig {
             let path = base.join(rel);
             if path.exists() {
                 let path = path.canonicalize().unwrap_or(path);
-                if path.starts_with(&canonical_base) && seen.insert(path.clone()) {
+                if path.starts_with(&canonical_base) && !seen.contains(&path) {
+                    seen.insert(path.clone());
                     paths.push(path);
                 }
             }
