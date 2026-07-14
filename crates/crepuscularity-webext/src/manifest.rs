@@ -487,7 +487,12 @@ impl ManifestV3 {
                 .iter()
                 .map(|cs| {
                     let mut css = cs.css.clone();
-                    css.extend(opts.content_css.iter().filter(|&e| !cs.css.contains(e)).cloned());
+                    css.extend(
+                        opts.content_css
+                            .iter()
+                            .filter(|&e| !cs.css.contains(e))
+                            .cloned(),
+                    );
                     ContentScriptSpec {
                         matches: cs.matches.clone(),
                         js: cs.js.clone(),
@@ -540,7 +545,8 @@ impl ManifestV3 {
         let mut resource_matches = manifest.web_accessible_resources.matches.clone();
         if resource_matches.is_empty() {
             resource_matches = host_permissions.to_vec();
-            let mut seen: std::collections::HashSet<&str> = host_permissions.iter().map(|s| s.as_str()).collect();
+            let mut seen: std::collections::HashSet<&str> =
+                host_permissions.iter().map(|s| s.as_str()).collect();
             for content_script in content_scripts {
                 for pattern in &content_script.matches {
                     if seen.insert(pattern.as_str()) {

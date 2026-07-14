@@ -538,6 +538,9 @@ div
         assert_eq!(sections[0].0, "Comp1");
         assert_eq!(sections[0].1, "");
         assert_eq!(sections[0].2, 9);
+    }
+
+    #[test]
     fn split_frontmatter_parts_basic() {
         let content = "+++\nfoo = 'bar'\n+++\nbody content";
         let (toml, rest, offset) = split_frontmatter_parts(content);
@@ -581,7 +584,4 @@ div
         assert_eq!(rest, "\nbody");
         assert_eq!(offset, 7);
     }
-}
-
-
 }

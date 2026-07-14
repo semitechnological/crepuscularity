@@ -1163,8 +1163,6 @@ fn add_photo_library_host(root: &Path) -> Result<(), String> {
     let mut source =
         fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
     if !source.contains("photoLibraryValue") {
-        source = source.replace("import Foundation\n", "import Foundation\n");
-        source = source.replace("import SwiftUI\n", "import SwiftUI\n");
         source = source.replace(
             "import SwiftUI\n#if canImport(UIKit)\n",
             "import SwiftUI\n#if canImport(UIKit)\nimport Photos\n",

@@ -123,7 +123,11 @@ fn build_project(
     let sdk = match config.platform.as_str() {
         "ios" => "iphonesimulator",
         "macos" => "macosx",
-        other => return Err(format!("apple platform must be ios or macos, got {other:?}")),
+        other => {
+            return Err(format!(
+                "apple platform must be ios or macos, got {other:?}"
+            ))
+        }
     };
     let mut command = Command::new("xcodebuild");
     command.current_dir(root).args([
@@ -150,9 +154,7 @@ fn build_project(
                 .unwrap_or("generic/platform=iOS Simulator"),
         );
     }
-    let status = command
-        .status()
-        .map_err(|e| format!("xcodebuild: {e}"))?;
+    let status = command.status().map_err(|e| format!("xcodebuild: {e}"))?;
     if !status.success() {
         return Err("xcodebuild failed".to_string());
     }

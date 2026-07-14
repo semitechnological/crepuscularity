@@ -520,19 +520,17 @@ fn start_watcher(
                         let mut map = vfm
                             .write()
                             .unwrap_or_else(std::sync::PoisonError::into_inner);
-                        for res in results {
-                            if let Ok((key, path, result)) = res {
-                                match result {
-                                    Ok(content) => {
-                                        map.insert(key, content);
-                                        changed += 1;
-                                        last_crepus_path = Some(path);
-                                    }
-                                    Err(_) => {
-                                        map.remove(&key);
-                                        changed += 1;
-                                        last_crepus_path = Some(path);
-                                    }
+                        for (key, path, result) in results.into_iter().flatten() {
+                            match result {
+                                Ok(content) => {
+                                    map.insert(key, content);
+                                    changed += 1;
+                                    last_crepus_path = Some(path);
+                                }
+                                Err(_) => {
+                                    map.remove(&key);
+                                    changed += 1;
+                                    last_crepus_path = Some(path);
                                 }
                             }
                         }

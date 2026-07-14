@@ -120,7 +120,7 @@ fn ssr_options_works() {
 
     let opts = SsrOptions::new(r#"div "Hello from options""#, "Options Test");
     assert_eq!(opts.title, "Options Test");
-    assert!(opts.nodes.len() > 0);
+    assert!(!opts.nodes.is_empty());
 
     let handler = SsrHandler::new(opts);
     let state = handler.state();
