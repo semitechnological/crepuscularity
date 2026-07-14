@@ -2659,10 +2659,6 @@ const TEMPLATE_FILES: &[(&str, &str)] = &[
         ),
     ),
     (
-        "android/app/src/main/res/values/themes.xml",
-        include_str!("../templates/native/android/app/src/main/res/values/themes.xml"),
-    ),
-    (
         "rust/Cargo.toml",
         include_str!("../templates/native/rust/Cargo.toml.template"),
     ),

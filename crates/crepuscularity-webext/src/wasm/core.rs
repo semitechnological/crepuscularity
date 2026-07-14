@@ -56,15 +56,30 @@ pub fn has_browser_global() -> bool {
         .is_some_and(|value| !value.is_undefined() && !value.is_null())
 }
 
-pub fn get_path(root: &JsValue, path: &str) -> Result<JsValue> {
-    let mut current = root.clone();
-    for part in path.split('.') {
-        current = Reflect::get(&current, &JsValue::from_str(part)).map_err(BrowserError::from)?;
-        if current.is_undefined() || current.is_null() {
-            return Err(BrowserError::ApiUnavailable(path.to_string()));
+#[wasm_bindgen(inline_js = "
+export function get_path_js(root, path) {
+    let current = root;
+    let parts = path.split('.');
+    for (let i = 0; i < parts.length; i++) {
+        current = current[parts[i]];
+        if (current === undefined || current === null) {
+            return current;
         }
     }
-    Ok(current)
+    return current;
+}
+")]
+extern "C" {
+    #[wasm_bindgen(catch)]
+    fn get_path_js(root: &JsValue, path: &str) -> std::result::Result<JsValue, JsValue>;
+}
+
+pub fn get_path(root: &JsValue, path: &str) -> Result<JsValue> {
+    let result = get_path_js(root, path).map_err(BrowserError::from)?;
+    if result.is_undefined() || result.is_null() {
+        return Err(BrowserError::ApiUnavailable(path.to_string()));
+    }
+    Ok(result)
 }
 
 pub fn namespace(path: &str) -> Result<JsValue> {
