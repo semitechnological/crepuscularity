@@ -1,7 +1,7 @@
 #[cfg(all(target_arch = "wasm32", feature = "dom"))]
 mod tests {
+    use crepuscularity_reactive::{bind_class, Signal};
     use wasm_bindgen_test::*;
-    use crepuscularity_reactive::{Signal, bind_class};
     use web_sys::window;
 
     // We can test all of them together to be efficient.

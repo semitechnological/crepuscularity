@@ -1,6 +1,6 @@
+use crate::{render_ssr_document_with_nodes, SsrDocument};
 use axum::{extract::State, response::Html};
 use crepuscularity_core::{TemplateContext, TemplateValue};
-use crate::{render_ssr_document_with_nodes, SsrDocument};
 use std::{cell::Cell, collections::HashMap, sync::Arc};
 
 use super::escape_html_error;
@@ -71,7 +71,7 @@ impl SsrHandler {
     ///
     /// ```rust,no_run
     /// use axum::{routing::get, Router};
-    /// use crate::{SsrHandler, SsrOptions};
+    /// use crepuscularity_web::{SsrHandler, SsrOptions};
     /// use std::sync::Arc;
     ///
     /// let handler = SsrHandler::new(SsrOptions::new(r#"div "Hello""#, "Title"));
