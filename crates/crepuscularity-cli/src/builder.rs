@@ -144,7 +144,26 @@ pub fn find_bin_name(cwd: &Path, override_name: Option<&str>) -> Option<String> 
         return Some(name.to_string());
     }
 
-    let content = std::fs::read_to_string(cwd.join("Cargo.toml")).ok()?;
+    thread_local! {
+        static CACHE: std::cell::RefCell<std::collections::HashMap<std::path::PathBuf, String>> = std::cell::RefCell::new(std::collections::HashMap::new());
+    }
+
+    let toml_path = cwd.join("Cargo.toml");
+
+    let content = CACHE.with(|cache| {
+        let mut map = cache.borrow_mut();
+        if let Some(cached) = map.get(&toml_path) {
+            return Some(cached.clone());
+        }
+
+        if let Ok(c) = std::fs::read_to_string(&toml_path) {
+            map.insert(toml_path, c.clone());
+            Some(c)
+        } else {
+            None
+        }
+    })?;
+
     let mut in_bin = false;
     let mut in_package = false;
     let mut package_name: Option<String> = None;
