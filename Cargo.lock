@@ -1943,6 +1943,7 @@ dependencies = [
  "crepuscularity-native",
  "crepuscularity-tauri-macros",
  "json5",
+ "rayon",
  "serde",
  "serde_json",
  "tempfile",

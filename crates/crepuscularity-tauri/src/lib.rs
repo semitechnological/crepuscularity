@@ -1,3 +1,4 @@
+use rayon::prelude::*;
 use std::any::{Any, TypeId};
 use std::collections::{BTreeMap, HashMap};
 use std::fs;
@@ -620,6 +621,7 @@ fn config_uses(config: &Value, config_path: &Path) -> Vec<ApiUse> {
 }
 
 fn collect_project_uses(root: &Path, uses: &mut Vec<ApiUse>) {
+    let mut files_to_read = Vec::new();
     let mut pending = vec![root.to_path_buf()];
     while let Some(dir) = pending.pop() {
         let Ok(entries) = fs::read_dir(&dir) else {
@@ -636,25 +638,33 @@ fn collect_project_uses(root: &Path, uses: &mut Vec<ApiUse>) {
                 }
                 continue;
             }
+            files_to_read.push(path);
+        }
+    }
+
+    let local_uses: Vec<ApiUse> = files_to_read
+        .into_par_iter()
+        .flat_map(|path| {
+            let mut file_uses = Vec::new();
             let Some(extension) = path.extension().and_then(|extension| extension.to_str()) else {
-                continue;
+                return file_uses;
             };
             let source = path.display().to_string();
             match extension {
                 "rs" => {
                     if let Ok(text) = fs::read_to_string(&path) {
                         if text.contains("#[tauri::command]") || text.contains("#[command]") {
-                            uses.push(api_use(&source, "command", Coverage::Backend));
+                            file_uses.push(api_use(&source, "command", Coverage::Backend));
                         }
                         if text.contains(".emit(") || text.contains(".listen(") {
-                            uses.push(api_use(&source, "event", Coverage::Backend));
+                            file_uses.push(api_use(&source, "event", Coverage::Backend));
                         }
                     }
                 }
                 "js" | "jsx" | "ts" | "tsx" => {
                     if let Ok(text) = fs::read_to_string(&path) {
                         for api in frontend_apis(&text) {
-                            uses.push(api_use(&source, api, frontend_coverage(api)));
+                            file_uses.push(api_use(&source, api, frontend_coverage(api)));
                         }
                     }
                 }
@@ -663,7 +673,7 @@ fn collect_project_uses(root: &Path, uses: &mut Vec<ApiUse>) {
                         for line in text.lines() {
                             let name = line.split('=').next().unwrap_or("").trim();
                             if let Some(plugin) = name.strip_prefix("tauri-plugin-") {
-                                uses.push(api_use(
+                                file_uses.push(api_use(
                                     &source,
                                     &format!("plugin.{plugin}"),
                                     plugin_coverage(plugin),
@@ -674,8 +684,11 @@ fn collect_project_uses(root: &Path, uses: &mut Vec<ApiUse>) {
                 }
                 _ => {}
             }
-        }
-    }
+            file_uses
+        })
+        .collect();
+
+    uses.extend(local_uses);
 }
 
 fn frontend_apis(text: &str) -> Vec<&'static str> {
