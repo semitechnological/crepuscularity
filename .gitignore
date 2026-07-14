@@ -39,3 +39,4 @@ crates/crepuscularity-cli/templates/native/android/.gradle/
 .poolside/
 .pi-subagents/
 PR-REVIEW-*.md
+node_modules/
