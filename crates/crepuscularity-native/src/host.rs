@@ -13,16 +13,16 @@ pub fn doctor_command(command: &str, args: &[&str]) -> bool {
     }
     match cmd.output() {
         Ok(out) if out.status.success() => {
-            eprintln!("{} {command}", "✓");
+            eprintln!("✓ {command}");
             true
         }
         Ok(out) => {
             let stderr = String::from_utf8_lossy(&out.stderr);
-            eprintln!("{} {command}: {}", "✗", stderr.trim());
+            eprintln!("✗ {command}: {}", stderr.trim());
             false
         }
         Err(e) => {
-            eprintln!("{} {command}: {e}", "✗");
+            eprintln!("✗ {command}: {e}");
             false
         }
     }
@@ -82,23 +82,22 @@ pub fn doctor_rust_target(target: &str) -> bool {
         Ok(out) if out.status.success() => {
             let stdout = String::from_utf8_lossy(&out.stdout);
             if stdout.lines().any(|line| line.trim() == target) {
-                eprintln!("{} rust target {target}", "✓");
+                eprintln!("✓ rust target {target}");
                 true
             } else {
                 eprintln!(
-                    "{} rust target {target}: install with `rustup target add {target}`",
-                    "✗"
+                    "✗ rust target {target}: install with `rustup target add {target}`"
                 );
                 false
             }
         }
         Ok(out) => {
             let stderr = String::from_utf8_lossy(&out.stderr);
-            eprintln!("{} rustup: {}", "✗", stderr.trim());
+            eprintln!("✗ rustup: {}", stderr.trim());
             false
         }
         Err(e) => {
-            eprintln!("{} rustup: {e}", "✗");
+            eprintln!("✗ rustup: {e}");
             false
         }
     }
@@ -108,13 +107,13 @@ pub fn doctor_java17() -> bool {
     if let Ok(java_home) = std::env::var("JAVA_HOME") {
         let java = PathBuf::from(&java_home).join("bin/java");
         if java_version_at_least(&java, 17) {
-            eprintln!("{} Java 17 {}", "✓", java_home);
+            eprintln!("✓ Java 17 {}", java_home);
             true
         } else if java_version_at_least(Path::new("java"), 17) {
-            eprintln!("{} Java 17 java on PATH", "✓");
+            eprintln!("✓ Java 17 java on PATH");
             true
         } else {
-            eprintln!("{} Java 17: JAVA_HOME does not point to Java 17+", "✗");
+            eprintln!("✗ Java 17: JAVA_HOME does not point to Java 17+");
             false
         }
     } else {
@@ -124,17 +123,16 @@ pub fn doctor_java17() -> bool {
         {
             Ok(out) if out.status.success() => {
                 let path = String::from_utf8_lossy(&out.stdout);
-                eprintln!("{} Java 17 {}", "✓", path.trim());
+                eprintln!("✓ Java 17 {}", path.trim());
                 true
             }
             _ if java_version_at_least(Path::new("java"), 17) => {
-                eprintln!("{} Java 17 java on PATH", "✓");
+                eprintln!("✓ Java 17 java on PATH");
                 true
             }
             _ => {
                 eprintln!(
-                    "{} Java 17: install openjdk@17 and expose it to Gradle",
-                    "✗"
+                    "✗ Java 17: install openjdk@17 and expose it to Gradle"
                 );
                 false
             }
@@ -169,22 +167,21 @@ pub fn doctor_java_home() -> bool {
         Ok(raw) => {
             let path = PathBuf::from(&raw);
             if path.join("bin/java").exists() {
-                eprintln!("{} JAVA_HOME {}", "✓", path.display());
+                eprintln!("✓ JAVA_HOME {}", path.display());
                 true
             } else if Path::new("java").exists() || java_version_at_least(Path::new("java"), 17) {
-                eprintln!("{} JAVA_HOME invalid; Gradle will use java from PATH", "✓");
+                eprintln!("✓ JAVA_HOME invalid; Gradle will use java from PATH");
                 true
             } else {
                 eprintln!(
-                    "{} JAVA_HOME {} does not contain bin/java",
-                    "✗",
+                    "✗ JAVA_HOME {} does not contain bin/java",
                     path.display()
                 );
                 false
             }
         }
         Err(_) => {
-            eprintln!("{} JAVA_HOME not set; Gradle will use java from PATH", "✓");
+            eprintln!("✓ JAVA_HOME not set; Gradle will use java from PATH");
             true
         }
     }
@@ -197,15 +194,15 @@ pub fn doctor_android_sdk() -> bool {
         .map(PathBuf::from);
     match sdk {
         Some(path) if path.join("platforms").exists() => {
-            eprintln!("{} Android SDK {}", "✓", path.display());
+            eprintln!("✓ Android SDK {}", path.display());
             true
         }
         Some(path) => {
-            eprintln!("{} Android SDK {} missing platforms/", "✗", path.display());
+            eprintln!("✗ Android SDK {} missing platforms/", path.display());
             false
         }
         None => {
-            eprintln!("{} Android SDK: set ANDROID_HOME or ANDROID_SDK_ROOT", "✗");
+            eprintln!("✗ Android SDK: set ANDROID_HOME or ANDROID_SDK_ROOT");
             false
         }
     }
@@ -214,7 +211,7 @@ pub fn doctor_android_sdk() -> bool {
 pub fn doctor_android_ndk() -> bool {
     if let Ok(path) = std::env::var("ANDROID_NDK_HOME").map(PathBuf::from) {
         if android_ndk_clang(&path).is_some() {
-            eprintln!("{} Android NDK {}", "✓", path.display());
+            eprintln!("✓ Android NDK {}", path.display());
             return true;
         }
     }
@@ -225,13 +222,12 @@ pub fn doctor_android_ndk() -> bool {
     if let Some(sdk) = sdk {
         let ndk = sdk.join("ndk");
         if let Some(path) = latest_android_ndk(&ndk) {
-            eprintln!("{} Android NDK {}", "✓", path.display());
+            eprintln!("✓ Android NDK {}", path.display());
             return true;
         }
     }
     eprintln!(
-        "{} Android NDK: install via Android Studio SDK Manager or set ANDROID_NDK_HOME",
-        "✗"
+        "✗ Android NDK: install via Android Studio SDK Manager or set ANDROID_NDK_HOME"
     );
     false
 }
