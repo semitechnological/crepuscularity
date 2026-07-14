@@ -1,6 +1,6 @@
-use crate::{render_ssr_document_with_nodes, SsrDocument};
 use axum::{extract::State, response::Html};
 use crepuscularity_core::{TemplateContext, TemplateValue};
+use crate::{render_ssr_document_with_nodes, SsrDocument};
 use std::{cell::Cell, collections::HashMap, sync::Arc};
 
 use super::escape_html_error;
