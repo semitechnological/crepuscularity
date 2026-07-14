@@ -93,7 +93,8 @@ fn dispatch_action_inner(action: &str, state: &serde_json::Value) -> serde_json:
 }
 
 fn dispatch_change_and_store(action: &str, bind: &str, value_json: &str) -> String {
-    let value: serde_json::Value = serde_json::from_str(value_json).unwrap_or(serde_json::Value::Null);
+    let value: serde_json::Value =
+        serde_json::from_str(value_json).unwrap_or(serde_json::Value::Null);
     let mut state = view_state().lock().unwrap_or_else(|e| e.into_inner());
 
     // Apply the bind change directly to view state.
@@ -106,9 +107,12 @@ fn dispatch_change_and_store(action: &str, bind: &str, value_json: &str) -> Stri
         serde_json::json!({"ok": true})
     } else {
         match action {
-            "tasks.toggle" | "settings.darkMode" | "settings.notifications"
-            | "settings.sync" => serde_json::json!({"ok": true, "action": action}),
-            _ => serde_json::json!({"ok": false, "error": format!("unknown change action: {action}")}),
+            "tasks.toggle" | "settings.darkMode" | "settings.notifications" | "settings.sync" => {
+                serde_json::json!({"ok": true, "action": action})
+            }
+            _ => {
+                serde_json::json!({"ok": false, "error": format!("unknown change action: {action}")})
+            }
         }
     };
 
@@ -119,15 +123,15 @@ fn dispatch_change_and_store(action: &str, bind: &str, value_json: &str) -> Stri
             obj.insert(k.clone(), v.clone());
         }
     }
-    let json = result.to_string();
-    json
+
+    result.to_string()
 }
 
 fn store_result(json: &str) {
-    let Ok(result) = serde_json::from_str::<serde_json::Value>(json) else {
+    let Ok(mut result) = serde_json::from_str::<serde_json::Value>(json) else {
         return;
     };
-    let Some(obj) = result.as_object() else {
+    let Some(obj) = result.as_object_mut() else {
         return;
     };
     let Some(ok) = obj.get("ok").and_then(|v| v.as_bool()) else {
@@ -138,12 +142,12 @@ fn store_result(json: &str) {
     }
 
     // If result has a "value" key, merge those fields into view state.
-    if let Some(value) = obj.get("value") {
-        if let Some(value_obj) = value.as_object() {
+    if let Some(true) = obj.get("value").map(|v| v.is_object()) {
+        if let Some(serde_json::Value::Object(value_obj)) = obj.remove("value") {
             let mut state = view_state().lock().unwrap_or_else(|e| e.into_inner());
             if let Some(state_obj) = state.as_object_mut() {
                 for (k, v) in value_obj {
-                    state_obj.insert(k.clone(), v.clone());
+                    state_obj.insert(k, v);
                 }
             }
         }
@@ -153,9 +157,9 @@ fn store_result(json: &str) {
     let skip = ["ok", "action", "error"];
     let mut state = view_state().lock().unwrap_or_else(|e| e.into_inner());
     if let Some(state_obj) = state.as_object_mut() {
-        for (k, v) in obj {
-            if !skip.contains(&k.as_str()) && !state_obj.contains_key(k) {
-                state_obj.insert(k.clone(), v.clone());
+        for (k, v) in std::mem::take(obj) {
+            if !skip.contains(&k.as_str()) && !state_obj.contains_key(&k) {
+                state_obj.insert(k, v);
             }
         }
     }
@@ -165,16 +169,16 @@ fn store_result(json: &str) {
 
 /// Store raw JSON result directly (for JNI storeResultJson).
 fn store_result_json_raw(json: &str) -> bool {
-    let Ok(result) = serde_json::from_str::<serde_json::Value>(json) else {
+    let Ok(mut result) = serde_json::from_str::<serde_json::Value>(json) else {
         return false;
     };
-    let Some(obj) = result.as_object() else {
+    let Some(obj) = result.as_object_mut() else {
         return false;
     };
     let mut state = view_state().lock().unwrap_or_else(|e| e.into_inner());
     if let Some(state_obj) = state.as_object_mut() {
-        for (k, v) in obj {
-            state_obj.insert(k.clone(), v.clone());
+        for (k, v) in std::mem::take(obj) {
+            state_obj.insert(k, v);
         }
     }
     true
@@ -209,7 +213,10 @@ fn eval_number(expr: &str, scope_name: Option<&str>, scope_json: Option<&str>) -
 fn eval_items_json(expr: &str, scope_name: Option<&str>, scope_json: Option<&str>) -> String {
     let state = view_state().lock().unwrap_or_else(|e| e.into_inner());
     resolve_expr(&state, expr, scope_name, scope_json)
-        .and_then(|v| v.as_array().map(|a| serde_json::to_string(a).unwrap_or_else(|_| "[]".into())))
+        .and_then(|v| {
+            v.as_array()
+                .map(|a| serde_json::to_string(a).unwrap_or_else(|_| "[]".into()))
+        })
         .unwrap_or_else(|| "[]".into())
 }
 
@@ -449,9 +456,7 @@ pub extern "system" fn Java_dev_crepuscularity_mobileapp_CrepusRustActions_dispa
 
 #[cfg(target_os = "android")]
 #[no_mangle]
-pub extern "system" fn Java_dev_crepuscularity_mobileapp_CrepusRustActions_evalText<
-    'a,
->(
+pub extern "system" fn Java_dev_crepuscularity_mobileapp_CrepusRustActions_evalText<'a>(
     env: jni::JNIEnv<'a>,
     _class: jni::objects::JClass<'a>,
     expr: jni::objects::JString<'a>,
@@ -465,9 +470,7 @@ pub extern "system" fn Java_dev_crepuscularity_mobileapp_CrepusRustActions_evalT
 
 #[cfg(target_os = "android")]
 #[no_mangle]
-pub extern "system" fn Java_dev_crepuscularity_mobileapp_CrepusRustActions_evalBool<
-    'a,
->(
+pub extern "system" fn Java_dev_crepuscularity_mobileapp_CrepusRustActions_evalBool<'a>(
     env: jni::JNIEnv<'a>,
     _class: jni::objects::JClass<'a>,
     expr: jni::objects::JString<'a>,
@@ -493,9 +496,7 @@ pub extern "system" fn Java_dev_crepuscularity_mobileapp_CrepusRustActions_evalN
 
 #[cfg(target_os = "android")]
 #[no_mangle]
-pub extern "system" fn Java_dev_crepuscularity_mobileapp_CrepusRustActions_evalItemsJson<
-    'a,
->(
+pub extern "system" fn Java_dev_crepuscularity_mobileapp_CrepusRustActions_evalItemsJson<'a>(
     env: jni::JNIEnv<'a>,
     _class: jni::objects::JClass<'a>,
     expr: jni::objects::JString<'a>,
@@ -509,9 +510,7 @@ pub extern "system" fn Java_dev_crepuscularity_mobileapp_CrepusRustActions_evalI
 
 #[cfg(target_os = "android")]
 #[no_mangle]
-pub extern "system" fn Java_dev_crepuscularity_mobileapp_CrepusRustActions_storeResultJson<
-    'a,
->(
+pub extern "system" fn Java_dev_crepuscularity_mobileapp_CrepusRustActions_storeResultJson<'a>(
     env: jni::JNIEnv<'a>,
     _class: jni::objects::JClass<'a>,
     json: jni::objects::JString<'a>,
