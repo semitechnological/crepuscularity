@@ -160,11 +160,9 @@ pub fn render_component(
 
     let mut child_ctx = with_tui_target(ctx);
     for (key, expr) in component.meta.defaults {
-        if !child_ctx.vars.contains_key(&key) {
-            child_ctx
-                .vars
-                .insert(key, eval_value(&expr, &TemplateContext::default()));
-        }
+        child_ctx.vars.entry(key).or_insert_with(|| {
+            eval_value(&expr, &TemplateContext::default())
+        });
     }
 
     render_nodes(&component.nodes, &child_ctx, frame, area)
