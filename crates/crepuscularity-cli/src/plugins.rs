@@ -88,11 +88,21 @@ fn run_test(manifest: Option<PathBuf>) {
     let mut failed = false;
     for pkg in &m.package {
         print!("  {} {} … ", style("→").cyan(), pkg.language);
-        let status = Command::new("sh")
-            .arg("-c")
-            .arg(&pkg.test)
+
+        let args = match shlex::split(&pkg.test) {
+            Some(a) if !a.is_empty() => a,
+            _ => {
+                println!("{}", style("invalid command string").red());
+                failed = true;
+                continue;
+            }
+        };
+
+        let status = Command::new(&args[0])
+            .args(&args[1..])
             .current_dir(&root)
             .status();
+
         match status {
             Ok(s) if s.success() => println!("{}", style("ok").green()),
             Ok(s) => {
