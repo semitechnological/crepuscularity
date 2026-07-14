@@ -487,11 +487,7 @@ impl ManifestV3 {
                 .iter()
                 .map(|cs| {
                     let mut css = cs.css.clone();
-                    for extra in &opts.content_css {
-                        if !css.contains(extra) {
-                            css.push(extra.clone());
-                        }
-                    }
+                    css.extend(opts.content_css.iter().filter(|&e| !cs.css.contains(e)).cloned());
                     ContentScriptSpec {
                         matches: cs.matches.clone(),
                         js: cs.js.clone(),
