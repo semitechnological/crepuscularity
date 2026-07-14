@@ -152,18 +152,18 @@ pub fn render_component(
     frame: &mut Frame,
     area: Rect,
 ) -> Result<(), CrepusError> {
-    let file = parse_component_file(content)?;
+    let mut file = parse_component_file(content)?;
     let component = file
         .components
-        .get(component_name)
+        .remove(component_name)
         .ok_or_else(|| CrepusError::render(format!("component not found: {component_name}")))?;
 
     let mut child_ctx = with_tui_target(ctx);
-    for (key, expr) in &component.meta.defaults {
-        if !child_ctx.vars.contains_key(key) {
+    for (key, expr) in component.meta.defaults {
+        if !child_ctx.vars.contains_key(&key) {
             child_ctx
                 .vars
-                .insert(key.clone(), eval_value(expr, &TemplateContext::default()));
+                .insert(key, eval_value(&expr, &TemplateContext::default()));
         }
     }
 
