@@ -34,3 +34,4 @@ js-sys = { workspace = true, optional = true }
 
 [dev-dependencies]
 crepuscularity-core = { path = "../crepuscularity-core", version = "0.4.15" }
+wasm-bindgen-test = "0.3"
