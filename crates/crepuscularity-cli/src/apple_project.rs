@@ -67,7 +67,9 @@ pub(crate) fn execute(command: AppleCommands) {
             let options = build.into_options_or_exit();
             let (root, config) = load(dir);
             let project = generate_configured(&root, &config);
-            build_project(&root, &project, &config, options);
+            if let Err(e) = build_project(&root, &project, &config, options) {
+                ui::error(&e);
+            }
         }
     }
 }
@@ -113,15 +115,15 @@ fn build_project(
     project: &Path,
     config: &crate::crepus_toml::AppleTomlSection,
     options: BuildOptions,
-) {
+) -> Result<(), String> {
     let project_name = project
         .file_name()
         .and_then(|name| name.to_str())
-        .unwrap_or_else(|| ui::error("invalid Apple project name"));
+        .ok_or_else(|| "invalid Apple project name".to_string())?;
     let sdk = match config.platform.as_str() {
         "ios" => "iphonesimulator",
         "macos" => "macosx",
-        _ => unreachable!(),
+        other => return Err(format!("apple platform must be ios or macos, got {other:?}")),
     };
     let mut command = Command::new("xcodebuild");
     command.current_dir(root).args([
@@ -150,10 +152,11 @@ fn build_project(
     }
     let status = command
         .status()
-        .unwrap_or_else(|e| ui::error(&format!("xcodebuild: {e}")));
+        .map_err(|e| format!("xcodebuild: {e}"))?;
     if !status.success() {
-        ui::error("xcodebuild failed");
+        return Err("xcodebuild failed".to_string());
     }
+    Ok(())
 }
 
 fn project_file(config: &Config<'_>) -> String {
