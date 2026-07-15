@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tree-sitter-crepusx"
+description = "CrepusX grammar for tree-sitter"
+version = "0.0.1"
+keywords = ["incremental", "parsing", "tree-sitter", "crepusx"]
+classifiers = [
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: Mozilla Public License 2.0 (MPL-2.0)",
+  "Topic :: Software Development :: Compilers",
+  "Topic :: Text Processing :: Linguistic",
+  "Typing :: Typed"
+]
+requires-python = ">=3.10"
+license.text = "MPL-2.0"
+readme = "README.md"
+
+[project.urls]
+Homepage = "https://github.com/tschk/crepuscularity"
+
+[project.optional-dependencies]
+core = ["tree-sitter~=0.21"]
+
+[tool.cibuildwheel]
+build = "cp310-*"
+build-frontend = "build"
