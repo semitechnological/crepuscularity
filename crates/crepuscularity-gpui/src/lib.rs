@@ -82,24 +82,6 @@ impl From<Anchor> for Corner {
     }
 }
 
-pub struct InputLatencySnapshot {
-    pub latency_histogram: hdrhistogram::Histogram<u64>,
-    pub events_per_frame_histogram: hdrhistogram::Histogram<u64>,
-    pub mid_draw_events_dropped: u64,
-}
-
-impl Default for InputLatencySnapshot {
-    fn default() -> Self {
-        Self {
-            latency_histogram: hdrhistogram::Histogram::new(3)
-                .expect("valid input latency histogram precision"),
-            events_per_frame_histogram: hdrhistogram::Histogram::new(3)
-                .expect("valid input event histogram precision"),
-            mid_draw_events_dropped: 0,
-        }
-    }
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum WindowButton {
     Minimize,

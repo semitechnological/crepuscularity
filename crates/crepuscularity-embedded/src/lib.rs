@@ -78,9 +78,6 @@ pub mod template;
 #[cfg(feature = "std")]
 pub mod ui;
 
-#[cfg(feature = "std")]
-pub mod ppm;
-
 #[cfg(all(test, feature = "std"))]
 mod tests;
 
@@ -107,8 +104,6 @@ pub use display::{
 };
 pub use panel::preset::PanelPreset;
 #[cfg(feature = "std")]
-pub use ppm::write_ppm;
-#[cfg(feature = "std")]
 pub use render::{
     render_component_file_to_framebuffer, render_file_to_framebuffer, render_nodes_to_document,
     render_parsed_nodes_to_framebuffer, render_template_to_framebuffer, with_embedded_target,
@@ -117,6 +112,12 @@ pub use render::{
 pub use template::{template, Template};
 #[cfg(feature = "std")]
 pub use ui::Ui;
+
+/// PPM (P6) export — delegates to [`Rgb888Buffer::write_ppm`].
+#[cfg(feature = "std")]
+pub fn write_ppm(path: &std::path::Path, buffer: &framebuffer::Rgb888Buffer) -> Result<(), String> {
+    buffer.write_ppm(path)
+}
 
 /// Shorthand for [`Ui::new`] with optional `.set` chain.
 ///

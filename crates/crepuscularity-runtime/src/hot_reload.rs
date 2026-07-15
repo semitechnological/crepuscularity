@@ -34,7 +34,6 @@ use gpui::{
 use notify::Watcher;
 
 use crate::renderer::render_nodes;
-use crate::watcher::create_watcher;
 use crepuscularity_core::ast::Node;
 use crepuscularity_core::context::TemplateContext;
 
@@ -66,7 +65,11 @@ impl HotReloadState {
         // The watcher worker keeps running as long as we hold this Box.
         // Surface creation errors as a red template block so a misconfigured
         // path does not silently disable hot reload.
-        let watcher = match create_watcher(path.clone(), Arc::clone(&changed)) {
+        let watcher = match crepuscularity_core::watch::create_watcher(
+            path.clone(),
+            Arc::clone(&changed),
+            "runtime",
+        ) {
             Ok(w) => Some(w),
             Err(e) => {
                 eprintln!("[crepuscularity-runtime] hot reload disabled: {e}");
