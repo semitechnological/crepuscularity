@@ -1,7 +1,40 @@
 use std::process::Command;
+use std::sync::Once;
 
+static BUILD_SLIM: Once = Once::new();
+
+/// Returns a `Command` for the `crepus` binary built without the `desktop`
+/// feature. On Windows CI the full binary links GPUI DLLs that aren't present;
+/// the tauri/native commands don't need them.
 fn crepus() -> Command {
-    Command::new(env!("CARGO_BIN_EXE_crepus"))
+    BUILD_SLIM.call_once(|| {
+        let status = Command::new(env!("CARGO"))
+            .args([
+                "build",
+                "--locked",
+                "-p",
+                "crepuscularity-cli",
+                "--no-default-features",
+            ])
+            .status()
+            .expect("cargo build slim crepus");
+        assert!(status.success(), "slim crepus build failed");
+    });
+    let pkg_dir = env!("CARGO_MANIFEST_DIR");
+    let profile = if cfg!(debug_assertions) {
+        "debug"
+    } else {
+        "release"
+    };
+    let bin = std::path::Path::new(pkg_dir)
+        .join("../../target")
+        .join(profile)
+        .join(if cfg!(windows) {
+            "crepus.exe"
+        } else {
+            "crepus"
+        });
+    Command::new(bin)
 }
 
 /// Run a command and panic with full diagnostics (exit code, stderr, stdout) on failure.
