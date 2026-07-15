@@ -1,5 +1,5 @@
 name = "CrepusX"
-grammar = "crepus"
+grammar = "crepusx"
 path_suffixes = ["csx"]
 line_comments = ["# "]
 tab_size = 2
