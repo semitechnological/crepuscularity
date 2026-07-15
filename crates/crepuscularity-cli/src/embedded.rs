@@ -4,7 +4,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crepuscularity_core::context::{TemplateContext, TemplateValue};
-use crepuscularity_core::parser::{parse_component_file, parse_template};
+use crepuscularity_core::parser::{parse_component_file, parse_template_with_path};
 use crepuscularity_embedded::{write_ppm, Ui};
 use serde_json::Value;
 
@@ -67,7 +67,7 @@ fn run_check_file(path: &Path, component: Option<String>) -> Result<(), String> 
             .get(&name)
             .ok_or_else(|| format!("component not found: {name}"))?;
     } else {
-        parse_template(&content).map_err(|e| e.to_string())?;
+        parse_template_with_path(&content, Some(path)).map_err(|e| e.to_string())?;
     }
     println!("ok: {}", path.display());
     Ok(())

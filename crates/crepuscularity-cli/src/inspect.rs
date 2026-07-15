@@ -5,7 +5,8 @@
 use std::path::{Path, PathBuf};
 
 use crepuscularity_core::context::{TemplateContext, TemplateValue};
-use crepuscularity_core::parser::parse_template;
+use crepuscularity_core::parser::parse_template_with_path;
+use crepuscularity_web::render_nodes_to_html;
 
 use crate::cli::InspectMode;
 use crate::ui;
@@ -49,8 +50,8 @@ pub fn execute(
     }
 
     match mode {
-        InspectMode::Ast => dump_ast(&source),
-        InspectMode::Render => dump_html(&source, &ctx_vars),
+        InspectMode::Ast => dump_ast(&source, &file),
+        InspectMode::Render => dump_html(&source, &file, &ctx_vars),
         InspectMode::Ir => dump_ir(&source, &file, &ctx_vars),
         InspectMode::Ctx => dump_ctx(&file),
         InspectMode::Preview => {
@@ -69,20 +70,23 @@ pub fn execute(
     }
 }
 
-fn dump_ast(source: &str) {
-    match parse_template(source) {
+fn dump_ast(source: &str, path: &Path) {
+    match parse_template_with_path(source, Some(path)) {
         Ok(ast) => println!("{ast:#?}"),
         Err(e) => ui::error(&format!("Parse error: {e}")),
     }
 }
 
-fn dump_html(source: &str, vars: &[(String, TemplateValue)]) {
+fn dump_html(source: &str, path: &Path, vars: &[(String, TemplateValue)]) {
     let mut ctx = TemplateContext::new();
     for (k, v) in vars {
         ctx.set(k, v.clone());
     }
-    match crepuscularity_web::render_template_to_html(source, &ctx) {
-        Ok(html) => print!("{html}"),
+    match parse_template_with_path(source, Some(path)) {
+        Ok(nodes) => match render_nodes_to_html(&nodes, &ctx) {
+            Ok(html) => print!("{html}"),
+            Err(e) => ui::error(&format!("Render error: {e}")),
+        },
         Err(e) => ui::error(&format!("Render error: {e}")),
     }
 }

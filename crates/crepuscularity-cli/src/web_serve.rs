@@ -189,14 +189,14 @@ fn walk_crepus_files(dir: &Path, out: &mut Vec<PathBuf>) {
 
 /// Walk `site_dir` and parse every `.crepus` file, printing pass/fail per file.
 fn validate_templates(site_dir: &std::path::Path) {
-    use crepuscularity_core::parser::parse_template;
+    use crepuscularity_core::parser::parse_template_with_path;
     let mut found = false;
     let mut files = Vec::new();
     walk_crepus_files(site_dir, &mut files);
     for path in &files {
         found = true;
         let rel = path.strip_prefix(site_dir).unwrap_or(path);
-        match std::fs::read_to_string(path).map(|s| parse_template(&s)) {
+        match std::fs::read_to_string(path).map(|s| parse_template_with_path(&s, Some(path))) {
             Ok(Ok(_)) => eprintln!("  {} {}", console::style("✓").green(), rel.display()),
             Ok(Err(e)) => eprintln!("  {} {} — {}", console::style("✗").red(), rel.display(), e),
             Err(e) => eprintln!(
@@ -400,7 +400,7 @@ fn relative_key(root: &Path, abs: &Path) -> String {
 
 /// Try to parse `path` and return the appropriate SSE event string.
 fn build_sse_message(path: &Path) -> String {
-    use crepuscularity_core::parser::parse_template;
+    use crepuscularity_core::parser::parse_template_with_path;
     let filename = path
         .file_name()
         .unwrap_or_default()
@@ -410,7 +410,7 @@ fn build_sse_message(path: &Path) -> String {
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
         .as_millis();
-    match std::fs::read_to_string(path).map(|s| parse_template(&s)) {
+    match std::fs::read_to_string(path).map(|s| parse_template_with_path(&s, Some(path))) {
         Ok(Ok(_)) => format!(
             "event: crepus-reload\ndata: {{\"file\":\"{}\",\"ts\":{}}}\n\n",
             filename, ts

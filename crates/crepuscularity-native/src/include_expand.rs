@@ -7,7 +7,7 @@ use crepuscularity_core::ast::{IncludeNode, Node};
 use crepuscularity_core::context::TemplateContext;
 use crepuscularity_core::eval::eval_expr;
 use crepuscularity_core::include_paths::resolve_include_path;
-use crepuscularity_core::parser::{parse_component_file, parse_template};
+use crepuscularity_core::parser::{parse_component_file, parse_template_with_path};
 use crepuscularity_core::virtual_files::lookup_virtual_file;
 use crepuscularity_core::CrepusError;
 
@@ -58,7 +58,7 @@ pub(crate) fn expand_include_with_depth(
 
     let file_path = resolve_include_path(ctx.base_dir.as_deref(), &inc.path)?;
     let content = read_file(ctx, &file_path)?;
-    let nodes = parse_template(&content)
+    let nodes = parse_template_with_path(&content, Some(&file_path))
         .map_err(|e| CrepusError::render(format!("include parse error: {e}")))?;
 
     let mut child_ctx = TemplateContext::new();

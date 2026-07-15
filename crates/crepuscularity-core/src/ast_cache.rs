@@ -7,7 +7,7 @@ use std::time::SystemTime;
 
 use crate::ast::Node;
 use crate::error::CrepusError;
-use crate::parser::parse_template;
+use crate::parser::{parse_template, parse_template_with_path};
 
 thread_local! {
     static FILE_CACHE: RefCell<HashMap<PathBuf, FileCacheEntry>> = RefCell::new(HashMap::new());
@@ -52,7 +52,7 @@ pub fn parse_file(path: &Path) -> Result<Arc<Vec<Node>>, CrepusError> {
             format!("read {:?}: {e}", path),
         ))
     })?;
-    let nodes = Arc::new(parse_template(&content)?);
+    let nodes = Arc::new(parse_template_with_path(&content, Some(path))?);
 
     FILE_CACHE.with(|cache| {
         cache.borrow_mut().insert(

@@ -27,7 +27,10 @@ fn compile_path(path: &Path) -> Result<(), String> {
         return Ok(());
     }
 
-    if path.extension().and_then(|ext| ext.to_str()) == Some("crepus") {
+    if matches!(
+        path.extension().and_then(|ext| ext.to_str()),
+        Some("crepus" | "csx" | "jsx" | "tsx")
+    ) {
         let source = fs::read_to_string(path)
             .map_err(|e| format!("could not read {}: {e}", path.display()))?;
         if let Ok(file) = crate::parse_component_file(&source) {
@@ -35,7 +38,7 @@ fn compile_path(path: &Path) -> Result<(), String> {
                 return Ok(());
             }
         }
-        crate::parse_template(&source)
+        crate::parse_template_with_path(&source, Some(path))
             .map_err(|e| format!("could not parse {}: {e}", path.display()))?;
     }
 

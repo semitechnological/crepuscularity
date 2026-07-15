@@ -225,11 +225,27 @@ fn toml_value_to_expr(v: &toml::Value) -> String {
 
 #[tracing::instrument(skip(template), fields(len = template.len()))]
 pub fn parse_template(template: &str) -> Result<Vec<Node>, crate::error::CrepusError> {
-    parse_template_raw(template).map_err(|e| crate::error::CrepusError::parse(e.message))
+    parse_template_with_path(template, None)
+}
+
+/// Parse a template, optionally using the file path to force JSX mode.
+/// This is used by the CLI to detect `.csx` / `.jsx` / `.tsx` files.
+pub fn parse_template_with_path(
+    template: &str,
+    path: Option<&std::path::Path>,
+) -> Result<Vec<Node>, crate::error::CrepusError> {
+    parse_template_raw_with_path(template, path).map_err(|e| crate::error::CrepusError::parse(e.message))
 }
 
 pub(crate) fn parse_template_raw(template: &str) -> Result<Vec<Node>, RawParseError> {
-    if is_jsx_mode(template) {
+    parse_template_raw_with_path(template, None)
+}
+
+pub(crate) fn parse_template_raw_with_path(
+    template: &str,
+    path: Option<&std::path::Path>,
+) -> Result<Vec<Node>, RawParseError> {
+    if is_jsx_mode(template, path) {
         parse_jsx_template(template)
     } else {
         let dec = crate::preprocess::strip_indent_decorators(template);
@@ -240,9 +256,19 @@ pub(crate) fn parse_template_raw(template: &str) -> Result<Vec<Node>, RawParseEr
     }
 }
 
-/// Returns true when the first non-blank, non-comment, non-`$:` line starts with `<`.
+/// Returns true when the first non-blank, non-comment, non-`$:` line starts with `<`
+/// or when the file path has a JSX extension (`.csx`, `.jsx`, `.tsx`).
 /// This activates the JSX/HTML tag-based input syntax.
-pub(crate) fn is_jsx_mode(template: &str) -> bool {
+pub(crate) fn is_jsx_mode(template: &str, path: Option<&std::path::Path>) -> bool {
+    if let Some(path) = path {
+        if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+            let ext = ext.to_lowercase();
+            if ext == "csx" || ext == "jsx" || ext == "tsx" {
+                return true;
+            }
+        }
+    }
+
     for line in template.lines() {
         let t = line.trim();
         if t.is_empty() || t.starts_with('#') || t.starts_with("$:") {

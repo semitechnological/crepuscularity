@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-use crepuscularity_core::{TemplateContext, TemplateValue};
+use crepuscularity_core::{parser::parse_template_with_path, TemplateContext, TemplateValue};
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
@@ -147,7 +147,9 @@ fn build_web(target: &Target, base_dir: &Path, idx: usize) -> Result<Artifact, S
     let contents = if let Some(component) = &target.component {
         crepuscularity_web::render_component_file_to_html(&template, component, &ctx)
     } else {
-        crepuscularity_web::render_template_to_html(&template, &ctx)
+        let nodes = parse_template_with_path(&template, Some(&template_path))
+            .map_err(|e| e.to_string())?;
+        crepuscularity_web::render_nodes_to_html(&nodes, &ctx)
     }
     .map_err(|e| e.to_string())?;
     Ok(artifact(target, idx, "web", contents, base_dir))
@@ -200,7 +202,9 @@ fn build_native(target: &Target, base_dir: &Path, idx: usize) -> Result<Artifact
     let ir = if let Some(component) = &target.component {
         crepuscularity_native::render_component_file_to_ir(&template, component, &ctx)
     } else {
-        crepuscularity_native::render_template_to_ir(&template, &ctx)
+        let nodes = parse_template_with_path(&template, Some(&template_path))
+            .map_err(|e| e.to_string())?;
+        crepuscularity_native::render_nodes_to_ir(&nodes, &ctx)
     }
     .map_err(|e| e.to_string())?;
     let contents = if target.root.as_deref() == Some("pretty") {

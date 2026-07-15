@@ -7,7 +7,8 @@
 use std::path::{Path, PathBuf};
 
 use crepuscularity_core::context::{TemplateContext, TemplateValue};
-use crepuscularity_web::{render_component_file_to_html, render_template_to_html};
+use crepuscularity_core::parser::parse_template_with_path;
+use crepuscularity_web::{render_component_file_to_html, render_nodes_to_html};
 use serde_json::Value;
 
 use crate::ui;
@@ -46,7 +47,10 @@ pub fn execute(
 
     let html = match component {
         Some(ref name) => render_component_file_to_html(&content, name, &ctx),
-        None => render_template_to_html(&content, &ctx),
+        None => match parse_template_with_path(&content, Some(&path)) {
+            Ok(nodes) => render_nodes_to_html(&nodes, &ctx),
+            Err(e) => Err(e),
+        },
     };
 
     match html {
