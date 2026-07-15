@@ -29,8 +29,8 @@ pub use diagnostics::{diagnose_crepus_source, is_multi_component_file, CrepusDia
 pub use error::CrepusError;
 pub use include_paths::resolve_include_path;
 pub use parser::{
-    parse_component_file, parse_template, parse_template_with_path,
-    unescape_crepus_text_literal, ComponentDef, ComponentFile, ComponentMeta,
+    parse_component_file, parse_template, parse_template_with_path, unescape_crepus_text_literal,
+    ComponentDef, ComponentFile, ComponentMeta,
 };
 pub use preprocess::{
     extract_head_block, google_fonts_head_markup, merge_unique_font_families,

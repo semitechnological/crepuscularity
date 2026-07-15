@@ -55,7 +55,8 @@ pub(crate) fn execute(args: ManifestBuildArgs) {
     } else if let Some(sel) = selector.as_deref() {
         pick_targets_by_selector(&targets, sel).unwrap_or_else(|e| ui::error(&e))
     } else {
-        crate::crepus_toml::pick_targets(&targets, target_id.as_deref()).unwrap_or_else(|e| ui::error(&e))
+        crate::crepus_toml::pick_targets(&targets, target_id.as_deref())
+            .unwrap_or_else(|e| ui::error(&e))
     };
     for target in picked {
         build_target(&target, options);
@@ -79,9 +80,7 @@ fn pick_targets_by_selector(
         return Ok(picked);
     }
     let ids: Vec<&str> = targets.iter().map(|t| t.id.as_str()).collect();
-    Err(format!(
-        "no target id or type {selector:?} (ids: {ids:?})"
-    ))
+    Err(format!("no target id or type {selector:?} (ids: {ids:?})"))
 }
 
 fn normalize_selector(selector: &str) -> &str {
@@ -139,7 +138,11 @@ fn build_lvgl_target(target: &ResolvedTarget, _options: BuildOptions) -> Result<
     let root = match target.root.as_deref().unwrap_or("component") {
         "screen" => LvglRoot::Screen,
         "component" => LvglRoot::Component,
-        other => return Err(format!("lvgl root must be component or screen, got {other:?}")),
+        other => {
+            return Err(format!(
+                "lvgl root must be component or screen, got {other:?}"
+            ))
+        }
     };
     let xml = if let Some(component) = &target.component {
         render_component_file_to_lvgl_xml(&template, component, &ctx)
@@ -147,12 +150,10 @@ fn build_lvgl_target(target: &ResolvedTarget, _options: BuildOptions) -> Result<
         render_template_to_lvgl_xml_with_options(&template, &ctx, &LvglOptions { name, root })
     }
     .map_err(|e| format!("render lvgl target {:?}: {e}", target.id))?;
-    let out = target.out.clone().unwrap_or_else(|| {
-        target
-            .dir
-            .join("dist")
-            .join(format!("{}.xml", target.id))
-    });
+    let out = target
+        .out
+        .clone()
+        .unwrap_or_else(|| target.dir.join("dist").join(format!("{}.xml", target.id)));
     write_output(&out, xml.as_bytes());
     eprintln!(
         "{} {} {}",
@@ -180,12 +181,10 @@ fn build_native_target(target: &ResolvedTarget, _options: BuildOptions) -> Resul
         to_json(&ir)
     }
     .map_err(|e| format!("serialize native target {:?}: {e}", target.id))?;
-    let out = target.out.clone().unwrap_or_else(|| {
-        target
-            .dir
-            .join("dist")
-            .join(format!("{}.json", target.id))
-    });
+    let out = target
+        .out
+        .clone()
+        .unwrap_or_else(|| target.dir.join("dist").join(format!("{}.json", target.id)));
     write_output(&out, json.as_bytes());
     eprintln!(
         "{} {} {}",
@@ -220,15 +219,12 @@ fn build_embedded_target(target: &ResolvedTarget, _options: BuildOptions) -> Res
     ui_view
         .render_into(&mut ppm)
         .map_err(|e| format!("render embedded target {:?}: {e}", target.id))?;
-    let out = target.out.clone().unwrap_or_else(|| {
-        target
-            .dir
-            .join("dist")
-            .join(format!("{}.ppm", target.id))
-    });
+    let out = target
+        .out
+        .clone()
+        .unwrap_or_else(|| target.dir.join("dist").join(format!("{}.ppm", target.id)));
     if let Some(parent) = out.parent() {
-        std::fs::create_dir_all(parent)
-            .map_err(|e| format!("create {}: {e}", parent.display()))?;
+        std::fs::create_dir_all(parent).map_err(|e| format!("create {}: {e}", parent.display()))?;
     }
     write_ppm(&out, &ppm).map_err(|e| format!("write {}: {e}", out.display()))?;
     eprintln!(

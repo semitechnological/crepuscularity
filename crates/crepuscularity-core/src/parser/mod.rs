@@ -234,7 +234,8 @@ pub fn parse_template_with_path(
     template: &str,
     path: Option<&std::path::Path>,
 ) -> Result<Vec<Node>, crate::error::CrepusError> {
-    parse_template_raw_with_path(template, path).map_err(|e| crate::error::CrepusError::parse(e.message))
+    parse_template_raw_with_path(template, path)
+        .map_err(|e| crate::error::CrepusError::parse(e.message))
 }
 
 pub(crate) fn parse_template_raw(template: &str) -> Result<Vec<Node>, RawParseError> {

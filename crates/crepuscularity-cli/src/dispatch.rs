@@ -4,8 +4,8 @@ use std::path::PathBuf;
 use std::time::Instant;
 
 use crate::cli::{
-    BenchmarkCheckArgs, BenchmarkCommands, BenchmarkRunArgs, BrowserArg, Cli, Commands, IosCommands,
-    MobileCommands, NativeCommands, TuiCommands, WebCommands, WebextCommands,
+    BenchmarkCheckArgs, BenchmarkCommands, BenchmarkRunArgs, BrowserArg, Cli, Commands,
+    IosCommands, MobileCommands, NativeCommands, TuiCommands, WebCommands, WebextCommands,
 };
 use crate::target_build::ManifestBuildArgs;
 use crate::ui;
@@ -221,5 +221,3 @@ pub fn benchmark_check_options(args: BenchmarkCheckArgs) -> crate::benchmark::Ch
         repo_override: args.common.repo,
     }
 }
-
-
