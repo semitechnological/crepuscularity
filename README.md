@@ -1,3 +1,5 @@
+<img src="docs-site/static/favicon.svg" alt="" height="50">
+
 # Crepuscularity
 
 > **Stability:** This project is **unstable** and in active development. APIs, CLI flags, and template semantics may change without a semver-major release until **1.0**. Pin exact dependency versions and expect occasional breakage.
