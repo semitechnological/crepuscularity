@@ -33,6 +33,11 @@ pub struct CapabilitySpec {
     cargo_feature: &'static str,
     android_manifest: &'static str,
     ios_project: &'static str,
+    host: fn(&Path) -> Result<(), String>,
+}
+
+fn no_op_host(_root: &Path) -> Result<(), String> {
+    Ok(())
 }
 
 pub const CAPABILITIES: &[CapabilitySpec] = &[
@@ -42,6 +47,7 @@ pub const CAPABILITIES: &[CapabilitySpec] = &[
         cargo_feature: "sensors",
         android_manifest: "    <uses-feature android:name=\"android.hardware.sensor.accelerometer\" android:required=\"false\" />\n    <uses-feature android:name=\"android.hardware.sensor.gyroscope\" android:required=\"false\" />\n",
         ios_project: "",
+        host: add_sensors_host,
     },
     CapabilitySpec {
         name: "bluetooth",
@@ -49,6 +55,7 @@ pub const CAPABILITIES: &[CapabilitySpec] = &[
         cargo_feature: "bluetooth",
         android_manifest: "    <uses-permission android:name=\"android.permission.ACCESS_FINE_LOCATION\" android:maxSdkVersion=\"30\" />\n    <uses-permission android:name=\"android.permission.BLUETOOTH_SCAN\" />\n    <uses-permission android:name=\"android.permission.BLUETOOTH_CONNECT\" />\n    <uses-feature android:name=\"android.hardware.bluetooth_le\" android:required=\"false\" />\n",
         ios_project: "        OTHER_LDFLAGS: \"-lcrepus_mobile_actions -framework CoreBluetooth\"\n        INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription: \"$(PRODUCT_NAME) uses Bluetooth for nearby device setup.\"\n",
+        host: add_bluetooth_host,
     },
     CapabilitySpec {
         name: "haptics",
@@ -56,20 +63,22 @@ pub const CAPABILITIES: &[CapabilitySpec] = &[
         cargo_feature: "haptics",
         android_manifest: "    <uses-permission android:name=\"android.permission.VIBRATE\" />\n",
         ios_project: "",
+        host: add_haptics_host,
     },
-    CapabilitySpec { name: "clipboard", aliases: &[], cargo_feature: "clipboard", android_manifest: "", ios_project: "" },
-    CapabilitySpec { name: "toast", aliases: &[], cargo_feature: "toast", android_manifest: "", ios_project: "" },
-    CapabilitySpec { name: "privacy-screen", aliases: &["privacyscreen"], cargo_feature: "privacy-screen", android_manifest: "", ios_project: "" },
-    CapabilitySpec { name: "video", aliases: &[], cargo_feature: "video", android_manifest: "    <uses-permission android:name=\"android.permission.CAMERA\" />\n    <uses-permission android:name=\"android.permission.RECORD_AUDIO\" />\n    <uses-feature android:name=\"android.hardware.camera\" android:required=\"false\" />\n", ios_project: "        INFOPLIST_KEY_NSCameraUsageDescription: \"$(PRODUCT_NAME) records video when you ask it to.\"\n        INFOPLIST_KEY_NSMicrophoneUsageDescription: \"$(PRODUCT_NAME) records video audio when you ask it to.\"\n" },
-    CapabilitySpec { name: "browser", aliases: &["linking", "app-launcher", "applauncher", "phone", "sms"], cargo_feature: "browser", android_manifest: "", ios_project: "" },
-    CapabilitySpec { name: "in-app-browser", aliases: &["inappbrowser", "web-browser"], cargo_feature: "in-app-browser", android_manifest: "", ios_project: "" },
-    CapabilitySpec { name: "share", aliases: &[], cargo_feature: "share", android_manifest: "", ios_project: "" },
+    CapabilitySpec { name: "clipboard", aliases: &[], cargo_feature: "clipboard", android_manifest: "", ios_project: "", host: add_clipboard_host },
+    CapabilitySpec { name: "toast", aliases: &[], cargo_feature: "toast", android_manifest: "", ios_project: "", host: add_toast_host },
+    CapabilitySpec { name: "privacy-screen", aliases: &["privacyscreen"], cargo_feature: "privacy-screen", android_manifest: "", ios_project: "", host: add_privacy_screen_host },
+    CapabilitySpec { name: "video", aliases: &[], cargo_feature: "video", android_manifest: "    <uses-permission android:name=\"android.permission.CAMERA\" />\n    <uses-permission android:name=\"android.permission.RECORD_AUDIO\" />\n    <uses-feature android:name=\"android.hardware.camera\" android:required=\"false\" />\n", ios_project: "        INFOPLIST_KEY_NSCameraUsageDescription: \"$(PRODUCT_NAME) records video when you ask it to.\"\n        INFOPLIST_KEY_NSMicrophoneUsageDescription: \"$(PRODUCT_NAME) records video audio when you ask it to.\"\n", host: add_video_host },
+    CapabilitySpec { name: "browser", aliases: &["linking", "app-launcher", "applauncher", "phone", "sms"], cargo_feature: "browser", android_manifest: "", ios_project: "", host: add_browser_host },
+    CapabilitySpec { name: "in-app-browser", aliases: &["inappbrowser", "web-browser"], cargo_feature: "in-app-browser", android_manifest: "", ios_project: "", host: add_in_app_browser_host },
+    CapabilitySpec { name: "share", aliases: &[], cargo_feature: "share", android_manifest: "", ios_project: "", host: add_share_host },
     CapabilitySpec {
         name: "documentpicker",
         aliases: &["document-picker", "documents"],
         cargo_feature: "documentpicker",
         android_manifest: "",
         ios_project: "",
+        host: add_document_picker_host,
     },
     CapabilitySpec {
         name: "image-picker",
@@ -77,6 +86,7 @@ pub const CAPABILITIES: &[CapabilitySpec] = &[
         cargo_feature: "image-picker",
         android_manifest: "",
         ios_project: "",
+        host: add_image_picker_host,
     },
     CapabilitySpec {
         name: "photo-library",
@@ -84,6 +94,7 @@ pub const CAPABILITIES: &[CapabilitySpec] = &[
         cargo_feature: "photo-library",
         android_manifest: "    <uses-permission android:name=\"android.permission.READ_MEDIA_IMAGES\" />\n    <uses-permission android:name=\"android.permission.READ_MEDIA_VIDEO\" />\n    <uses-permission android:name=\"android.permission.READ_EXTERNAL_STORAGE\" android:maxSdkVersion=\"32\" />\n",
         ios_project: "        INFOPLIST_KEY_NSPhotoLibraryUsageDescription: \"$(PRODUCT_NAME) accesses your media library when you ask it to.\"\n",
+        host: add_photo_library_host,
     },
     CapabilitySpec {
         name: "camera",
@@ -91,31 +102,33 @@ pub const CAPABILITIES: &[CapabilitySpec] = &[
         cargo_feature: "camera",
         android_manifest: "    <uses-permission android:name=\"android.permission.CAMERA\" />\n    <uses-feature android:name=\"android.hardware.camera\" android:required=\"false\" />\n",
         ios_project: "        INFOPLIST_KEY_NSCameraUsageDescription: \"$(PRODUCT_NAME) uses the camera when you ask it to.\"\n",
+        host: add_camera_host,
     },
-    CapabilitySpec { name: "dimensions", aliases: &[], cargo_feature: "dimensions", android_manifest: "", ios_project: "" },
-    CapabilitySpec { name: "dialog", aliases: &[], cargo_feature: "dialog", android_manifest: "", ios_project: "" },
-    CapabilitySpec { name: "action-sheet", aliases: &["actionsheet"], cargo_feature: "action-sheet", android_manifest: "", ios_project: "" },
-    CapabilitySpec { name: "app-state", aliases: &["appstate"], cargo_feature: "app-state", android_manifest: "", ios_project: "" },
-    CapabilitySpec { name: "app", aliases: &["app-info", "appinfo"], cargo_feature: "app", android_manifest: "", ios_project: "" },
-    CapabilitySpec { name: "screen-orientation", aliases: &["screenorientation"], cargo_feature: "screen-orientation", android_manifest: "", ios_project: "" },
-    CapabilitySpec { name: "accessibility-info", aliases: &["accessibilityinfo", "screen-reader", "screenreader"], cargo_feature: "accessibility-info", android_manifest: "", ios_project: "" },
-    CapabilitySpec { name: "device", aliases: &["device-info", "deviceinfo", "platform"], cargo_feature: "device", android_manifest: "", ios_project: "" },
-    CapabilitySpec { name: "preferences", aliases: &["storage", "async-storage"], cargo_feature: "preferences", android_manifest: "", ios_project: "" },
-    CapabilitySpec { name: "network", aliases: &["net-info", "netinfo"], cargo_feature: "network", android_manifest: "", ios_project: "" },
-    CapabilitySpec { name: "keyboard", aliases: &[], cargo_feature: "keyboard", android_manifest: "", ios_project: "" },
-    CapabilitySpec { name: "settings", aliases: &["app-settings"], cargo_feature: "settings", android_manifest: "", ios_project: "" },
-    CapabilitySpec { name: "local-notifications", aliases: &["localnotifications", "notifications"], cargo_feature: "local-notifications", android_manifest: "    <uses-permission android:name=\"android.permission.POST_NOTIFICATIONS\" />\n", ios_project: "" },
-    CapabilitySpec { name: "secure-storage", aliases: &["securestorage"], cargo_feature: "secure-storage", android_manifest: "", ios_project: "" },
-    CapabilitySpec { name: "biometrics", aliases: &["authentication"], cargo_feature: "biometrics", android_manifest: "", ios_project: "" },
-    CapabilitySpec { name: "permissions", aliases: &["permission"], cargo_feature: "permissions", android_manifest: "", ios_project: "        OTHER_LDFLAGS: \"-lcrepus_mobile_actions -framework CoreBluetooth\"\n        INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription: \"$(PRODUCT_NAME) uses Bluetooth when you ask it to.\"\n" },
-    CapabilitySpec { name: "microphone", aliases: &["audio"], cargo_feature: "microphone", android_manifest: "    <uses-permission android:name=\"android.permission.RECORD_AUDIO\" />\n", ios_project: "        INFOPLIST_KEY_NSMicrophoneUsageDescription: \"$(PRODUCT_NAME) uses the microphone when you ask it to.\"\n" },
-    CapabilitySpec { name: "calendar", aliases: &["calendars"], cargo_feature: "calendar", android_manifest: "    <uses-permission android:name=\"android.permission.READ_CALENDAR\" />\n    <uses-permission android:name=\"android.permission.WRITE_CALENDAR\" />\n", ios_project: "        INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription: \"$(PRODUCT_NAME) accesses your calendar when you ask it to.\"\n" },
+    CapabilitySpec { name: "dimensions", aliases: &[], cargo_feature: "dimensions", android_manifest: "", ios_project: "", host: add_dimensions_host },
+    CapabilitySpec { name: "dialog", aliases: &[], cargo_feature: "dialog", android_manifest: "", ios_project: "", host: add_dialog_host },
+    CapabilitySpec { name: "action-sheet", aliases: &["actionsheet"], cargo_feature: "action-sheet", android_manifest: "", ios_project: "", host: add_action_sheet_host },
+    CapabilitySpec { name: "app-state", aliases: &["appstate"], cargo_feature: "app-state", android_manifest: "", ios_project: "", host: add_app_state_host },
+    CapabilitySpec { name: "app", aliases: &["app-info", "appinfo"], cargo_feature: "app", android_manifest: "", ios_project: "", host: add_app_host },
+    CapabilitySpec { name: "screen-orientation", aliases: &["screenorientation"], cargo_feature: "screen-orientation", android_manifest: "", ios_project: "", host: add_screen_orientation_host },
+    CapabilitySpec { name: "accessibility-info", aliases: &["accessibilityinfo", "screen-reader", "screenreader"], cargo_feature: "accessibility-info", android_manifest: "", ios_project: "", host: add_accessibility_info_host },
+    CapabilitySpec { name: "device", aliases: &["device-info", "deviceinfo", "platform"], cargo_feature: "device", android_manifest: "", ios_project: "", host: add_device_host },
+    CapabilitySpec { name: "preferences", aliases: &["storage", "async-storage"], cargo_feature: "preferences", android_manifest: "", ios_project: "", host: add_preferences_host },
+    CapabilitySpec { name: "network", aliases: &["net-info", "netinfo"], cargo_feature: "network", android_manifest: "", ios_project: "", host: add_network_host },
+    CapabilitySpec { name: "keyboard", aliases: &[], cargo_feature: "keyboard", android_manifest: "", ios_project: "", host: add_keyboard_host },
+    CapabilitySpec { name: "settings", aliases: &["app-settings"], cargo_feature: "settings", android_manifest: "", ios_project: "", host: add_settings_host },
+    CapabilitySpec { name: "local-notifications", aliases: &["localnotifications", "notifications"], cargo_feature: "local-notifications", android_manifest: "    <uses-permission android:name=\"android.permission.POST_NOTIFICATIONS\" />\n", ios_project: "", host: add_local_notifications_host },
+    CapabilitySpec { name: "secure-storage", aliases: &["securestorage"], cargo_feature: "secure-storage", android_manifest: "", ios_project: "", host: add_secure_storage_host },
+    CapabilitySpec { name: "biometrics", aliases: &["authentication"], cargo_feature: "biometrics", android_manifest: "", ios_project: "", host: add_biometrics_host },
+    CapabilitySpec { name: "permissions", aliases: &["permission"], cargo_feature: "permissions", android_manifest: "", ios_project: "        OTHER_LDFLAGS: \"-lcrepus_mobile_actions -framework CoreBluetooth\"\n        INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription: \"$(PRODUCT_NAME) uses Bluetooth when you ask it to.\"\n", host: add_permissions_host },
+    CapabilitySpec { name: "microphone", aliases: &["audio"], cargo_feature: "microphone", android_manifest: "    <uses-permission android:name=\"android.permission.RECORD_AUDIO\" />\n", ios_project: "        INFOPLIST_KEY_NSMicrophoneUsageDescription: \"$(PRODUCT_NAME) uses the microphone when you ask it to.\"\n", host: add_microphone_host },
+    CapabilitySpec { name: "calendar", aliases: &["calendars"], cargo_feature: "calendar", android_manifest: "    <uses-permission android:name=\"android.permission.READ_CALENDAR\" />\n    <uses-permission android:name=\"android.permission.WRITE_CALENDAR\" />\n", ios_project: "        INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription: \"$(PRODUCT_NAME) accesses your calendar when you ask it to.\"\n", host: add_calendar_host },
     CapabilitySpec {
         name: "contacts",
         aliases: &[],
         cargo_feature: "contacts",
         android_manifest: "    <uses-permission android:name=\"android.permission.READ_CONTACTS\" />\n",
         ios_project: "        INFOPLIST_KEY_NSContactsUsageDescription: \"$(PRODUCT_NAME) accesses your contacts when you ask it to.\"\n",
+        host: add_contacts_host,
     },
     CapabilitySpec {
         name: "filesystem",
@@ -123,6 +136,7 @@ pub const CAPABILITIES: &[CapabilitySpec] = &[
         cargo_feature: "filesystem",
         android_manifest: "",
         ios_project: "",
+        host: no_op_host,
     },
     CapabilitySpec {
         name: "geolocation",
@@ -130,11 +144,12 @@ pub const CAPABILITIES: &[CapabilitySpec] = &[
         cargo_feature: "geolocation",
         android_manifest: "    <uses-permission android:name=\"android.permission.ACCESS_FINE_LOCATION\" />\n    <uses-permission android:name=\"android.permission.ACCESS_COARSE_LOCATION\" />\n",
         ios_project: "        INFOPLIST_KEY_NSLocationWhenInUseUsageDescription: \"$(PRODUCT_NAME) uses your location while the app is open.\"\n",
+        host: add_geolocation_host,
     },
-    CapabilitySpec { name: "battery", aliases: &[], cargo_feature: "battery", android_manifest: "", ios_project: "" },
-    CapabilitySpec { name: "appearance", aliases: &[], cargo_feature: "appearance", android_manifest: "", ios_project: "" },
-    CapabilitySpec { name: "system-bars", aliases: &["systembars", "status-bar", "statusbar"], cargo_feature: "system-bars", android_manifest: "", ios_project: "" },
-    CapabilitySpec { name: "deep-links", aliases: &["deeplinks", "deep-link", "url-events"], cargo_feature: "deep-links", android_manifest: "", ios_project: "" },
+    CapabilitySpec { name: "battery", aliases: &[], cargo_feature: "battery", android_manifest: "", ios_project: "", host: add_battery_host },
+    CapabilitySpec { name: "appearance", aliases: &[], cargo_feature: "appearance", android_manifest: "", ios_project: "", host: add_appearance_host },
+    CapabilitySpec { name: "system-bars", aliases: &["systembars", "status-bar", "statusbar"], cargo_feature: "system-bars", android_manifest: "", ios_project: "", host: add_system_bars_host },
+    CapabilitySpec { name: "deep-links", aliases: &["deeplinks", "deep-link", "url-events"], cargo_feature: "deep-links", android_manifest: "", ios_project: "", host: add_deep_links_host },
 ];
 
 pub fn add_capability(capability: &str, root: &Path) -> Result<(), String> {
@@ -206,120 +221,7 @@ pub fn add_capability(capability: &str, root: &Path) -> Result<(), String> {
                 .map_err(|e| format!("write '{}': {e}", project.display()))?;
         }
     }
-    if spec.name == "sensors" {
-        add_sensors_host(root)?;
-    }
-    if spec.name == "haptics" {
-        add_haptics_host(root)?;
-    }
-    if spec.name == "clipboard" {
-        add_clipboard_host(root)?;
-    }
-    if spec.name == "toast" {
-        add_toast_host(root)?;
-    }
-    if spec.name == "privacy-screen" {
-        add_privacy_screen_host(root)?;
-    }
-    if spec.name == "video" {
-        add_video_host(root)?;
-    }
-    if spec.name == "browser" {
-        add_browser_host(root)?;
-    }
-    if spec.name == "in-app-browser" {
-        add_in_app_browser_host(root)?;
-    }
-    if spec.name == "share" {
-        add_share_host(root)?;
-    }
-    if spec.name == "documentpicker" {
-        add_document_picker_host(root)?;
-    }
-    if spec.name == "image-picker" {
-        add_image_picker_host(root)?;
-    }
-    if spec.name == "photo-library" {
-        add_photo_library_host(root)?;
-    }
-    if spec.name == "camera" {
-        add_camera_host(root)?;
-    }
-    if spec.name == "dimensions" {
-        add_dimensions_host(root)?;
-    }
-    if spec.name == "dialog" {
-        add_dialog_host(root)?;
-    }
-    if spec.name == "action-sheet" {
-        add_action_sheet_host(root)?;
-    }
-    if spec.name == "app-state" {
-        add_app_state_host(root)?;
-    }
-    if spec.name == "app" {
-        add_app_host(root)?;
-    }
-    if spec.name == "screen-orientation" {
-        add_screen_orientation_host(root)?;
-    }
-    if spec.name == "accessibility-info" {
-        add_accessibility_info_host(root)?;
-    }
-    if spec.name == "device" {
-        add_device_host(root)?;
-    }
-    if spec.name == "preferences" {
-        add_preferences_host(root)?;
-    }
-    if spec.name == "network" {
-        add_network_host(root)?;
-    }
-    if spec.name == "keyboard" {
-        add_keyboard_host(root)?;
-    }
-    if spec.name == "settings" {
-        add_settings_host(root)?;
-    }
-    if spec.name == "local-notifications" {
-        add_local_notifications_host(root)?;
-    }
-    if spec.name == "secure-storage" {
-        add_secure_storage_host(root)?;
-    }
-    if spec.name == "biometrics" {
-        add_biometrics_host(root)?;
-    }
-    if spec.name == "permissions" {
-        add_permissions_host(root)?;
-    }
-    if spec.name == "microphone" {
-        add_microphone_host(root)?;
-    }
-    if spec.name == "calendar" {
-        add_calendar_host(root)?;
-    }
-    if spec.name == "contacts" {
-        add_contacts_host(root)?;
-    }
-    if spec.name == "bluetooth" {
-        add_bluetooth_host(root)?;
-    }
-    if spec.name == "geolocation" {
-        add_geolocation_host(root)?;
-    }
-    if spec.name == "battery" {
-        add_battery_host(root)?;
-    }
-    if spec.name == "appearance" {
-        add_appearance_host(root)?;
-    }
-    if spec.name == "system-bars" {
-        add_system_bars_host(root)?;
-    }
-    if spec.name == "deep-links" {
-        add_deep_links_host(root)?;
-    }
+    (spec.host)(root)?;
     dedupe_android_imports(root)?;
     ui::success(&format!(
         "added native capability '{}' to '{}'",
