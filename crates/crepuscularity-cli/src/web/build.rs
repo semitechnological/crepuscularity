@@ -1308,7 +1308,7 @@ fn render_head_raw(head_raw: &str) -> String {
 
 fn copy_unocss(vendor_dir: &Path) {
     let dst = vendor_dir.join("unocss.js");
-    std::fs::write(&dst, super::UNOCSS_JS).unwrap_or_else(|e| {
+    std::fs::write(&dst, crepuscularity_web::UNOCSS_JS).unwrap_or_else(|e| {
         ui::error(&format!("write {}: {e}", dst.display()));
     });
 }

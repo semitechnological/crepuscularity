@@ -14,7 +14,6 @@ use crate::ui;
 
 const WEB_INDEX_HTML: &str = include_str!("../assets/web/index.html");
 const WEB_APP_JS: &str = include_str!("../assets/web/app.js");
-const UNOCSS_JS: &[u8] = include_bytes!("../../crepuscularity-web/assets/vendor/unocss.js");
 
 pub mod build;
 pub mod full;

@@ -28,6 +28,9 @@ pub mod reactive {
 }
 
 pub use bundle::{parse_bundle, render_bundle, render_bundle_with_context, Bundle};
+
+/// Vendored UnoCSS runtime embedded by `crepuscularity-cli` and `crepuscularity-webext`.
+pub static UNOCSS_JS: &[u8] = include_bytes!("../assets/vendor/unocss.js");
 pub use crepuscularity_core::build;
 pub use crepuscularity_core::preprocess::google_fonts_head_markup;
 pub use crepuscularity_core::CrepusError;

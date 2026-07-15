@@ -21,10 +21,7 @@ pub const RUNTIME_ADAPTER: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/assets/runtime-as-adapter.js"
 ));
-pub static UNOCSS_JS: &[u8] = include_bytes!(concat!(
-    env!("CARGO_MANIFEST_DIR"),
-    "/../crepuscularity-web/assets/vendor/unocss.js"
-));
+pub static UNOCSS_JS: &[u8] = crepuscularity_web::UNOCSS_JS;
 
 #[cfg(test)]
 mod tests {
