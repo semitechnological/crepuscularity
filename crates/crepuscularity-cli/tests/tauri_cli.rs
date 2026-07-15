@@ -4,6 +4,17 @@ fn crepus() -> Command {
     Command::new(env!("CARGO_BIN_EXE_crepus"))
 }
 
+fn assert_success(out: &std::process::Output, label: &str) {
+    if !out.status.success() {
+        panic!(
+            "[{label}] exit={status} stderr={stderr:?} stdout={stdout:?}",
+            status = out.status,
+            stderr = String::from_utf8_lossy(&out.stderr),
+            stdout = String::from_utf8_lossy(&out.stdout),
+        );
+    }
+}
+
 fn fixture(version: u8) -> tempfile::TempDir {
     let root = tempfile::tempdir().unwrap();
     std::fs::create_dir_all(root.path().join("src-tauri")).unwrap();
