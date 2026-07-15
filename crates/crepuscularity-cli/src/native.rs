@@ -17,6 +17,7 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
+use clap::{Args, ValueEnum};
 use console::style;
 use crepuscularity_core::context::{TemplateContext, TemplateValue};
 use crepuscularity_core::{DriverCache, Fingerprint};
@@ -47,17 +48,30 @@ use crepuscularity_native::{
 use serde::Deserialize;
 use serde_json::Value;
 
-use crate::cli::{
-    NativeBuildCommands, NativeCodegenCliArgs, NativeCodegenPlatformArg, NativeCommands,
-    NativeExtensionCommands, NativeIrArgs, NativeRunCommands, NativeSyncArgs,
-};
-use crate::dispatch::native_ios_target;
+use crate::cli::{NativeBuildCommands, NativeCommands, NativeExtensionCommands, NativeRunCommands};
 use crate::ui;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, ValueEnum, PartialEq, Eq)]
 pub(crate) enum IosBuildTarget {
     Simulator,
     Device,
+}
+
+#[derive(Clone, Copy, Debug, ValueEnum, PartialEq, Eq)]
+pub(crate) enum CodegenPlatform {
+    #[value(name = "swiftui", alias = "swift", alias = "ios")]
+    SwiftUi,
+    #[value(name = "compose", alias = "kotlin", alias = "android")]
+    Compose,
+}
+
+impl From<CodegenPlatform> for NativeCodegenTarget {
+    fn from(p: CodegenPlatform) -> Self {
+        match p {
+            CodegenPlatform::SwiftUi => NativeCodegenTarget::SwiftUi,
+            CodegenPlatform::Compose => NativeCodegenTarget::Compose,
+        }
+    }
 }
 
 pub fn execute(cmd: NativeCommands) {
@@ -67,14 +81,21 @@ pub fn execute(cmd: NativeCommands) {
             add_capability(&capability, &dir).unwrap_or_else(|e| ui::error(&e))
         }
         NativeCommands::Extension { extension } => handle_extension(extension),
-        NativeCommands::Ir { args } => run_ir_from(args),
+        NativeCommands::Ir { args } => match run_ir_parsed(args) {
+            Ok(out) => print!("{out}"),
+            Err(e) => {
+                let payload = serde_json::json!({ "error": e });
+                eprintln!("{payload}");
+                std::process::exit(1);
+            }
+        },
         NativeCommands::Sync { args } => {
-            if let Err(e) = sync_from_cli(args) {
+            if let Err(e) = sync_native_fixture_inner(args) {
                 ui::error(&e);
             }
         }
         NativeCommands::Codegen { args } => {
-            if let Err(e) = codegen_from_cli(args) {
+            if let Err(e) = codegen_native_source_inner(args) {
                 ui::error(&e);
             }
         }
@@ -2080,7 +2101,7 @@ fn handle_build(platform: NativeBuildCommands) {
             configuration,
         } => build_ios(
             &dir.unwrap_or_else(default_native_dir),
-            native_ios_target(target),
+            target,
             &configuration,
         ),
         NativeBuildCommands::Android { dir, flavor } => {
@@ -2104,79 +2125,6 @@ fn default_native_dir() -> PathBuf {
     PathBuf::from(".")
 }
 
-fn run_ir_from(a: NativeIrArgs) {
-    let parsed = IrArgs {
-        path: a.file,
-        component: a.component,
-        ctx_file: a.ctx,
-        vars: parse_kv_vars(&a.vars),
-        pretty: a.pretty,
-        stdin: a.stdin,
-        stdin_json: a.stdin_json,
-        base_dir: a.base_dir,
-    };
-    match run_ir_parsed(parsed) {
-        Ok(out) => print!("{out}"),
-        Err(e) => {
-            let payload = serde_json::json!({ "error": e });
-            eprintln!("{payload}");
-            std::process::exit(1);
-        }
-    }
-}
-
-fn sync_from_cli(a: NativeSyncArgs) -> Result<(), String> {
-    let template = a
-        .template
-        .ok_or_else(|| "expected <file.crepus>".to_string())?;
-    sync_native_fixture_inner(SyncArgs {
-        template,
-        dir: a.dir,
-        outputs: a.out,
-        defaults: !a.no_defaults,
-        component: a.component,
-        ctx_file: a.ctx,
-        vars: parse_kv_vars(&a.vars),
-        pretty: a.pretty,
-    })
-}
-
-fn codegen_from_cli(a: NativeCodegenCliArgs) -> Result<PathBuf, String> {
-    let template = a.template.ok_or_else(|| {
-        "Usage: crepus native codegen <file.crepus> --platform swiftui|compose --out DIR --view-name NAME".to_string()
-    })?;
-    let platform = a
-        .platform
-        .ok_or_else(|| "--platform swiftui|compose is required".to_string())?;
-    let out_dir = a.out.ok_or_else(|| "--out DIR is required".to_string())?;
-    let view_name = a
-        .view_name
-        .ok_or_else(|| "--view-name NAME is required".to_string())?;
-    codegen_native_source_inner(CodegenArgs {
-        template,
-        platform: match platform {
-            NativeCodegenPlatformArg::SwiftUi => NativeCodegenTarget::SwiftUi,
-            NativeCodegenPlatformArg::Compose => NativeCodegenTarget::Compose,
-        },
-        out_dir,
-        view_name,
-        component: a.component,
-        ctx_file: a.ctx,
-        vars: parse_kv_vars(&a.vars),
-    })
-}
-
-fn parse_kv_vars(vars: &[String]) -> Vec<(String, String)> {
-    vars.iter()
-        .map(|raw| {
-            raw.split_once('=')
-                .map(|(k, v)| (k.to_string(), v.to_string()))
-                .ok_or_else(|| format!("--var expects key=value, got: {raw}"))
-        })
-        .collect::<Result<Vec<_>, _>>()
-        .unwrap_or_else(|e| ui::error(&e))
-}
-
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct IrEnvelope {
@@ -2189,36 +2137,70 @@ struct IrEnvelope {
     base_dir: Option<PathBuf>,
 }
 
-struct IrArgs {
-    path: Option<PathBuf>,
-    component: Option<String>,
-    ctx_file: Option<PathBuf>,
-    vars: Vec<(String, String)>,
-    pretty: bool,
-    stdin: bool,
-    stdin_json: bool,
-    base_dir: Option<PathBuf>,
+#[derive(Args, Debug, Clone)]
+pub(crate) struct IrArgs {
+    pub file: Option<PathBuf>,
+    #[arg(long)]
+    pub component: Option<String>,
+    #[arg(long)]
+    pub ctx: Option<PathBuf>,
+    #[arg(long = "var", value_name = "KEY=VALUE")]
+    pub vars: Vec<String>,
+    #[arg(long)]
+    pub pretty: bool,
+    #[arg(long)]
+    pub stdin: bool,
+    #[arg(long = "stdin-json")]
+    pub stdin_json: bool,
+    #[arg(long)]
+    pub base_dir: Option<PathBuf>,
 }
 
-struct SyncArgs {
-    template: PathBuf,
-    dir: PathBuf,
-    outputs: Vec<PathBuf>,
-    defaults: bool,
-    component: Option<String>,
-    ctx_file: Option<PathBuf>,
-    vars: Vec<(String, String)>,
-    pretty: bool,
+#[derive(Args, Debug, Clone)]
+pub(crate) struct SyncArgs {
+    pub template: PathBuf,
+    #[arg(long, default_value = ".")]
+    pub dir: PathBuf,
+    #[arg(long)]
+    pub out: Vec<PathBuf>,
+    #[arg(long = "no-defaults")]
+    pub no_defaults: bool,
+    #[arg(long)]
+    pub component: Option<String>,
+    #[arg(long)]
+    pub ctx: Option<PathBuf>,
+    #[arg(long = "var", value_name = "KEY=VALUE")]
+    pub vars: Vec<String>,
+    #[arg(long)]
+    pub pretty: bool,
 }
 
-struct CodegenArgs {
-    template: PathBuf,
-    platform: NativeCodegenTarget,
-    out_dir: PathBuf,
-    view_name: String,
-    component: Option<String>,
-    ctx_file: Option<PathBuf>,
-    vars: Vec<(String, String)>,
+#[derive(Args, Debug, Clone)]
+pub(crate) struct CodegenArgs {
+    pub template: Option<PathBuf>,
+    #[arg(long)]
+    pub platform: Option<CodegenPlatform>,
+    #[arg(long)]
+    pub out: Option<PathBuf>,
+    #[arg(long)]
+    pub view_name: Option<String>,
+    #[arg(long)]
+    pub component: Option<String>,
+    #[arg(long)]
+    pub ctx: Option<PathBuf>,
+    #[arg(long = "var", value_name = "KEY=VALUE")]
+    pub vars: Vec<String>,
+}
+
+fn parse_kv_vars(vars: &[String]) -> Vec<(String, String)> {
+    vars.iter()
+        .map(|raw| {
+            raw.split_once('=')
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .ok_or_else(|| format!("--var expects key=value, got: {raw}"))
+        })
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap_or_else(|e| ui::error(&e))
 }
 
 impl IosBuildTarget {
@@ -2256,10 +2238,10 @@ fn run_ir_parsed(parsed: IrArgs) -> Result<String, String> {
     }
 
     let mut ctx = TemplateContext::new();
-    if let Some(path) = &parsed.ctx_file {
+    if let Some(path) = &parsed.ctx {
         load_json_ctx(path, &mut ctx)?;
     }
-    for (key, raw) in parsed.vars {
+    for (key, raw) in parse_kv_vars(&parsed.vars) {
         ctx.set(key, parse_var_value(&raw));
     }
 
@@ -2307,7 +2289,7 @@ fn run_ir_parsed(parsed: IrArgs) -> Result<String, String> {
         return stringify_ir(&ir, parsed.pretty);
     }
 
-    let path = parsed.path.ok_or_else(|| {
+    let path = parsed.file.ok_or_else(|| {
         "Usage: crepus native ir <file.crepus> [--component Name] [--ctx FILE] [--var k=v] [--pretty]".to_string()
     })?;
     let content = fs::read_to_string(&path).map_err(|e| format!("read {}: {e}", path.display()))?;
@@ -2424,10 +2406,10 @@ fn sync_native_fixture_inner(parsed: SyncArgs) -> Result<(), String> {
         .map_err(|e| format!("read {}: {e}", template_path.display()))?;
 
     let mut ctx = TemplateContext::new();
-    if let Some(path) = &parsed.ctx_file {
+    if let Some(path) = &parsed.ctx {
         load_json_ctx(path, &mut ctx)?;
     }
-    for (key, raw) in parsed.vars {
+    for (key, raw) in parse_kv_vars(&parsed.vars) {
         ctx.set(key, parse_var_value(&raw));
     }
     ctx.base_dir = template_path.parent().map(Path::to_path_buf);
@@ -2449,7 +2431,7 @@ fn sync_native_fixture_inner(parsed: SyncArgs) -> Result<(), String> {
     let fp = Fingerprint::new(&template, component_ref.as_deref(), "native-ir");
 
     let mut written = 0;
-    if parsed.defaults {
+    if !parsed.no_defaults {
         for path in default_fixture_output_paths(&root) {
             if let Some(parent) = path.parent() {
                 if parent.exists() {
@@ -2464,7 +2446,7 @@ fn sync_native_fixture_inner(parsed: SyncArgs) -> Result<(), String> {
             }
         }
     }
-    for path in explicit_fixture_output_paths(&root, &parsed.outputs) {
+    for path in explicit_fixture_output_paths(&root, &parsed.out) {
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent).map_err(|e| format!("create {}: {e}", parent.display()))?;
         }
@@ -2490,37 +2472,44 @@ fn sync_native_fixture_inner(parsed: SyncArgs) -> Result<(), String> {
 }
 
 fn codegen_native_source_inner(parsed: CodegenArgs) -> Result<PathBuf, String> {
-    let template = fs::read_to_string(&parsed.template)
-        .map_err(|e| format!("read {}: {e}", parsed.template.display()))?;
+    let template_path = parsed.template.ok_or_else(|| {
+        "Usage: crepus native codegen <file.crepus> --platform swiftui|compose --out DIR --view-name NAME".to_string()
+    })?;
+    let platform = parsed.platform.ok_or_else(|| "--platform swiftui|compose is required".to_string())?;
+    let out_dir = parsed.out.ok_or_else(|| "--out DIR is required".to_string())?;
+    let view_name = parsed.view_name.ok_or_else(|| "--view-name NAME is required".to_string())?;
+
+    let template = fs::read_to_string(&template_path)
+        .map_err(|e| format!("read {}: {e}", template_path.display()))?;
 
     let mut ctx = TemplateContext::new();
-    if let Some(path) = &parsed.ctx_file {
+    if let Some(path) = &parsed.ctx {
         load_json_ctx(path, &mut ctx)?;
     }
-    for (key, raw) in parsed.vars {
+    for (key, raw) in parse_kv_vars(&parsed.vars) {
         ctx.set(key, parse_var_value(&raw));
     }
-    ctx.base_dir = parsed.template.parent().map(Path::to_path_buf);
+    ctx.base_dir = template_path.parent().map(Path::to_path_buf);
 
     let ir = if let Some(component) = &parsed.component {
         render_component_file_to_ir(&template, component, &ctx).map_err(|e| e.to_string())?
     } else {
         render_template_to_ir(&template, &ctx).map_err(|e| e.to_string())?
     };
-    let mut source = generate_native_source(&ir, parsed.platform, &parsed.view_name);
+    let mut source = generate_native_source(&ir, platform.into(), &view_name);
     if !source.ends_with('\n') {
         source.push('\n');
     }
-    fs::create_dir_all(&parsed.out_dir)
-        .map_err(|e| format!("create {}: {e}", parsed.out_dir.display()))?;
-    let ext = match parsed.platform {
-        NativeCodegenTarget::SwiftUi => "swift",
-        NativeCodegenTarget::Compose => "kt",
+    fs::create_dir_all(&out_dir)
+        .map_err(|e| format!("create {}: {e}", out_dir.display()))?;
+    let ext = match platform {
+        CodegenPlatform::SwiftUi => "swift",
+        CodegenPlatform::Compose => "kt",
     };
-    let path = parsed.out_dir.join(format!("{}.{}", parsed.view_name, ext));
+    let path = out_dir.join(format!("{}.{}", view_name, ext));
     fs::write(&path, source).map_err(|e| format!("write {}: {e}", path.display()))?;
-    if parsed.platform == NativeCodegenTarget::Compose
-        && is_native_shell_android_generated_dir(&parsed.out_dir)
+    if platform == CodegenPlatform::Compose
+        && is_native_shell_android_generated_dir(&out_dir)
     {
         prepend_kotlin_package(&path);
     }
@@ -3441,22 +3430,22 @@ fn sync_default_mobile_artifacts(root: &Path, ios: bool, android: bool) {
     sync_native_fixture_inner(SyncArgs {
         template: template.clone(),
         dir: root.to_path_buf(),
-        outputs: Vec::new(),
-        defaults: true,
+        out: Vec::new(),
+        no_defaults: false,
         component: None,
-        ctx_file: None,
+        ctx: None,
         vars: Vec::new(),
         pretty: true,
     })
     .unwrap_or_else(|e| ui::error(&e));
     if ios {
         codegen_native_source_inner(CodegenArgs {
-            template: template.clone(),
-            platform: NativeCodegenTarget::SwiftUi,
-            out_dir: root.join("ios/Sources/NativeShell/Generated"),
-            view_name: "CrepusGeneratedView".to_string(),
+            template: Some(template.clone()),
+            platform: Some(CodegenPlatform::SwiftUi),
+            out: Some(root.join("ios/Sources/NativeShell/Generated")),
+            view_name: Some("CrepusGeneratedView".to_string()),
             component: None,
-            ctx_file: None,
+            ctx: None,
             vars: Vec::new(),
         })
         .unwrap_or_else(|e| ui::error(&e));
@@ -3465,12 +3454,12 @@ fn sync_default_mobile_artifacts(root: &Path, ios: bool, android: bool) {
         let out_dir =
             root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/generated");
         codegen_native_source_inner(CodegenArgs {
-            template: template.clone(),
-            platform: NativeCodegenTarget::Compose,
-            out_dir: out_dir.clone(),
-            view_name: "CrepusGeneratedView".to_string(),
+            template: Some(template.clone()),
+            platform: Some(CodegenPlatform::Compose),
+            out: Some(out_dir.clone()),
+            view_name: Some("CrepusGeneratedView".to_string()),
             component: None,
-            ctx_file: None,
+            ctx: None,
             vars: Vec::new(),
         })
         .unwrap_or_else(|e| ui::error(&e));
@@ -3720,11 +3709,11 @@ scheme = "CrepusMobileApp"
         sync_native_fixture_inner(SyncArgs {
             template: root.join("views/main.crepus"),
             dir: root.clone(),
-            outputs: vec![root.join("linux/share/dashboard.view-ir.json")],
-            defaults: true,
+            out: vec![root.join("linux/share/dashboard.view-ir.json")],
+            no_defaults: false,
             component: None,
-            ctx_file: None,
-            vars: vec![("name".into(), "Acme".into())],
+            ctx: None,
+            vars: vec!["name=Acme".into()],
             pretty: true,
         })
         .unwrap();
@@ -3758,11 +3747,11 @@ scheme = "CrepusMobileApp"
         sync_native_fixture_inner(SyncArgs {
             template: root.join("views/main.crepus"),
             dir: root.clone(),
-            outputs: vec![root.join("desktop/dashboard.view-ir.json")],
-            defaults: false,
+            out: vec![root.join("desktop/dashboard.view-ir.json")],
+            no_defaults: true,
             component: None,
-            ctx_file: None,
-            vars: vec![("name".into(), "Acme".into())],
+            ctx: None,
+            vars: vec!["name=Acme".into()],
             pretty: true,
         })
         .unwrap();

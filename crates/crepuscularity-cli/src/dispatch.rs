@@ -5,8 +5,8 @@ use std::time::Instant;
 
 use crate::cli::{
     BenchmarkCheckArgs, BenchmarkCommands, BenchmarkRunArgs, BrowserArg, Cli, Commands,
-    IosCommands, MobileCommands, MobilePlatformArg, NativeCommands, NativeIosTargetArg,
-    TuiCommands, WebCommands, WebextCommands,
+    IosCommands, MobileCommands, MobilePlatformArg, NativeCommands, TuiCommands, WebCommands,
+    WebextCommands,
 };
 use crate::target_build::ManifestBuildArgs;
 use crate::ui;
@@ -228,12 +228,5 @@ pub fn mobile_platform(p: MobilePlatformArg) -> crate::mobile::MobilePlatform {
         MobilePlatformArg::Ios => crate::mobile::MobilePlatform::Ios,
         MobilePlatformArg::Android => crate::mobile::MobilePlatform::Android,
         MobilePlatformArg::All => crate::mobile::MobilePlatform::All,
-    }
-}
-
-pub fn native_ios_target(t: NativeIosTargetArg) -> crate::native::IosBuildTarget {
-    match t {
-        NativeIosTargetArg::Simulator => crate::native::IosBuildTarget::Simulator,
-        NativeIosTargetArg::Device => crate::native::IosBuildTarget::Device,
     }
 }

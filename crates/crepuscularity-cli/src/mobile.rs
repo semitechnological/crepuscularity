@@ -15,7 +15,8 @@ use crepuscularity_native::{
 use notify::{Event, EventKind, RecursiveMode, Watcher};
 use serde_json::Value;
 
-use crate::{native, ui};
+use crate::native::{self, CodegenArgs as NativeCodegenArgs, CodegenPlatform, IosBuildTarget, SyncArgs};
+use crate::ui;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum MobilePlatform {
@@ -45,11 +46,7 @@ struct MobileDevState {
     last_event: RwLock<HotReloadEnvelope>,
 }
 
-use crate::cli::NativeIosTargetArg;
-use crate::cli::{
-    MobileCodegenPlatformArg, MobileCommands, NativeBuildCommands, NativeCodegenCliArgs,
-    NativeCodegenPlatformArg, NativeCommands, NativeRunCommands, NativeSyncArgs,
-};
+use crate::cli::{MobileCodegenPlatformArg, MobileCommands, NativeBuildCommands, NativeCommands, NativeRunCommands};
 use crate::dispatch::mobile_platform;
 
 pub fn execute(cmd: MobileCommands) {
@@ -64,8 +61,8 @@ pub fn execute(cmd: MobileCommands) {
             pretty,
         } => {
             native::execute(NativeCommands::Sync {
-                args: NativeSyncArgs {
-                    template: Some(template),
+                args: SyncArgs {
+                    template,
                     dir,
                     out: Vec::new(),
                     no_defaults: false,
@@ -178,8 +175,8 @@ fn scaffold_mobile_app(name: &str) {
     // Step 2: regenerate fixture + codegen (before rename, uses nativeshell paths).
     let template = PathBuf::from("views/main.crepus");
     native::execute(NativeCommands::Sync {
-        args: NativeSyncArgs {
-            template: Some(template.clone()),
+        args: SyncArgs {
+            template: template.clone(),
             dir: root.clone(),
             out: Vec::new(),
             no_defaults: false,
@@ -309,11 +306,11 @@ fn run_codegen_full(
         let (default_out, plat_arg) = match plat {
             MobilePlatform::Ios => (
                 dir.join("ios/Sources/NativeShell/Generated"),
-                NativeCodegenPlatformArg::SwiftUi,
+                CodegenPlatform::SwiftUi,
             ),
             MobilePlatform::Android => (
                 dir.join("android/app/src/main/java/dev/crepuscularity/nativeshell/generated"),
-                NativeCodegenPlatformArg::Compose,
+                CodegenPlatform::Compose,
             ),
             MobilePlatform::All => continue,
         };
@@ -323,7 +320,7 @@ fn run_codegen_full(
             default_out
         };
         native::execute(NativeCommands::Codegen {
-            args: NativeCodegenCliArgs {
+            args: NativeCodegenArgs {
                 template: Some(template_path.clone()),
                 platform: Some(plat_arg),
                 out: Some(out_dir.clone()),
@@ -343,7 +340,7 @@ fn run_codegen_full(
 fn run_mobile_build(
     platform: MobilePlatform,
     dir: Option<PathBuf>,
-    target: NativeIosTargetArg,
+    target: IosBuildTarget,
     configuration: String,
     flavor: String,
 ) {
@@ -629,8 +626,8 @@ fn sync_outputs(root: &Path, template_path: &Path, platform: MobilePlatform) {
         .unwrap_or(template_path)
         .to_path_buf();
     native::execute(NativeCommands::Sync {
-        args: NativeSyncArgs {
-            template: Some(rel),
+        args: SyncArgs {
+            template: rel,
             dir: root.to_path_buf(),
             out: Vec::new(),
             no_defaults: false,
@@ -644,9 +641,9 @@ fn sync_outputs(root: &Path, template_path: &Path, platform: MobilePlatform) {
     if matches!(platform, MobilePlatform::Ios | MobilePlatform::All) {
         let out = root.join("ios/Sources/NativeShell/Generated");
         native::execute(NativeCommands::Codegen {
-            args: NativeCodegenCliArgs {
+            args: NativeCodegenArgs {
                 template: Some(tpl.clone()),
-                platform: Some(NativeCodegenPlatformArg::SwiftUi),
+                platform: Some(CodegenPlatform::SwiftUi),
                 out: Some(out),
                 view_name: Some("CrepusGeneratedView".into()),
                 component: None,
@@ -659,9 +656,9 @@ fn sync_outputs(root: &Path, template_path: &Path, platform: MobilePlatform) {
         let out_dir =
             root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/generated");
         native::execute(NativeCommands::Codegen {
-            args: NativeCodegenCliArgs {
+            args: NativeCodegenArgs {
                 template: Some(tpl),
-                platform: Some(NativeCodegenPlatformArg::Compose),
+                platform: Some(CodegenPlatform::Compose),
                 out: Some(out_dir.clone()),
                 view_name: Some("CrepusGeneratedView".into()),
                 component: None,

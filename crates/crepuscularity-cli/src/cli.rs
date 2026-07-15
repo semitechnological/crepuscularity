@@ -302,15 +302,15 @@ pub enum NativeCommands {
     },
     Ir {
         #[command(flatten)]
-        args: NativeIrArgs,
+        args: crate::native::IrArgs,
     },
     Sync {
         #[command(flatten)]
-        args: NativeSyncArgs,
+        args: crate::native::SyncArgs,
     },
     Codegen {
         #[command(flatten)]
-        args: NativeCodegenCliArgs,
+        args: crate::native::CodegenArgs,
     },
     Build {
         #[command(subcommand)]
@@ -346,7 +346,7 @@ pub enum NativeBuildCommands {
         #[arg(long)]
         dir: Option<PathBuf>,
         #[arg(long, default_value = "simulator")]
-        target: NativeIosTargetArg,
+        target: crate::native::IosBuildTarget,
         #[arg(long, default_value = "Debug")]
         configuration: String,
     },
@@ -370,75 +370,6 @@ pub enum NativeRunCommands {
         #[arg(long, default_value = "Debug")]
         flavor: String,
     },
-}
-
-#[derive(Clone, Copy, Debug, ValueEnum)]
-pub enum NativeIosTargetArg {
-    Simulator,
-    Device,
-}
-
-#[derive(Args, Debug, Clone)]
-pub struct NativeIrArgs {
-    pub file: Option<PathBuf>,
-    #[arg(long)]
-    pub component: Option<String>,
-    #[arg(long)]
-    pub ctx: Option<PathBuf>,
-    #[arg(long = "var", value_name = "KEY=VALUE")]
-    pub vars: Vec<String>,
-    #[arg(long)]
-    pub pretty: bool,
-    #[arg(long)]
-    pub stdin: bool,
-    #[arg(long = "stdin-json")]
-    pub stdin_json: bool,
-    #[arg(long)]
-    pub base_dir: Option<PathBuf>,
-}
-
-#[derive(Args, Debug, Clone)]
-pub struct NativeSyncArgs {
-    pub template: Option<PathBuf>,
-    #[arg(long, default_value = ".")]
-    pub dir: PathBuf,
-    #[arg(long)]
-    pub out: Vec<PathBuf>,
-    #[arg(long = "no-defaults")]
-    pub no_defaults: bool,
-    #[arg(long)]
-    pub component: Option<String>,
-    #[arg(long)]
-    pub ctx: Option<PathBuf>,
-    #[arg(long = "var", value_name = "KEY=VALUE")]
-    pub vars: Vec<String>,
-    #[arg(long)]
-    pub pretty: bool,
-}
-
-#[derive(Args, Debug, Clone)]
-pub struct NativeCodegenCliArgs {
-    pub template: Option<PathBuf>,
-    #[arg(long)]
-    pub platform: Option<NativeCodegenPlatformArg>,
-    #[arg(long)]
-    pub out: Option<PathBuf>,
-    #[arg(long)]
-    pub view_name: Option<String>,
-    #[arg(long)]
-    pub component: Option<String>,
-    #[arg(long)]
-    pub ctx: Option<PathBuf>,
-    #[arg(long = "var", value_name = "KEY=VALUE")]
-    pub vars: Vec<String>,
-}
-
-#[derive(Clone, Copy, Debug, ValueEnum)]
-pub enum NativeCodegenPlatformArg {
-    #[value(name = "swiftui", alias = "swift", alias = "ios")]
-    SwiftUi,
-    #[value(name = "compose", alias = "kotlin", alias = "android")]
-    Compose,
 }
 
 #[derive(Subcommand, Debug)]
@@ -466,7 +397,7 @@ pub enum MobileCommands {
         #[arg(long)]
         dir: Option<PathBuf>,
         #[arg(long, default_value = "simulator")]
-        target: NativeIosTargetArg,
+        target: crate::native::IosBuildTarget,
         #[arg(long, default_value = "Debug")]
         configuration: String,
         #[arg(long, default_value = "Debug")]
