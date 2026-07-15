@@ -46,7 +46,6 @@ clap = { version = "4.5", optional = true, features = ["derive"] }
 crossterm = { version = "0.28", optional = true }
 ratatui = { version = "0.30", default-features = false, features = ["crossterm"], optional = true }
 rayon = { version = "1", optional = true }
-which = "8.0.3"
 shlex = "2.0.1"
 
 [[bin]]

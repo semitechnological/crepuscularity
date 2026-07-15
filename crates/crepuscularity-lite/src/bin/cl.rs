@@ -8,16 +8,43 @@ use clap::{Parser, Subcommand};
 use crepuscularity_lite::config::CrepusLiteConfig;
 use serde_json::Value;
 
+fn find_exe(name: &str) -> Result<PathBuf, String> {
+    let cmd = if cfg!(target_os = "windows") {
+        "where"
+    } else {
+        "which"
+    };
+    let out = Command::new(cmd)
+        .arg(name)
+        .output()
+        .map_err(|e| format!("{cmd} {name}: {e}"))?;
+    if !out.status.success() {
+        return Err(format!("{name} not found in PATH"));
+    }
+    let first = out
+        .stdout
+        .iter()
+        .position(|&b| b == b'\n')
+        .unwrap_or(out.stdout.len());
+    let path = String::from_utf8_lossy(&out.stdout[..first])
+        .trim()
+        .to_string();
+    if path.is_empty() {
+        return Err(format!("{name} not found in PATH"));
+    }
+    Ok(PathBuf::from(path))
+}
+
 fn bun_exe() -> Result<PathBuf, String> {
-    which::which("bun").map_err(|_| "bun not found in PATH".to_string())
+    find_exe("bun")
 }
 
 fn cargo_exe() -> Result<PathBuf, String> {
-    which::which("cargo").map_err(|_| "cargo not found in PATH".to_string())
+    find_exe("cargo")
 }
 
 fn xcrun_exe() -> Result<PathBuf, String> {
-    which::which("xcrun").map_err(|_| "xcrun not found in PATH".to_string())
+    find_exe("xcrun")
 }
 
 #[derive(Parser, Debug)]

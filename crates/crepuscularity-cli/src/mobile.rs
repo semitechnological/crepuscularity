@@ -221,8 +221,6 @@ fn scaffold_mobile_app(name: &str) {
         r_4.as_str(),
     ];
 
-    let ac = aho_corasick::AhoCorasick::new(patterns).expect("failed to build aho-corasick");
-
     let rewrite_paths: &[&str] = &[
         "crepus.toml",
         "rust/Cargo.toml",
@@ -240,7 +238,10 @@ fn scaffold_mobile_app(name: &str) {
     for rel in rewrite_paths {
         let path = root.join(rel);
         if let Ok(content) = fs::read_to_string(&path) {
-            let updated = ac.replace_all(&content, replace_with);
+            let mut updated = content.clone();
+            for (from, to) in patterns.iter().zip(replace_with.iter()) {
+                updated = updated.replace(from, to);
+            }
             if updated != content {
                 let _ = fs::write(&path, updated);
             }
