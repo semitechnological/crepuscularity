@@ -4,6 +4,7 @@ fn crepus() -> Command {
     Command::new(env!("CARGO_BIN_EXE_crepus"))
 }
 
+/// Run a command and panic with full diagnostics (exit code, stderr, stdout) on failure.
 fn assert_success(out: &std::process::Output, label: &str) {
     if !out.status.success() {
         panic!(
@@ -50,11 +51,7 @@ fn converts_v1_and_v2_static_crepus_bundles() {
             ])
             .output()
             .unwrap();
-        assert!(
-            out.status.success(),
-            "{}",
-            String::from_utf8_lossy(&out.stderr)
-        );
+        assert_success(&out, "converts_v1_and_v2");
         assert!(destination.join("fixture.json").is_file());
         assert!(destination
             .join("ios/Sources/NativeShell/Generated/CrepusGeneratedView.swift")
@@ -87,11 +84,7 @@ fn webview_conversion_targets_mobile_and_omits_desktop_from_all() {
             ])
             .output()
             .unwrap();
-        assert!(
-            out.status.success(),
-            "{}",
-            String::from_utf8_lossy(&out.stderr)
-        );
+        assert_success(&out, "webview_conversion_targets_mobile");
         assert!(destination.join("ios").is_dir());
         assert!(destination.join("android").is_dir());
         assert!(!destination.join("desktop").exists());
@@ -145,11 +138,7 @@ fn converts_shipped_examples() {
             ])
             .output()
             .unwrap();
-        assert!(
-            out.status.success(),
-            "{}",
-            String::from_utf8_lossy(&out.stderr)
-        );
+        assert_success(&out, "converts_shipped_examples");
         assert!(destination.join("fixture.json").is_file());
     }
 }
@@ -182,11 +171,7 @@ fn preserves_nested_bundle_entries_for_native_sync() {
         ])
         .output()
         .unwrap();
-    assert!(
-        converted.status.success(),
-        "{}",
-        String::from_utf8_lossy(&converted.stderr)
-    );
+    assert_success(&converted, "preserves_nested_convert");
     let sync = crepus()
         .args([
             "native",
@@ -195,11 +180,7 @@ fn preserves_nested_bundle_entries_for_native_sync() {
         ])
         .output()
         .unwrap();
-    assert!(
-        sync.status.success(),
-        "{}",
-        String::from_utf8_lossy(&sync.stderr)
-    );
+    assert_success(&sync, "preserves_nested_sync");
 }
 
 #[test]
@@ -279,11 +260,7 @@ fn conversion_preserves_tauri_application_metadata() {
         ])
         .output()
         .unwrap();
-    assert!(
-        converted.status.success(),
-        "{}",
-        String::from_utf8_lossy(&converted.stderr)
-    );
+    assert_success(&converted, "conversion_preserves_metadata");
     assert!(
         std::fs::read_to_string(destination.join("android/app/src/main/AndroidManifest.xml"))
             .unwrap()
