@@ -44,10 +44,7 @@ desktop = ["dep:gpui", "dep:crepuscularity-runtime"]
 # TUI commands: `crepus tui preview`, `crepus benchmark` live dashboard.
 tui = ["dep:ratatui", "dep:crepuscularity-tui"]
 
-# Aurora (SwiftUI) commands: `crepus aurora ...` (forwards to `aurorality`).
-aurora = []
-
-full = ["desktop", "tui", "aurora"]
+full = ["desktop", "tui"]
 
 [dependencies]
 gpui                   = { version = "=0.2.2", default-features = false, features = ["font-kit"], optional = true }

@@ -13,8 +13,6 @@ use axum::{
 use crepuscularity_core::ast::Node;
 use crepuscularity_core::TemplateContext;
 
-use super::escape_html_error;
-
 /// A single route entry pointing to a pre-parsed template.
 ///
 /// The `nodes` field holds the pre-parsed AST so templates are not re-parsed on every request.
@@ -126,11 +124,11 @@ async fn render_entry(routes: &HashMap<String, RouteEntry>, path: &str) -> Html<
         Ok(Ok(h)) => Html(h),
         Ok(Err(e)) => Html(format!(
             "<pre style='color:red'>{}</pre>",
-            escape_html_error(&e.to_string())
+            crate::escape_html(&e.to_string())
         )),
         Err(e) => Html(format!(
             "<pre style='color:red'>render task panicked: {}</pre>",
-            escape_html_error(&e.to_string())
+            crate::escape_html(&e.to_string())
         )),
     }
 }

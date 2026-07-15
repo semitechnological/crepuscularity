@@ -31,7 +31,7 @@ use crepuscularity_web::{escape_html_attr, render_bundle_with_ssr};
 
 const WEB_INDEX_HTML: &str = include_str!("../assets/web/index.html");
 const WEB_APP_JS: &str = include_str!("../assets/web/app.js");
-const UNOCSS_JS: &[u8] = include_bytes!("../assets/vendor/unocss.js");
+const UNOCSS_JS: &[u8] = include_bytes!("../../crepuscularity-web/assets/vendor/unocss.js");
 
 // ── Entry point ──────────────────────────────────────────────────────────────
 

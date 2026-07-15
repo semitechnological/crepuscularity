@@ -3,8 +3,6 @@ use axum::{extract::State, response::Html};
 use crepuscularity_core::{TemplateContext, TemplateValue};
 use std::{cell::Cell, collections::HashMap, sync::Arc};
 
-use super::escape_html_error;
-
 /// Configuration for [`SsrHandler`].
 ///
 /// The `nodes` field holds the pre-parsed template AST so the template is not re-parsed
@@ -116,7 +114,7 @@ impl SsrHandler {
             Ok(page) => Html(page),
             Err(e) => Html(format!(
                 "<pre style='color:red'>{}</pre>",
-                escape_html_error(&e)
+                crate::escape_html(&e)
             )),
         }
     }

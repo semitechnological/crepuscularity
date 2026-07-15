@@ -51,8 +51,8 @@ pub mod axum_ssr;
 
 #[cfg(feature = "axum")]
 pub use axum_ssr::{
-    escape_html_error, stream_ssr_response, stream_ssr_response_with_nodes, stream_static_template,
-    RouteEntry, SsrHandler, SsrOptions, SsrRouter,
+    stream_ssr_response, stream_ssr_response_with_nodes, stream_static_template, RouteEntry,
+    SsrHandler, SsrOptions, SsrRouter,
 };
 
 /// Render an entry point from an in-memory file map — no filesystem access.

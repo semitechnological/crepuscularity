@@ -14,7 +14,6 @@ pub mod diagnostics;
 pub mod error;
 pub mod eval;
 pub mod include_paths;
-pub mod incremental;
 pub mod parser;
 pub mod preprocess;
 pub mod render_entry;
@@ -29,7 +28,6 @@ pub use context::{TemplateContext, TemplateValue};
 pub use diagnostics::{diagnose_crepus_source, is_multi_component_file, CrepusDiagnostic};
 pub use error::CrepusError;
 pub use include_paths::resolve_include_path;
-pub use incremental::ActiveInvalidator;
 pub use parser::{
     parse_component_file, parse_template, parse_template_with_path,
     unescape_crepus_text_literal, ComponentDef, ComponentFile, ComponentMeta,

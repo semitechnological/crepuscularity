@@ -57,12 +57,7 @@ pub fn run(cli: Cli) {
         Commands::Native { command } => crate::native::execute(command),
         Commands::Mobile { command } => crate::mobile::execute(command),
         Commands::Tauri { command } => crate::tauri::execute(command),
-        #[cfg(feature = "aurora")]
         Commands::Aurora { aurorality_args } => crate::aurora::run_forwarded(&aurorality_args),
-        #[cfg(not(feature = "aurora"))]
-        Commands::Aurora { .. } => {
-            ui::error("Aurora not compiled in. Rebuild crepus with --features aurora.");
-        }
         Commands::Embedded { command } => crate::embedded::execute(command),
         Commands::Benchmark { command, flat } => run_benchmark(command, flat),
         Commands::Plugins { command } => crate::plugins::execute(command),
@@ -115,10 +110,9 @@ fn run_init(kind: &str, name: &str) {
         "gpui" | "app" | "desktop" => {
             ui::error("GPUI scaffold not compiled in. Rebuild crepus with --features desktop.");
         }
-        #[cfg(feature = "aurora")]
         "aurora" => crate::aurora::run_forwarded(&["new".to_string(), name.to_string()]),
         other => {
-            let mut kinds = "web, webext, tui, native, ios, mobile".to_string();
+            let mut kinds = "web, webext, tui, native, ios, mobile, aurora".to_string();
             #[cfg(feature = "desktop")]
             {
                 kinds.push_str(", gpui");
@@ -126,10 +120,6 @@ fn run_init(kind: &str, name: &str) {
             #[cfg(not(feature = "desktop"))]
             {
                 kinds.push_str(", app");
-            }
-            #[cfg(feature = "aurora")]
-            {
-                kinds.push_str(", aurora");
             }
             ui::error(&format!("unknown init kind {other:?}; expected {kinds}"));
         }

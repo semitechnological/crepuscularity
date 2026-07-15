@@ -1,7 +1,6 @@
 //! crepus — the Crepuscularity CLI
 
 mod apple_project;
-#[cfg(feature = "aurora")]
 mod aurora;
 mod benchmark;
 mod benchmark_tui;
@@ -28,7 +27,6 @@ mod plugins;
 mod preview;
 mod render;
 mod target_build;
-mod target_builder;
 mod tauri;
 mod tui;
 pub mod ui;

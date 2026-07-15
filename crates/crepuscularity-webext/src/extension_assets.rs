@@ -23,7 +23,7 @@ pub const RUNTIME_ADAPTER: &str = include_str!(concat!(
 ));
 pub static UNOCSS_JS: &[u8] = include_bytes!(concat!(
     env!("CARGO_MANIFEST_DIR"),
-    "/assets/vendor/unocss.js"
+    "/../crepuscularity-web/assets/vendor/unocss.js"
 ));
 
 #[cfg(test)]
