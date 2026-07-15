@@ -23,10 +23,6 @@ fn fixture(version: u8) -> tempfile::TempDir {
 }
 
 #[test]
-#[cfg_attr(
-    windows,
-    ignore = "default desktop crepus.exe does not spawn reliably on Windows CI"
-)]
 fn converts_v1_and_v2_static_crepus_bundles() {
     for version in [1, 2] {
         let source = fixture(version);
@@ -57,10 +53,6 @@ fn converts_v1_and_v2_static_crepus_bundles() {
 }
 
 #[test]
-#[cfg_attr(
-    windows,
-    ignore = "default desktop crepus.exe does not spawn reliably on Windows CI"
-)]
 fn webview_conversion_targets_mobile_and_omits_desktop_from_all() {
     let source = fixture(2);
     std::fs::write(
@@ -99,10 +91,6 @@ fn webview_conversion_targets_mobile_and_omits_desktop_from_all() {
 }
 
 #[test]
-#[cfg_attr(
-    windows,
-    ignore = "default desktop crepus.exe does not spawn reliably on Windows CI"
-)]
 fn webview_conversion_rejects_desktop() {
     let source = fixture(2);
     std::fs::write(
@@ -130,10 +118,6 @@ fn webview_conversion_rejects_desktop() {
 }
 
 #[test]
-#[cfg_attr(
-    windows,
-    ignore = "default desktop crepus.exe does not spawn reliably on Windows CI"
-)]
 fn converts_shipped_examples() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     for name in ["tauri-v1-crepus", "tauri-v2-crepus", "tauri-v2-multiwindow"] {
@@ -160,10 +144,6 @@ fn converts_shipped_examples() {
 }
 
 #[test]
-#[cfg_attr(
-    windows,
-    ignore = "default desktop crepus.exe does not spawn reliably on Windows CI"
-)]
 fn preserves_nested_bundle_entries_for_native_sync() {
     let source = tempfile::tempdir().unwrap();
     std::fs::create_dir_all(source.path().join("src-tauri")).unwrap();
@@ -212,10 +192,6 @@ fn preserves_nested_bundle_entries_for_native_sync() {
 }
 
 #[test]
-#[cfg_attr(
-    windows,
-    ignore = "default desktop crepus.exe does not spawn reliably on Windows CI"
-)]
 fn rejects_unsafe_bundle_without_creating_output() {
     let source = fixture(2);
     std::fs::write(
@@ -241,10 +217,6 @@ fn rejects_unsafe_bundle_without_creating_output() {
 }
 
 #[test]
-#[cfg_attr(
-    windows,
-    ignore = "default desktop crepus.exe does not spawn reliably on Windows CI"
-)]
 fn audit_and_conversion_reject_unadapted_tauri_commands() {
     let source = fixture(2);
     std::fs::write(
@@ -276,10 +248,6 @@ fn audit_and_conversion_reject_unadapted_tauri_commands() {
 }
 
 #[test]
-#[cfg_attr(
-    windows,
-    ignore = "default desktop crepus.exe does not spawn reliably on Windows CI"
-)]
 fn conversion_preserves_tauri_application_metadata() {
     let source = fixture(2);
     std::fs::write(

@@ -68,6 +68,10 @@ impl TauriProject {
             );
         };
         let frontend_dist = config.parent().unwrap_or(&root).join(dist);
+        // Canonicalize to resolve `..` components — Windows UNC (\\?\) paths
+        // do not resolve `..` at the OS level, so bundle reads fail without this.
+        let frontend_dist = std::fs::canonicalize(&frontend_dist)
+            .unwrap_or(frontend_dist);
         Ok(Self {
             root,
             config,
