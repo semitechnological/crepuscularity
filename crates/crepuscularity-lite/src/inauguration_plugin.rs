@@ -67,18 +67,40 @@ fn require_str(payload: &Value, key: &str) -> Result<String, BridgeError> {
 }
 
 fn which_in() -> Result<Value, BridgeError> {
-    let path = which::which("in").map(|p| p.display().to_string());
+    let cmd = if cfg!(target_os = "windows") {
+        "where"
+    } else {
+        "which"
+    };
+    let path = Command::new(cmd)
+        .arg("in")
+        .output()
+        .ok()
+        .filter(|o| o.status.success())
+        .and_then(|o| {
+            let stdout = String::from_utf8_lossy(&o.stdout);
+            let first = stdout.lines().next().unwrap_or("");
+            if first.is_empty() {
+                None
+            } else {
+                Some(first.to_string())
+            }
+        });
     Ok(json!({
-        "found": path.is_ok(),
-        "path": path.ok(),
+        "found": path.is_some(),
+        "path": path,
     }))
 }
 
 fn process_run(payload: &Value) -> Result<Value, BridgeError> {
     let command = require_str(payload, "command")?;
-    let output = Command::new("sh")
-        .arg("-c")
-        .arg(&command)
+    // Split on whitespace to avoid shell injection — no sh -c.
+    let parts: Vec<&str> = command.split_whitespace().collect();
+    let (program, args) = parts
+        .split_first()
+        .ok_or_else(|| BridgeError::new("invalid_argument", "empty command"))?;
+    let output = Command::new(program)
+        .args(args)
         .output()
         .map_err(|e| BridgeError::new("spawn_failed", e.to_string()))?;
     let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
