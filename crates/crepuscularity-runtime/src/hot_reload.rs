@@ -1,6 +1,5 @@
 //! Hot-reload GPUI view component: reads a template file, renders it, and
-//! watches for changes via the parent-directory `notify` watcher in
-//! [`crate::watcher`].
+//! watches for changes via the parent-directory `notify` watcher.
 //!
 //! # What triggers a reload
 //!
