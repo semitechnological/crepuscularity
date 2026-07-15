@@ -1,6 +1,6 @@
-name = "Crepus"
+name = "CrepusX"
 grammar = "crepus"
-path_suffixes = ["crepus"]
+path_suffixes = ["csx"]
 line_comments = ["# "]
 tab_size = 2
 autoclose_before = ":\"'}]>"

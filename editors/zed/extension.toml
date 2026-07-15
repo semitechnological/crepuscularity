@@ -1,12 +1,12 @@
 id = "crepuscularity"
 name = "Crepuscularity"
-version = "0.2.3"
+version = "0.3.0"
 schema_version = 1
 authors = ["Max Carter <max@undivisible.dev>"]
-description = "Crepus templates (.crepus): tree-sitter highlighting, snippets, and crepus-lsp."
+description = "Crepus templates (.crepus) and CrepusX (.csx) for React Native: tree-sitter highlighting, snippets, and crepus-lsp."
 repository = "https://github.com/tschk/crepuscularity"
 
-snippets = ["./snippets/crepus.json"]
+snippets = ["./snippets/crepus.json", "./snippets/csx.json"]
 
 [[capabilities]]
 kind = "process:exec"
@@ -16,9 +16,9 @@ args = ["**"]
 [grammars.crepus]
 repository = "https://github.com/tschk/crepuscularity"
 path = "tree-sitter-crepus"
-# Must match a commit on `repository` whose `tree-sitter-crepus/grammar.js` includes every node used by `languages/crepus/*.scm`.
-rev = "a8d07c4a3530556d3c784ab3a1ace4ae0759e6f7"
+# Must match a commit on `repository` whose `tree-sitter-crepus/grammar.js` includes every node used by `languages/crepus/*.scm` and `languages/csx/*.scm`.
+rev = "59a42e330f02a6c8b87ab851a989bc9fb8cb7560"
 
 [language_servers.crepus-lsp]
 name = "crepus-lsp"
-languages = ["Crepus"]
+languages = ["Crepus", "CrepusX"]

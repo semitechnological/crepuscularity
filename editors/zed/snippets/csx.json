@@ -1,0 +1,57 @@
+{
+  "View": {
+    "prefix": "View",
+    "body": ["View ${1:class}", "  $0"],
+    "description": "React Native View"
+  },
+  "Text": {
+    "prefix": "Text",
+    "body": ["Text ${1:class}", "  \"$0\""],
+    "description": "React Native Text"
+  },
+  "Image": {
+    "prefix": "Image",
+    "body": ["Image source={${1:src}} ${2:class}", "  $0"],
+    "description": "React Native Image"
+  },
+  "ScrollView": {
+    "prefix": "ScrollView",
+    "body": ["ScrollView ${1:class}", "  $0"],
+    "description": "React Native ScrollView"
+  },
+  "FlatList": {
+    "prefix": "FlatList",
+    "body": ["FlatList data={${1:items}} ${2:class}", "  $0"],
+    "description": "React Native FlatList"
+  },
+  "Pressable": {
+    "prefix": "Pressable",
+    "body": ["Pressable onPress={${1:fn}} ${2:class}", "  $0"],
+    "description": "React Native Pressable"
+  },
+  "TextInput": {
+    "prefix": "TextInput",
+    "body": ["TextInput value={${1:value}} ${2:class}", "  $0"],
+    "description": "React Native TextInput"
+  },
+  "SafeAreaView": {
+    "prefix": "SafeAreaView",
+    "body": ["SafeAreaView ${1:class}", "  $0"],
+    "description": "React Native SafeAreaView"
+  },
+  "if": {
+    "prefix": "if",
+    "body": ["if {${1:condition}}", "  $0"],
+    "description": "Crepus if block"
+  },
+  "for": {
+    "prefix": "for",
+    "body": ["for ${1:item} in {${2:list}}", "  $0"],
+    "description": "Crepus for loop"
+  },
+  "include": {
+    "prefix": "include",
+    "body": ["include ${1:file.csx}${2:#Name}", "  $0"],
+    "description": "Crepus include statement"
+  }
+}
