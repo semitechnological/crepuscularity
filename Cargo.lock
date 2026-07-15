@@ -1750,7 +1750,7 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-cli"
-version = "0.10.6"
+version = "0.10.7"
 dependencies = [
  "axum",
  "clap",
@@ -1798,7 +1798,7 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-embedded"
-version = "0.1.18"
+version = "0.1.19"
 dependencies = [
  "crepuscularity-core",
  "crepuscularity_macros",
@@ -1819,7 +1819,7 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-gpui"
-version = "0.5.4"
+version = "0.5.5"
 dependencies = [
  "crepuscularity-core",
  "crepuscularity-runtime",
@@ -1832,7 +1832,7 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-lite"
-version = "0.4.11"
+version = "0.4.12"
 dependencies = [
  "arboard",
  "clap",
@@ -1916,7 +1916,7 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-runtime"
-version = "0.4.14"
+version = "0.4.15"
 dependencies = [
  "crepuscularity-core",
  "gpui",
@@ -1967,7 +1967,7 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-web"
-version = "0.4.16"
+version = "0.4.17"
 dependencies = [
  "ammonia",
  "axum",

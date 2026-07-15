@@ -1,6 +1,6 @@
 [package]
 name = "crepuscularity-gpui"
-version = "0.5.4"
+version = "0.5.5"
 edition = "2021"
 license = "MPL-2.0"
 description = "GPUI backend for Crepuscularity (view! macro re-exports) — UNSTABLE; in active development."
@@ -39,6 +39,6 @@ gpui = { version = "=0.2.2", default-features = false }
 xkbcommon = { version = "0.8", default-features = false, features = ["wayland"], optional = true }
 crepuscularity-core = { path = "../crepuscularity-core", version = "0.4.22" }
 crepuscularity_macros = { path = "../crepuscularity_macros", version = "0.5.8" }
-crepuscularity-runtime = { path = "../crepuscularity-runtime", version = "0.4.14" }
+crepuscularity-runtime = { path = "../crepuscularity-runtime", version = "0.4.15" }
 gpui-symbols = { version = "0.6", optional = true }
 pollster = "0.4"

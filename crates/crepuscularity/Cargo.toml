@@ -13,7 +13,7 @@ path = "src/lib.rs"
 
 [dependencies]
 crepuscularity-core = { path = "../crepuscularity-core", version = "0.4.22" }
-crepuscularity-web = { path = "../crepuscularity-web", version = "0.4.16" }
+crepuscularity-web = { path = "../crepuscularity-web", version = "0.4.17" }
 crepuscularity-native = { path = "../crepuscularity-native", version = "0.5.11" }
 crepuscularity-lvgl = { path = "../crepuscularity-lvgl", version = "0.1.7" }
 serde = { workspace = true }
