@@ -4,9 +4,8 @@ use std::path::PathBuf;
 use std::time::Instant;
 
 use crate::cli::{
-    BenchmarkCheckArgs, BenchmarkCommands, BenchmarkRunArgs, BrowserArg, Cli, Commands,
-    IosCommands, MobileCommands, MobilePlatformArg, NativeCommands, TuiCommands, WebCommands,
-    WebextCommands,
+    BenchmarkCheckArgs, BenchmarkCommands, BenchmarkRunArgs, BrowserArg, Cli, Commands, IosCommands,
+    MobileCommands, NativeCommands, TuiCommands, WebCommands, WebextCommands,
 };
 use crate::target_build::ManifestBuildArgs;
 use crate::ui;
@@ -55,7 +54,7 @@ pub fn run(cli: Cli) {
         Commands::Apple { command } => crate::apple_project::execute(command),
         Commands::Tui { command } => crate::tui::execute(command),
         Commands::Native { command } => crate::native::execute(command),
-        Commands::Mobile { command } => crate::mobile::execute(command),
+        Commands::Mobile { command } => crate::native::execute_mobile(command),
         Commands::Tauri { command } => crate::tauri::execute(command),
         Commands::Aurora { aurorality_args } => crate::aurora::run_forwarded(&aurorality_args),
         Commands::Embedded { command } => crate::embedded::execute(command),
@@ -98,7 +97,7 @@ fn run_init(kind: &str, name: &str) {
         "native" => crate::native::execute(NativeCommands::New {
             name: name.to_string(),
         }),
-        "mobile" => crate::mobile::execute(MobileCommands::New {
+        "mobile" => crate::native::execute_mobile(MobileCommands::New {
             name: name.to_string(),
         }),
         "ios" => crate::ios::execute(IosCommands::New {
@@ -223,10 +222,4 @@ pub fn benchmark_check_options(args: BenchmarkCheckArgs) -> crate::benchmark::Ch
     }
 }
 
-pub fn mobile_platform(p: MobilePlatformArg) -> crate::mobile::MobilePlatform {
-    match p {
-        MobilePlatformArg::Ios => crate::mobile::MobilePlatform::Ios,
-        MobilePlatformArg::Android => crate::mobile::MobilePlatform::Android,
-        MobilePlatformArg::All => crate::mobile::MobilePlatform::All,
-    }
-}
+

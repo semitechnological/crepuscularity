@@ -20,7 +20,6 @@ pub mod events;
 mod hud;
 mod inspect;
 mod ios;
-mod mobile;
 mod native;
 mod new;
 mod plugins;
