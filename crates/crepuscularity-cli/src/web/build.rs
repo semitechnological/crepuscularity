@@ -12,6 +12,7 @@ use std::time::Instant;
 
 use crate::build_options::BuildOptions;
 use crate::docs_generator;
+use crate::error::CrepusCliError;
 use crate::ui;
 use crate::wasm_bundle::{
     cargo_build_wasm32, find_wasm_file, run_wasm_bindgen, run_wasm_opt, wasm_profile_dirs,
@@ -1313,40 +1314,37 @@ fn copy_unocss(vendor_dir: &Path) {
 }
 
 /// Build site `runtime/` to WASM once and populate `.crepus-dev/` with the same assets as a `crepus web build` dist folder.
-pub(crate) fn ensure_web_dev_artifacts(site_dir: &Path) -> Result<(), String> {
+pub(crate) fn ensure_web_dev_artifacts(site_dir: &Path) -> Result<(), CrepusCliError> {
     let options = BuildOptions::debug();
     let runtime_dir = site_dir.join("runtime");
     if !runtime_dir.join("Cargo.toml").is_file() {
-        return Err(format!(
+        return Err(CrepusCliError::context(format!(
             "no runtime/Cargo.toml under {} — run `crepus web new <name>` or copy examples/web-site",
             site_dir.display()
-        ));
+        )));
     }
 
     let dev = site_dir.join(super::WEB_DEV_ARTIFACT_DIR);
     let vendor_dir = dev.join("vendor");
     let pkg_dir = dev.join("pkg");
-    std::fs::create_dir_all(&vendor_dir).map_err(|e| e.to_string())?;
-    std::fs::create_dir_all(&pkg_dir).map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(&vendor_dir).map_err(|e| CrepusCliError::io(e, vendor_dir.clone()))?;
+    std::fs::create_dir_all(&pkg_dir).map_err(|e| CrepusCliError::io(e, pkg_dir.clone()))?;
 
     copy_unocss(&vendor_dir);
-    std::fs::write(dev.join("app.js"), super::WEB_APP_JS).map_err(|e| e.to_string())?;
+    std::fs::write(dev.join("app.js"), super::WEB_APP_JS)
+        .map_err(|e| CrepusCliError::io(e, dev.join("app.js")))?;
 
     let mut files: HashMap<String, String> = HashMap::new();
     load_all_crepus(site_dir, site_dir, &mut files);
-    crate::web_islands::build_web_islands(site_dir, &dev, &files)?;
+    crate::web_islands::build_web_islands(site_dir, &dev, &files)
+        .map_err(CrepusCliError::context)?;
 
-    cargo_build_wasm32(&runtime_dir, options)?;
+    cargo_build_wasm32(&runtime_dir, options).map_err(CrepusCliError::context)?;
     let (workspace_target, local_target) = wasm_profile_dirs(site_dir, &runtime_dir, options);
     let wasm_path = find_wasm_file(&workspace_target)
         .or_else(|| find_wasm_file(&local_target))
-        .ok_or_else(|| {
-            format!(
-                "built .wasm not found under target/wasm32-unknown-unknown/{}/ (install wasm32 target and fix runtime errors)",
-                options.cargo_profile()
-            )
-        })?;
-    run_wasm_bindgen(&wasm_path, &pkg_dir, "runtime")?;
+        .ok_or_else(|| CrepusCliError::context(format!("built .wasm not found under target/wasm32-unknown-unknown/{}/ (install wasm32 target and fix runtime errors)", options.cargo_profile())))?;
+    run_wasm_bindgen(&wasm_path, &pkg_dir, "runtime").map_err(CrepusCliError::context)?;
     Ok(())
 }
 

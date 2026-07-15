@@ -17,6 +17,7 @@ use crate::build_options::BuildOptions;
 use crate::cli::IosCommands;
 use crate::crepus_toml;
 use crate::new::to_pascal_case;
+use crate::scaffold;
 use crate::ui;
 
 #[derive(Debug, Clone)]
@@ -157,45 +158,40 @@ fn scaffold_ios_app(name: &str) {
     let native = dir.join("NativeShell");
     let sources = native.join("Sources").join("NativeShell");
 
-    fs::create_dir_all(&sources).unwrap_or_else(|e| {
-        ui::error(&format!("create dirs: {e}"));
-    });
-    fs::create_dir_all(dir.join("App")).unwrap_or_else(|e| {
-        ui::error(&format!("create App: {e}"));
-    });
+    scaffold::ensure_dir(&sources).unwrap_or_else(|e| ui::error(&format!("create dirs: {e}")));
+    scaffold::ensure_dir(&dir.join("App"))
+        .unwrap_or_else(|e| ui::error(&format!("create App: {e}")));
 
-    fs::write(dir.join("crepus.toml"), crepus_toml(&app_target)).unwrap_or_else(|e| {
-        ui::error(&format!("write crepus.toml: {e}"));
-    });
-    fs::write(dir.join(".gitignore"), ios_gitignore()).unwrap_or_else(|e| {
-        ui::error(&format!("write .gitignore: {e}"));
-    });
-    fs::write(dir.join("README.md"), readme_md(name, &app_target))
+    scaffold::write_file(&dir.join("crepus.toml"), &crepus_toml(&app_target))
+        .unwrap_or_else(|e| ui::error(&format!("write crepus.toml: {e}")));
+    scaffold::write_file(&dir.join(".gitignore"), &ios_gitignore())
+        .unwrap_or_else(|e| ui::error(&format!("write .gitignore: {e}")));
+    scaffold::write_file(&dir.join("README.md"), &readme_md(name, &app_target))
         .unwrap_or_else(|e| ui::error(&format!("write README: {e}")));
 
-    fs::write(native.join("Package.swift"), native_package_swift())
+    scaffold::write_file(&native.join("Package.swift"), &native_package_swift())
         .unwrap_or_else(|e| ui::error(&format!("write Package.swift: {e}")));
-    fs::write(
-        sources.join("ViewIrModels.swift"),
+    scaffold::write_file(
+        &sources.join("ViewIrModels.swift"),
         include_str!("../assets/ios/ViewIrModels.swift"),
     )
     .unwrap_or_else(|e| ui::error(&format!("write ViewIrModels: {e}")));
-    fs::write(
-        sources.join("ViewIrTreeView.swift"),
+    scaffold::write_file(
+        &sources.join("ViewIrTreeView.swift"),
         include_str!("../assets/ios/ViewIrTreeView.swift"),
     )
     .unwrap_or_else(|e| ui::error(&format!("write ViewIrTreeView: {e}")));
-    fs::write(
-        sources.join("fixture.json"),
+    scaffold::write_file(
+        &sources.join("fixture.json"),
         include_str!("../assets/ios/fixture.json"),
     )
     .unwrap_or_else(|e| ui::error(&format!("write fixture.json: {e}")));
 
-    fs::write(dir.join("App").join("App.swift"), app_swift(&pascal))
+    scaffold::write_file(&dir.join("App").join("App.swift"), &app_swift(&pascal))
         .unwrap_or_else(|e| ui::error(&format!("write App.swift: {e}")));
-    fs::write(
-        dir.join("App").join("ContentView.swift"),
-        content_view_swift(),
+    scaffold::write_file(
+        &dir.join("App").join("ContentView.swift"),
+        &content_view_swift(),
     )
     .unwrap_or_else(|e| ui::error(&format!("write ContentView: {e}")));
 

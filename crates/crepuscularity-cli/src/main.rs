@@ -14,6 +14,7 @@ mod dev;
 mod dispatch;
 mod docs_generator;
 mod embedded;
+mod error;
 #[cfg(feature = "desktop")]
 pub mod events;
 #[cfg(feature = "desktop")]
@@ -25,6 +26,7 @@ mod new;
 mod plugins;
 mod preview;
 mod render;
+mod scaffold;
 mod target_build;
 mod tauri;
 mod tui;
@@ -56,5 +58,7 @@ fn init_tracing() {
 fn main() {
     init_tracing();
     let cli = cli::parse();
-    dispatch::run(cli);
+    if let Err(err) = dispatch::run(cli) {
+        ui::report_error(&err);
+    }
 }

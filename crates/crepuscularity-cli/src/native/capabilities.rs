@@ -25,6 +25,7 @@ use crepuscularity_native::{
     IOS_VIDEO_BRIDGE,
 };
 
+use crate::error::CrepusCliError;
 use crate::ui;
 
 pub struct CapabilitySpec {
@@ -33,10 +34,10 @@ pub struct CapabilitySpec {
     cargo_feature: &'static str,
     android_manifest: &'static str,
     ios_project: &'static str,
-    host: fn(&Path) -> Result<(), String>,
+    host: fn(&Path) -> Result<(), CrepusCliError>,
 }
 
-fn no_op_host(_root: &Path) -> Result<(), String> {
+fn no_op_host(_root: &Path) -> Result<(), CrepusCliError> {
     Ok(())
 }
 
@@ -152,7 +153,7 @@ pub const CAPABILITIES: &[CapabilitySpec] = &[
     CapabilitySpec { name: "deep-links", aliases: &["deeplinks", "deep-link", "url-events"], cargo_feature: "deep-links", android_manifest: "", ios_project: "", host: add_deep_links_host },
 ];
 
-pub fn add_capability(capability: &str, root: &Path) -> Result<(), String> {
+pub fn add_capability(capability: &str, root: &Path) -> Result<(), CrepusCliError> {
     let capability = capability.to_ascii_lowercase();
     let spec = CAPABILITIES
         .iter()
@@ -171,7 +172,10 @@ pub fn add_capability(capability: &str, root: &Path) -> Result<(), String> {
     let manifest = root.join("android/app/src/main/AndroidManifest.xml");
     let project = root.join("ios/project.yml");
     if !cargo.is_file() || !manifest.is_file() || !project.is_file() {
-        return Err(format!("'{}' is not a native scaffold", root.display()));
+        return Err(CrepusCliError::context(format!(
+            "'{}' is not a native scaffold",
+            root.display()
+        )));
     }
     add_feature(&cargo, spec.cargo_feature)?;
     if spec.name == "filesystem" {
@@ -184,7 +188,7 @@ pub fn add_capability(capability: &str, root: &Path) -> Result<(), String> {
     )?;
     if !spec.ios_project.is_empty() {
         let mut source = fs::read_to_string(&project)
-            .map_err(|e| format!("read '{}': {e}", project.display()))?;
+            .map_err(|e| CrepusCliError::io(e, project.to_path_buf()))?;
         if source.contains("INFOPLIST_FILE: App/Info.plist") {
             add_ios_info_plist_key(root, spec.ios_project)?;
         } else if (spec.name == "geolocation"
@@ -209,7 +213,7 @@ pub fn add_capability(capability: &str, root: &Path) -> Result<(), String> {
                 ),
             );
             fs::write(&project, source)
-                .map_err(|e| format!("write '{}': {e}", project.display()))?;
+                .map_err(|e| CrepusCliError::io(e, project.to_path_buf()))?;
         } else if (spec.name == "bluetooth" || spec.name == "permissions")
             && !source.contains("CoreBluetooth")
         {
@@ -218,7 +222,7 @@ pub fn add_capability(capability: &str, root: &Path) -> Result<(), String> {
                 spec.ios_project,
             );
             fs::write(&project, source)
-                .map_err(|e| format!("write '{}': {e}", project.display()))?;
+                .map_err(|e| CrepusCliError::io(e, project.to_path_buf()))?;
         }
     }
     (spec.host)(root)?;
@@ -231,20 +235,20 @@ pub fn add_capability(capability: &str, root: &Path) -> Result<(), String> {
     Ok(())
 }
 
-pub fn add_deep_links_host(root: &Path) -> Result<(), String> {
+pub fn add_deep_links_host(root: &Path) -> Result<(), CrepusCliError> {
     let manifest = root.join("android/app/src/main/AndroidManifest.xml");
     let mut source =
-        fs::read_to_string(&manifest).map_err(|e| format!("read '{}': {e}", manifest.display()))?;
+        fs::read_to_string(&manifest).map_err(|e| CrepusCliError::io(e, manifest.to_path_buf()))?;
     if !source.contains("android.intent.action.VIEW") {
         source = source.replace(
             "        </activity>\n",
             "            <intent-filter>\n                <action android:name=\"android.intent.action.VIEW\" />\n                <category android:name=\"android.intent.category.DEFAULT\" />\n                <category android:name=\"android.intent.category.BROWSABLE\" />\n                <data android:scheme=\"crepus\" />\n            </intent-filter>\n        </activity>\n",
         );
-        fs::write(&manifest, source).map_err(|e| format!("write '{}': {e}", manifest.display()))?;
+        fs::write(&manifest, source).map_err(|e| CrepusCliError::io(e, manifest.to_path_buf()))?;
     }
     let android = android_actions_path(root)?;
     let mut source =
-        fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
+        fs::read_to_string(&android).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     if !source.contains("deepLinksValue") {
         source = source.replace(
             "        when (capability) {\n",
@@ -254,12 +258,12 @@ pub fn add_deep_links_host(root: &Path) -> Result<(), String> {
             "\n    private fun dispatchHostAction",
             &format!("{ANDROID_DEEP_LINKS}\n    private fun dispatchHostAction"),
         );
-        fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))?;
+        fs::write(&android, source).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     }
     let activity =
         root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/MainActivity.kt");
     let mut source =
-        fs::read_to_string(&activity).map_err(|e| format!("read '{}': {e}", activity.display()))?;
+        fs::read_to_string(&activity).map_err(|e| CrepusCliError::io(e, activity.to_path_buf()))?;
     if !source.contains("receiveDeepLink(intent.data)") {
         source = source.replace(
             "import android.os.Bundle\n",
@@ -273,11 +277,11 @@ pub fn add_deep_links_host(root: &Path) -> Result<(), String> {
             "\n    override fun onDestroy()",
             "\n    override fun onNewIntent(intent: Intent) {\n        super.onNewIntent(intent)\n        setIntent(intent)\n        CrepusRustActions.receiveDeepLink(intent.data)\n    }\n\n    override fun onDestroy()",
         );
-        fs::write(&activity, source).map_err(|e| format!("write '{}': {e}", activity.display()))?;
+        fs::write(&activity, source).map_err(|e| CrepusCliError::io(e, activity.to_path_buf()))?;
     }
     let ios = root.join("ios/Sources/NativeShell/CrepusRustActions.swift");
     let mut source =
-        fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
+        fs::read_to_string(&ios).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     if !source.contains("deepLinksValue") {
         source = source.replace(
             "        switch capability {\n",
@@ -287,27 +291,27 @@ pub fn add_deep_links_host(root: &Path) -> Result<(), String> {
             "\n    private static func dispatchHostAction",
             &format!("{IOS_DEEP_LINKS}\n\n    private static func dispatchHostAction"),
         );
-        fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
+        fs::write(&ios, source).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     }
     let app = root.join("ios/App/CrepusMobileApp.swift");
     let mut source =
-        fs::read_to_string(&app).map_err(|e| format!("read '{}': {e}", app.display()))?;
+        fs::read_to_string(&app).map_err(|e| CrepusCliError::io(e, app.to_path_buf()))?;
     if !source.contains(".onOpenURL") {
         source = source.replace(
             "        WindowGroup {\n            ContentView()\n        }\n",
             "        WindowGroup {\n            ContentView()\n                .onOpenURL { CrepusRustActions.receiveDeepLink($0) }\n        }\n",
         );
-        fs::write(&app, source).map_err(|e| format!("write '{}': {e}", app.display()))?;
+        fs::write(&app, source).map_err(|e| CrepusCliError::io(e, app.to_path_buf()))?;
     }
     let project = root.join("ios/project.yml");
     let mut source =
-        fs::read_to_string(&project).map_err(|e| format!("read '{}': {e}", project.display()))?;
+        fs::read_to_string(&project).map_err(|e| CrepusCliError::io(e, project.to_path_buf()))?;
     if source.contains("GENERATE_INFOPLIST_FILE: YES") {
         source = source.replace(
             "        GENERATE_INFOPLIST_FILE: YES\n",
             "        GENERATE_INFOPLIST_FILE: NO\n        INFOPLIST_FILE: App/Info.plist\n",
         );
-        fs::write(&project, &source).map_err(|e| format!("write '{}': {e}", project.display()))?;
+        fs::write(&project, &source).map_err(|e| CrepusCliError::io(e, project.to_path_buf()))?;
     }
     let info = root.join("ios/App/Info.plist");
     if !info.exists() {
@@ -315,12 +319,12 @@ pub fn add_deep_links_host(root: &Path) -> Result<(), String> {
             &info,
             format!("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\">\n<dict>\n    <key>CFBundleURLTypes</key>\n    <array>\n        <dict>\n            <key>CFBundleTypeRole</key>\n            <string>Editor</string>\n            <key>CFBundleURLName</key>\n            <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>\n            <key>CFBundleURLSchemes</key>\n            <array>\n                <string>crepus</string>\n            </array>\n        </dict>\n    </array>\n{}    <key>UILaunchScreen</key>\n    <dict/>\n</dict>\n</plist>\n", ios_info_plist_keys(&source)),
         )
-        .map_err(|e| format!("write '{}': {e}", info.display()))?;
+        .map_err(|e| CrepusCliError::io(e, info.to_path_buf()))?;
     }
     Ok(())
 }
 
-pub fn add_ios_info_plist_key(root: &Path, setting: &str) -> Result<(), String> {
+pub fn add_ios_info_plist_key(root: &Path, setting: &str) -> Result<(), CrepusCliError> {
     let keys = setting
         .lines()
         .filter_map(ios_info_plist_key)
@@ -330,7 +334,7 @@ pub fn add_ios_info_plist_key(root: &Path, setting: &str) -> Result<(), String> 
     }
     let path = root.join("ios/App/Info.plist");
     let mut source =
-        fs::read_to_string(&path).map_err(|e| format!("read '{}': {e}", path.display()))?;
+        fs::read_to_string(&path).map_err(|e| CrepusCliError::io(e, path.to_path_buf()))?;
     let mut changed = false;
     for (key, value) in keys {
         if !source.contains(&format!("<key>{key}</key>")) {
@@ -342,7 +346,7 @@ pub fn add_ios_info_plist_key(root: &Path, setting: &str) -> Result<(), String> 
         }
     }
     if changed {
-        fs::write(&path, source).map_err(|e| format!("write '{}': {e}", path.display()))?;
+        fs::write(&path, source).map_err(|e| CrepusCliError::io(e, path.to_path_buf()))?;
     }
     Ok(())
 }
@@ -362,10 +366,10 @@ pub fn ios_info_plist_key(setting: &str) -> Option<(String, &str)> {
     Some((format!("NS{key}"), value.trim_matches('"')))
 }
 
-pub fn add_system_bars_host(root: &Path) -> Result<(), String> {
+pub fn add_system_bars_host(root: &Path) -> Result<(), CrepusCliError> {
     let android = android_actions_path(root)?;
     let mut source =
-        fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
+        fs::read_to_string(&android).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     if !source.contains("systemBarsValue") {
         source = source.replace("import android.content.ClipData\n", "import android.content.ClipData\nimport android.graphics.Color\nimport android.os.Build\nimport android.view.View\n");
         source = source.replace(
@@ -376,26 +380,26 @@ pub fn add_system_bars_host(root: &Path) -> Result<(), String> {
             "\n}\n\nobject CrepusActionState",
             &format!("{ANDROID_SYSTEM_BARS}\n}}\n\nobject CrepusActionState"),
         );
-        fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))?;
+        fs::write(&android, source).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     }
     let ios = root.join("ios/Sources/NativeShell/CrepusRustActions.swift");
     let mut source =
-        fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
+        fs::read_to_string(&ios).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     if !source.contains("systemBarsValue") {
         source = source.replace("        switch capability {\n", "        switch capability {\n        case \"systemBars\":\n            return try systemBarsValue(method: method, payload: payload)\n");
         source = source.replace(
             "\n    fileprivate static func emit",
             &format!("{IOS_SYSTEM_BARS}\n\n    fileprivate static func emit"),
         );
-        fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
+        fs::write(&ios, source).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     }
     Ok(())
 }
 
-pub fn add_appearance_host(root: &Path) -> Result<(), String> {
+pub fn add_appearance_host(root: &Path) -> Result<(), CrepusCliError> {
     let android = android_actions_path(root)?;
     let mut source =
-        fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
+        fs::read_to_string(&android).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     if !source.contains("appearanceValue") {
         source = source.replace(
             "import android.content.Context\n",
@@ -409,26 +413,26 @@ pub fn add_appearance_host(root: &Path) -> Result<(), String> {
             "\n}\n\nobject CrepusActionState",
             &format!("{ANDROID_APPEARANCE}\n}}\n\nobject CrepusActionState"),
         );
-        fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))?;
+        fs::write(&android, source).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     }
     let ios = root.join("ios/Sources/NativeShell/CrepusRustActions.swift");
     let mut source =
-        fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
+        fs::read_to_string(&ios).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     if !source.contains("appearanceValue") {
         source = source.replace("        switch capability {\n", "        switch capability {\n        case \"appearance\":\n            return try appearanceValue(method: method)\n");
         source = source.replace(
             "\n    fileprivate static func emit",
             &format!("{IOS_APPEARANCE}\n\n    fileprivate static func emit"),
         );
-        fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
+        fs::write(&ios, source).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     }
     Ok(())
 }
 
-pub fn add_battery_host(root: &Path) -> Result<(), String> {
+pub fn add_battery_host(root: &Path) -> Result<(), CrepusCliError> {
     let android = android_actions_path(root)?;
     let mut source =
-        fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
+        fs::read_to_string(&android).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     if !source.contains("batteryValue") {
         source = source.replace("import android.content.Context\n", "import android.content.BroadcastReceiver\nimport android.content.Context\nimport android.content.IntentFilter\nimport android.os.BatteryManager\n");
         source = source.replace(
@@ -439,26 +443,26 @@ pub fn add_battery_host(root: &Path) -> Result<(), String> {
             "\n}\n\nobject CrepusActionState",
             &format!("{ANDROID_BATTERY}\n}}\n\nobject CrepusActionState"),
         );
-        fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))?;
+        fs::write(&android, source).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     }
     let ios = root.join("ios/Sources/NativeShell/CrepusRustActions.swift");
     let mut source =
-        fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
+        fs::read_to_string(&ios).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     if !source.contains("batteryValue") {
         source = source.replace("        switch capability {\n", "        switch capability {\n        case \"battery\":\n            return try batteryValue(method: method)\n");
         source = source.replace(
             "\n    fileprivate static func emit",
             &format!("{IOS_BATTERY}\n\n    fileprivate static func emit"),
         );
-        fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
+        fs::write(&ios, source).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     }
     Ok(())
 }
 
-pub fn add_geolocation_ios_host(root: &Path) -> Result<(), String> {
+pub fn add_geolocation_ios_host(root: &Path) -> Result<(), CrepusCliError> {
     let ios = root.join("ios/Sources/NativeShell/CrepusRustActions.swift");
     let mut source =
-        fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
+        fs::read_to_string(&ios).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     if source.contains("GeolocationBridge") {
         return Ok(());
     }
@@ -483,13 +487,14 @@ pub fn add_geolocation_ios_host(root: &Path) -> Result<(), String> {
         "    static func successJson(action: String, capability: String, method: String, value: Any) -> String",
     );
     source.push_str(IOS_GEOLOCATION_BRIDGE);
-    fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))
+    fs::write(&ios, source).map_err(|e| CrepusCliError::io(e, ios.clone()))?;
+    Ok(())
 }
 
-pub fn add_geolocation_host(root: &Path) -> Result<(), String> {
+pub fn add_geolocation_host(root: &Path) -> Result<(), CrepusCliError> {
     let android = android_actions_path(root)?;
     let mut source =
-        fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
+        fs::read_to_string(&android).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     if source.contains("GeolocationBridge") {
         return Ok(());
     }
@@ -506,13 +511,13 @@ pub fn add_geolocation_host(root: &Path) -> Result<(), String> {
         &format!("{ANDROID_GEOLOCATION}\n}}\n\nobject CrepusActionState"),
     );
     source.push_str(ANDROID_GEOLOCATION_BRIDGE);
-    fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))?;
+    fs::write(&android, source).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     add_geolocation_ios_host(root)
 }
 
-pub fn add_feature(path: &Path, feature: &str) -> Result<(), String> {
+pub fn add_feature(path: &Path, feature: &str) -> Result<(), CrepusCliError> {
     let mut source =
-        fs::read_to_string(path).map_err(|e| format!("read '{}': {e}", path.display()))?;
+        fs::read_to_string(path).map_err(|e| CrepusCliError::io(e, path.to_path_buf()))?;
     if source
         .lines()
         .any(|line| line.trim_start().starts_with(&format!("{feature} =")))
@@ -528,12 +533,13 @@ pub fn add_feature(path: &Path, feature: &str) -> Result<(), String> {
     } else {
         source.push_str(&format!("\n[features]\n{feature} = []\n"));
     }
-    fs::write(path, source).map_err(|e| format!("write '{}': {e}", path.display()))
+    fs::write(path, source).map_err(|e| CrepusCliError::io(e, path.to_path_buf()))?;
+    Ok(())
 }
 
-pub fn enable_default_feature(path: &Path, feature: &str) -> Result<(), String> {
+pub fn enable_default_feature(path: &Path, feature: &str) -> Result<(), CrepusCliError> {
     let mut source =
-        fs::read_to_string(path).map_err(|e| format!("read '{}': {e}", path.display()))?;
+        fs::read_to_string(path).map_err(|e| CrepusCliError::io(e, path.to_path_buf()))?;
     let default = "default = []";
     if source.contains(&format!("\"{feature}\"")) {
         return Ok(());
@@ -549,15 +555,19 @@ pub fn enable_default_feature(path: &Path, feature: &str) -> Result<(), String> 
             1,
         );
     } else {
-        return Err(format!("missing feature table in '{}'", path.display()));
+        return Err(CrepusCliError::context(format!(
+            "missing feature table in '{}'",
+            path.display()
+        )));
     }
-    fs::write(path, source).map_err(|e| format!("write '{}': {e}", path.display()))
+    fs::write(path, source).map_err(|e| CrepusCliError::io(e, path.to_path_buf()))?;
+    Ok(())
 }
 
-pub fn add_bluetooth_host(root: &Path) -> Result<(), String> {
+pub fn add_bluetooth_host(root: &Path) -> Result<(), CrepusCliError> {
     let android = android_actions_path(root)?;
     let mut source =
-        fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
+        fs::read_to_string(&android).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     if source.contains("BluetoothBridge") {
         return Ok(());
     }
@@ -578,14 +588,14 @@ pub fn add_bluetooth_host(root: &Path) -> Result<(), String> {
         "    internal fun emit(result: String)",
     );
     source.push_str(ANDROID_BLUETOOTH_BRIDGE);
-    fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))?;
+    fs::write(&android, source).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     add_bluetooth_ios_host(root)
 }
 
-pub fn add_bluetooth_ios_host(root: &Path) -> Result<(), String> {
+pub fn add_bluetooth_ios_host(root: &Path) -> Result<(), CrepusCliError> {
     let ios = root.join("ios/Sources/NativeShell/CrepusRustActions.swift");
     let mut source =
-        fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
+        fs::read_to_string(&ios).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     if source.contains("BluetoothBridge") {
         return Ok(());
     }
@@ -606,13 +616,14 @@ pub fn add_bluetooth_ios_host(root: &Path) -> Result<(), String> {
         &format!("{IOS_BLUETOOTH}\n\n    fileprivate static func emit"),
     );
     source.push_str(IOS_BLUETOOTH_BRIDGE);
-    fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))
+    fs::write(&ios, source).map_err(|e| CrepusCliError::io(e, ios.clone()))?;
+    Ok(())
 }
 
-pub fn add_haptics_host(root: &Path) -> Result<(), String> {
+pub fn add_haptics_host(root: &Path) -> Result<(), CrepusCliError> {
     let android = android_actions_path(root)?;
     let mut source =
-        fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
+        fs::read_to_string(&android).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     if !source.contains("hapticsValue") {
         source = source.replace(
             "import android.net.Uri\n",
@@ -626,11 +637,11 @@ pub fn add_haptics_host(root: &Path) -> Result<(), String> {
             "\n}\n\nobject CrepusActionState",
             &format!("{ANDROID_HAPTICS}\n}}\n\nobject CrepusActionState"),
         );
-        fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))?;
+        fs::write(&android, source).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     }
     let ios = root.join("ios/Sources/NativeShell/CrepusRustActions.swift");
     let mut source =
-        fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
+        fs::read_to_string(&ios).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     if !source.contains("hapticsValue") {
         source = source.replace(
             "        switch capability {\n",
@@ -640,15 +651,15 @@ pub fn add_haptics_host(root: &Path) -> Result<(), String> {
             "\n    fileprivate static func emit",
             &format!("{IOS_HAPTICS}\n\n    fileprivate static func emit"),
         );
-        fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
+        fs::write(&ios, source).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     }
     Ok(())
 }
 
-pub fn add_clipboard_host(root: &Path) -> Result<(), String> {
+pub fn add_clipboard_host(root: &Path) -> Result<(), CrepusCliError> {
     let android = android_actions_path(root)?;
     let mut source =
-        fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
+        fs::read_to_string(&android).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     if !source.contains("clipboardValue") {
         source = source.replace(
             "import android.content.Context\n",
@@ -662,11 +673,11 @@ pub fn add_clipboard_host(root: &Path) -> Result<(), String> {
             "\n}\n\nobject CrepusActionState",
             &format!("{ANDROID_CLIPBOARD}\n}}\n\nobject CrepusActionState"),
         );
-        fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))?;
+        fs::write(&android, source).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     }
     let ios = root.join("ios/Sources/NativeShell/CrepusRustActions.swift");
     let mut source =
-        fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
+        fs::read_to_string(&ios).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     if !source.contains("clipboardValue") {
         source = source.replace(
             "        switch capability {\n",
@@ -677,15 +688,15 @@ pub fn add_clipboard_host(root: &Path) -> Result<(), String> {
             &format!("{IOS_CLIPBOARD}\n\n    fileprivate static func emit"),
         );
         source.push_str(IOS_CLIPBOARD_BRIDGE);
-        fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
+        fs::write(&ios, source).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     }
     Ok(())
 }
 
-pub fn add_toast_host(root: &Path) -> Result<(), String> {
+pub fn add_toast_host(root: &Path) -> Result<(), CrepusCliError> {
     let android = android_actions_path(root)?;
     let mut source =
-        fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
+        fs::read_to_string(&android).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     if !source.contains("toastValue") {
         source = source.replace(
             "import android.content.Context\n",
@@ -699,11 +710,11 @@ pub fn add_toast_host(root: &Path) -> Result<(), String> {
             "\n}\n\nobject CrepusActionState",
             &format!("{ANDROID_TOAST}\n}}\n\nobject CrepusActionState"),
         );
-        fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))?;
+        fs::write(&android, source).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     }
     let ios = root.join("ios/Sources/NativeShell/CrepusRustActions.swift");
     let mut source =
-        fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
+        fs::read_to_string(&ios).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     if !source.contains("toastValue") {
         source = source.replace(
             "        switch capability {\n",
@@ -713,15 +724,15 @@ pub fn add_toast_host(root: &Path) -> Result<(), String> {
             "\n    fileprivate static func emit",
             &format!("{IOS_TOAST}\n\n    fileprivate static func emit"),
         );
-        fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
+        fs::write(&ios, source).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     }
     Ok(())
 }
 
-pub fn add_video_host(root: &Path) -> Result<(), String> {
+pub fn add_video_host(root: &Path) -> Result<(), CrepusCliError> {
     let android = android_actions_path(root)?;
     let mut source =
-        fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
+        fs::read_to_string(&android).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     if !source.contains("videoValue") {
         source = source.replace("import android.content.Context\n", "import android.app.Activity\nimport android.content.Context\nimport android.provider.MediaStore\n");
         source = source.replace("    private var openDocuments: (() -> Unit)? = null\n", "    private var openDocuments: (() -> Unit)? = null\n    private var pendingVideoAction: String? = null\n    private var captureVideo: (() -> Unit)? = null\n");
@@ -731,11 +742,11 @@ pub fn add_video_host(root: &Path) -> Result<(), String> {
             "        when (capability) {\n            \"video\" -> videoValue(method)\n",
         );
         source = source.replace("\n    private fun dispatchHostAction", &format!("{ANDROID_VIDEO}\n    private fun videoCancelledJson(action: String): String = JSONObject().put(\"ok\", true).put(\"action\", action).put(\"value\", JSONObject().put(\"files\", JSONArray())).toString()\n\n    private fun dispatchHostAction"));
-        fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))?;
+        fs::write(&android, source).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     }
     let ios = root.join("ios/Sources/NativeShell/CrepusRustActions.swift");
     let mut source =
-        fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
+        fs::read_to_string(&ios).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     if !source.contains("videoValue") {
         source = source.replace("        switch capability {\n", "        switch capability {\n        case \"video\":\n            return try videoValue(method: method)\n");
         source = source.replace(
@@ -743,15 +754,15 @@ pub fn add_video_host(root: &Path) -> Result<(), String> {
             &format!("{IOS_VIDEO}\n\n    private static func dispatchHostAction"),
         );
         source.push_str(IOS_VIDEO_BRIDGE);
-        fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
+        fs::write(&ios, source).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     }
     Ok(())
 }
 
-pub fn add_privacy_screen_host(root: &Path) -> Result<(), String> {
+pub fn add_privacy_screen_host(root: &Path) -> Result<(), CrepusCliError> {
     let android = android_actions_path(root)?;
     let mut source =
-        fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
+        fs::read_to_string(&android).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     if !source.contains("privacyScreenValue") {
         source = source.replace(
             "import android.content.Context\n",
@@ -762,26 +773,26 @@ pub fn add_privacy_screen_host(root: &Path) -> Result<(), String> {
             "\n}\n\nobject CrepusActionState",
             &format!("{ANDROID_PRIVACY_SCREEN}\n}}\n\nobject CrepusActionState"),
         );
-        fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))?;
+        fs::write(&android, source).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     }
     let ios = root.join("ios/Sources/NativeShell/CrepusRustActions.swift");
     let mut source =
-        fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
+        fs::read_to_string(&ios).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     if !source.contains("privacyScreenValue") {
         source = source.replace("        switch capability {\n", "        switch capability {\n        case \"privacyScreen\":\n            return try privacyScreenValue(method: method)\n");
         source = source.replace(
             "\n    fileprivate static func emit",
             &format!("{IOS_PRIVACY_SCREEN}\n\n    fileprivate static func emit"),
         );
-        fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
+        fs::write(&ios, source).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     }
     Ok(())
 }
 
-pub fn add_browser_host(root: &Path) -> Result<(), String> {
+pub fn add_browser_host(root: &Path) -> Result<(), CrepusCliError> {
     let android = android_actions_path(root)?;
     let mut source =
-        fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
+        fs::read_to_string(&android).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     if !source.contains("openUrlValue") {
         source = source.replace(
             "        when (capability) {\n",
@@ -791,11 +802,11 @@ pub fn add_browser_host(root: &Path) -> Result<(), String> {
             "\n    private fun dispatchHostAction",
             &format!("{ANDROID_BROWSER}\n    private fun dispatchHostAction"),
         );
-        fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))?;
+        fs::write(&android, source).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     }
     let ios = root.join("ios/Sources/NativeShell/CrepusRustActions.swift");
     let mut source =
-        fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
+        fs::read_to_string(&ios).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     if !source.contains("openUrlValue") {
         source = source.replace(
             "        switch capability {\n",
@@ -805,12 +816,12 @@ pub fn add_browser_host(root: &Path) -> Result<(), String> {
             "\n    private static func dispatchHostAction",
             &format!("{IOS_BROWSER}\n\n    private static func dispatchHostAction"),
         );
-        fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
+        fs::write(&ios, source).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     }
     Ok(())
 }
 
-pub fn add_in_app_browser_host(root: &Path) -> Result<(), String> {
+pub fn add_in_app_browser_host(root: &Path) -> Result<(), CrepusCliError> {
     let gradle = root.join("android/app/build.gradle.kts");
     add_once(
         &gradle,
@@ -819,7 +830,7 @@ pub fn add_in_app_browser_host(root: &Path) -> Result<(), String> {
     )?;
     let android = android_actions_path(root)?;
     let mut source =
-        fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
+        fs::read_to_string(&android).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     if !source.contains("inAppBrowserValue") {
         source = source.replace(
             "import androidx.activity.ComponentActivity\n",
@@ -833,11 +844,11 @@ pub fn add_in_app_browser_host(root: &Path) -> Result<(), String> {
             "\n    private fun dispatchHostAction",
             &format!("{ANDROID_IN_APP_BROWSER}\n    private fun dispatchHostAction"),
         );
-        fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))?;
+        fs::write(&android, source).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     }
     let ios = root.join("ios/Sources/NativeShell/CrepusRustActions.swift");
     let mut source =
-        fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
+        fs::read_to_string(&ios).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     if !source.contains("inAppBrowserValue") {
         source = source.replace(
             "import Foundation\n",
@@ -851,15 +862,15 @@ pub fn add_in_app_browser_host(root: &Path) -> Result<(), String> {
             "\n    private static func dispatchHostAction",
             &format!("{IOS_IN_APP_BROWSER}\n\n    private static func dispatchHostAction"),
         );
-        fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
+        fs::write(&ios, source).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     }
     Ok(())
 }
 
-pub fn add_share_host(root: &Path) -> Result<(), String> {
+pub fn add_share_host(root: &Path) -> Result<(), CrepusCliError> {
     let android = android_actions_path(root)?;
     let mut source =
-        fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
+        fs::read_to_string(&android).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     if !source.contains("shareValue") {
         source = source.replace(
             "        when (capability) {\n",
@@ -869,11 +880,11 @@ pub fn add_share_host(root: &Path) -> Result<(), String> {
             "\n    private fun dispatchHostAction",
             &format!("{ANDROID_SHARE}\n    private fun dispatchHostAction"),
         );
-        fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))?;
+        fs::write(&android, source).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     }
     let ios = root.join("ios/Sources/NativeShell/CrepusRustActions.swift");
     let mut source =
-        fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
+        fs::read_to_string(&ios).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     if !source.contains("shareValue") {
         source = source.replace(
             "        switch capability {\n",
@@ -883,15 +894,15 @@ pub fn add_share_host(root: &Path) -> Result<(), String> {
             "\n    private static func dispatchHostAction",
             &format!("{IOS_SHARE}\n\n    private static func dispatchHostAction"),
         );
-        fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
+        fs::write(&ios, source).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     }
     Ok(())
 }
 
-pub fn add_document_picker_host(root: &Path) -> Result<(), String> {
+pub fn add_document_picker_host(root: &Path) -> Result<(), CrepusCliError> {
     let android = android_actions_path(root)?;
     let mut source =
-        fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
+        fs::read_to_string(&android).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     if !source.contains("documentPickerValue") {
         source = source.replace(
             "        when (capability) {\n",
@@ -901,11 +912,11 @@ pub fn add_document_picker_host(root: &Path) -> Result<(), String> {
             "\n    private fun dispatchHostAction",
             &format!("{ANDROID_DOCUMENT_PICKER}\n    private fun dispatchHostAction"),
         );
-        fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))?;
+        fs::write(&android, source).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     }
     let ios = root.join("ios/Sources/NativeShell/CrepusRustActions.swift");
     let mut source =
-        fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
+        fs::read_to_string(&ios).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     if !source.contains("documentPickerValue") {
         source = source.replace(
             "        switch capability {\n",
@@ -915,15 +926,15 @@ pub fn add_document_picker_host(root: &Path) -> Result<(), String> {
             "\n    private static func dispatchHostAction",
             &format!("{IOS_DOCUMENT_PICKER}\n\n    private static func dispatchHostAction"),
         );
-        fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
+        fs::write(&ios, source).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     }
     Ok(())
 }
 
-pub fn add_image_picker_host(root: &Path) -> Result<(), String> {
+pub fn add_image_picker_host(root: &Path) -> Result<(), CrepusCliError> {
     let android = android_actions_path(root)?;
     let mut source =
-        fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
+        fs::read_to_string(&android).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     if !source.contains("imagePickerValue") {
         source = source.replace(
             "    private var openDocuments: (() -> Unit)? = null\n",
@@ -945,11 +956,11 @@ pub fn add_image_picker_host(root: &Path) -> Result<(), String> {
             "    private fun dispatchHostAction",
             &format!("{ANDROID_IMAGE_PICKER}\n    private fun dispatchHostAction"),
         );
-        fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))?;
+        fs::write(&android, source).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     }
     let ios = root.join("ios/Sources/NativeShell/CrepusRustActions.swift");
     let mut source =
-        fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
+        fs::read_to_string(&ios).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     if !source.contains("imagePickerValue") {
         source = source.replace("import UIKit\n", "import PhotosUI\nimport UIKit\n");
         source = source.replace(
@@ -965,15 +976,15 @@ pub fn add_image_picker_host(root: &Path) -> Result<(), String> {
             &format!("{IOS_IMAGE_PICKER}\n\n    private static func dispatchHostAction"),
         );
         source.push_str(IOS_IMAGE_PICKER_BRIDGE);
-        fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
+        fs::write(&ios, source).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     }
     Ok(())
 }
 
-pub fn add_photo_library_host(root: &Path) -> Result<(), String> {
+pub fn add_photo_library_host(root: &Path) -> Result<(), CrepusCliError> {
     let android = android_actions_path(root)?;
     let mut source =
-        fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
+        fs::read_to_string(&android).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     if !source.contains("photoLibraryValue") {
         source = source.replace(
             "import android.content.Context\n",
@@ -1003,11 +1014,11 @@ pub fn add_photo_library_host(root: &Path) -> Result<(), String> {
             "\n    private fun dispatchHostAction",
             &format!("{ANDROID_PHOTO_LIBRARY}\n    private fun dispatchHostAction"),
         );
-        fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))?;
+        fs::write(&android, source).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     }
     let ios = root.join("ios/Sources/NativeShell/CrepusRustActions.swift");
     let mut source =
-        fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
+        fs::read_to_string(&ios).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     if !source.contains("photoLibraryValue") {
         source = source.replace(
             "import SwiftUI\n#if canImport(UIKit)\n",
@@ -1022,15 +1033,15 @@ pub fn add_photo_library_host(root: &Path) -> Result<(), String> {
             &format!("{IOS_PHOTO_LIBRARY}\n\n    private static func dispatchHostAction"),
         );
         source.push_str(IOS_PHOTO_LIBRARY_BRIDGE);
-        fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
+        fs::write(&ios, source).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     }
     Ok(())
 }
 
-pub fn add_camera_host(root: &Path) -> Result<(), String> {
+pub fn add_camera_host(root: &Path) -> Result<(), CrepusCliError> {
     let android = android_actions_path(root)?;
     let mut source =
-        fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
+        fs::read_to_string(&android).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     if !source.contains("cameraValue") {
         source = source.replace(
             "import android.content.Context\n",
@@ -1052,11 +1063,11 @@ pub fn add_camera_host(root: &Path) -> Result<(), String> {
             "\n    private fun dispatchHostAction",
             &format!("{ANDROID_CAMERA}\n    private fun cameraCancelledJson(action: String): String = JSONObject().put(\"ok\", true).put(\"action\", action).put(\"value\", JSONObject().put(\"files\", JSONArray())).toString()\n\n    private fun dispatchHostAction"),
         );
-        fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))?;
+        fs::write(&android, source).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     }
     let ios = root.join("ios/Sources/NativeShell/CrepusRustActions.swift");
     let mut source =
-        fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
+        fs::read_to_string(&ios).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     if !source.contains("cameraValue") {
         source = source.replace(
             "        switch capability {\n",
@@ -1067,15 +1078,15 @@ pub fn add_camera_host(root: &Path) -> Result<(), String> {
             &format!("{IOS_CAMERA}\n\n    private static func dispatchHostAction"),
         );
         source.push_str(IOS_CAMERA_BRIDGE);
-        fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
+        fs::write(&ios, source).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     }
     Ok(())
 }
 
-pub fn add_dimensions_host(root: &Path) -> Result<(), String> {
+pub fn add_dimensions_host(root: &Path) -> Result<(), CrepusCliError> {
     let android = android_actions_path(root)?;
     let mut source =
-        fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
+        fs::read_to_string(&android).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     if !source.contains("dimensionsValue") {
         source = source.replace(
             "        when (capability) {\n",
@@ -1085,11 +1096,11 @@ pub fn add_dimensions_host(root: &Path) -> Result<(), String> {
             "\n    private fun dispatchHostAction",
             &format!("{ANDROID_DIMENSIONS}\n    private fun dispatchHostAction"),
         );
-        fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))?;
+        fs::write(&android, source).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     }
     let ios = root.join("ios/Sources/NativeShell/CrepusRustActions.swift");
     let mut source =
-        fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
+        fs::read_to_string(&ios).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     if !source.contains("dimensionsValue") {
         source = source.replace(
             "        switch capability {\n",
@@ -1099,15 +1110,15 @@ pub fn add_dimensions_host(root: &Path) -> Result<(), String> {
             "\n    private static func dispatchHostAction",
             &format!("{IOS_DIMENSIONS}\n\n    private static func dispatchHostAction"),
         );
-        fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
+        fs::write(&ios, source).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     }
     Ok(())
 }
 
-pub fn add_dialog_host(root: &Path) -> Result<(), String> {
+pub fn add_dialog_host(root: &Path) -> Result<(), CrepusCliError> {
     let android = android_actions_path(root)?;
     let mut source =
-        fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
+        fs::read_to_string(&android).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     if !source.contains("dialogValue") {
         source = source.replace(
             "import android.content.Context\n",
@@ -1121,11 +1132,11 @@ pub fn add_dialog_host(root: &Path) -> Result<(), String> {
             "\n    private fun dispatchHostAction",
             &format!("{ANDROID_DIALOG}\n    private fun dispatchHostAction"),
         );
-        fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))?;
+        fs::write(&android, source).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     }
     let ios = root.join("ios/Sources/NativeShell/CrepusRustActions.swift");
     let mut source =
-        fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
+        fs::read_to_string(&ios).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     if !source.contains("dialogValue") {
         source = source.replace(
             "        switch capability {\n",
@@ -1140,15 +1151,15 @@ pub fn add_dialog_host(root: &Path) -> Result<(), String> {
             &format!("{IOS_DIALOG}\n\n    private static func dispatchHostAction"),
         );
         source.push_str(IOS_DIALOG_BRIDGE);
-        fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
+        fs::write(&ios, source).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     }
     Ok(())
 }
 
-pub fn add_action_sheet_host(root: &Path) -> Result<(), String> {
+pub fn add_action_sheet_host(root: &Path) -> Result<(), CrepusCliError> {
     let android = android_actions_path(root)?;
     let mut source =
-        fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
+        fs::read_to_string(&android).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     if !source.contains("actionSheetValue") {
         source = source.replace(
             "import android.content.Context\n",
@@ -1159,11 +1170,11 @@ pub fn add_action_sheet_host(root: &Path) -> Result<(), String> {
             "\n    private fun dispatchHostAction",
             &format!("{ANDROID_ACTION_SHEET}\n    private fun dispatchHostAction"),
         );
-        fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))?;
+        fs::write(&android, source).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     }
     let ios = root.join("ios/Sources/NativeShell/CrepusRustActions.swift");
     let mut source =
-        fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
+        fs::read_to_string(&ios).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     if !source.contains("actionSheetValue") {
         source = source.replace("        switch capability {\n", "        switch capability {\n        case \"actionSheet\":\n            return try actionSheetValue(method: method, payload: payload)\n");
         source = source.replace(
@@ -1175,15 +1186,15 @@ pub fn add_action_sheet_host(root: &Path) -> Result<(), String> {
             &format!("{IOS_ACTION_SHEET}\n\n    private static func dispatchHostAction"),
         );
         source.push_str(IOS_ACTION_SHEET_BRIDGE);
-        fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
+        fs::write(&ios, source).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     }
     Ok(())
 }
 
-pub fn add_app_state_host(root: &Path) -> Result<(), String> {
+pub fn add_app_state_host(root: &Path) -> Result<(), CrepusCliError> {
     let android = android_actions_path(root)?;
     let mut source =
-        fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
+        fs::read_to_string(&android).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     if !source.contains("appStateValue") {
         source = source.replace(
             "        when (capability) {\n",
@@ -1193,26 +1204,26 @@ pub fn add_app_state_host(root: &Path) -> Result<(), String> {
             "\n    private fun dispatchHostAction",
             &format!("{ANDROID_APP_STATE}\n    private fun dispatchHostAction"),
         );
-        fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))?;
+        fs::write(&android, source).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     }
     let ios = root.join("ios/Sources/NativeShell/CrepusRustActions.swift");
     let mut source =
-        fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
+        fs::read_to_string(&ios).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     if !source.contains("appStateValue") {
         source = source.replace("        switch capability {\n", "        switch capability {\n        case \"appState\":\n            return try appStateValue(method: method)\n");
         source = source.replace(
             "\n    private static func dispatchHostAction",
             &format!("{IOS_APP_STATE}\n\n    private static func dispatchHostAction"),
         );
-        fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
+        fs::write(&ios, source).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     }
     Ok(())
 }
 
-pub fn add_app_host(root: &Path) -> Result<(), String> {
+pub fn add_app_host(root: &Path) -> Result<(), CrepusCliError> {
     let android = android_actions_path(root)?;
     let mut source =
-        fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
+        fs::read_to_string(&android).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     if !source.contains("appValue") {
         source = source.replace(
             "        when (capability) {\n",
@@ -1222,11 +1233,11 @@ pub fn add_app_host(root: &Path) -> Result<(), String> {
             "\n    private fun dispatchHostAction",
             &format!("{ANDROID_APP}\n    private fun dispatchHostAction"),
         );
-        fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))?;
+        fs::write(&android, source).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     }
     let ios = root.join("ios/Sources/NativeShell/CrepusRustActions.swift");
     let mut source =
-        fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
+        fs::read_to_string(&ios).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     if !source.contains("appValue") {
         source = source.replace(
             "        switch capability {\n",
@@ -1236,41 +1247,41 @@ pub fn add_app_host(root: &Path) -> Result<(), String> {
             "\n    private static func dispatchHostAction",
             &format!("{IOS_APP}\n\n    private static func dispatchHostAction"),
         );
-        fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
+        fs::write(&ios, source).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     }
     Ok(())
 }
 
-pub fn add_screen_orientation_host(root: &Path) -> Result<(), String> {
+pub fn add_screen_orientation_host(root: &Path) -> Result<(), CrepusCliError> {
     let android = android_actions_path(root)?;
     let mut source =
-        fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
+        fs::read_to_string(&android).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     if !source.contains("screenOrientationValue") {
         source = source.replace("        when (capability) {\n", "        when (capability) {\n            \"screenOrientation\" -> screenOrientationValue(method, payload)\n");
         source = source.replace(
             "\n    private fun dispatchHostAction",
             &format!("{ANDROID_SCREEN_ORIENTATION}\n    private fun dispatchHostAction"),
         );
-        fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))?;
+        fs::write(&android, source).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     }
     let ios = root.join("ios/Sources/NativeShell/CrepusRustActions.swift");
     let mut source =
-        fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
+        fs::read_to_string(&ios).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     if !source.contains("screenOrientationValue") {
         source = source.replace("        switch capability {\n", "        switch capability {\n        case \"screenOrientation\":\n            return try screenOrientationValue(method: method, payload: payload)\n");
         source = source.replace(
             "\n    private static func dispatchHostAction",
             &format!("{IOS_SCREEN_ORIENTATION}\n\n    private static func dispatchHostAction"),
         );
-        fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
+        fs::write(&ios, source).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     }
     Ok(())
 }
 
-pub fn add_accessibility_info_host(root: &Path) -> Result<(), String> {
+pub fn add_accessibility_info_host(root: &Path) -> Result<(), CrepusCliError> {
     let android = android_actions_path(root)?;
     let mut source =
-        fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
+        fs::read_to_string(&android).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     if !source.contains("accessibilityInfoValue") {
         source = source.replace(
             "import android.net.Uri\n",
@@ -1284,11 +1295,11 @@ pub fn add_accessibility_info_host(root: &Path) -> Result<(), String> {
             "\n    private fun dispatchHostAction",
             &format!("{ANDROID_ACCESSIBILITY_INFO}\n    private fun dispatchHostAction"),
         );
-        fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))?;
+        fs::write(&android, source).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     }
     let ios = root.join("ios/Sources/NativeShell/CrepusRustActions.swift");
     let mut source =
-        fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
+        fs::read_to_string(&ios).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     if !source.contains("accessibilityInfoValue") {
         source = source.replace(
             "        switch capability {\n",
@@ -1298,15 +1309,15 @@ pub fn add_accessibility_info_host(root: &Path) -> Result<(), String> {
             "\n    private static func dispatchHostAction",
             &format!("{IOS_ACCESSIBILITY_INFO}\n\n    private static func dispatchHostAction"),
         );
-        fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
+        fs::write(&ios, source).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     }
     Ok(())
 }
 
-pub fn add_device_host(root: &Path) -> Result<(), String> {
+pub fn add_device_host(root: &Path) -> Result<(), CrepusCliError> {
     let android = android_actions_path(root)?;
     let mut source =
-        fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
+        fs::read_to_string(&android).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     if !source.contains("deviceValue") {
         source = source.replace(
             "import android.net.Uri\n",
@@ -1320,11 +1331,11 @@ pub fn add_device_host(root: &Path) -> Result<(), String> {
             "\n    private fun dispatchHostAction",
             &format!("{ANDROID_DEVICE}\n    private fun dispatchHostAction"),
         );
-        fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))?;
+        fs::write(&android, source).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     }
     let ios = root.join("ios/Sources/NativeShell/CrepusRustActions.swift");
     let mut source =
-        fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
+        fs::read_to_string(&ios).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     if !source.contains("deviceValue") {
         source = source.replace(
             "        switch capability {\n",
@@ -1334,15 +1345,15 @@ pub fn add_device_host(root: &Path) -> Result<(), String> {
             "\n    private static func dispatchHostAction",
             &format!("{IOS_DEVICE}\n\n    private static func dispatchHostAction"),
         );
-        fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
+        fs::write(&ios, source).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     }
     Ok(())
 }
 
-pub fn add_preferences_host(root: &Path) -> Result<(), String> {
+pub fn add_preferences_host(root: &Path) -> Result<(), CrepusCliError> {
     let android = android_actions_path(root)?;
     let mut source =
-        fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
+        fs::read_to_string(&android).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     if !source.contains("preferencesValue") {
         source = source.replace(
             "        when (capability) {\n",
@@ -1352,11 +1363,11 @@ pub fn add_preferences_host(root: &Path) -> Result<(), String> {
             "\n    private fun dispatchHostAction",
             &format!("{ANDROID_PREFERENCES}\n    private fun dispatchHostAction"),
         );
-        fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))?;
+        fs::write(&android, source).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     }
     let ios = root.join("ios/Sources/NativeShell/CrepusRustActions.swift");
     let mut source =
-        fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
+        fs::read_to_string(&ios).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     if !source.contains("preferencesValue") {
         source = source.replace(
             "        switch capability {\n",
@@ -1366,15 +1377,15 @@ pub fn add_preferences_host(root: &Path) -> Result<(), String> {
             "\n    private static func dispatchHostAction",
             &format!("{IOS_PREFERENCES}\n\n    private static func dispatchHostAction"),
         );
-        fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
+        fs::write(&ios, source).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     }
     Ok(())
 }
 
-pub fn add_network_host(root: &Path) -> Result<(), String> {
+pub fn add_network_host(root: &Path) -> Result<(), CrepusCliError> {
     let android = android_actions_path(root)?;
     let mut source =
-        fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
+        fs::read_to_string(&android).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     if !source.contains("networkValue") {
         source = source.replace(
             "import android.net.Uri\n",
@@ -1388,11 +1399,11 @@ pub fn add_network_host(root: &Path) -> Result<(), String> {
             "\n    private fun dispatchHostAction",
             &format!("{ANDROID_NETWORK}\n    private fun dispatchHostAction"),
         );
-        fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))?;
+        fs::write(&android, source).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     }
     let ios = root.join("ios/Sources/NativeShell/CrepusRustActions.swift");
     let mut source =
-        fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
+        fs::read_to_string(&ios).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     if !source.contains("networkValue") {
         source = source.replace("import Foundation\n", "import Foundation\nimport Network\n");
         source = source.replace(
@@ -1403,15 +1414,15 @@ pub fn add_network_host(root: &Path) -> Result<(), String> {
             "\n    private static func dispatchHostAction",
             &format!("{IOS_NETWORK}\n\n    private static func dispatchHostAction"),
         );
-        fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
+        fs::write(&ios, source).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     }
     Ok(())
 }
 
-pub fn add_keyboard_host(root: &Path) -> Result<(), String> {
+pub fn add_keyboard_host(root: &Path) -> Result<(), CrepusCliError> {
     let android = android_actions_path(root)?;
     let mut source =
-        fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
+        fs::read_to_string(&android).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     if !source.contains("keyboardValue") {
         source = source.replace(
             "import android.net.Uri\n",
@@ -1425,11 +1436,11 @@ pub fn add_keyboard_host(root: &Path) -> Result<(), String> {
             "\n    private fun dispatchHostAction",
             &format!("{ANDROID_KEYBOARD}\n    private fun dispatchHostAction"),
         );
-        fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))?;
+        fs::write(&android, source).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     }
     let ios = root.join("ios/Sources/NativeShell/CrepusRustActions.swift");
     let mut source =
-        fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
+        fs::read_to_string(&ios).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     if !source.contains("keyboardValue") {
         source = source.replace(
             "        switch capability {\n",
@@ -1439,15 +1450,15 @@ pub fn add_keyboard_host(root: &Path) -> Result<(), String> {
             "\n    private static func dispatchHostAction",
             &format!("{IOS_KEYBOARD}\n\n    private static func dispatchHostAction"),
         );
-        fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
+        fs::write(&ios, source).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     }
     Ok(())
 }
 
-pub fn add_settings_host(root: &Path) -> Result<(), String> {
+pub fn add_settings_host(root: &Path) -> Result<(), CrepusCliError> {
     let android = android_actions_path(root)?;
     let mut source =
-        fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
+        fs::read_to_string(&android).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     if !source.contains("settingsValue") {
         source = source.replace(
             "        when (capability) {\n",
@@ -1457,11 +1468,11 @@ pub fn add_settings_host(root: &Path) -> Result<(), String> {
             "\n    private fun dispatchHostAction",
             &format!("{ANDROID_SETTINGS}\n    private fun dispatchHostAction"),
         );
-        fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))?;
+        fs::write(&android, source).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     }
     let ios = root.join("ios/Sources/NativeShell/CrepusRustActions.swift");
     let mut source =
-        fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
+        fs::read_to_string(&ios).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     if !source.contains("settingsValue") {
         source = source.replace(
             "        switch capability {\n",
@@ -1471,18 +1482,18 @@ pub fn add_settings_host(root: &Path) -> Result<(), String> {
             "\n    private static func dispatchHostAction",
             &format!("{IOS_SETTINGS}\n\n    private static func dispatchHostAction"),
         );
-        fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
+        fs::write(&ios, source).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     }
     Ok(())
 }
 
-pub fn add_local_notifications_host(root: &Path) -> Result<(), String> {
+pub fn add_local_notifications_host(root: &Path) -> Result<(), CrepusCliError> {
     let receiver = root.join(
         "android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusNotificationReceiver.kt",
     );
     if !receiver.exists() {
         fs::write(&receiver, ANDROID_SCHEDULED_NOTIFICATION_RECEIVER)
-            .map_err(|e| format!("write '{}': {e}", receiver.display()))?;
+            .map_err(|e| CrepusCliError::io(e, receiver.to_path_buf()))?;
     }
     let manifest = root.join("android/app/src/main/AndroidManifest.xml");
     add_once(
@@ -1492,7 +1503,7 @@ pub fn add_local_notifications_host(root: &Path) -> Result<(), String> {
     )?;
     let android = android_actions_path(root)?;
     let mut source =
-        fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
+        fs::read_to_string(&android).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     if !source.contains("localNotificationsValue") {
         source = source.replace(
             "import android.content.Context\n",
@@ -1506,11 +1517,11 @@ pub fn add_local_notifications_host(root: &Path) -> Result<(), String> {
             "\n    private fun dispatchHostAction",
             &format!("{ANDROID_LOCAL_NOTIFICATIONS}\n    private fun dispatchHostAction"),
         );
-        fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))?;
+        fs::write(&android, source).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     }
     let ios = root.join("ios/Sources/NativeShell/CrepusRustActions.swift");
     let mut source =
-        fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
+        fs::read_to_string(&ios).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     if !source.contains("localNotificationsValue") {
         source = source.replace(
             "import Foundation\n",
@@ -1524,15 +1535,15 @@ pub fn add_local_notifications_host(root: &Path) -> Result<(), String> {
             "\n    private static func dispatchHostAction",
             &format!("{IOS_LOCAL_NOTIFICATIONS}\n\n    private static func dispatchHostAction"),
         );
-        fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
+        fs::write(&ios, source).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     }
     Ok(())
 }
 
-pub fn add_secure_storage_host(root: &Path) -> Result<(), String> {
+pub fn add_secure_storage_host(root: &Path) -> Result<(), CrepusCliError> {
     let android = android_actions_path(root)?;
     let mut source =
-        fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
+        fs::read_to_string(&android).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     if !source.contains("secureStorageValue") {
         source = source.replace(
             "import android.content.Context\n",
@@ -1546,11 +1557,11 @@ pub fn add_secure_storage_host(root: &Path) -> Result<(), String> {
             "\n    private fun dispatchHostAction",
             &format!("{ANDROID_SECURE_STORAGE}\n    private fun dispatchHostAction"),
         );
-        fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))?;
+        fs::write(&android, source).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     }
     let ios = root.join("ios/Sources/NativeShell/CrepusRustActions.swift");
     let mut source =
-        fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
+        fs::read_to_string(&ios).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     if !source.contains("secureStorageValue") {
         source = source.replace(
             "import Foundation\n",
@@ -1564,12 +1575,12 @@ pub fn add_secure_storage_host(root: &Path) -> Result<(), String> {
             "\n    private static func dispatchHostAction",
             &format!("{IOS_SECURE_STORAGE}\n\n    private static func dispatchHostAction"),
         );
-        fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
+        fs::write(&ios, source).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     }
     Ok(())
 }
 
-pub fn add_biometrics_host(root: &Path) -> Result<(), String> {
+pub fn add_biometrics_host(root: &Path) -> Result<(), CrepusCliError> {
     let gradle = root.join("android/app/build.gradle.kts");
     add_once(
         &gradle,
@@ -1578,7 +1589,7 @@ pub fn add_biometrics_host(root: &Path) -> Result<(), String> {
     )?;
     let android = android_actions_path(root)?;
     let mut source =
-        fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
+        fs::read_to_string(&android).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     if !source.contains("biometricsValue") {
         source = source.replace(
             "import androidx.activity.ComponentActivity\n",
@@ -1592,11 +1603,11 @@ pub fn add_biometrics_host(root: &Path) -> Result<(), String> {
             "\n    private fun dispatchHostAction",
             &format!("{ANDROID_BIOMETRICS}\n    private fun dispatchHostAction"),
         );
-        fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))?;
+        fs::write(&android, source).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
         let activity =
             root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/MainActivity.kt");
         let source = fs::read_to_string(&activity)
-            .map_err(|e| format!("read '{}': {e}", activity.display()))?
+            .map_err(|e| CrepusCliError::io(e, activity.to_path_buf()))?
             .replace(
                 "import androidx.activity.ComponentActivity\n",
                 "import androidx.fragment.app.FragmentActivity\n",
@@ -1605,11 +1616,11 @@ pub fn add_biometrics_host(root: &Path) -> Result<(), String> {
                 "class MainActivity : ComponentActivity()",
                 "class MainActivity : FragmentActivity()",
             );
-        fs::write(&activity, source).map_err(|e| format!("write '{}': {e}", activity.display()))?;
+        fs::write(&activity, source).map_err(|e| CrepusCliError::io(e, activity.to_path_buf()))?;
     }
     let ios = root.join("ios/Sources/NativeShell/CrepusRustActions.swift");
     let mut source =
-        fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
+        fs::read_to_string(&ios).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     if !source.contains("biometricsValue") {
         source = source.replace(
             "import Foundation\n",
@@ -1623,15 +1634,15 @@ pub fn add_biometrics_host(root: &Path) -> Result<(), String> {
             "\n    private static func dispatchHostAction",
             &format!("{IOS_BIOMETRICS}\n\n    private static func dispatchHostAction"),
         );
-        fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
+        fs::write(&ios, source).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     }
     Ok(())
 }
 
-pub fn add_permissions_host(root: &Path) -> Result<(), String> {
+pub fn add_permissions_host(root: &Path) -> Result<(), CrepusCliError> {
     let android = android_actions_path(root)?;
     let mut source =
-        fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
+        fs::read_to_string(&android).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     if !source.contains("permissionsValue") {
         source = source.replace(
             "        when (capability) {\n",
@@ -1641,11 +1652,11 @@ pub fn add_permissions_host(root: &Path) -> Result<(), String> {
             "\n    private fun dispatchHostAction",
             &format!("{ANDROID_PERMISSIONS}\n    private fun dispatchHostAction"),
         );
-        fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))?;
+        fs::write(&android, source).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     }
     let ios = root.join("ios/Sources/NativeShell/CrepusRustActions.swift");
     let mut source =
-        fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
+        fs::read_to_string(&ios).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     if !source.contains("permissionsValue") {
         source = source.replace(
             "import Foundation\n",
@@ -1659,15 +1670,15 @@ pub fn add_permissions_host(root: &Path) -> Result<(), String> {
             "\n    private static func dispatchHostAction",
             &format!("{IOS_PERMISSIONS}\n\n    private static func dispatchHostAction"),
         );
-        fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
+        fs::write(&ios, source).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     }
     Ok(())
 }
 
-pub fn add_microphone_host(root: &Path) -> Result<(), String> {
+pub fn add_microphone_host(root: &Path) -> Result<(), CrepusCliError> {
     let android = android_actions_path(root)?;
     let mut source =
-        fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
+        fs::read_to_string(&android).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     if !source.contains("microphoneValue") {
         source = source.replace(
             "        when (capability) {\n",
@@ -1677,11 +1688,11 @@ pub fn add_microphone_host(root: &Path) -> Result<(), String> {
             "\n    private fun dispatchHostAction",
             &format!("{ANDROID_MICROPHONE}\n    private fun dispatchHostAction"),
         );
-        fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))?;
+        fs::write(&android, source).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     }
     let ios = root.join("ios/Sources/NativeShell/CrepusRustActions.swift");
     let mut source =
-        fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
+        fs::read_to_string(&ios).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     if !source.contains("microphoneValue") {
         if !source.contains("import AVFoundation\n") {
             source = source.replace(
@@ -1697,15 +1708,15 @@ pub fn add_microphone_host(root: &Path) -> Result<(), String> {
             "\n    private static func dispatchHostAction",
             &format!("{IOS_MICROPHONE}\n\n    private static func dispatchHostAction"),
         );
-        fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
+        fs::write(&ios, source).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     }
     Ok(())
 }
 
-pub fn add_contacts_host(root: &Path) -> Result<(), String> {
+pub fn add_contacts_host(root: &Path) -> Result<(), CrepusCliError> {
     let android = android_actions_path(root)?;
     let mut source =
-        fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
+        fs::read_to_string(&android).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     if !source.contains("contactsValue") {
         source = source.replace(
             "        when (capability) {\n",
@@ -1715,11 +1726,11 @@ pub fn add_contacts_host(root: &Path) -> Result<(), String> {
             "\n    private fun dispatchHostAction",
             &format!("{ANDROID_CONTACTS}\n    private fun dispatchHostAction"),
         );
-        fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))?;
+        fs::write(&android, source).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     }
     let ios = root.join("ios/Sources/NativeShell/CrepusRustActions.swift");
     let mut source =
-        fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
+        fs::read_to_string(&ios).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     if !source.contains("contactsValue") {
         if !source.contains("import Contacts\n") {
             source = source.replace(
@@ -1735,15 +1746,15 @@ pub fn add_contacts_host(root: &Path) -> Result<(), String> {
             "\n    private static func dispatchHostAction",
             &format!("{IOS_CONTACTS}\n\n    private static func dispatchHostAction"),
         );
-        fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
+        fs::write(&ios, source).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     }
     Ok(())
 }
 
-pub fn add_calendar_host(root: &Path) -> Result<(), String> {
+pub fn add_calendar_host(root: &Path) -> Result<(), CrepusCliError> {
     let android = android_actions_path(root)?;
     let mut source =
-        fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
+        fs::read_to_string(&android).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     if !source.contains("calendarValue") {
         source = source.replace(
             "import android.content.ClipData\n",
@@ -1757,11 +1768,11 @@ pub fn add_calendar_host(root: &Path) -> Result<(), String> {
             "\n    private fun dispatchHostAction",
             &format!("{ANDROID_CALENDAR}\n    private fun dispatchHostAction"),
         );
-        fs::write(&android, source).map_err(|e| format!("write '{}': {e}", android.display()))?;
+        fs::write(&android, source).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     }
     let ios = root.join("ios/Sources/NativeShell/CrepusRustActions.swift");
     let mut source =
-        fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
+        fs::read_to_string(&ios).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     if !source.contains("calendarValue") {
         source = source.replace(
             "import Foundation\n",
@@ -1775,16 +1786,16 @@ pub fn add_calendar_host(root: &Path) -> Result<(), String> {
             "\n    private static func dispatchHostAction",
             &format!("{IOS_CALENDAR}\n\n    private static func dispatchHostAction"),
         );
-        fs::write(&ios, source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
+        fs::write(&ios, source).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     }
     Ok(())
 }
 
-pub fn add_sensors_host(root: &Path) -> Result<(), String> {
+pub fn add_sensors_host(root: &Path) -> Result<(), CrepusCliError> {
     let android = android_actions_path(root)?;
     let ios = root.join("ios/Sources/NativeShell/CrepusRustActions.swift");
     let mut android_source =
-        fs::read_to_string(&android).map_err(|e| format!("read '{}': {e}", android.display()))?;
+        fs::read_to_string(&android).map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     if !android_source.contains("SensorBridge") {
         android_source = android_source.replace(
             "import android.net.Uri\n",
@@ -1800,10 +1811,10 @@ pub fn add_sensors_host(root: &Path) -> Result<(), String> {
         );
         android_source.push_str(ANDROID_SENSORS_BRIDGE);
         fs::write(&android, android_source)
-            .map_err(|e| format!("write '{}': {e}", android.display()))?;
+            .map_err(|e| CrepusCliError::io(e, android.to_path_buf()))?;
     }
     let mut ios_source =
-        fs::read_to_string(&ios).map_err(|e| format!("read '{}': {e}", ios.display()))?;
+        fs::read_to_string(&ios).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     if !ios_source.contains("SensorBridge") {
         ios_source = ios_source.replace(
             "import Foundation\n",
@@ -1818,30 +1829,30 @@ pub fn add_sensors_host(root: &Path) -> Result<(), String> {
             &format!("{IOS_SENSORS}\n\n    fileprivate static func emit"),
         );
         ios_source.push_str(IOS_SENSORS_BRIDGE);
-        fs::write(&ios, ios_source).map_err(|e| format!("write '{}': {e}", ios.display()))?;
+        fs::write(&ios, ios_source).map_err(|e| CrepusCliError::io(e, ios.to_path_buf()))?;
     }
     Ok(())
 }
 
-pub fn android_actions_path(root: &Path) -> Result<PathBuf, String> {
+pub fn android_actions_path(root: &Path) -> Result<PathBuf, CrepusCliError> {
     let packages = root.join("android/app/src/main/java/dev/crepuscularity");
     fs::read_dir(&packages)
-        .map_err(|e| format!("read '{}': {e}", packages.display()))?
+        .map_err(|e| CrepusCliError::io(e, packages.to_path_buf()))?
         .filter_map(Result::ok)
         .map(|entry| entry.path().join("CrepusRustActions.kt"))
         .find(|path| path.is_file())
         .ok_or_else(|| {
-            format!(
+            CrepusCliError::context(format!(
                 "Android Rust actions not found under '{}'",
                 packages.display()
-            )
+            ))
         })
 }
 
-pub fn dedupe_android_imports(root: &Path) -> Result<(), String> {
+pub fn dedupe_android_imports(root: &Path) -> Result<(), CrepusCliError> {
     let path = android_actions_path(root)?;
     let source =
-        fs::read_to_string(&path).map_err(|e| format!("read '{}': {e}", path.display()))?;
+        fs::read_to_string(&path).map_err(|e| CrepusCliError::io(e, path.to_path_buf()))?;
     let mut imports = HashSet::new();
     let deduped = source
         .lines()
@@ -1850,14 +1861,14 @@ pub fn dedupe_android_imports(root: &Path) -> Result<(), String> {
         .join("\n");
     if deduped != source.trim_end() {
         fs::write(&path, format!("{deduped}\n"))
-            .map_err(|e| format!("write '{}': {e}", path.display()))?;
+            .map_err(|e| CrepusCliError::io(e, path.to_path_buf()))?;
     }
     Ok(())
 }
 
-pub fn add_once(path: &Path, addition: &str, anchor: &str) -> Result<(), String> {
+pub fn add_once(path: &Path, addition: &str, anchor: &str) -> Result<(), CrepusCliError> {
     let mut source =
-        fs::read_to_string(path).map_err(|e| format!("read '{}': {e}", path.display()))?;
+        fs::read_to_string(path).map_err(|e| CrepusCliError::io(e, path.to_path_buf()))?;
     if addition.starts_with("    <uses-") {
         let mut missing = String::new();
         for line in addition.lines() {
@@ -1890,10 +1901,10 @@ pub fn add_once(path: &Path, addition: &str, anchor: &str) -> Result<(), String>
             }
         }
         if missing.is_empty() {
-            return fs::write(path, source).map_err(|e| format!("write '{}': {e}", path.display()));
+            return fs::write(path, source).map_err(|e| CrepusCliError::io(e, path.to_path_buf()));
         }
         source = source.replacen(anchor, &format!("{anchor}{missing}"), 1);
-        return fs::write(path, source).map_err(|e| format!("write '{}': {e}", path.display()));
+        return fs::write(path, source).map_err(|e| CrepusCliError::io(e, path.to_path_buf()));
     }
     if source.contains(addition.lines().next().unwrap_or_default()) {
         return Ok(());
@@ -1904,5 +1915,6 @@ pub fn add_once(path: &Path, addition: &str, anchor: &str) -> Result<(), String>
     } else {
         source = source.replacen(anchor, &format!("{anchor}{addition}"), 1);
     }
-    fs::write(path, source).map_err(|e| format!("write '{}': {e}", path.display()))
+    fs::write(path, source).map_err(|e| CrepusCliError::io(e, path.to_path_buf()))?;
+    Ok(())
 }

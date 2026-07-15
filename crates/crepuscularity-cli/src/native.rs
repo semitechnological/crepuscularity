@@ -15,7 +15,7 @@ use std::fs;
 use std::path::Path;
 
 use crate::cli::NativeCommands;
-use crate::ui;
+use crate::error::CrepusCliError;
 
 #[cfg(test)]
 use crepuscularity_native::{render_template_to_ir, to_json, HotReloadEnvelope, HotReloadMessage};
@@ -53,33 +53,38 @@ pub(crate) use scaffold::{
     main_bundle_id, share_extension_target, ShareExtensionPlatform, TEMPLATE_FILES,
 };
 
-pub fn execute(cmd: NativeCommands) {
+pub fn execute(cmd: NativeCommands) -> Result<(), CrepusCliError> {
     match cmd {
-        NativeCommands::New { name } => scaffold::scaffold_native_app(&name),
-        NativeCommands::Add { capability, dir } => {
-            capabilities::add_capability(&capability, &dir).unwrap_or_else(|e| ui::error(&e))
+        NativeCommands::New { name } => {
+            scaffold::scaffold_native_app(&name);
+            Ok(())
         }
-        NativeCommands::Extension { extension } => build::handle_extension(extension),
+        NativeCommands::Add { capability, dir } => capabilities::add_capability(&capability, &dir),
+        NativeCommands::Extension { extension } => {
+            build::handle_extension(extension);
+            Ok(())
+        }
         NativeCommands::Ir { args } => match ir::run_ir_parsed(args) {
-            Ok(out) => print!("{out}"),
+            Ok(out) => {
+                print!("{out}");
+                Ok(())
+            }
             Err(e) => {
-                let payload = serde_json::json!({ "error": e });
+                let payload = serde_json::json!({ "error": e.to_string() });
                 eprintln!("{payload}");
                 std::process::exit(1);
             }
         },
-        NativeCommands::Sync { args } => {
-            if let Err(e) = ir::sync_native_fixture_inner(args) {
-                ui::error(&e);
-            }
+        NativeCommands::Sync { args } => ir::sync_native_fixture_inner(args),
+        NativeCommands::Codegen { args } => ir::codegen_native_source_inner(args).map(|_| ()),
+        NativeCommands::Build { platform } => {
+            build::handle_build(platform);
+            Ok(())
         }
-        NativeCommands::Codegen { args } => {
-            if let Err(e) = ir::codegen_native_source_inner(args) {
-                ui::error(&e);
-            }
+        NativeCommands::Run { platform } => {
+            build::handle_run(platform);
+            Ok(())
         }
-        NativeCommands::Build { platform } => build::handle_build(platform),
-        NativeCommands::Run { platform } => build::handle_run(platform),
     }
 }
 

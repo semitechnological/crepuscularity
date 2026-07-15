@@ -555,7 +555,7 @@ fn start_watcher(
                                 runtime_rebuilt = true;
                                 None
                             }
-                            Err(e) => Some(runtime_build_error_sse(&e)),
+                            Err(e) => Some(runtime_build_error_sse(&e.to_string())),
                         }
                     } else {
                         None

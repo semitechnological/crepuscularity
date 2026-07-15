@@ -9,6 +9,7 @@ use std::time::Instant;
 use crate::build_options::BuildOptions;
 use crate::cli::WebextCommands;
 use crate::dispatch::browser_target;
+use crate::scaffold;
 use crate::ui;
 use crate::wasm_bundle::{
     cargo_build_wasm32, find_wasm_file, run_wasm_bindgen, run_wasm_opt, wasm_profile_dirs,
@@ -71,35 +72,8 @@ fn app_path_or_cwd(app: Option<PathBuf>) -> PathBuf {
 
 // ── scaffold ─────────────────────────────────────────────────────────────────
 
-fn scaffold_extension(name: &str) {
-    let t0 = Instant::now();
-
-    let slug = name
-        .to_lowercase()
-        .chars()
-        .map(|c| if c.is_alphanumeric() { c } else { '-' })
-        .collect::<String>();
-
-    let base = PathBuf::from(&slug);
-    if base.exists() {
-        ui::error(&format!("directory already exists: {slug}"));
-    }
-
-    std::fs::create_dir_all(base.join("runtime/src")).unwrap_or_else(|e| {
-        ui::error(&format!("create runtime/src dir: {e}"));
-    });
-    std::fs::create_dir_all(base.join("views")).unwrap_or_else(|e| {
-        ui::error(&format!("create views dir: {e}"));
-    });
-
-    let crepus_toml = scaffold_crepus_toml(name);
-    std::fs::write(base.join("crepus.toml"), crepus_toml).unwrap_or_else(|e| {
-        ui::error(&format!("write crepus.toml: {e}"));
-    });
-
-    let cargo_toml = format!(
-        r#"[package]
-name = "{slug}_runtime"
+const WEBEXT_CARGO_TOML_TEMPLATE: &str = r#"[package]
+name = "{{slug}}_runtime"
 version = "0.1.0"
 edition = "2021"
 
@@ -107,18 +81,14 @@ edition = "2021"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-crepuscularity-webext = {{ version = "0.2.7" }}
-serde = {{ version = "1.0", features = ["derive"] }}
+crepuscularity-webext = { version = "0.2.7" }
+serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 serde-wasm-bindgen = "0.6"
 wasm-bindgen = "0.2"
-"#
-    );
-    std::fs::write(base.join("runtime/Cargo.toml"), cargo_toml).unwrap_or_else(|e| {
-        ui::error(&format!("write runtime/Cargo.toml: {e}"));
-    });
+"#;
 
-    let lib_rs = r##"use wasm_bindgen::prelude::*;
+const WEBEXT_LIB_RS: &str = r##"use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
 pub fn runtime_version() -> String {
@@ -154,11 +124,8 @@ pub fn handle_background_message(message: JsValue) -> Result<JsValue, JsValue> {
         .map_err(|e| JsValue::from_str(&e.to_string()))
 }
 "##;
-    std::fs::write(base.join("runtime/src/lib.rs"), lib_rs).unwrap_or_else(|e| {
-        ui::error(&format!("write runtime/src/lib.rs: {e}"));
-    });
 
-    let ui_crepus = r#"+++
+const WEBEXT_UI_CREPUS: &str = r#"+++
 [Popup.defaults]
 title = "Extension"
 description = ""
@@ -171,22 +138,54 @@ div flex flex-col gap-4 p-4
   div text-sm text-zinc-500
     "{description}"
 "#;
-    std::fs::write(base.join("views/ui.crepus"), ui_crepus).unwrap_or_else(|e| {
-        ui::error(&format!("write views/ui.crepus: {e}"));
-    });
 
-    eprintln!(
-        "\n{} created {}",
-        ui::ok(),
-        style(format!("{slug}/")).cyan().bold()
-    );
-    eprintln!();
-    eprintln!("{}", style("Next steps:").dim());
-    eprintln!("  cd {slug}");
-    eprintln!("  crepus build");
-    eprintln!(
-        "  {}",
-        style("# Load dist/unpacked/ in chrome://extensions").dim()
+fn scaffold_extension(name: &str) {
+    let t0 = Instant::now();
+
+    let slug = name
+        .to_lowercase()
+        .chars()
+        .map(|c| if c.is_alphanumeric() { c } else { '-' })
+        .collect::<String>();
+
+    let base = PathBuf::from(&slug);
+    if base.exists() {
+        ui::error(&format!("directory already exists: {slug}"));
+    }
+
+    scaffold::ensure_dir(&base.join("runtime/src"))
+        .unwrap_or_else(|e| ui::error(&format!("create runtime/src dir: {e}")));
+    scaffold::ensure_dir(&base.join("views"))
+        .unwrap_or_else(|e| ui::error(&format!("create views dir: {e}")));
+
+    scaffold::write_file(&base.join("crepus.toml"), &scaffold_crepus_toml(name))
+        .unwrap_or_else(|e| ui::error(&format!("write crepus.toml: {e}")));
+
+    scaffold::write_template(
+        &base.join("runtime/Cargo.toml"),
+        WEBEXT_CARGO_TOML_TEMPLATE,
+        &[("{{slug}}", &slug)],
+    )
+    .unwrap_or_else(|e| ui::error(&format!("write runtime/Cargo.toml: {e}")));
+
+    scaffold::write_file(&base.join("runtime/src/lib.rs"), WEBEXT_LIB_RS)
+        .unwrap_or_else(|e| ui::error(&format!("write runtime/src/lib.rs: {e}")));
+
+    scaffold::write_file(&base.join("views/ui.crepus"), WEBEXT_UI_CREPUS)
+        .unwrap_or_else(|e| ui::error(&format!("write views/ui.crepus: {e}")));
+
+    let steps = vec![
+        format!("cd {slug}"),
+        "crepus build".to_string(),
+        format!(
+            "{}",
+            style("# Load dist/unpacked/ in chrome://extensions").dim()
+        ),
+    ];
+    scaffold::scaffold_success(
+        &slug,
+        &base,
+        &steps.iter().map(|s| s.as_str()).collect::<Vec<_>>(),
     );
     ui::done_in(t0.elapsed());
 }

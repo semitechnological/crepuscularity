@@ -22,6 +22,7 @@ use crate::cli::{
     MobileCodegenPlatformArg, MobileCommands, NativeBuildCommands, NativeCommands,
     NativeRunCommands,
 };
+use crate::error::CrepusCliError;
 use crate::ui;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -60,30 +61,29 @@ pub fn mobile_platform(p: crate::cli::MobilePlatformArg) -> MobilePlatform {
     }
 }
 
-pub fn execute_mobile(cmd: MobileCommands) {
+pub fn execute_mobile(cmd: MobileCommands) -> Result<(), CrepusCliError> {
     match cmd {
         MobileCommands::New { name } => {
             scaffold_mobile_app(&name);
+            Ok(())
         }
         MobileCommands::Sync {
             template,
             dir,
             vars,
             pretty,
-        } => {
-            execute(NativeCommands::Sync {
-                args: SyncArgs {
-                    template,
-                    dir,
-                    out: Vec::new(),
-                    no_defaults: false,
-                    component: None,
-                    ctx: None,
-                    vars,
-                    pretty,
-                },
-            });
-        }
+        } => execute(NativeCommands::Sync {
+            args: SyncArgs {
+                template,
+                dir,
+                out: Vec::new(),
+                no_defaults: false,
+                component: None,
+                ctx: None,
+                vars,
+                pretty,
+            },
+        }),
         MobileCommands::Codegen {
             template,
             dir,
@@ -91,10 +91,7 @@ pub fn execute_mobile(cmd: MobileCommands) {
             out,
             view_name,
             vars,
-        } => {
-            run_codegen_full(template, dir, platform, out, view_name, &vars)
-                .unwrap_or_else(|e| ui::error(&e));
-        }
+        } => run_codegen_full(template, dir, platform, out, view_name, &vars),
         MobileCommands::Build {
             platform,
             dir,
@@ -104,7 +101,7 @@ pub fn execute_mobile(cmd: MobileCommands) {
         } => {
             let root = dir.clone().unwrap_or_else(|| PathBuf::from("."));
             // Auto-codegen before build.
-            let _ = run_codegen_full(
+            run_codegen_full(
                 Some(PathBuf::from("views/main.crepus")),
                 root,
                 match mobile_platform(platform) {
@@ -115,21 +112,24 @@ pub fn execute_mobile(cmd: MobileCommands) {
                 None,
                 Some("CrepusGeneratedView".into()),
                 &[],
-            );
+            )?;
             run_mobile_build(
                 mobile_platform(platform),
                 dir,
                 target,
                 configuration,
                 flavor,
-            );
+            )
         }
         MobileCommands::Run {
             platform,
             dir,
             flavor,
         } => run_mobile_run(mobile_platform(platform), dir, flavor),
-        MobileCommands::Doctor { platform } => run_doctor(mobile_platform(platform)),
+        MobileCommands::Doctor { platform } => {
+            run_doctor(mobile_platform(platform));
+            Ok(())
+        }
         MobileCommands::Dev {
             dir,
             port,
@@ -155,7 +155,10 @@ pub fn execute_mobile(cmd: MobileCommands) {
                     })
                     .collect(),
             };
-            run_dev(parsed).unwrap_or_else(|e| ui::error(&e));
+            if let Err(e) = run_dev(parsed) {
+                ui::error(&e.to_string());
+            }
+            Ok(())
         }
     }
 }
@@ -174,7 +177,7 @@ pub fn scaffold_mobile_app(name: &str) {
         .collect();
 
     // Step 1: scaffold with generic names.
-    execute(NativeCommands::New {
+    let _ = execute(NativeCommands::New {
         name: name.to_string(),
     });
 
@@ -185,7 +188,7 @@ pub fn scaffold_mobile_app(name: &str) {
 
     // Step 2: regenerate fixture + codegen (before rename, uses nativeshell paths).
     let template = PathBuf::from("views/main.crepus");
-    execute(NativeCommands::Sync {
+    let _ = execute(NativeCommands::Sync {
         args: SyncArgs {
             template: template.clone(),
             dir: root.clone(),
@@ -205,7 +208,7 @@ pub fn scaffold_mobile_app(name: &str) {
         Some("CrepusGeneratedView".into()),
         &[],
     )
-    .unwrap_or_else(|e| ui::error(&e));
+    .unwrap_or_else(|e| ui::error(&e.to_string()));
 
     // Step 3: replace generic names with app-specific ones (after codegen).
     let r_0 = format!("{name_snake}_actions");
@@ -302,7 +305,7 @@ pub fn run_codegen_full(
     out: Option<PathBuf>,
     view_name: Option<String>,
     vars: &[String],
-) -> Result<(), String> {
+) -> Result<(), CrepusCliError> {
     let template = template.ok_or_else(|| "expected template path".to_string())?;
     let view_name = view_name.unwrap_or_else(|| "CrepusGeneratedView".into());
     let plats = match platform {
@@ -330,7 +333,7 @@ pub fn run_codegen_full(
         } else {
             default_out
         };
-        execute(NativeCommands::Codegen {
+        let _ = execute(NativeCommands::Codegen {
             args: CodegenArgs {
                 template: Some(template_path.clone()),
                 platform: Some(plat_arg),
@@ -354,7 +357,7 @@ pub fn run_mobile_build(
     target: IosBuildTarget,
     configuration: String,
     flavor: String,
-) {
+) -> Result<(), CrepusCliError> {
     match platform {
         MobilePlatform::Ios => execute(NativeCommands::Build {
             platform: NativeBuildCommands::Ios {
@@ -373,13 +376,17 @@ pub fn run_mobile_build(
                 target,
                 configuration.clone(),
                 flavor.clone(),
-            );
-            run_mobile_build(MobilePlatform::Android, dir, target, configuration, flavor);
+            )?;
+            run_mobile_build(MobilePlatform::Android, dir, target, configuration, flavor)
         }
     }
 }
 
-pub fn run_mobile_run(platform: MobilePlatform, dir: Option<PathBuf>, flavor: String) {
+pub fn run_mobile_run(
+    platform: MobilePlatform,
+    dir: Option<PathBuf>,
+    flavor: String,
+) -> Result<(), CrepusCliError> {
     match platform {
         MobilePlatform::Ios => execute(NativeCommands::Run {
             platform: NativeRunCommands::Ios { dir },
@@ -387,7 +394,9 @@ pub fn run_mobile_run(platform: MobilePlatform, dir: Option<PathBuf>, flavor: St
         MobilePlatform::Android => execute(NativeCommands::Run {
             platform: NativeRunCommands::Android { dir, flavor },
         }),
-        MobilePlatform::All => ui::error("crepus mobile run expects --platform ios or android"),
+        MobilePlatform::All => Err(CrepusCliError::context(
+            "crepus mobile run expects --platform ios or android",
+        )),
     }
 }
 
@@ -421,7 +430,7 @@ pub fn run_doctor(platform: MobilePlatform) {
     }
 }
 
-pub fn run_dev(args: MobileDevArgs) -> Result<(), String> {
+pub fn run_dev(args: MobileDevArgs) -> Result<(), CrepusCliError> {
     let root = fs::canonicalize(&args.dir).unwrap_or(args.dir);
     let template_path = resolve_template_path(&root, &args.template);
     let mut ctx = TemplateContext::new();
@@ -434,9 +443,11 @@ pub fn run_dev(args: MobileDevArgs) -> Result<(), String> {
     ctx.base_dir = template_path.parent().map(Path::to_path_buf);
 
     let initial_template = fs::read_to_string(&template_path)
-        .map_err(|e| format!("read {}: {e}", template_path.display()))?;
-    let ir = render_template_to_ir(&initial_template, &ctx).map_err(|e| e.to_string())?;
-    let ir_json = to_json(&ir).map_err(|e| format!("serialize IR: {e}"))?;
+        .map_err(|e| CrepusCliError::io(e, template_path.clone()))?;
+    let ir = render_template_to_ir(&initial_template, &ctx)
+        .map_err(|e| CrepusCliError::context(e.to_string()))?;
+    let ir_json =
+        to_json(&ir).map_err(|e| CrepusCliError::context(format!("serialize IR: {e}")))?;
     let event = HotReloadEnvelope {
         sequence: 0,
         message: HotReloadMessage::FullReload {
@@ -639,7 +650,7 @@ pub fn sync_outputs(root: &Path, template_path: &Path, platform: MobilePlatform)
         .strip_prefix(root)
         .unwrap_or(template_path)
         .to_path_buf();
-    execute(NativeCommands::Sync {
+    let _ = execute(NativeCommands::Sync {
         args: SyncArgs {
             template: rel,
             dir: root.to_path_buf(),
@@ -654,7 +665,7 @@ pub fn sync_outputs(root: &Path, template_path: &Path, platform: MobilePlatform)
     let tpl = template_path.to_path_buf();
     if matches!(platform, MobilePlatform::Ios | MobilePlatform::All) {
         let out = root.join("ios/Sources/NativeShell/Generated");
-        execute(NativeCommands::Codegen {
+        let _ = execute(NativeCommands::Codegen {
             args: CodegenArgs {
                 template: Some(tpl.clone()),
                 platform: Some(CodegenPlatform::SwiftUi),
@@ -669,7 +680,7 @@ pub fn sync_outputs(root: &Path, template_path: &Path, platform: MobilePlatform)
     if matches!(platform, MobilePlatform::Android | MobilePlatform::All) {
         let out_dir =
             root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/generated");
-        execute(NativeCommands::Codegen {
+        let _ = execute(NativeCommands::Codegen {
             args: CodegenArgs {
                 template: Some(tpl),
                 platform: Some(CodegenPlatform::Compose),

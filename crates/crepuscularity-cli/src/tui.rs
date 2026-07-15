@@ -3,7 +3,6 @@
 //! Scaffold and build TUI applications that render `.crepus` templates in the terminal
 //! using Ratatui for layout and Crossterm for input handling.
 
-use std::fs;
 use std::path::Path;
 use std::process::Command;
 
@@ -12,6 +11,7 @@ use console::style;
 
 use crate::build_options::BuildOptions;
 use crate::cli::TuiCommands;
+use crate::scaffold;
 use crate::ui;
 
 /// Caret-style version requirement injected into scaffolded TUI apps for
@@ -44,9 +44,8 @@ fn scaffold_tui_app(name: &str) {
     let dir = Path::new(name);
 
     // Create directory structure
-    fs::create_dir_all(dir).unwrap_or_else(|e| {
-        ui::error(&format!("failed to create directory: {}", e));
-    });
+    scaffold::ensure_dir(dir)
+        .unwrap_or_else(|e| ui::error(&format!("failed to create directory: {e}")));
 
     let cargo_toml = format!(
         r#"[package]
@@ -107,19 +106,16 @@ fn run(terminal: &mut Terminal<impl Backend>, hot: &mut HotTemplate) -> anyhow::
     }
 }
 "###;
-    fs::write(dir.join("Cargo.toml"), cargo_toml).unwrap_or_else(|e| {
-        ui::error(&format!("failed to write Cargo.toml: {}", e));
-    });
+    scaffold::write_file(&dir.join("Cargo.toml"), &cargo_toml)
+        .unwrap_or_else(|e| ui::error(&format!("failed to write Cargo.toml: {e}")));
 
     // Create src directory
-    fs::create_dir_all(dir.join("src")).unwrap_or_else(|e| {
-        ui::error(&format!("failed to create src directory: {}", e));
-    });
+    scaffold::ensure_dir(&dir.join("src"))
+        .unwrap_or_else(|e| ui::error(&format!("failed to create src directory: {e}")));
 
     // Write src/main.rs
-    fs::write(dir.join("src/main.rs"), main_rs).unwrap_or_else(|e| {
-        ui::error(&format!("failed to write src/main.rs: {}", e));
-    });
+    scaffold::write_file(&dir.join("src/main.rs"), main_rs)
+        .unwrap_or_else(|e| ui::error(&format!("failed to write src/main.rs: {e}")));
 
     // Create a basic .crepus template file
     let template_content = r#"div bg-black text-white flex flex-col gap-4
@@ -131,9 +127,8 @@ fn run(terminal: &mut Terminal<impl Backend>, hot: &mut HotTemplate) -> anyhow::
     "{quit_hint}"
 "#;
 
-    fs::write(dir.join("app.crepus"), template_content).unwrap_or_else(|e| {
-        ui::error(&format!("failed to write app.crepus: {}", e));
-    });
+    scaffold::write_file(&dir.join("app.crepus"), template_content)
+        .unwrap_or_else(|e| ui::error(&format!("failed to write app.crepus: {e}")));
 
     ui::success(&format!(
         "Created new TUI app '{}' in directory '{}'",

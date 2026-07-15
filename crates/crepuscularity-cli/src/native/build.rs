@@ -543,7 +543,7 @@ pub fn sync_default_mobile_artifacts(root: &Path, ios: bool, android: bool) {
         vars: Vec::new(),
         pretty: true,
     })
-    .unwrap_or_else(|e| ui::error(&e));
+    .unwrap_or_else(|e| ui::error(&e.to_string()));
     if ios {
         codegen_native_source_inner(CodegenArgs {
             template: Some(template.clone()),
@@ -554,7 +554,7 @@ pub fn sync_default_mobile_artifacts(root: &Path, ios: bool, android: bool) {
             ctx: None,
             vars: Vec::new(),
         })
-        .unwrap_or_else(|e| ui::error(&e));
+        .unwrap_or_else(|e| ui::error(&e.to_string()));
     }
     if android {
         let out_dir =
@@ -568,7 +568,7 @@ pub fn sync_default_mobile_artifacts(root: &Path, ios: bool, android: bool) {
             ctx: None,
             vars: Vec::new(),
         })
-        .unwrap_or_else(|e| ui::error(&e));
+        .unwrap_or_else(|e| ui::error(&e.to_string()));
         prepend_kotlin_package(&out_dir.join("CrepusGeneratedView.kt"));
     }
 }

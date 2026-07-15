@@ -7,23 +7,33 @@ use crate::cli::{
     BenchmarkCheckArgs, BenchmarkCommands, BenchmarkRunArgs, BrowserArg, Cli, Commands,
     IosCommands, MobileCommands, NativeCommands, TuiCommands, WebCommands, WebextCommands,
 };
+use crate::error::CrepusCliError;
 use crate::target_build::ManifestBuildArgs;
 use crate::ui;
 
-pub fn run(cli: Cli) {
+pub fn run(cli: Cli) -> Result<(), CrepusCliError> {
     let Some(command) = cli.command else {
         print_top_level_help();
         std::process::exit(0);
     };
     match command {
-        Commands::New { name } => crate::new::run(&name),
-        Commands::Init { kind, name } => run_init(&kind, &name),
+        Commands::New { name } => {
+            crate::new::run(&name);
+            Ok(())
+        }
+        Commands::Init { kind, name } => {
+            run_init(&kind, &name);
+            Ok(())
+        }
         #[cfg(feature = "desktop")]
         Commands::Dev {
             bin,
             emit_events,
             build,
-        } => run_dev(bin, emit_events, build),
+        } => {
+            run_dev(bin, emit_events, build);
+            Ok(())
+        }
         Commands::Build {
             build,
             target_id,
@@ -32,13 +42,19 @@ pub fn run(cli: Cli) {
             selector,
         } => run_top_level_build(build, target_id, manifest, all, selector),
         #[cfg(feature = "desktop")]
-        Commands::Preview { file } => crate::preview::run_preview(file),
+        Commands::Preview { file } => {
+            crate::preview::run_preview(file);
+            Ok(())
+        }
         Commands::Render {
             file,
             ctx,
             vars,
             component,
-        } => crate::render::execute(file, ctx, vars, component),
+        } => {
+            crate::render::execute(file, ctx, vars, component);
+            Ok(())
+        }
         Commands::Inspect {
             file,
             mode,
@@ -47,19 +63,52 @@ pub fn run(cli: Cli) {
             ints,
             width,
             height,
-        } => crate::inspect::execute(file, mode, vars, bools, ints, width, height),
-        Commands::Web { command } => crate::web::execute(command),
-        Commands::Webext { command } => crate::webext::execute(command),
-        Commands::Ios { command } => crate::ios::execute(command),
-        Commands::Apple { command } => crate::apple_project::execute(command),
-        Commands::Tui { command } => crate::tui::execute(command),
+        } => {
+            crate::inspect::execute(file, mode, vars, bools, ints, width, height);
+            Ok(())
+        }
+        Commands::Web { command } => {
+            crate::web::execute(command);
+            Ok(())
+        }
+        Commands::Webext { command } => {
+            crate::webext::execute(command);
+            Ok(())
+        }
+        Commands::Ios { command } => {
+            crate::ios::execute(command);
+            Ok(())
+        }
+        Commands::Apple { command } => {
+            crate::apple_project::execute(command);
+            Ok(())
+        }
+        Commands::Tui { command } => {
+            crate::tui::execute(command);
+            Ok(())
+        }
         Commands::Native { command } => crate::native::execute(command),
         Commands::Mobile { command } => crate::native::execute_mobile(command),
-        Commands::Tauri { command } => crate::tauri::execute(command),
-        Commands::Aurora { aurorality_args } => crate::aurora::run_forwarded(&aurorality_args),
-        Commands::Embedded { command } => crate::embedded::execute(command),
-        Commands::Benchmark { command, flat } => run_benchmark(command, flat),
-        Commands::Plugins { command } => crate::plugins::execute(command),
+        Commands::Tauri { command } => {
+            crate::tauri::execute(command);
+            Ok(())
+        }
+        Commands::Aurora { aurorality_args } => {
+            crate::aurora::run_forwarded(&aurorality_args);
+            Ok(())
+        }
+        Commands::Embedded { command } => {
+            crate::embedded::execute(command);
+            Ok(())
+        }
+        Commands::Benchmark { command, flat } => {
+            run_benchmark(command, flat);
+            Ok(())
+        }
+        Commands::Plugins { command } => {
+            crate::plugins::execute(command);
+            Ok(())
+        }
     }
 }
 
@@ -94,12 +143,16 @@ fn run_init(kind: &str, name: &str) {
         "tui" => crate::tui::execute(TuiCommands::New {
             name: name.to_string(),
         }),
-        "native" => crate::native::execute(NativeCommands::New {
-            name: name.to_string(),
-        }),
-        "mobile" => crate::native::execute_mobile(MobileCommands::New {
-            name: name.to_string(),
-        }),
+        "native" => {
+            let _ = crate::native::execute(NativeCommands::New {
+                name: name.to_string(),
+            });
+        }
+        "mobile" => {
+            let _ = crate::native::execute_mobile(MobileCommands::New {
+                name: name.to_string(),
+            });
+        }
         "ios" => crate::ios::execute(IosCommands::New {
             name: name.to_string(),
         }),
@@ -131,7 +184,7 @@ fn run_top_level_build(
     manifest: Option<PathBuf>,
     all: bool,
     selector: Option<String>,
-) {
+) -> Result<(), CrepusCliError> {
     let options = build.into_options_or_exit();
     let use_manifest = target_id.is_some()
         || manifest.is_some()
@@ -139,19 +192,17 @@ fn run_top_level_build(
         || selector.is_some()
         || crate::target_build::has_manifest_targets(manifest.clone());
     if use_manifest {
-        crate::target_build::execute(ManifestBuildArgs {
+        return crate::target_build::execute(ManifestBuildArgs {
             options,
             target_id,
             selector,
             manifest,
             all,
         });
-        return;
     }
     let t0 = Instant::now();
-    let cwd = std::env::current_dir().unwrap_or_else(|e| {
-        ui::error(&format!("cannot determine current directory: {e}"));
-    });
+    let cwd = std::env::current_dir()
+        .map_err(|e| CrepusCliError::context(format!("cannot determine current directory: {e}")))?;
     let sp = ui::spinner(if options.release() {
         "cargo build --release"
     } else {
@@ -166,8 +217,9 @@ fn run_top_level_build(
         ui::done_in(t0.elapsed());
     } else {
         sp.finish_and_clear();
-        ui::error("build failed");
+        return Err(CrepusCliError::context("build failed"));
     }
+    Ok(())
 }
 
 fn print_top_level_help() {

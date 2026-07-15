@@ -14,6 +14,7 @@ use serde::Deserialize;
 use serde_json::Value;
 
 use super::{check_template_size, prepend_kotlin_package};
+use crate::error::CrepusCliError;
 use crate::ui;
 
 #[derive(Clone, Copy, Debug, ValueEnum, PartialEq, Eq)]
@@ -111,9 +112,11 @@ pub fn parse_kv_vars(vars: &[String]) -> Vec<(String, String)> {
         .unwrap_or_else(|e| ui::error(&e))
 }
 
-pub fn run_ir_parsed(parsed: IrArgs) -> Result<String, String> {
+pub fn run_ir_parsed(parsed: IrArgs) -> Result<String, CrepusCliError> {
     if parsed.stdin && parsed.stdin_json {
-        return Err("--stdin and --stdin-json are mutually exclusive".to_string());
+        return Err(CrepusCliError::context(
+            "--stdin and --stdin-json are mutually exclusive",
+        ));
     }
 
     let mut ctx = TemplateContext::new();
@@ -128,9 +131,10 @@ pub fn run_ir_parsed(parsed: IrArgs) -> Result<String, String> {
         let mut raw = String::new();
         std::io::stdin()
             .read_to_string(&mut raw)
-            .map_err(|e| format!("read stdin: {e}"))?;
-        check_template_size(raw.len())?;
-        let env: IrEnvelope = serde_json::from_str(&raw).map_err(|e| format!("stdin JSON: {e}"))?;
+            .map_err(|e| CrepusCliError::context(format!("read stdin: {e}")))?;
+        check_template_size(raw.len()).map_err(CrepusCliError::context)?;
+        let env: IrEnvelope = serde_json::from_str(&raw)
+            .map_err(|e| CrepusCliError::context(format!("stdin JSON: {e}")))?;
         if let Some(value) = env.context {
             merge_json_ctx(&value, &mut ctx)?;
         }
@@ -139,16 +143,20 @@ pub fn run_ir_parsed(parsed: IrArgs) -> Result<String, String> {
         }
         let pretty = env.pretty.unwrap_or(parsed.pretty);
         let ir = if let (Some(files), Some(entry)) = (env.files, env.entry) {
-            render_from_files(&files, &entry, &ctx).map_err(|e| e.to_string())?
+            render_from_files(&files, &entry, &ctx)
+                .map_err(|e| CrepusCliError::context(e.to_string()))?
         } else if let Some(template) = env.template {
             if let Some(component) = env.component {
                 render_component_file_to_ir(&template, &component, &ctx)
-                    .map_err(|e| e.to_string())?
+                    .map_err(|e| CrepusCliError::context(e.to_string()))?
             } else {
-                render_template_to_ir(&template, &ctx).map_err(|e| e.to_string())?
+                render_template_to_ir(&template, &ctx)
+                    .map_err(|e| CrepusCliError::context(e.to_string()))?
             }
         } else {
-            return Err("stdin JSON must include files+entry or template".to_string());
+            return Err(CrepusCliError::context(
+                "stdin JSON must include files+entry or template",
+            ));
         };
         return stringify_ir(&ir, pretty);
     }
@@ -157,41 +165,44 @@ pub fn run_ir_parsed(parsed: IrArgs) -> Result<String, String> {
         let mut template = String::new();
         std::io::stdin()
             .read_to_string(&mut template)
-            .map_err(|e| format!("read stdin: {e}"))?;
-        check_template_size(template.len())?;
+            .map_err(|e| CrepusCliError::context(format!("read stdin: {e}")))?;
+        check_template_size(template.len()).map_err(CrepusCliError::context)?;
         ctx.base_dir = parsed.base_dir;
         let ir = if let Some(component) = parsed.component {
-            render_component_file_to_ir(&template, &component, &ctx).map_err(|e| e.to_string())?
+            render_component_file_to_ir(&template, &component, &ctx)
+                .map_err(|e| CrepusCliError::context(e.to_string()))?
         } else {
-            render_template_to_ir(&template, &ctx).map_err(|e| e.to_string())?
+            render_template_to_ir(&template, &ctx)
+                .map_err(|e| CrepusCliError::context(e.to_string()))?
         };
         return stringify_ir(&ir, parsed.pretty);
     }
 
     let path = parsed.file.ok_or_else(|| {
-        "Usage: crepus native ir <file.crepus> [--component Name] [--ctx FILE] [--var k=v] [--pretty]".to_string()
+        CrepusCliError::context("Usage: crepus native ir <file.crepus> [--component Name] [--ctx FILE] [--var k=v] [--pretty]")
     })?;
-    let content = fs::read_to_string(&path).map_err(|e| format!("read {}: {e}", path.display()))?;
-    check_template_size(content.len())?;
+    let content = fs::read_to_string(&path).map_err(|e| CrepusCliError::io(e, path.clone()))?;
+    check_template_size(content.len()).map_err(CrepusCliError::context)?;
     ctx.base_dir = path.parent().map(Path::to_path_buf);
     let ir = if let Some(component) = parsed.component {
-        render_component_file_to_ir(&content, &component, &ctx).map_err(|e| e.to_string())?
+        render_component_file_to_ir(&content, &component, &ctx)
+            .map_err(|e| CrepusCliError::context(e.to_string()))?
     } else {
-        render_template_to_ir(&content, &ctx).map_err(|e| e.to_string())?
+        render_template_to_ir(&content, &ctx).map_err(|e| CrepusCliError::context(e.to_string()))?
     };
     stringify_ir(&ir, parsed.pretty)
 }
 
-pub fn load_json_ctx(path: &Path, ctx: &mut TemplateContext) -> Result<(), String> {
-    let raw = fs::read_to_string(path).map_err(|e| format!("read {}: {e}", path.display()))?;
+pub fn load_json_ctx(path: &Path, ctx: &mut TemplateContext) -> Result<(), CrepusCliError> {
+    let raw = fs::read_to_string(path).map_err(|e| CrepusCliError::io(e, path.to_path_buf()))?;
     let value: Value =
         serde_json::from_str(&raw).map_err(|e| format!("context JSON {}: {e}", path.display()))?;
     merge_json_ctx(&value, ctx)
 }
 
-pub fn merge_json_ctx(value: &Value, ctx: &mut TemplateContext) -> Result<(), String> {
+pub fn merge_json_ctx(value: &Value, ctx: &mut TemplateContext) -> Result<(), CrepusCliError> {
     let Some(obj) = value.as_object() else {
-        return Err("context must be a JSON object".to_string());
+        return Err(CrepusCliError::context("context must be a JSON object"));
     };
     for (key, value) in obj {
         ctx.set(key.clone(), json_to_template_value(value)?);
@@ -199,7 +210,7 @@ pub fn merge_json_ctx(value: &Value, ctx: &mut TemplateContext) -> Result<(), St
     Ok(())
 }
 
-pub fn json_to_template_value(value: &Value) -> Result<TemplateValue, String> {
+pub fn json_to_template_value(value: &Value) -> Result<TemplateValue, CrepusCliError> {
     match value {
         Value::Null => Ok(TemplateValue::Null),
         Value::Bool(v) => Ok(TemplateValue::Bool(*v)),
@@ -209,7 +220,7 @@ pub fn json_to_template_value(value: &Value) -> Result<TemplateValue, String> {
             } else if let Some(n) = v.as_f64() {
                 Ok(TemplateValue::Float(n))
             } else {
-                Err(format!("unsupported number: {v}"))
+                Err(CrepusCliError::context(format!("unsupported number: {v}")))
             }
         }
         Value::String(v) => Ok(TemplateValue::Str(v.clone())),
@@ -231,22 +242,22 @@ pub fn json_to_template_value(value: &Value) -> Result<TemplateValue, String> {
                         child.set("value", json_to_template_scalar(item)?);
                         items.push(child);
                     }
-                    _ => return Err("unsupported array item type".to_string()),
+                    _ => return Err(CrepusCliError::context("unsupported array item type")),
                 }
             }
             Ok(TemplateValue::List(items))
         }
-        Value::Object(_) => {
-            Err("context object values are only supported inside arrays".to_string())
-        }
+        Value::Object(_) => Err(CrepusCliError::context(
+            "context object values are only supported inside arrays",
+        )),
     }
 }
 
-pub fn json_to_template_scalar(value: &Value) -> Result<TemplateValue, String> {
+pub fn json_to_template_scalar(value: &Value) -> Result<TemplateValue, CrepusCliError> {
     match value {
-        Value::Array(_) | Value::Object(_) => {
-            Err("loop item fields must be scalar JSON values".to_string())
-        }
+        Value::Array(_) | Value::Object(_) => Err(CrepusCliError::context(
+            "loop item fields must be scalar JSON values",
+        )),
         _ => json_to_template_value(value),
     }
 }
@@ -264,25 +275,28 @@ pub fn parse_var_value(raw: &str) -> TemplateValue {
     }
 }
 
-pub fn stringify_ir(ir: &crepuscularity_native::ViewIr, pretty: bool) -> Result<String, String> {
+pub fn stringify_ir(
+    ir: &crepuscularity_native::ViewIr,
+    pretty: bool,
+) -> Result<String, CrepusCliError> {
     if pretty {
-        to_json_pretty(ir).map_err(|e| format!("serialize IR: {e}"))
+        to_json_pretty(ir).map_err(|e| CrepusCliError::context(format!("serialize IR: {e}")))
     } else {
-        to_json(ir).map_err(|e| format!("serialize IR: {e}"))
+        to_json(ir).map_err(|e| CrepusCliError::context(format!("serialize IR: {e}")))
     }
 }
 
-pub fn sync_native_fixture_inner(parsed: SyncArgs) -> Result<(), String> {
+pub fn sync_native_fixture_inner(parsed: SyncArgs) -> Result<(), CrepusCliError> {
     if !parsed.dir.exists() {
-        return Err(format!(
+        return Err(CrepusCliError::context(format!(
             "native scaffold dir not found: {}",
             parsed.dir.display()
-        ));
+        )));
     }
     let root = fs::canonicalize(&parsed.dir).unwrap_or(parsed.dir);
     let template_path = resolve_template_path(&root, &parsed.template);
     let template = fs::read_to_string(&template_path)
-        .map_err(|e| format!("read {}: {e}", template_path.display()))?;
+        .map_err(|e| CrepusCliError::io(e, template_path.clone()))?;
 
     let mut ctx = TemplateContext::new();
     if let Some(path) = &parsed.ctx {
@@ -295,9 +309,11 @@ pub fn sync_native_fixture_inner(parsed: SyncArgs) -> Result<(), String> {
 
     let component_ref = parsed.component.clone();
     let ir = if let Some(component) = &parsed.component {
-        render_component_file_to_ir(&template, component, &ctx).map_err(|e| e.to_string())?
+        render_component_file_to_ir(&template, component, &ctx)
+            .map_err(|e| CrepusCliError::context(e.to_string()))?
     } else {
-        render_template_to_ir(&template, &ctx).map_err(|e| e.to_string())?
+        render_template_to_ir(&template, &ctx)
+            .map_err(|e| CrepusCliError::context(e.to_string()))?
     };
     let mut json = stringify_ir(&ir, parsed.pretty)?;
     if !json.ends_with('\n') {
@@ -318,8 +334,7 @@ pub fn sync_native_fixture_inner(parsed: SyncArgs) -> Result<(), String> {
                         written += 1;
                         continue;
                     }
-                    fs::write(&path, &json)
-                        .map_err(|e| format!("write {}: {e}", path.display()))?;
+                    fs::write(&path, &json).map_err(|e| CrepusCliError::io(e, path.clone()))?;
                     written += 1;
                 }
             }
@@ -327,21 +342,21 @@ pub fn sync_native_fixture_inner(parsed: SyncArgs) -> Result<(), String> {
     }
     for path in explicit_fixture_output_paths(&root, &parsed.out) {
         if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent).map_err(|e| format!("create {}: {e}", parent.display()))?;
+            fs::create_dir_all(parent).map_err(|e| CrepusCliError::io(e, parent.to_path_buf()))?;
         }
         if path.is_file() && cache.is_up_to_date(&fp, &json) {
             written += 1;
             continue;
         }
-        fs::write(&path, &json).map_err(|e| format!("write {}: {e}", path.display()))?;
+        fs::write(&path, &json).map_err(|e| CrepusCliError::io(e, path.clone()))?;
         written += 1;
     }
     cache.record(&fp, &json);
     if written == 0 {
-        return Err(format!(
+        return Err(CrepusCliError::context(format!(
             "no native fixture directories found under {}",
             root.display()
-        ));
+        )));
     }
     ui::success(&format!(
         "synced View IR fixture from {}",
@@ -350,22 +365,22 @@ pub fn sync_native_fixture_inner(parsed: SyncArgs) -> Result<(), String> {
     Ok(())
 }
 
-pub fn codegen_native_source_inner(parsed: CodegenArgs) -> Result<PathBuf, String> {
+pub fn codegen_native_source_inner(parsed: CodegenArgs) -> Result<PathBuf, CrepusCliError> {
     let template_path = parsed.template.ok_or_else(|| {
-        "Usage: crepus native codegen <file.crepus> --platform swiftui|compose --out DIR --view-name NAME".to_string()
+        CrepusCliError::context("Usage: crepus native codegen <file.crepus> --platform swiftui|compose --out DIR --view-name NAME")
     })?;
     let platform = parsed
         .platform
-        .ok_or_else(|| "--platform swiftui|compose is required".to_string())?;
+        .ok_or_else(|| CrepusCliError::context("--platform swiftui|compose is required"))?;
     let out_dir = parsed
         .out
-        .ok_or_else(|| "--out DIR is required".to_string())?;
+        .ok_or_else(|| CrepusCliError::context("--out DIR is required"))?;
     let view_name = parsed
         .view_name
-        .ok_or_else(|| "--view-name NAME is required".to_string())?;
+        .ok_or_else(|| CrepusCliError::context("--view-name NAME is required"))?;
 
     let template = fs::read_to_string(&template_path)
-        .map_err(|e| format!("read {}: {e}", template_path.display()))?;
+        .map_err(|e| CrepusCliError::io(e, template_path.clone()))?;
 
     let mut ctx = TemplateContext::new();
     if let Some(path) = &parsed.ctx {
@@ -377,21 +392,23 @@ pub fn codegen_native_source_inner(parsed: CodegenArgs) -> Result<PathBuf, Strin
     ctx.base_dir = template_path.parent().map(Path::to_path_buf);
 
     let ir = if let Some(component) = &parsed.component {
-        render_component_file_to_ir(&template, component, &ctx).map_err(|e| e.to_string())?
+        render_component_file_to_ir(&template, component, &ctx)
+            .map_err(|e| CrepusCliError::context(e.to_string()))?
     } else {
-        render_template_to_ir(&template, &ctx).map_err(|e| e.to_string())?
+        render_template_to_ir(&template, &ctx)
+            .map_err(|e| CrepusCliError::context(e.to_string()))?
     };
     let mut source = generate_native_source(&ir, platform.into(), &view_name);
     if !source.ends_with('\n') {
         source.push('\n');
     }
-    fs::create_dir_all(&out_dir).map_err(|e| format!("create {}: {e}", out_dir.display()))?;
+    fs::create_dir_all(&out_dir).map_err(|e| CrepusCliError::io(e, out_dir.clone()))?;
     let ext = match platform {
         CodegenPlatform::SwiftUi => "swift",
         CodegenPlatform::Compose => "kt",
     };
     let path = out_dir.join(format!("{}.{}", view_name, ext));
-    fs::write(&path, source).map_err(|e| format!("write {}: {e}", path.display()))?;
+    fs::write(&path, source).map_err(|e| CrepusCliError::io(e, path.clone()))?;
     if platform == CodegenPlatform::Compose && is_native_shell_android_generated_dir(&out_dir) {
         prepend_kotlin_package(&path);
     }

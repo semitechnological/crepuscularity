@@ -6,6 +6,8 @@ use console::style;
 use indicatif::{ProgressBar, ProgressStyle};
 use std::time::Duration;
 
+use crate::error::CrepusCliError;
+
 // ── Symbols ─────────────────────────────────────────────────────────────────
 
 pub fn ok() -> impl std::fmt::Display {
@@ -29,6 +31,11 @@ pub fn success(msg: &str) {
 
 pub fn error(msg: &str) -> ! {
     eprintln!("{} {}", err(), style(msg).red());
+    std::process::exit(1);
+}
+
+pub fn report_error(error: &CrepusCliError) -> ! {
+    eprintln!("{} {}", err(), style(error).red());
     std::process::exit(1);
 }
 

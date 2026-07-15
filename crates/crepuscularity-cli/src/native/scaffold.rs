@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 
 use console::style;
 
+use crate::scaffold;
 use crate::ui;
 
 /// Each entry is `(relative path within the scaffold root, file content)`.
@@ -116,12 +117,7 @@ pub fn scaffold_native_app(name: &str) {
 
     for (rel, content) in TEMPLATE_FILES {
         let target = root.join(rel);
-        if let Some(parent) = target.parent() {
-            fs::create_dir_all(parent).unwrap_or_else(|e| {
-                ui::error(&format!("failed to create '{}': {e}", parent.display()));
-            });
-        }
-        fs::write(&target, content).unwrap_or_else(|e| {
+        scaffold::write_file(&target, content).unwrap_or_else(|e| {
             ui::error(&format!("failed to write '{}': {e}", target.display()));
         });
     }
@@ -138,9 +134,8 @@ pub fn scaffold_native_app(name: &str) {
                      android/local.properties\n\
                      .idea/\n\
                      *.iml\n";
-    fs::write(root.join(".gitignore"), gitignore).unwrap_or_else(|e| {
-        ui::error(&format!("failed to write .gitignore: {e}"));
-    });
+    scaffold::write_file(&root.join(".gitignore"), gitignore)
+        .unwrap_or_else(|e| ui::error(&format!("failed to write .gitignore: {e}")));
 
     ui::success(&format!(
         "scaffolded native app '{}' at '{}'",
@@ -170,16 +165,12 @@ pub fn scaffold_native_app_at(root: &Path) -> Result<(), String> {
     }
     for (rel, content) in TEMPLATE_FILES {
         let target = root.join(rel);
-        if let Some(parent) = target.parent() {
-            fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-        }
-        fs::write(target, content).map_err(|e| e.to_string())?;
+        scaffold::write_file(&target, content)?;
     }
-    fs::write(
-        root.join(".gitignore"),
+    scaffold::write_file(
+        &root.join(".gitignore"),
         "ios/.build/\nandroid/.gradle/\nandroid/build/\nandroid/app/build/\n",
     )
-    .map_err(|e| e.to_string())
 }
 
 pub const IOS_SHARE_INFO_PLIST: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
