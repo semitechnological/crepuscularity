@@ -860,7 +860,7 @@ fn serialize_ctx_to_value(ctx: &TemplateContext) -> serde_json::Value {
     Value::Object(map)
 }
 
-pub(crate) fn escape_html(input: &str) -> String {
+pub fn escape_html(input: &str) -> String {
     let mut out = String::with_capacity(input.len());
     for ch in input.chars() {
         match ch {
@@ -875,7 +875,7 @@ pub(crate) fn escape_html(input: &str) -> String {
     out
 }
 
-pub(crate) fn escape_html_attr(s: &str) -> String {
+pub fn escape_html_attr(s: &str) -> String {
     escape_html(s)
 }
 

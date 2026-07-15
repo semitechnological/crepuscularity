@@ -27,7 +27,7 @@ use crate::wasm_bundle::{
     cargo_build_wasm32, find_wasm_file, run_wasm_bindgen, run_wasm_opt, wasm_profile_dirs,
     WasmOptStatus,
 };
-use crepuscularity_web::render_bundle_with_ssr;
+use crepuscularity_web::{escape_html_attr, render_bundle_with_ssr};
 
 const WEB_INDEX_HTML: &str = include_str!("../assets/web/index.html");
 const WEB_APP_JS: &str = include_str!("../assets/web/app.js");
@@ -1437,13 +1437,6 @@ fn collect_html_sitemap_paths(base: &Path, dir: &Path, paths: &mut Vec<String>) 
             paths.push(route);
         }
     }
-}
-
-fn escape_html_attr(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
 }
 
 fn escape_xml_text(s: &str) -> String {
