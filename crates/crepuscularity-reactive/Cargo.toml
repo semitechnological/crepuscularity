@@ -1,6 +1,6 @@
 [package]
 name = "crepuscularity-reactive"
-version = "0.1.8"
+version = "0.1.9"
 edition = "2021"
 license = "MPL-2.0"
 description = "Reactive signals for Crepuscularity WASM clients (UNSTABLE; in active development)."
@@ -33,5 +33,5 @@ wasm-bindgen = { workspace = true, optional = true }
 js-sys = { workspace = true, optional = true }
 
 [dev-dependencies]
-crepuscularity-core = { path = "../crepuscularity-core", version = "0.4.22" }
+crepuscularity-core = { path = "../crepuscularity-core", version = "0.4.23" }
 wasm-bindgen-test = "0.3"
