@@ -6,12 +6,12 @@ license = "MPL-2.0"
 readme = "README.md"
 keywords = ["incremental", "parsing", "tree-sitter", "crepus"]
 categories = ["parsing", "text-editors"]
-repository = "https://github.com/tree-sitter/tree-sitter-crepus"
+repository = "https://github.com/tschk/crepuscularity/tree-sitter-crepus"
 edition = "2021"
 autoexamples = false
 
 build = "bindings/rust/build.rs"
-include = ["bindings/rust/*", "grammar.js", "queries/*", "src/*"]
+include = ["README.md", "bindings/rust/*", "grammar.js", "queries/*", "src/*"]
 
 [lib]
 path = "bindings/rust/lib.rs"
