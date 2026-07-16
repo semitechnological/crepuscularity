@@ -1,6 +1,6 @@
 [package]
 name = "crepuscularity-tui"
-version = "0.4.20"
+version = "0.4.21"
 edition = "2021"
 license = "MPL-2.0"
 description = "Ratatui backend for the Crepuscularity .crepus DSL — write full-screen terminal UIs with nested div layouts."
