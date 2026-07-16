@@ -1346,3 +1346,339 @@ mod focus_events {
         assert!(fired.load(Ordering::SeqCst));
     }
 }
+
+// ─── Diff tracking ────────────────────────────────────────────────────────────
+
+mod diff_tracking {
+    use crate::{DiffTracker, Template, TemplateContext};
+    use ratatui::{backend::TestBackend, Terminal};
+
+    #[test]
+    fn diff_tracker_detects_new_variables() {
+        let mut tracker = DiffTracker::new();
+        let mut ctx = TemplateContext::new();
+        ctx.set("a", "1");
+        tracker.update(&ctx);
+
+        ctx.set("b", "2");
+        assert!(tracker.has_changed(&ctx));
+    }
+
+    #[test]
+    fn diff_tracker_detects_changed_variable_values() {
+        let mut tracker = DiffTracker::new();
+        let mut ctx = TemplateContext::new();
+        ctx.set("a", "1");
+        tracker.update(&ctx);
+
+        ctx.set("a", "2");
+        assert!(tracker.has_changed(&ctx));
+    }
+
+    #[test]
+    fn diff_tracker_detects_removed_variables() {
+        let mut tracker = DiffTracker::new();
+        let mut ctx = TemplateContext::new();
+        ctx.set("a", "1");
+        ctx.set("b", "2");
+        tracker.update(&ctx);
+
+        ctx.vars.remove("b");
+        assert!(tracker.has_changed(&ctx));
+    }
+
+    #[test]
+    fn diff_tracker_returns_false_when_nothing_changed() {
+        let mut tracker = DiffTracker::new();
+        let mut ctx = TemplateContext::new();
+        ctx.set("a", "1");
+        ctx.set("b", "2");
+        tracker.update(&ctx);
+
+        assert!(!tracker.has_changed(&ctx));
+    }
+
+    #[test]
+    fn changed_keys_returns_correct_list_of_changed_variable_names() {
+        let mut tracker = DiffTracker::new();
+        let mut ctx = TemplateContext::new();
+        ctx.set("a", "1");
+        ctx.set("b", "2");
+        ctx.set("c", "3");
+        tracker.update(&ctx);
+
+        ctx.set("a", "changed");
+        ctx.vars.remove("b");
+        ctx.set("d", "new");
+
+        let mut changed = tracker.changed_keys(&ctx);
+        changed.sort();
+        assert_eq!(changed, vec!["a", "b", "d"]);
+    }
+
+    #[test]
+    fn template_draw_if_changed_skips_when_unchanged() {
+        let mut tpl = Template::from_source("div\n  \"{title}\"");
+        tpl.set("title", "Hello");
+
+        let backend = TestBackend::new(40, 3);
+        let mut terminal = Terminal::new(backend).unwrap();
+
+        let mut drew = false;
+        terminal
+            .draw(|frame| {
+                let area = frame.area();
+                drew = tpl.draw_if_changed(frame, area).unwrap();
+            })
+            .unwrap();
+        assert!(drew, "first draw should render");
+
+        let mut drew_again = false;
+        terminal
+            .draw(|frame| {
+                let area = frame.area();
+                drew_again = tpl.draw_if_changed(frame, area).unwrap();
+            })
+            .unwrap();
+        assert!(!drew_again, "second draw with no changes should skip");
+    }
+
+    #[test]
+    fn template_changed_keys_reports_changed_variables() {
+        let mut tpl = Template::from_source("div\n  \"{title}\"");
+        tpl.set("title", "Hello");
+        tpl.set("count", 1i64);
+
+        let backend = TestBackend::new(40, 3);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal
+            .draw(|frame| {
+                let area = frame.area();
+                tpl.draw_if_changed(frame, area).unwrap();
+            })
+            .unwrap();
+
+        tpl.set("title", "World");
+        let mut changed = tpl.changed_keys();
+        changed.sort();
+        assert_eq!(changed, vec!["title"]);
+    }
+}
+
+// ─── Component model ──────────────────────────────────────────────────────────
+
+mod component_model {
+    use super::*;
+    use crate::{Component, ComponentRegistry, ComponentState, StateKey};
+    use crepuscularity_core::context::value_to_str;
+
+    #[test]
+    fn component_registry_register_and_get() {
+        let mut registry = ComponentRegistry::new();
+        registry.register("Card", "div border\n  slot");
+        assert!(registry.get("Card").is_some());
+        assert_eq!(registry.get("Card").unwrap().name, "Card");
+        assert_eq!(registry.get("Card").unwrap().source, "div border\n  slot");
+        assert!(registry.get("Nonexistent").is_none());
+    }
+
+    #[test]
+    fn component_registry_render_with_props() {
+        let mut registry = ComponentRegistry::new();
+        registry.register("Greeting", "div\n  \"Hello {name}\"");
+
+        let ctx = TemplateContext::new();
+        let props = vec![("name".to_string(), TemplateValue::Str("World".to_string()))];
+
+        let backend = TestBackend::new(30, 3);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal
+            .draw(|frame| {
+                let area = frame.area();
+                registry
+                    .render("Greeting", &props, &ctx, frame, area)
+                    .unwrap();
+            })
+            .unwrap();
+
+        let text = all_text(&buffer_rows(&terminal));
+        assert!(text.contains("Hello World"), "{text}");
+    }
+
+    #[test]
+    fn component_defaults_overridden_by_provided_props() {
+        let mut registry = ComponentRegistry::new();
+        let component =
+            Component::new("Card", "div\n  \"{title}\"").with_default("title", "Default Title");
+        registry.components.insert("Card".to_string(), component);
+
+        let ctx = TemplateContext::new();
+
+        let backend = TestBackend::new(30, 3);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal
+            .draw(|frame| {
+                registry
+                    .render("Card", &[], &ctx, frame, frame.area())
+                    .unwrap();
+            })
+            .unwrap();
+        assert!(all_text(&buffer_rows(&terminal)).contains("Default Title"));
+
+        let backend = TestBackend::new(30, 3);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let props = vec![(
+            "title".to_string(),
+            TemplateValue::Str("Override".to_string()),
+        )];
+        terminal
+            .draw(|frame| {
+                registry
+                    .render("Card", &props, &ctx, frame, frame.area())
+                    .unwrap();
+            })
+            .unwrap();
+        let text = all_text(&buffer_rows(&terminal));
+        assert!(text.contains("Override"), "{text}");
+        assert!(!text.contains("Default Title"), "{text}");
+    }
+
+    #[test]
+    fn component_with_props_merges_defaults_and_props() {
+        let component = Component::new("Card", "div\n  \"{title} {subtitle}\"")
+            .with_default("title", "Default")
+            .with_default("subtitle", "Sub");
+
+        let props = vec![(
+            "title".to_string(),
+            TemplateValue::Str("Override".to_string()),
+        )];
+        let ctx = component.with_props(&props);
+
+        assert_eq!(ctx.get_str("title"), "Override");
+        assert_eq!(ctx.get_str("subtitle"), "Sub");
+    }
+
+    #[test]
+    fn component_state_get_set_update() {
+        let mut state = ComponentState::new();
+        let key = StateKey::new("count");
+
+        assert!(state.get_state(&key).is_none());
+
+        state.set_state(&key, 0i64);
+        assert_eq!(value_to_str(state.get_state(&key).unwrap()), "0");
+
+        state.update_state(&key, |v| match v {
+            TemplateValue::Int(n) => TemplateValue::Int(n + 1),
+            _ => TemplateValue::Int(1),
+        });
+        assert_eq!(value_to_str(state.get_state(&key).unwrap()), "1");
+
+        state.update_state(&key, |v| match v {
+            TemplateValue::Int(n) => TemplateValue::Int(n + 10),
+            _ => TemplateValue::Int(10),
+        });
+        assert_eq!(value_to_str(state.get_state(&key).unwrap()), "11");
+    }
+
+    #[test]
+    fn component_state_update_on_missing_key_inserts() {
+        let mut state = ComponentState::new();
+        let key = StateKey::new("new_key");
+
+        state.update_state(&key, |_| TemplateValue::Str("initialized".to_string()));
+        assert_eq!(value_to_str(state.get_state(&key).unwrap()), "initialized");
+    }
+
+    #[test]
+    fn register_file_parses_multi_component_files() {
+        let dir = temp_case("register_file");
+        let path = dir.join("components.crepus");
+        fs::write(
+            &path,
+            "--- Card\ndiv border rounded p-1\n  slot\n    \"fallback\"\n--- Button\nbutton\n  \"{label}\"",
+        )
+        .unwrap();
+
+        let mut registry = ComponentRegistry::new();
+        registry.register_file(&path).unwrap();
+
+        assert!(registry.get("Card").is_some());
+        assert!(registry.get("Button").is_some());
+        assert!(registry.get("Nonexistent").is_none());
+    }
+
+    #[test]
+    fn register_file_parses_frontmatter_defaults() {
+        let dir = temp_case("register_file_defaults");
+        let path = dir.join("components.crepus");
+        fs::write(
+            &path,
+            "+++\n[Card.defaults]\ntitle = \"Untitled\"\n+++\n\n--- Card\ndiv\n  \"{title}\"",
+        )
+        .unwrap();
+
+        let mut registry = ComponentRegistry::new();
+        registry.register_file(&path).unwrap();
+
+        let card = registry.get("Card").unwrap();
+        assert_eq!(
+            value_to_str(card.defaults.get("title").unwrap()),
+            "Untitled"
+        );
+    }
+
+    #[test]
+    fn register_file_renders_component_with_defaults() {
+        let dir = temp_case("register_file_render");
+        let path = dir.join("components.crepus");
+        fs::write(
+            &path,
+            "+++\n[Card.defaults]\ntitle = \"Untitled\"\n+++\n\n--- Card\ndiv\n  \"{title}\"",
+        )
+        .unwrap();
+
+        let mut registry = ComponentRegistry::new();
+        registry.register_file(&path).unwrap();
+
+        let ctx = TemplateContext::new();
+        let backend = TestBackend::new(30, 3);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal
+            .draw(|frame| {
+                registry
+                    .render("Card", &[], &ctx, frame, frame.area())
+                    .unwrap();
+            })
+            .unwrap();
+        assert!(all_text(&buffer_rows(&terminal)).contains("Untitled"));
+    }
+
+    #[test]
+    fn template_register_component_makes_it_includable() {
+        let mut tpl = crate::Template::from_source("div\n  include Greeting");
+        tpl.register_component("Greeting", "div\n  \"Hello from component\"");
+
+        let backend = TestBackend::new(40, 3);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal
+            .draw(|frame| tpl.draw_full(frame).unwrap())
+            .unwrap();
+
+        let text = all_text(&buffer_rows(&terminal));
+        assert!(text.contains("Hello from component"), "{text}");
+    }
+
+    #[test]
+    fn template_register_component_stores_in_registry() {
+        let mut tpl = crate::Template::from_source("div\n  \"x\"");
+        tpl.register_component("Card", "div border\n  slot");
+
+        assert!(tpl.components().get("Card").is_some());
+        assert_eq!(
+            tpl.components().get("Card").unwrap().source,
+            "div border\n  slot"
+        );
+    }
+}

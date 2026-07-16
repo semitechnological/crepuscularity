@@ -1955,7 +1955,7 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-tui"
-version = "0.4.19"
+version = "0.4.21"
 dependencies = [
  "crepuscularity-core",
  "crepuscularity_macros",

@@ -4,6 +4,8 @@ use ratatui::backend::Backend;
 use ratatui::layout::Rect;
 use ratatui::{CompletedFrame, Frame, Terminal};
 
+use crate::component::ComponentRegistry;
+use crate::diff::DiffTracker;
 use crate::event::{DispatchResult, Event, EventDispatcher, FocusManager};
 use crate::{collect_focusable_ids, render_template, TemplateContext};
 
@@ -13,6 +15,8 @@ pub struct Template {
     ctx: TemplateContext,
     focus: FocusManager,
     dispatcher: EventDispatcher,
+    diff: DiffTracker,
+    components: ComponentRegistry,
 }
 
 impl Clone for Template {
@@ -23,6 +27,8 @@ impl Clone for Template {
             ctx: self.ctx.clone(),
             focus: self.focus.clone(),
             dispatcher: EventDispatcher::new(),
+            diff: DiffTracker::new(),
+            components: self.components.clone(),
         }
     }
 }
@@ -81,6 +87,8 @@ impl Template {
             ctx: TemplateContext::new(),
             focus: FocusManager::new(),
             dispatcher: EventDispatcher::new(),
+            diff: DiffTracker::new(),
+            components: ComponentRegistry::new(),
         }
     }
 
@@ -94,6 +102,8 @@ impl Template {
             ctx,
             focus: FocusManager::new(),
             dispatcher: EventDispatcher::new(),
+            diff: DiffTracker::new(),
+            components: ComponentRegistry::new(),
         }
     }
 
@@ -109,6 +119,8 @@ impl Template {
             ctx,
             focus: FocusManager::new(),
             dispatcher: EventDispatcher::new(),
+            diff: DiffTracker::new(),
+            components: ComponentRegistry::new(),
         })
     }
 
@@ -132,6 +144,21 @@ impl Template {
 
     pub fn context_mut(&mut self) -> &mut TemplateContext {
         &mut self.ctx
+    }
+
+    pub fn register_component(&mut self, name: &str, source: &str) -> &mut Self {
+        self.components.register(name, source);
+        std::sync::Arc::make_mut(&mut self.ctx.virtual_files)
+            .insert(name.to_string(), source.to_string());
+        self
+    }
+
+    pub fn components(&self) -> &ComponentRegistry {
+        &self.components
+    }
+
+    pub fn components_mut(&mut self) -> &mut ComponentRegistry {
+        &mut self.components
     }
 
     pub fn source(&self) -> &str {
@@ -172,6 +199,24 @@ impl Template {
 
     pub fn draw_full(&self, frame: &mut Frame) -> Result<(), String> {
         self.draw(frame, frame.area())
+    }
+
+    pub fn draw_if_changed(&mut self, frame: &mut Frame, area: Rect) -> Result<bool, String> {
+        if self.diff.has_changed(&self.ctx) {
+            render_template(&self.source, &self.ctx, frame, area).map_err(|e| e.to_string())?;
+            self.diff.update(&self.ctx);
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
+    pub fn draw_full_if_changed(&mut self, frame: &mut Frame) -> Result<bool, String> {
+        self.draw_if_changed(frame, frame.area())
+    }
+
+    pub fn changed_keys(&self) -> Vec<String> {
+        self.diff.changed_keys(&self.ctx)
     }
 
     /// Returns a reference to the focus manager.
