@@ -219,6 +219,10 @@ impl Template {
         self.diff.changed_keys(&self.ctx)
     }
 
+    pub fn mark_rendered(&mut self) {
+        self.diff.update(&self.ctx);
+    }
+
     /// Returns a reference to the focus manager.
     pub fn focus(&self) -> &FocusManager {
         &self.focus
