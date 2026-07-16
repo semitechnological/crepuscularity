@@ -1960,6 +1960,7 @@ dependencies = [
  "crepuscularity-core",
  "crepuscularity_macros",
  "criterion",
+ "crossterm 0.29.0",
  "notify",
  "ratatui",
  "tempfile",

@@ -10,6 +10,7 @@ readme = "../../README.md"
 [dependencies]
 crepuscularity-core = { path = "../crepuscularity-core", version = "0.4.25", features = ["notify"] }
 crepuscularity_macros = { path = "../crepuscularity_macros", version = "0.5.11" }
+crossterm = "0.29"
 notify = { workspace = true }
 ratatui = { workspace = true }
 

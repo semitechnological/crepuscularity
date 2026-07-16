@@ -123,6 +123,7 @@
 //! [`HotTemplate::poll_and_draw_full`] — animates phrases automatically. It
 //! does not yet provide a terminal app runtime or generic event dispatch.
 
+pub mod event;
 pub mod hot_reload;
 pub mod render;
 pub mod style;
@@ -134,8 +135,11 @@ pub use crepuscularity_core::{
     build, parse_component_file, parse_template, CrepusError, TemplateContext, TemplateValue,
 };
 pub use crepuscularity_macros::template_refs;
+pub use event::{DispatchResult, Event, EventDispatcher, FocusManager};
 pub use hot_reload::{HotTemplate, ReloadOutcome};
 pub use ratatui;
-pub use render::{paint_node, render_component, render_nodes, render_template};
+pub use render::{
+    collect_focusable_ids, paint_node, render_component, render_nodes, render_template,
+};
 pub use style::parse_classes;
-pub use template::{draw, template, ElementRef, Template};
+pub use template::{draw, template, ElementRef, EventResult, Template};

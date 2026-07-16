@@ -46,6 +46,10 @@ pub struct StyleHints {
     pub borders: Borders,
     pub border_type: BorderType,
     pub border_fg: Option<Color>,
+    pub focus_border_fg: Option<Color>,
+    // ── Element id (from `id="..."` or `#id`) ────────────────────────────────
+    pub id: Option<String>,
+    pub focusable: bool,
     // ── Title (from `title="..."` binding, not a class) ──────────────────────
     pub title: Option<String>,
     pub title_alignment: Alignment,
@@ -73,6 +77,9 @@ impl Default for StyleHints {
             borders: Borders::NONE,
             border_type: BorderType::Plain,
             border_fg: None,
+            focus_border_fg: None,
+            id: None,
+            focusable: false,
             title: None,
             title_alignment: Alignment::Left,
             padding: Padding::ZERO,
@@ -171,6 +178,7 @@ fn apply_modifiers(class: &str, h: &mut StyleHints) -> bool {
             h.width = SizeHint::Fixed(0);
             h.height = SizeHint::Fixed(0);
         }
+        "focusable" => h.focusable = true,
         _ => return false,
     }
     true
@@ -262,6 +270,9 @@ fn apply_named_colors(class: &str, h: &mut StyleHints) -> bool {
 }
 
 fn apply_parametric(class: &str, h: &mut StyleHints) {
+    if apply_focus_border(class, h) {
+        return;
+    }
     if apply_color_parametric(class, h) {
         return;
     }
@@ -269,6 +280,16 @@ fn apply_parametric(class: &str, h: &mut StyleHints) {
         return;
     }
     apply_layout_parametric(class, h);
+}
+
+fn apply_focus_border(class: &str, h: &mut StyleHints) -> bool {
+    if let Some(rest) = class.strip_prefix("focus:border-") {
+        if let Some(c) = parse_color(rest) {
+            h.focus_border_fg = Some(c);
+            return true;
+        }
+    }
+    false
 }
 
 fn apply_color_parametric(class: &str, h: &mut StyleHints) -> bool {

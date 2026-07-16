@@ -208,7 +208,7 @@ fn overflow_y_scroll_uses_scroll_offset() {
     let rows = render(
         20,
         3,
-        "div h-[3] overflow-y-scroll scroll-offset={offset}\n  div h-[1]\n    \"zero\"\n  div h-[1]\n    \"one\"\n  div h-[1]\n    \"two\"\n  div h-[1]\n    \"three\"",
+        "div h-[3] overflow-y-scroll scroll-offset={offset}\n  div h-[1]\n    \"zero\"\n  div h-[1]\n    \"one\"\n  div h-[1]\n    \"two\"\n  div h-[1]\n    \"three\"\n  div h-[1]\n    \"four\"\n  div h-[1]\n    \"five\"",
         &ctx,
     );
     let text = all_text(&rows);
@@ -216,6 +216,95 @@ fn overflow_y_scroll_uses_scroll_offset() {
     assert!(!text.contains("one"), "{text}");
     assert!(text.contains("two"), "{text}");
     assert!(text.contains("three"), "{text}");
+    assert!(text.contains("four"), "{text}");
+    assert!(!text.contains("five"), "{text}");
+}
+
+#[test]
+fn scroll_offset_clamps_to_max() {
+    let mut ctx = TemplateContext::new();
+    ctx.set("offset", 100i64);
+    let rows = render(
+        20,
+        3,
+        "div h-[3] overflow-y-scroll scroll-offset={offset}\n  div h-[1]\n    \"zero\"\n  div h-[1]\n    \"one\"\n  div h-[1]\n    \"two\"\n  div h-[1]\n    \"three\"",
+        &ctx,
+    );
+    let text = all_text(&rows);
+    assert!(!text.contains("zero"), "{text}");
+    assert!(text.contains("two"), "{text}");
+    assert!(text.contains("three"), "{text}");
+}
+
+#[test]
+fn scroll_viewport_culls_children_outside_viewport() {
+    let mut ctx = TemplateContext::new();
+    ctx.set("offset", 3i64);
+    let rows = render(
+        20,
+        3,
+        "div h-[3] overflow-y-scroll scroll-offset={offset}\n  div h-[1]\n    \"row0\"\n  div h-[1]\n    \"row1\"\n  div h-[1]\n    \"row2\"\n  div h-[1]\n    \"row3\"\n  div h-[1]\n    \"row4\"\n  div h-[1]\n    \"row5\"\n  div h-[1]\n    \"row6\"",
+        &ctx,
+    );
+    let text = all_text(&rows);
+    assert!(!text.contains("row0"), "{text}");
+    assert!(!text.contains("row1"), "{text}");
+    assert!(!text.contains("row2"), "{text}");
+    assert!(text.contains("row3"), "{text}");
+    assert!(text.contains("row4"), "{text}");
+    assert!(text.contains("row5"), "{text}");
+    assert!(!text.contains("row6"), "{text}");
+}
+
+#[test]
+fn scroll_bottom_auto_scrolls_to_last_child() {
+    let mut ctx = TemplateContext::new();
+    ctx.set("auto_scroll", true);
+    let rows = render(
+        20,
+        3,
+        "div h-[3] overflow-y-scroll scroll-bottom={auto_scroll}\n  div h-[1]\n    \"row0\"\n  div h-[1]\n    \"row1\"\n  div h-[1]\n    \"row2\"\n  div h-[1]\n    \"row3\"\n  div h-[1]\n    \"row4\"",
+        &ctx,
+    );
+    let text = all_text(&rows);
+    assert!(!text.contains("row0"), "{text}");
+    assert!(!text.contains("row1"), "{text}");
+    assert!(text.contains("row2"), "{text}");
+    assert!(text.contains("row3"), "{text}");
+    assert!(text.contains("row4"), "{text}");
+}
+
+#[test]
+fn scroll_bottom_false_does_not_auto_scroll() {
+    let mut ctx = TemplateContext::new();
+    ctx.set("auto_scroll", false);
+    let rows = render(
+        20,
+        3,
+        "div h-[3] overflow-y-scroll scroll-bottom={auto_scroll}\n  div h-[1]\n    \"row0\"\n  div h-[1]\n    \"row1\"\n  div h-[1]\n    \"row2\"\n  div h-[1]\n    \"row3\"\n  div h-[1]\n    \"row4\"",
+        &ctx,
+    );
+    let text = all_text(&rows);
+    assert!(text.contains("row0"), "{text}");
+    assert!(text.contains("row1"), "{text}");
+    assert!(text.contains("row2"), "{text}");
+    assert!(!text.contains("row3"), "{text}");
+    assert!(!text.contains("row4"), "{text}");
+}
+
+#[test]
+fn scroll_content_shorter_than_viewport_renders_normally() {
+    let mut ctx = TemplateContext::new();
+    ctx.set("offset", 5i64);
+    let rows = render(
+        20,
+        5,
+        "div h-[5] overflow-y-scroll scroll-offset={offset}\n  div h-[1]\n    \"only\"\n  div h-[1]\n    \"two\"",
+        &ctx,
+    );
+    let text = all_text(&rows);
+    assert!(text.contains("only"), "{text}");
+    assert!(text.contains("two"), "{text}");
 }
 
 // ─── JSX / React-style syntax ─────────────────────────────────────────────────
@@ -1035,5 +1124,224 @@ mod template_error_tests {
             e.contains("parse error"),
             "error should mention parse error: {e}"
         );
+    }
+}
+
+// ─── Focus + event system ─────────────────────────────────────────────────────
+
+mod focus_events {
+    use crate::event::{DispatchResult, Event, EventDispatcher, FocusManager};
+    use crate::{collect_focusable_ids, EventResult, Template};
+    use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
+
+    #[test]
+    fn focus_manager_next_wraps() {
+        let mut fm = FocusManager::new();
+        fm.set_focusable_ids(vec!["a".to_string(), "b".to_string(), "c".to_string()]);
+
+        assert_eq!(fm.focused_id.as_deref(), Some("a"));
+        fm.focus_next();
+        assert_eq!(fm.focused_id.as_deref(), Some("b"));
+        fm.focus_next();
+        assert_eq!(fm.focused_id.as_deref(), Some("c"));
+        fm.focus_next();
+        assert_eq!(fm.focused_id.as_deref(), Some("a"));
+    }
+
+    #[test]
+    fn focus_manager_prev_wraps() {
+        let mut fm = FocusManager::new();
+        fm.set_focusable_ids(vec!["a".to_string(), "b".to_string(), "c".to_string()]);
+
+        assert_eq!(fm.focused_id.as_deref(), Some("a"));
+        fm.focus_prev();
+        assert_eq!(fm.focused_id.as_deref(), Some("c"));
+        fm.focus_prev();
+        assert_eq!(fm.focused_id.as_deref(), Some("b"));
+        fm.focus_prev();
+        assert_eq!(fm.focused_id.as_deref(), Some("a"));
+    }
+
+    #[test]
+    fn focus_manager_focus_by_id() {
+        let mut fm = FocusManager::new();
+        fm.set_focusable_ids(vec!["a".to_string(), "b".to_string(), "c".to_string()]);
+
+        assert!(fm.focus("b"));
+        assert_eq!(fm.focused_id.as_deref(), Some("b"));
+        assert!(fm.is_focused("b"));
+        assert!(!fm.is_focused("a"));
+
+        assert!(!fm.focus("nonexistent"));
+        assert_eq!(fm.focused_id.as_deref(), Some("b"));
+    }
+
+    #[test]
+    fn focus_manager_empty_list() {
+        let mut fm = FocusManager::new();
+        assert_eq!(fm.focus_next(), None);
+        assert_eq!(fm.focus_prev(), None);
+        assert_eq!(fm.focused_id, None);
+    }
+
+    #[test]
+    fn focus_manager_single_element() {
+        let mut fm = FocusManager::new();
+        fm.set_focusable_ids(vec!["only".to_string()]);
+        assert_eq!(fm.focused_id.as_deref(), Some("only"));
+        fm.focus_next();
+        assert_eq!(fm.focused_id.as_deref(), Some("only"));
+        fm.focus_prev();
+        assert_eq!(fm.focused_id.as_deref(), Some("only"));
+    }
+
+    #[test]
+    fn event_dispatcher_routes_to_focused() {
+        use std::sync::atomic::{AtomicBool, Ordering};
+        use std::sync::Arc;
+
+        let called = Arc::new(AtomicBool::new(false));
+        let called_clone = called.clone();
+        let mut dispatcher = EventDispatcher::new();
+        dispatcher.on("btn", move |_ev| {
+            called_clone.store(true, Ordering::SeqCst);
+            true
+        });
+
+        let result = dispatcher.dispatch(&Event::FocusGained, Some("btn"));
+        assert_eq!(result, DispatchResult::Handled);
+        assert!(called.load(Ordering::SeqCst));
+    }
+
+    #[test]
+    fn event_dispatcher_bubbles_to_parent() {
+        use std::sync::atomic::{AtomicU32, Ordering};
+        use std::sync::Arc;
+
+        let child_calls = Arc::new(AtomicU32::new(0));
+        let parent_calls = Arc::new(AtomicU32::new(0));
+        let child_clone = child_calls.clone();
+        let parent_clone = parent_calls.clone();
+
+        let mut dispatcher = EventDispatcher::new();
+        dispatcher.on("child", move |_ev| {
+            child_clone.fetch_add(1, Ordering::SeqCst);
+            false
+        });
+        dispatcher.on("parent", move |_ev| {
+            parent_clone.fetch_add(1, Ordering::SeqCst);
+            true
+        });
+        dispatcher.set_parent("child", "parent");
+
+        let result = dispatcher.dispatch(&Event::FocusGained, Some("child"));
+        assert_eq!(result, DispatchResult::Handled);
+        assert_eq!(child_calls.load(Ordering::SeqCst), 1);
+        assert_eq!(parent_calls.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn event_dispatcher_not_handled_when_no_callback() {
+        let dispatcher = EventDispatcher::new();
+        let result = dispatcher.dispatch(&Event::FocusGained, Some("unknown"));
+        assert_eq!(result, DispatchResult::NotHandled);
+    }
+
+    #[test]
+    fn collect_focusable_ids_from_template() {
+        let template = "div flex-col\n  div #a focusable\n    \"A\"\n  div #b focusable\n    \"B\"\n  div #c\n    \"C\"";
+        let ids = collect_focusable_ids(template).unwrap();
+        assert_eq!(ids, vec!["a", "b"]);
+    }
+
+    #[test]
+    fn collect_focusable_ids_via_id_attribute() {
+        let template = "div flex-col\n  div id=\"save\" focusable\n    \"Save\"\n  div id=\"cancel\" focusable\n    \"Cancel\"";
+        let ids = collect_focusable_ids(template).unwrap();
+        assert_eq!(ids, vec!["save", "cancel"]);
+    }
+
+    #[test]
+    fn template_handle_event_tab_cycles_focus() {
+        let source = "div flex-col\n  div #first focusable\n    \"First\"\n  div #second focusable\n    \"Second\"";
+        let mut tpl = Template::from_source(source);
+        tpl.refresh_focus();
+
+        assert_eq!(tpl.focus().focused_id.as_deref(), Some("first"));
+
+        let tab = crossterm::event::Event::Key(KeyEvent::new_with_kind_and_state(
+            KeyCode::Tab,
+            KeyModifiers::NONE,
+            KeyEventKind::Press,
+            crossterm::event::KeyEventState::NONE,
+        ));
+        let result = tpl.handle_event(&tab);
+        assert_eq!(result, EventResult::Handled);
+        assert_eq!(tpl.focus().focused_id.as_deref(), Some("second"));
+        assert_eq!(tpl.context().get_str("focused_id"), "second");
+
+        tpl.handle_event(&tab);
+        assert_eq!(tpl.focus().focused_id.as_deref(), Some("first"));
+    }
+
+    #[test]
+    fn template_handle_event_backtab_cycles_prev() {
+        let source = "div flex-col\n  div #first focusable\n    \"First\"\n  div #second focusable\n    \"Second\"";
+        let mut tpl = Template::from_source(source);
+        tpl.refresh_focus();
+
+        assert_eq!(tpl.focus().focused_id.as_deref(), Some("first"));
+
+        let backtab = crossterm::event::Event::Key(KeyEvent::new_with_kind_and_state(
+            KeyCode::BackTab,
+            KeyModifiers::SHIFT,
+            KeyEventKind::Press,
+            crossterm::event::KeyEventState::NONE,
+        ));
+        tpl.handle_event(&backtab);
+        assert_eq!(tpl.focus().focused_id.as_deref(), Some("second"));
+    }
+
+    #[test]
+    fn template_handle_event_unhandled_for_unknown_key() {
+        let source = "div flex-col\n  div #first focusable\n    \"First\"";
+        let mut tpl = Template::from_source(source);
+        tpl.refresh_focus();
+
+        let enter = crossterm::event::Event::Key(KeyEvent::new_with_kind_and_state(
+            KeyCode::Enter,
+            KeyModifiers::NONE,
+            KeyEventKind::Press,
+            crossterm::event::KeyEventState::NONE,
+        ));
+        let result = tpl.handle_event(&enter);
+        assert_eq!(result, EventResult::Unhandled);
+    }
+
+    #[test]
+    fn template_dispatcher_callback_invoked() {
+        use std::sync::atomic::{AtomicBool, Ordering};
+        use std::sync::Arc;
+
+        let source = "div flex-col\n  div #btn focusable\n    \"Button\"";
+        let mut tpl = Template::from_source(source);
+        tpl.refresh_focus();
+
+        let fired = Arc::new(AtomicBool::new(false));
+        let fired_clone = fired.clone();
+        tpl.dispatcher_mut().on("btn", move |_ev| {
+            fired_clone.store(true, Ordering::SeqCst);
+            true
+        });
+
+        let enter = crossterm::event::Event::Key(KeyEvent::new_with_kind_and_state(
+            KeyCode::Enter,
+            KeyModifiers::NONE,
+            KeyEventKind::Press,
+            crossterm::event::KeyEventState::NONE,
+        ));
+        let result = tpl.handle_event(&enter);
+        assert_eq!(result, EventResult::Handled);
+        assert!(fired.load(Ordering::SeqCst));
     }
 }

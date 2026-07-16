@@ -13,10 +13,11 @@
 //! `w-1/3`, …) become ratatui `Constraint`s so the layout is fully driven by the
 //! template, not imperative Rust code.
 
+use ratatui::buffer::Buffer;
 use ratatui::layout::{Alignment, Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Style};
 use ratatui::text::{Line, Span, Text};
-use ratatui::widgets::{Block, BorderType, Borders, Padding, Paragraph, Wrap};
+use ratatui::widgets::{Block, BorderType, Borders, Padding, Paragraph, Widget, Wrap};
 use ratatui::Frame;
 use std::sync::Arc;
 
@@ -71,6 +72,7 @@ pub enum WidgetNode {
         style: Style,
         block: Option<BlockSpec>,
         scroll_offset: usize,
+        scroll_bottom: bool,
     },
     /// A leaf node rendered as a ratatui `Paragraph`.
     Content {
@@ -128,6 +130,55 @@ pub fn render_template(
 ) -> Result<(), CrepusError> {
     let nodes = parse_template(template)?;
     render_nodes(&nodes, ctx, frame, area)
+}
+
+/// Walk a template source and collect the IDs of elements marked `focusable`,
+/// in document (tab) order.
+pub fn collect_focusable_ids(template: &str) -> Result<Vec<String>, CrepusError> {
+    let nodes = parse_template(template)?;
+    Ok(collect_focusable_ids_from_nodes(&nodes))
+}
+
+/// Walk pre-parsed `nodes` and collect focusable element IDs in document order.
+pub fn collect_focusable_ids_from_nodes(nodes: &[Node]) -> Vec<String> {
+    let mut ids = Vec::new();
+    collect_focusable_ids_recursive(nodes, &mut ids);
+    ids
+}
+
+fn collect_focusable_ids_recursive(nodes: &[Node], out: &mut Vec<String>) {
+    for node in nodes {
+        match node {
+            Node::Element(el) => {
+                if el.id.is_some()
+                    && el
+                        .classes
+                        .iter()
+                        .any(|c| c == "focusable" || c.contains("focusable"))
+                {
+                    if let Some(ref id) = el.id {
+                        out.push(id.clone());
+                    }
+                }
+                collect_focusable_ids_recursive(&el.children, out);
+            }
+            Node::If(block) => {
+                collect_focusable_ids_recursive(&block.then_children, out);
+                if let Some(ref else_children) = block.else_children {
+                    collect_focusable_ids_recursive(else_children, out);
+                }
+            }
+            Node::For(block) => {
+                collect_focusable_ids_recursive(&block.body, out);
+            }
+            Node::Match(block) => {
+                for arm in &block.arms {
+                    collect_focusable_ids_recursive(&arm.body, out);
+                }
+            }
+            _ => {}
+        }
+    }
 }
 
 /// Paint pre-parsed `nodes` into `frame` within `area`.
@@ -346,6 +397,21 @@ fn build_element(
     }
     let mut hints = parse_classes(&classes);
 
+    if let Some(ref el_id) = el.id {
+        hints.id = Some(el_id.clone());
+    }
+
+    let focused_id = ctx.get_str("focused_id");
+    if !focused_id.is_empty()
+        && hints.id.as_deref() == Some(focused_id.as_str())
+        && hints.focus_border_fg.is_some()
+    {
+        hints.border_fg = hints.focus_border_fg;
+        if hints.borders == Borders::NONE {
+            hints.borders = Borders::ALL;
+        }
+    }
+
     // Allow a `title={expr}` binding to set the block title.
     if let Some(title_val) = el
         .bindings
@@ -464,6 +530,7 @@ fn build_empty_box(hints: &StyleHints, constraint: Constraint, style: Style) -> 
             style,
             block: hints_to_block(hints),
             scroll_offset: 0,
+            scroll_bottom: false,
         },
         constraint,
     }
@@ -474,14 +541,14 @@ fn build_container_element(
     el: &Element,
     hints: &StyleHints,
     ctx: &TemplateContext,
-    parent_dir: Direction,
+    _parent_dir: Direction,
     constraint: Constraint,
     style: Style,
     classes: &[String],
 ) -> WidgetChild {
     let child_dir = hints.direction;
     let children = build_children(&el.children, ctx, child_dir, style);
-    let scroll_offset = scroll_offset(el, ctx, classes);
+    let scroll_cfg = scroll_config(el, ctx, classes);
 
     // Resolve Fit constraints: measure the natural content size and
     // convert to a Fixed constraint so the element doesn't fill.
@@ -494,7 +561,8 @@ fn build_container_element(
             children,
             style,
             block: hints_to_block(hints),
-            scroll_offset,
+            scroll_offset: scroll_cfg.offset,
+            scroll_bottom: scroll_cfg.scroll_to_bottom,
         },
         constraint,
     }
@@ -642,6 +710,7 @@ fn build_slot(
             style: inherited,
             block: None,
             scroll_offset: 0,
+            scroll_bottom: false,
         },
         constraint: Constraint::Fill(1),
     }
@@ -886,6 +955,10 @@ fn build_include(
 
 /// Recursively render a `WidgetNode` tree into `frame` at `area`.
 pub fn paint_node(node: &WidgetNode, frame: &mut Frame, area: Rect) {
+    paint_node_buf(node, frame.buffer_mut(), area);
+}
+
+fn paint_node_buf(node: &WidgetNode, buf: &mut Buffer, area: Rect) {
     match node {
         WidgetNode::Container {
             direction,
@@ -894,22 +967,35 @@ pub fn paint_node(node: &WidgetNode, frame: &mut Frame, area: Rect) {
             style,
             block,
             scroll_offset,
+            scroll_bottom,
         } => {
             // Fill background / draw border, then recurse into the inner area.
             let inner = if let Some(spec) = block {
                 let b = spec.to_block().style(*style);
                 let inner = b.inner(area);
-                frame.render_widget(b, area);
+                b.render(area, buf);
                 inner
             } else if *style != Style::default() {
                 // Background colour only — no border.
-                frame.render_widget(Block::default().style(*style), area);
+                Block::default().style(*style).render(area, buf);
                 area
             } else {
                 area
             };
 
-            paint_children(children, frame, inner, *direction, *gap, *scroll_offset);
+            if *scroll_offset > 0 || *scroll_bottom {
+                Scrollable::new(
+                    children,
+                    *direction,
+                    *gap,
+                    *scroll_offset,
+                    *scroll_bottom,
+                    inner,
+                )
+                .paint(buf);
+            } else {
+                paint_children_buf(children, buf, inner, *direction, *gap);
+            }
         }
 
         WidgetNode::Content {
@@ -924,9 +1010,9 @@ pub fn paint_node(node: &WidgetNode, frame: &mut Frame, area: Rect) {
                 .alignment(*alignment)
                 .wrap(Wrap { trim: false });
             if let Some(spec) = block {
-                frame.render_widget(para.block(spec.to_block()), area);
+                para.block(spec.to_block()).render(area, buf);
             } else {
-                frame.render_widget(para, area);
+                para.render(area, buf);
             }
         }
 
@@ -940,29 +1026,125 @@ fn paint_children(
     area: Rect,
     direction: Direction,
     gap: u16,
-    scroll_offset: usize,
+    _scroll_offset: usize,
+) {
+    paint_children_buf(children, frame.buffer_mut(), area, direction, gap);
+}
+
+fn paint_children_buf(
+    children: &[WidgetChild],
+    buf: &mut Buffer,
+    area: Rect,
+    direction: Direction,
+    gap: u16,
 ) {
     if children.is_empty() {
         return;
     }
-    let visible_children = if direction == Direction::Vertical && scroll_offset > 0 {
-        &children[scroll_offset.min(children.len())..]
-    } else {
-        children
-    };
-    if visible_children.is_empty() {
-        return;
-    }
-    let constraints: Vec<Constraint> = visible_children.iter().map(|c| c.constraint).collect();
+    let constraints: Vec<Constraint> = children.iter().map(|c| c.constraint).collect();
     let chunks = Layout::default()
         .direction(direction)
         .constraints(constraints)
         .spacing(gap)
         .split(area);
 
-    for (i, child) in visible_children.iter().enumerate() {
+    for (i, child) in children.iter().enumerate() {
         if let Some(&chunk) = chunks.get(i) {
-            paint_node(&child.node, frame, chunk);
+            paint_node_buf(&child.node, buf, chunk);
+        }
+    }
+}
+
+struct Scrollable<'a> {
+    children: &'a [WidgetChild],
+    direction: Direction,
+    gap: u16,
+    scroll_offset: usize,
+    scroll_to_bottom: bool,
+    viewport: Rect,
+}
+
+impl<'a> Scrollable<'a> {
+    fn new(
+        children: &'a [WidgetChild],
+        direction: Direction,
+        gap: u16,
+        scroll_offset: usize,
+        scroll_to_bottom: bool,
+        viewport: Rect,
+    ) -> Self {
+        Scrollable {
+            children,
+            direction,
+            gap,
+            scroll_offset,
+            scroll_to_bottom,
+            viewport,
+        }
+    }
+
+    fn total_content_height(&self) -> u16 {
+        let n = self.children.len() as u16;
+        let total_gap = self.gap.saturating_mul(n.saturating_sub(1));
+        let sum: u16 = self
+            .children
+            .iter()
+            .map(|c| constraint_min_height(&c.constraint))
+            .sum();
+        sum.saturating_add(total_gap)
+    }
+
+    fn clamped_offset(&self) -> usize {
+        let total = self.total_content_height() as usize;
+        if self.scroll_to_bottom {
+            let max = total.saturating_sub(self.viewport.height as usize);
+            return max;
+        }
+        let max = total.saturating_sub(1);
+        self.scroll_offset.min(max)
+    }
+
+    fn paint(&self, buf: &mut Buffer) {
+        if self.children.is_empty() || self.viewport.height == 0 {
+            return;
+        }
+        if self.direction != Direction::Vertical {
+            paint_children_buf(self.children, buf, self.viewport, self.direction, self.gap);
+            return;
+        }
+        let total_height = self.total_content_height();
+        if total_height <= self.viewport.height {
+            paint_children_buf(self.children, buf, self.viewport, self.direction, self.gap);
+            return;
+        }
+        let offset = self.clamped_offset();
+        let virtual_area = Rect::new(0, 0, self.viewport.width, total_height);
+        let mut virtual_buf = Buffer::empty(virtual_area);
+        let constraints: Vec<Constraint> = self.children.iter().map(|c| c.constraint).collect();
+        let chunks = Layout::default()
+            .direction(self.direction)
+            .constraints(constraints)
+            .spacing(self.gap)
+            .split(virtual_area);
+        let vis_start = offset as u16;
+        let vis_end = vis_start + self.viewport.height;
+        for (i, child) in self.children.iter().enumerate() {
+            if let Some(&chunk) = chunks.get(i) {
+                if chunk.bottom() <= vis_start || chunk.y >= vis_end {
+                    continue;
+                }
+                paint_node_buf(&child.node, &mut virtual_buf, chunk);
+            }
+        }
+        for y in 0..self.viewport.height {
+            let src_y = offset as u16 + y;
+            if src_y >= total_height {
+                break;
+            }
+            for x in 0..self.viewport.width {
+                let cell = virtual_buf[(x, src_y)].clone();
+                buf[(self.viewport.x + x, self.viewport.y + y)] = cell;
+            }
         }
     }
 }
@@ -998,7 +1180,7 @@ fn active_class(ctx: &TemplateContext, class: &str) -> Option<String> {
     Some(class.to_string())
 }
 
-fn scroll_offset(el: &Element, ctx: &TemplateContext, classes: &[String]) -> usize {
+fn scroll_config(el: &Element, ctx: &TemplateContext, classes: &[String]) -> ScrollConfig {
     let scrollable = classes.iter().any(|class| {
         matches!(
             class.as_str(),
@@ -1006,9 +1188,25 @@ fn scroll_offset(el: &Element, ctx: &TemplateContext, classes: &[String]) -> usi
         )
     });
     if !scrollable {
-        return 0;
+        return ScrollConfig::default();
     }
-    el.bindings
+    let scroll_to_bottom = el
+        .bindings
+        .iter()
+        .find(|b| b.prop == "scroll-bottom")
+        .map(|b| {
+            let v = eval_value(&b.value, ctx);
+            match v {
+                TemplateValue::Bool(b) => b,
+                _ => {
+                    let s = value_to_str(&v);
+                    s == "true" || s == "1"
+                }
+            }
+        })
+        .unwrap_or(false);
+    let offset = el
+        .bindings
         .iter()
         .find(|binding| {
             matches!(
@@ -1022,7 +1220,17 @@ fn scroll_offset(el: &Element, ctx: &TemplateContext, classes: &[String]) -> usi
             (!value.is_empty()).then_some(value)
         })
         .and_then(|value| value.parse::<usize>().ok())
-        .unwrap_or(0)
+        .unwrap_or(0);
+    ScrollConfig {
+        offset,
+        scroll_to_bottom,
+    }
+}
+
+#[derive(Default)]
+struct ScrollConfig {
+    offset: usize,
+    scroll_to_bottom: bool,
 }
 
 fn matches_target_prefix(ctx: &TemplateContext, prefix: &str) -> bool {

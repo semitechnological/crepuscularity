@@ -4,13 +4,36 @@ use ratatui::backend::Backend;
 use ratatui::layout::Rect;
 use ratatui::{CompletedFrame, Frame, Terminal};
 
-use crate::{render_template, TemplateContext};
+use crate::event::{DispatchResult, Event, EventDispatcher, FocusManager};
+use crate::{collect_focusable_ids, render_template, TemplateContext};
 
-#[derive(Clone)]
 pub struct Template {
     path: PathBuf,
     source: String,
     ctx: TemplateContext,
+    focus: FocusManager,
+    dispatcher: EventDispatcher,
+}
+
+impl Clone for Template {
+    fn clone(&self) -> Self {
+        Self {
+            path: self.path.clone(),
+            source: self.source.clone(),
+            ctx: self.ctx.clone(),
+            focus: self.focus.clone(),
+            dispatcher: EventDispatcher::new(),
+        }
+    }
+}
+
+/// The outcome of [`Template::handle_event`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EventResult {
+    /// The event was handled (focus moved or a callback consumed it).
+    Handled,
+    /// The event was not handled.
+    Unhandled,
 }
 
 #[derive(Clone, Debug)]
@@ -56,6 +79,8 @@ impl Template {
             path: PathBuf::new(),
             source: source.into(),
             ctx: TemplateContext::new(),
+            focus: FocusManager::new(),
+            dispatcher: EventDispatcher::new(),
         }
     }
 
@@ -67,6 +92,8 @@ impl Template {
             path,
             source: source.into(),
             ctx,
+            focus: FocusManager::new(),
+            dispatcher: EventDispatcher::new(),
         }
     }
 
@@ -76,7 +103,13 @@ impl Template {
             .map_err(|e| format!("template error: {:?}: {}", path, e))?;
         let mut ctx = TemplateContext::new();
         ctx.base_dir = path.parent().map(Path::to_path_buf);
-        Ok(Self { path, source, ctx })
+        Ok(Self {
+            path,
+            source,
+            ctx,
+            focus: FocusManager::new(),
+            dispatcher: EventDispatcher::new(),
+        })
     }
 
     pub fn set(
@@ -139,6 +172,109 @@ impl Template {
 
     pub fn draw_full(&self, frame: &mut Frame) -> Result<(), String> {
         self.draw(frame, frame.area())
+    }
+
+    /// Returns a reference to the focus manager.
+    pub fn focus(&self) -> &FocusManager {
+        &self.focus
+    }
+
+    /// Returns a mutable reference to the focus manager.
+    pub fn focus_mut(&mut self) -> &mut FocusManager {
+        &mut self.focus
+    }
+
+    /// Returns a builder for registering callbacks on the event dispatcher.
+    /// Register callbacks before calling [`Template::handle_event`].
+    pub fn dispatcher_mut(&mut self) -> EventDispatcherBuilder<'_> {
+        EventDispatcherBuilder {
+            dispatcher: &mut self.dispatcher,
+        }
+    }
+
+    /// Refresh the focusable ID list from the current template source and sync
+    /// the `focused_id` context variable.
+    pub fn refresh_focus(&mut self) {
+        if let Ok(ids) = collect_focusable_ids(&self.source) {
+            self.focus.set_focusable_ids(ids);
+        }
+        let focused = self.focus.focused_id.clone().unwrap_or_default();
+        self.ctx.set("focused_id", focused);
+    }
+
+    /// Handle a crossterm [`Event`].
+    ///
+    /// Tab / Shift-Tab cycle focus through focusable elements. The event is
+    /// then dispatched to the focused element's callback (with bubbling). The
+    /// `focused_id` context variable is updated so templates can react.
+    pub fn handle_event(&mut self, event: &crossterm::event::Event) -> EventResult {
+        let ev = Event::from(event.clone());
+        self.handle_tui_event(&ev)
+    }
+
+    /// Handle a crate-level [`Event`].
+    pub fn handle_tui_event(&mut self, event: &Event) -> EventResult {
+        if self.focus.focusable_ids.is_empty() {
+            if let Ok(ids) = collect_focusable_ids(&self.source) {
+                self.focus.set_focusable_ids(ids);
+            }
+        }
+
+        let mut handled = false;
+        if let Event::Key(key) = event {
+            use crossterm::event::{KeyCode, KeyEventKind};
+            if key.kind == KeyEventKind::Press {
+                match key.code {
+                    KeyCode::Tab => {
+                        self.focus.focus_next();
+                        handled = true;
+                    }
+                    KeyCode::BackTab => {
+                        self.focus.focus_prev();
+                        handled = true;
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        let focused = self.focus.focused_id.clone().unwrap_or_default();
+        self.ctx.set("focused_id", focused);
+
+        let dispatch_result = self
+            .dispatcher
+            .dispatch(event, self.focus.focused_id.as_deref());
+        if dispatch_result == DispatchResult::Handled {
+            handled = true;
+        }
+
+        if handled {
+            EventResult::Handled
+        } else {
+            EventResult::Unhandled
+        }
+    }
+}
+
+/// Builder for registering callbacks on a [`Template`]'s dispatcher.
+pub struct EventDispatcherBuilder<'a> {
+    dispatcher: &'a mut EventDispatcher,
+}
+
+impl<'a> EventDispatcherBuilder<'a> {
+    /// Register a callback for an element ID.
+    pub fn on<F>(self, id: &str, callback: F) -> Self
+    where
+        F: Fn(&Event) -> bool + Send + Sync + 'static,
+    {
+        self.dispatcher.on(id, callback);
+        self
+    }
+
+    /// Register a parent relationship for event bubbling.
+    pub fn parent(self, child: &str, parent: &str) -> Self {
+        self.dispatcher.set_parent(child, parent);
+        self
     }
 }
 
