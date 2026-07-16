@@ -208,7 +208,7 @@ fn overflow_y_scroll_uses_scroll_offset() {
     let rows = render(
         20,
         3,
-        "div h-[3] overflow-y-scroll scroll-offset={offset}\n  div h-[1]\n    \"zero\"\n  div h-[1]\n    \"one\"\n  div h-[1]\n    \"two\"\n  div h-[1]\n    \"three\"\n  div h-[1]\n    \"four\"\n  div h-[1]\n    \"five\"",
+        "div h-full overflow-y-scroll scroll-offset={offset}\n  div h-[1]\n    \"zero\"\n  div h-[1]\n    \"one\"\n  div h-[1]\n    \"two\"\n  div h-[1]\n    \"three\"\n  div h-[1]\n    \"four\"\n  div h-[1]\n    \"five\"",
         &ctx,
     );
     let text = all_text(&rows);
@@ -227,11 +227,12 @@ fn scroll_offset_clamps_to_max() {
     let rows = render(
         20,
         3,
-        "div h-[3] overflow-y-scroll scroll-offset={offset}\n  div h-[1]\n    \"zero\"\n  div h-[1]\n    \"one\"\n  div h-[1]\n    \"two\"\n  div h-[1]\n    \"three\"",
+        "div h-full overflow-y-scroll scroll-offset={offset}\n  div h-[1]\n    \"zero\"\n  div h-[1]\n    \"one\"\n  div h-[1]\n    \"two\"\n  div h-[1]\n    \"three\"",
         &ctx,
     );
     let text = all_text(&rows);
     assert!(!text.contains("zero"), "{text}");
+    assert!(text.contains("one"), "{text}");
     assert!(text.contains("two"), "{text}");
     assert!(text.contains("three"), "{text}");
 }
@@ -243,7 +244,7 @@ fn scroll_viewport_culls_children_outside_viewport() {
     let rows = render(
         20,
         3,
-        "div h-[3] overflow-y-scroll scroll-offset={offset}\n  div h-[1]\n    \"row0\"\n  div h-[1]\n    \"row1\"\n  div h-[1]\n    \"row2\"\n  div h-[1]\n    \"row3\"\n  div h-[1]\n    \"row4\"\n  div h-[1]\n    \"row5\"\n  div h-[1]\n    \"row6\"",
+        "div h-full overflow-y-scroll scroll-offset={offset}\n  div h-[1]\n    \"row0\"\n  div h-[1]\n    \"row1\"\n  div h-[1]\n    \"row2\"\n  div h-[1]\n    \"row3\"\n  div h-[1]\n    \"row4\"\n  div h-[1]\n    \"row5\"\n  div h-[1]\n    \"row6\"",
         &ctx,
     );
     let text = all_text(&rows);
@@ -263,7 +264,7 @@ fn scroll_bottom_auto_scrolls_to_last_child() {
     let rows = render(
         20,
         3,
-        "div h-[3] overflow-y-scroll scroll-bottom={auto_scroll}\n  div h-[1]\n    \"row0\"\n  div h-[1]\n    \"row1\"\n  div h-[1]\n    \"row2\"\n  div h-[1]\n    \"row3\"\n  div h-[1]\n    \"row4\"",
+        "div h-full overflow-y-scroll scroll-bottom={auto_scroll}\n  div h-[1]\n    \"row0\"\n  div h-[1]\n    \"row1\"\n  div h-[1]\n    \"row2\"\n  div h-[1]\n    \"row3\"\n  div h-[1]\n    \"row4\"",
         &ctx,
     );
     let text = all_text(&rows);
@@ -281,7 +282,7 @@ fn scroll_bottom_false_does_not_auto_scroll() {
     let rows = render(
         20,
         3,
-        "div h-[3] overflow-y-scroll scroll-bottom={auto_scroll}\n  div h-[1]\n    \"row0\"\n  div h-[1]\n    \"row1\"\n  div h-[1]\n    \"row2\"\n  div h-[1]\n    \"row3\"\n  div h-[1]\n    \"row4\"",
+        "div h-full overflow-y-scroll scroll-bottom={auto_scroll}\n  div h-[1]\n    \"row0\"\n  div h-[1]\n    \"row1\"\n  div h-[1]\n    \"row2\"\n  div h-[1]\n    \"row3\"\n  div h-[1]\n    \"row4\"",
         &ctx,
     );
     let text = all_text(&rows);
@@ -299,7 +300,7 @@ fn scroll_content_shorter_than_viewport_renders_normally() {
     let rows = render(
         20,
         5,
-        "div h-[5] overflow-y-scroll scroll-offset={offset}\n  div h-[1]\n    \"only\"\n  div h-[1]\n    \"two\"",
+        "div h-full overflow-y-scroll scroll-offset={offset}\n  div h-[1]\n    \"only\"\n  div h-[1]\n    \"two\"",
         &ctx,
     );
     let text = all_text(&rows);

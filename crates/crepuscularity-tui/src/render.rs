@@ -73,6 +73,7 @@ pub enum WidgetNode {
         block: Option<BlockSpec>,
         scroll_offset: usize,
         scroll_bottom: bool,
+        scrollable: bool,
     },
     /// A leaf node rendered as a ratatui `Paragraph`.
     Content {
@@ -531,6 +532,7 @@ fn build_empty_box(hints: &StyleHints, constraint: Constraint, style: Style) -> 
             block: hints_to_block(hints),
             scroll_offset: 0,
             scroll_bottom: false,
+            scrollable: false,
         },
         constraint,
     }
@@ -563,6 +565,7 @@ fn build_container_element(
             block: hints_to_block(hints),
             scroll_offset: scroll_cfg.offset,
             scroll_bottom: scroll_cfg.scroll_to_bottom,
+            scrollable: scroll_cfg.scrollable,
         },
         constraint,
     }
@@ -711,6 +714,7 @@ fn build_slot(
             block: None,
             scroll_offset: 0,
             scroll_bottom: false,
+            scrollable: false,
         },
         constraint: Constraint::Fill(1),
     }
@@ -968,6 +972,7 @@ fn paint_node_buf(node: &WidgetNode, buf: &mut Buffer, area: Rect) {
             block,
             scroll_offset,
             scroll_bottom,
+            scrollable,
         } => {
             // Fill background / draw border, then recurse into the inner area.
             let inner = if let Some(spec) = block {
@@ -983,7 +988,7 @@ fn paint_node_buf(node: &WidgetNode, buf: &mut Buffer, area: Rect) {
                 area
             };
 
-            if *scroll_offset > 0 || *scroll_bottom {
+            if *scrollable {
                 Scrollable::new(
                     children,
                     *direction,
@@ -1096,11 +1101,10 @@ impl<'a> Scrollable<'a> {
 
     fn clamped_offset(&self) -> usize {
         let total = self.total_content_height() as usize;
+        let max = total.saturating_sub(self.viewport.height as usize);
         if self.scroll_to_bottom {
-            let max = total.saturating_sub(self.viewport.height as usize);
             return max;
         }
-        let max = total.saturating_sub(1);
         self.scroll_offset.min(max)
     }
 
@@ -1224,6 +1228,7 @@ fn scroll_config(el: &Element, ctx: &TemplateContext, classes: &[String]) -> Scr
     ScrollConfig {
         offset,
         scroll_to_bottom,
+        scrollable: true,
     }
 }
 
@@ -1231,6 +1236,7 @@ fn scroll_config(el: &Element, ctx: &TemplateContext, classes: &[String]) -> Scr
 struct ScrollConfig {
     offset: usize,
     scroll_to_bottom: bool,
+    scrollable: bool,
 }
 
 fn matches_target_prefix(ctx: &TemplateContext, prefix: &str) -> bool {
