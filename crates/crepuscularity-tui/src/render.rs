@@ -29,7 +29,7 @@ use crepuscularity_core::preprocess::slot_rotate_child_phrases;
 use crepuscularity_core::virtual_files::lookup_virtual_file;
 use crepuscularity_core::CrepusError;
 
-use crate::style::{parse_classes, StyleHints};
+use crate::style::{parse_classes, SizeHint, StyleHints};
 
 fn eval_value(expr: &str, ctx: &TemplateContext) -> TemplateValue {
     eval_expr(expr, ctx).unwrap_or(TemplateValue::Null)
@@ -434,6 +434,15 @@ fn build_content_element(
         })
         .collect();
 
+    // Resolve w-fit for text elements: width = longest line length.
+    let constraint = if matches!(hints.width, SizeHint::Fit) {
+        let max_width = lines.iter().map(|l| l.width() as u16).max().unwrap_or(0);
+        let overhead = border_padding_overhead(hints, Direction::Horizontal);
+        Constraint::Length(max_width.saturating_add(overhead))
+    } else {
+        constraint
+    };
+
     WidgetChild {
         node: WidgetNode::Content {
             lines,
@@ -465,7 +474,7 @@ fn build_container_element(
     el: &Element,
     hints: &StyleHints,
     ctx: &TemplateContext,
-    _parent_dir: Direction,
+    parent_dir: Direction,
     constraint: Constraint,
     style: Style,
     classes: &[String],
@@ -473,6 +482,10 @@ fn build_container_element(
     let child_dir = hints.direction;
     let children = build_children(&el.children, ctx, child_dir, style);
     let scroll_offset = scroll_offset(el, ctx, classes);
+
+    // Resolve Fit constraints: measure the natural content size and
+    // convert to a Fixed constraint so the element doesn't fill.
+    let constraint = resolve_fit_constraint(constraint, &children, child_dir, hints.gap, hints);
 
     WidgetChild {
         node: WidgetNode::Container {
@@ -484,6 +497,125 @@ fn build_container_element(
             scroll_offset,
         },
         constraint,
+    }
+}
+
+/// When a container has a `Fit` size hint (via `h-fit`/`w-fit`), measure the
+/// natural content height/width from the built children and return a `Length`
+/// constraint so the element takes exactly its content size.
+fn resolve_fit_constraint(
+    constraint: Constraint,
+    children: &[WidgetChild],
+    child_dir: Direction,
+    gap: u16,
+    hints: &StyleHints,
+) -> Constraint {
+    // Determine which axis needs fitting and compute content size for it.
+    // h-fit → measure height; w-fit → measure width.
+    let fit_height = matches!(hints.height, SizeHint::Fit);
+    let fit_width = matches!(hints.width, SizeHint::Fit);
+
+    if !fit_height && !fit_width {
+        return constraint;
+    }
+
+    let n = children.len();
+    if n == 0 {
+        return Constraint::Length(0);
+    }
+
+    let total_gap = gap * (n as u16).saturating_sub(1);
+
+    // Content size along the container's main axis (child_dir).
+    let main_size: u16 = match child_dir {
+        Direction::Vertical => {
+            let sum: u16 = children
+                .iter()
+                .map(|c| constraint_min_height(&c.constraint))
+                .sum();
+            sum + total_gap
+        }
+        Direction::Horizontal => {
+            let sum: u16 = children
+                .iter()
+                .map(|c| constraint_min_width(&c.constraint))
+                .sum();
+            sum + total_gap
+        }
+    };
+
+    // Content size along the cross axis (perpendicular to child_dir).
+    let cross_size: u16 = match child_dir {
+        Direction::Vertical => children
+            .iter()
+            .map(|c| constraint_min_width(&c.constraint))
+            .max()
+            .unwrap_or(0),
+        Direction::Horizontal => children
+            .iter()
+            .map(|c| constraint_min_height(&c.constraint))
+            .max()
+            .unwrap_or(0),
+    };
+
+    // Pick the right size based on which axis has Fit.
+    let (content_size, overhead_axis) = if fit_height {
+        // Height fit: if container is flex-col, main axis = height;
+        // if flex-row, cross axis = height.
+        let size = match child_dir {
+            Direction::Vertical => main_size,
+            Direction::Horizontal => cross_size,
+        };
+        (size, Direction::Vertical)
+    } else {
+        // Width fit: if container is flex-row, main axis = width;
+        // if flex-col, cross axis = width.
+        let size = match child_dir {
+            Direction::Horizontal => main_size,
+            Direction::Vertical => cross_size,
+        };
+        (size, Direction::Horizontal)
+    };
+
+    let overhead = border_padding_overhead(hints, overhead_axis);
+    Constraint::Length(content_size.saturating_add(overhead))
+}
+
+/// Estimate the minimum height a constraint needs.
+fn constraint_min_height(c: &Constraint) -> u16 {
+    match c {
+        Constraint::Length(n) | Constraint::Min(n) => *n,
+        Constraint::Fill(_) => 1,
+        Constraint::Percentage(_) => 1,
+        Constraint::Max(n) => *n,
+        _ => 1,
+    }
+}
+
+/// Estimate the minimum width a constraint needs.
+fn constraint_min_width(c: &Constraint) -> u16 {
+    match c {
+        Constraint::Length(n) | Constraint::Min(n) => *n,
+        Constraint::Fill(_) => 1,
+        Constraint::Percentage(_) => 1,
+        Constraint::Max(n) => *n,
+        _ => 1,
+    }
+}
+
+/// Border + padding cells consumed along the main axis.
+fn border_padding_overhead(hints: &StyleHints, dir: Direction) -> u16 {
+    match dir {
+        Direction::Vertical => {
+            let b = u16::from(hints.borders.intersects(Borders::TOP))
+                + u16::from(hints.borders.intersects(Borders::BOTTOM));
+            b + hints.padding.top + hints.padding.bottom
+        }
+        Direction::Horizontal => {
+            let b = u16::from(hints.borders.intersects(Borders::LEFT))
+                + u16::from(hints.borders.intersects(Borders::RIGHT));
+            b + hints.padding.left + hints.padding.right
+        }
     }
 }
 

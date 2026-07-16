@@ -18,6 +18,9 @@ pub enum SizeHint {
     Fixed(u16),
     /// Percentage of the parent area.
     Percentage(u16),
+    /// Fit to content — size to the natural height/width of children.
+    /// Resolved during the build phase, not from a static class.
+    Fit,
 }
 
 impl SizeHint {
@@ -26,6 +29,7 @@ impl SizeHint {
             SizeHint::Fill => Constraint::Fill(1),
             SizeHint::Fixed(n) => Constraint::Length(*n),
             SizeHint::Percentage(p) => Constraint::Percentage(*p),
+            SizeHint::Fit => Constraint::Min(0),
         }
     }
 }
@@ -139,6 +143,8 @@ fn apply_layout(class: &str, h: &mut StyleHints) -> bool {
         "flex" | "flex-row" | "inline-flex" => h.direction = Direction::Horizontal,
         "w-full" => h.width = SizeHint::Percentage(100),
         "h-full" | "h-screen" => h.height = SizeHint::Percentage(100),
+        "w-fit" | "w-auto-content" | "w-min" => h.width = SizeHint::Fit,
+        "h-fit" | "h-auto-content" | "h-min" => h.height = SizeHint::Fit,
         "flex-1" | "grow" | "flex-grow" => {
             h.width = SizeHint::Fill;
             h.height = SizeHint::Fill;
