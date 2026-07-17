@@ -39,6 +39,11 @@ pub enum Commands {
     },
     #[cfg(feature = "desktop")]
     Dev {
+        /// Target kind or id from crepus.toml (e.g. "gpui", "tui", "ios").
+        /// When given, resolves the target directory from crepus.toml
+        /// and runs the dev loop there. "tui" uses terminal-only mode
+        /// (no GPUI HUD); "gpui" opens the DevHUD window.
+        target: Option<String>,
         #[arg(long)]
         bin: Option<String>,
         #[arg(long)]
