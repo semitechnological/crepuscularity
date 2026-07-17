@@ -2,7 +2,7 @@
 name = "crepuscularity-reactive"
 version = "0.1.11"
 edition = "2021"
-license = "MPL-2.0"
+license = "ISC"
 description = "Reactive signals for Crepuscularity WASM clients (UNSTABLE; in active development)."
 repository = "https://github.com/tschk/crepuscularity"
 documentation = "https://docs.rs/crepuscularity-reactive"

@@ -5,7 +5,7 @@
   "version": "0.2.1",
   "publisher": "crepuscularity",
   "author": "Max Carter <max@undivisible.dev>",
-  "license": "MPL-2.0",
+  "license": "ISC",
   "repository": {
     "type": "git",
     "url": "https://github.com/tschk/crepuscularity.git",

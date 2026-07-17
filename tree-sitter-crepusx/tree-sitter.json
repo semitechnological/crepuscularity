@@ -11,7 +11,7 @@
   ],
   "metadata": {
     "version": "0.1.0",
-    "license": "MPL-2.0",
+    "license": "ISC",
     "description": "crepusx grammar for tree-sitter",
     "links": {
       "repository": "https://github.com/tschk/crepuscularity"

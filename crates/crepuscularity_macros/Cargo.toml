@@ -2,7 +2,7 @@
 name = "crepuscularity_macros"
 version = "0.5.11"
 edition = "2021"
-license = "MPL-2.0"
+license = "ISC"
 description = "Compile-time view! macro for Crepuscularity templates (UNSTABLE; in active development)."
 repository = "https://github.com/tschk/crepuscularity"
 documentation = "https://docs.rs/crepuscularity_macros"

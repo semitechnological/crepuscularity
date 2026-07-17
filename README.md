@@ -284,4 +284,4 @@ The required variables are `SDKROOT` for SDK headers, `DEVELOPER_DIR` for the ac
 
 ## License
 
-Mozilla Public License 2.0 — see [LICENSE](LICENSE).
+ISC License — see [LICENSE](LICENSE).

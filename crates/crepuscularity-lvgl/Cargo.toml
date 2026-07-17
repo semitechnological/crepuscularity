@@ -2,7 +2,7 @@
 name = "crepuscularity-lvgl"
 version = "0.1.10"
 edition = "2021"
-license = "MPL-2.0"
+license = "ISC"
 description = "LVGL Pro XML generator for the Crepuscularity .crepus DSL."
 repository = "https://github.com/tschk/crepuscularity"
 readme = "../../README.md"

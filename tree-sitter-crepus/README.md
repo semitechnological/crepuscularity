@@ -24,4 +24,4 @@ let tree = parser.parse("div p-4\n  text-lg\n    Hello", None).unwrap();
 
 ## License
 
-MPL-2.0
+ISC

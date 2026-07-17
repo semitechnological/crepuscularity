@@ -2,7 +2,7 @@
 name = "crepuscularity-abi"
 version = "0.1.12"
 edition = "2021"
-license = "MPL-2.0"
+license = "ISC"
 description = "Plain C ABI for Crepuscularity View IR sessions."
 repository = "https://github.com/tschk/crepuscularity"
 documentation = "https://docs.rs/crepuscularity-abi"

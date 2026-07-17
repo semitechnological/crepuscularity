@@ -2,7 +2,7 @@
 name = "crepuscularity-tauri"
 version = "0.1.13"
 edition = "2021"
-license = "MPL-2.0"
+license = "ISC"
 description = "Tauri v1/v2 static-bundle adapter for Crepuscularity."
 repository = "https://github.com/tschk/crepuscularity"
 readme = "README.md"

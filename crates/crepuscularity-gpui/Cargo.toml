@@ -2,7 +2,7 @@
 name = "crepuscularity-gpui"
 version = "0.5.8"
 edition = "2021"
-license = "MPL-2.0"
+license = "ISC"
 description = "GPUI backend for Crepuscularity (view! macro re-exports) — UNSTABLE; in active development."
 repository = "https://github.com/tschk/crepuscularity"
 documentation = "https://docs.rs/crepuscularity-gpui"

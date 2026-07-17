@@ -1,7 +1,7 @@
 {
   "name": "tree-sitter-crepus",
   "version": "0.1.0",
-  "license": "MPL-2.0",
+  "license": "ISC",
   "main": "bindings/node",
   "types": "bindings/node",
   "peerDependencies": {

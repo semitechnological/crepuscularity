@@ -2,7 +2,7 @@
 name = "crepuscularity-core"
 version = "0.4.25"
 edition = "2021"
-license = "MPL-2.0"
+license = "ISC"
 description = "Parser, AST, and expression evaluation for the Crepuscularity .crepus DSL (UNSTABLE; in active development)."
 repository = "https://github.com/tschk/crepuscularity"
 documentation = "https://docs.rs/crepuscularity-core"

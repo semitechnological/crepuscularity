@@ -24,4 +24,4 @@ let tree = parser.parse("<View class=\"flex-1\">\n  <Text>Hello</Text>\n</View>"
 
 ## License
 
-MPL-2.0
+ISC

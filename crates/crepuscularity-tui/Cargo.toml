@@ -2,7 +2,7 @@
 name = "crepuscularity-tui"
 version = "0.4.22"
 edition = "2021"
-license = "MPL-2.0"
+license = "ISC"
 description = "Ratatui backend for the Crepuscularity .crepus DSL — write full-screen terminal UIs with nested div layouts."
 repository = "https://github.com/tschk/crepuscularity"
 readme = "../../README.md"

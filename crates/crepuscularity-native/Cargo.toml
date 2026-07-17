@@ -2,7 +2,7 @@
 name = "crepuscularity-native"
 version = "0.5.14"
 edition = "2021"
-license = "MPL-2.0"
+license = "ISC"
 description = "View intermediate representation (JSON) for native SwiftUI / Compose shells (UNSTABLE)."
 repository = "https://github.com/tschk/crepuscularity"
 readme = "../../README.md"

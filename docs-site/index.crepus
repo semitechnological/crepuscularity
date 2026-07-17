@@ -351,7 +351,7 @@ $ crepus aurora new my-ios && crepus aurora dev
 					span text-sm font-medium
 						"Crepuscularity"
 				span text-xs crepus-t-muted
-					"MPL-2.0 — built with crepuscularity-web"
+					"ISC — built with crepuscularity-web"
 			nav flex flex-wrap gap-x-5 gap-y-2 text-xs crepus-t-muted items-center justify-start sm:justify-end
 				a href="./docs/index.html" no-underline crepus-t-muted hover:text-[var(--cp-fg)] transition-colors
 					"Docs"
