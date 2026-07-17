@@ -1,21 +1,16 @@
-/// `crepus dev` — hot-reload dev loop with multi-target + UnoCSS hint support.
-///
-/// Usage:
-///   crepus dev                      # cwd, HUD mode
-///   crepus dev gpui                 # resolve ui/gui, HUD mode
-///   crepus dev tui                  # resolve ui/tui, terminal mode
-///   crepus dev tui:h-1 gpui:h-20px  # both simultaneously
-///
-/// Hint syntax (UnoCSS-style, colon-separated after target name):
-///   h-N    → CREPUS_DEV_HEIGHT=N
-///   h-Npx  → CREPUS_DEV_HEIGHT=N
-///   w-N    → CREPUS_DEV_WIDTH=N
-///   w-Npx  → CREPUS_DEV_WIDTH=N
+/// `crepus dev` — hot-reload dev loop.
 ///
 /// Thread layout:
-///   main thread  → GPUI Application::run (DevHUD) for gpui target, or
-///                  terminal loop for tui-only
-///   background   → file watcher + cargo build + child process per target
+///   main thread  → GPUI Application::run (owns DevHUD window, blocks until closed)
+///   background   → file watcher + cargo build + child process management
+///
+/// Communication: `Arc<Mutex<HudState>>` (polled by GPUI entity every 100ms)
+/// Shutdown:      `Arc<AtomicBool>` set when GPUI window closes
+///
+/// When `--emit-events` is passed, emits structured JSON CompilerEvents to stdout
+/// for IDE/editor integration (following Equilibrium HotCompiler pattern).
+///
+/// When `target` is "tui", runs in terminal-only mode (no GPUI HUD).
 use std::path::PathBuf;
 use std::process::{Child, Command};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -31,65 +26,17 @@ use crate::events::CompilerEvent;
 use crate::hud::{open_hud_window, DevStatus, HudState};
 use crate::ui;
 
-// ── Hint parsing ───────────────────────────────────────────────────────────
-
-/// Parsed dev target spec: name + optional UnoCSS-style hints.
-#[derive(Clone)]
-struct DevTargetSpec {
-    name: String,
-    height: Option<String>,
-    width: Option<String>,
-}
-
-/// Parse a target string like "tui:h-1" or "gpui:w-400px:h-20px" into name + hints.
-fn parse_target_spec(s: &str) -> DevTargetSpec {
-    let (name, rest) = match s.split_once(':') {
-        Some((n, r)) => (n.to_string(), r),
-        None => (s.to_string(), ""),
-    };
-
-    let mut spec = DevTargetSpec {
-        name,
-        height: None,
-        width: None,
-    };
-
-    // Parse UnoCSS-style utilities: h-1, h-20px, w-400, w-400px
-    for part in rest.split(':') {
-        if let Some(val) = part.strip_prefix("h-") {
-            spec.height = Some(strip_px(val));
-        } else if let Some(val) = part.strip_prefix("w-") {
-            spec.width = Some(strip_px(val));
-        }
-    }
-    spec
-}
-
-/// Strip trailing "px" from a value: "20px" → "20", "1" → "1".
-fn strip_px(s: &str) -> String {
-    s.trim_end_matches("px").to_string()
-}
-
-/// Build env vars from a DevTargetSpec for the child process.
-fn hint_env(spec: &DevTargetSpec) -> Vec<(&str, String)> {
-    let mut env = Vec::new();
-    if let Some(ref h) = spec.height {
-        env.push(("CREPUS_DEV_HEIGHT", h.clone()));
-    }
-    if let Some(ref w) = spec.width {
-        env.push(("CREPUS_DEV_WIDTH", w.clone()));
-    }
-    env
-}
-
-// ── Target resolution ──────────────────────────────────────────────────────
-
 /// Resolve a target name to a working directory by looking up crepus.toml.
+///
+/// Matches against target `type` (e.g. "gpui", "tui") or `id` first.
+/// Falls back to common directory conventions: `ui/gui` for gpui, `ui/tui` for tui.
 fn resolve_target_dir(target: &str) -> Option<PathBuf> {
     let cwd = std::env::current_dir().ok()?;
 
+    // Try crepus.toml lookup
     if let Some(mpath) = find_manifest_upward(&cwd) {
-        if let Ok(Some(targets)) = load_manifest_targets(Some(mpath)) {
+        if let Ok(Some(targets)) = load_manifest_targets(Some(mpath.clone())) {
+            // Match by type or id
             for t in &targets {
                 if t.target_type == target || t.id == target {
                     return Some(t.dir.clone());
@@ -98,6 +45,7 @@ fn resolve_target_dir(target: &str) -> Option<PathBuf> {
         }
     }
 
+    // Convention fallbacks
     let fallbacks: &[(&str, &[&str])] = &[
         ("gpui", &["ui/gui", "gui"]),
         ("tui", &["ui/tui", "tui"]),
@@ -118,132 +66,46 @@ fn resolve_target_dir(target: &str) -> Option<PathBuf> {
     None
 }
 
-fn is_terminal_target(name: &str) -> bool {
-    name == "tui" || name == "terminal"
-}
-
-// ── Entry point ────────────────────────────────────────────────────────────
-
 pub fn run(
-    targets: Vec<String>,
+    target: Option<String>,
     bin_override: Option<String>,
     options: BuildOptions,
     emit_events: bool,
 ) {
-    if targets.is_empty() {
-        // No target — original behavior: dev in cwd with HUD
-        let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-        let bin_name = find_bin_name(&cwd, bin_override.as_deref()).unwrap_or_else(|| {
-            ui::error("could not determine binary name — add [[bin]] to Cargo.toml or use --bin");
-        });
-        run_hud(cwd, bin_name, options, emit_events, &[]);
-        return;
-    }
-
-    let specs: Vec<DevTargetSpec> = targets.iter().map(|s| parse_target_spec(s)).collect();
-
-    // Resolve all target directories upfront
-    let mut resolved: Vec<(DevTargetSpec, PathBuf, String)> = Vec::new();
-    for spec in specs {
-        match resolve_target_dir(&spec.name) {
-            Some(dir) => {
-                let bin_name = find_bin_name(&dir, bin_override.as_deref()).unwrap_or_else(|| {
-                    ui::error(&format!(
-                        "could not determine binary name for target '{}' — add [[bin]] to Cargo.toml or use --bin",
-                        spec.name
-                    ));
-                });
-                resolved.push((spec, dir, bin_name));
-            }
+    // Resolve target directory if a target was specified
+    let cwd = if let Some(ref t) = target {
+        match resolve_target_dir(t) {
+            Some(dir) => dir,
             None => {
                 ui::error(&format!(
-                    "could not resolve target '{}' — no matching [[targets]] in crepus.toml and no ui/{}/ directory",
-                    spec.name, spec.name
+                    "could not resolve target '{t}' — no matching [[targets]] in crepus.toml and no ui/{t}/ directory"
                 ));
             }
         }
-    }
-
-    if resolved.is_empty() {
-        return;
-    }
-
-    // Partition: terminal targets → background threads, gpui/other → main thread HUD
-    let mut terminal: Vec<_> = resolved
-        .iter()
-        .filter(|(s, _, _)| is_terminal_target(&s.name))
-        .cloned()
-        .collect();
-    let hud: Vec<_> = resolved
-        .iter()
-        .filter(|(s, _, _)| !is_terminal_target(&s.name))
-        .cloned()
-        .collect();
-
-    let shutdown = Arc::new(AtomicBool::new(false));
-
-    if hud.is_empty() && !terminal.is_empty() {
-        // All terminal — keep first for main thread, rest in background
-        let main_terminal = terminal.remove(0);
-        for (spec, cwd, bin_name) in &terminal {
-            let spec = spec.clone();
-            let cwd = cwd.clone();
-            let bin_name = bin_name.clone();
-            let options = options.clone();
-            let shutdown = shutdown.clone();
-            std::thread::spawn(move || {
-                run_terminal(spec, cwd, bin_name, options, emit_events, shutdown);
-            });
-        }
-        run_terminal(main_terminal.0, main_terminal.1, main_terminal.2, options, emit_events, shutdown);
     } else {
-        // Spawn all terminal targets in background threads
-        for (spec, cwd, bin_name) in &terminal {
-            let spec = spec.clone();
-            let cwd = cwd.clone();
-            let bin_name = bin_name.clone();
-            let options = options.clone();
-            let shutdown = shutdown.clone();
-            std::thread::spawn(move || {
-                run_terminal(spec, cwd, bin_name, options, emit_events, shutdown);
-            });
-        }
-        // Main thread: first HUD target
-        if let Some((spec, cwd, bin_name)) = hud.first() {
-            let env = hint_env(spec);
-            run_hud(cwd.clone(), bin_name.clone(), options, emit_events, &env);
-            shutdown.store(true, Ordering::Relaxed);
-        }
+        std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
+    };
+
+    let bin_name = find_bin_name(&cwd, bin_override.as_deref()).unwrap_or_else(|| {
+        ui::error("could not determine binary name — add [[bin]] to Cargo.toml or use --bin");
+    });
+
+    // Terminal-only mode for tui targets (no GPUI HUD)
+    let terminal_only = target
+        .as_deref()
+        .map(|t| t == "tui" || t == "terminal")
+        .unwrap_or(false);
+
+    if terminal_only {
+        run_terminal(cwd, bin_name, options, emit_events);
+    } else {
+        run_hud(cwd, bin_name, options, emit_events);
     }
 }
 
-// ── Terminal dev loop ──────────────────────────────────────────────────────
-
-fn run_terminal(
-    spec: DevTargetSpec,
-    cwd: PathBuf,
-    bin_name: String,
-    options: BuildOptions,
-    emit_events: bool,
-    shutdown: Arc<AtomicBool>,
-) {
-    let env = hint_env(&spec);
-    let hint_str = if env.is_empty() {
-        String::new()
-    } else {
-        format!(
-            " [{}]",
-            env.iter()
-                .map(|(k, v)| format!("{k}={v}"))
-                .collect::<Vec<_>>()
-                .join(", ")
-        )
-    };
-    eprintln!(
-        "  {} dev (terminal) — {bin_name} in {}{hint_str}",
-        ui::arrow(),
-        cwd.display()
-    );
+/// Terminal-only dev loop — no GPUI HUD, just rebuild + relaunch on file change.
+fn run_terminal(cwd: PathBuf, bin_name: String, options: BuildOptions, emit_events: bool) {
+    eprintln!("  {} dev (terminal) — {bin_name} in {}", ui::arrow(), cwd.display());
 
     let (tx, rx) = std::sync::mpsc::channel::<PathBuf>();
     let tx_notify = tx.clone();
@@ -274,32 +136,26 @@ fn run_terminal(
         .watch(&cwd.join("Cargo.toml"), RecursiveMode::NonRecursive)
         .ok();
 
-    let mut child = do_build_launch_terminal(&cwd, &bin_name, options, None, emit_events, &env);
+    let mut child = do_build_launch_terminal(&cwd, &bin_name, options, None, emit_events);
 
     loop {
-        if shutdown.load(Ordering::Relaxed) {
-            if let Some(mut c) = child {
-                kill_child(&mut c);
-            }
-            break;
-        }
-
         match rx.recv_timeout(Duration::from_millis(200)) {
             Ok(_changed_path) => {
+                // Debounce: drain events for 300 ms
                 let t = Instant::now();
                 while t.elapsed() < Duration::from_millis(300) {
                     while rx.try_recv().is_ok() {}
                     std::thread::sleep(Duration::from_millis(30));
                 }
-                eprintln!("  {} change detected — rebuilding {bin_name}…", ui::arrow());
-                child = do_build_launch_terminal(&cwd, &bin_name, options, child, emit_events, &env);
+                eprintln!("  {} change detected — rebuilding…", ui::arrow());
+                child = do_build_launch_terminal(&cwd, &bin_name, options, child, emit_events);
             }
             Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
                 if let Some(ref mut c) = child {
                     match c.try_wait() {
                         Ok(Some(status)) => {
                             let code = status.code();
-                            eprintln!("  {} {bin_name} exited ({code:?})", ui::warn());
+                            eprintln!("  {} app exited ({code:?})", ui::warn());
                             if emit_events {
                                 CompilerEvent::process_exited(c.id(), code).emit();
                             }
@@ -324,7 +180,6 @@ fn do_build_launch_terminal(
     options: BuildOptions,
     old_child: Option<Child>,
     emit_events: bool,
-    env: &[(&str, String)],
 ) -> Option<Child> {
     if let Some(mut c) = old_child {
         let pid = c.id();
@@ -352,12 +207,7 @@ fn do_build_launch_terminal(
         eprintln!("  {} built in {elapsed_ms} ms — launching {bin_name}", ui::ok());
 
         let bin_path = locate_binary(cwd, options.cargo_profile(), bin_name);
-        let mut cmd = Command::new(&bin_path);
-        cmd.current_dir(cwd);
-        for (key, val) in env {
-            cmd.env(key, val);
-        }
-        match cmd.spawn() {
+        match Command::new(&bin_path).current_dir(cwd).spawn() {
             Ok(c) => {
                 if emit_events {
                     CompilerEvent::process_launched(c.id(), bin_path).emit();
@@ -378,18 +228,12 @@ fn do_build_launch_terminal(
     }
 }
 
-// ── GPUI HUD dev loop ──────────────────────────────────────────────────────
-
-fn run_hud(
-    cwd: PathBuf,
-    bin_name: String,
-    options: BuildOptions,
-    emit_events: bool,
-    env: &[(&str, String)],
-) {
+/// GPUI HUD dev loop — original behavior with DevHUD window.
+fn run_hud(cwd: PathBuf, bin_name: String, options: BuildOptions, emit_events: bool) {
     let shared = Arc::new(Mutex::new(HudState::new(bin_name.clone())));
     let shutdown = Arc::new(AtomicBool::new(false));
 
+    // Emit server started event
     if emit_events {
         CompilerEvent::dev_server_started(
             bin_name.clone(),
@@ -404,9 +248,8 @@ fn run_hud(
         let shutdown = shutdown.clone();
         let cwd = cwd.clone();
         let bin_name = bin_name.clone();
-        let env: Vec<(String, String)> = env.iter().map(|(k, v)| (k.to_string(), v.clone())).collect();
         std::thread::spawn(move || {
-            background_loop(shared, shutdown, cwd, bin_name, options, emit_events, &env)
+            background_loop(shared, shutdown, cwd, bin_name, options, emit_events)
         });
     }
 
@@ -419,8 +262,11 @@ fn run_hud(
         });
     }
 
+    // Window closed — tell background thread to stop
     shutdown.store(true, Ordering::Relaxed);
 }
+
+// ── Background loop ────────────────────────────────────────────────────────
 
 fn background_loop(
     shared: Arc<Mutex<HudState>>,
@@ -429,7 +275,6 @@ fn background_loop(
     bin_name: String,
     options: BuildOptions,
     emit_events: bool,
-    env: &[(String, String)],
 ) {
     let (tx, rx) = std::sync::mpsc::channel::<PathBuf>();
     let tx_notify = tx.clone();
@@ -438,6 +283,7 @@ fn background_loop(
         if let Ok(ev) = res {
             match ev.kind {
                 EventKind::Modify(_) | EventKind::Create(_) | EventKind::Remove(_) => {
+                    // Send the first changed path for event emission
                     if let Some(path) = ev.paths.into_iter().next() {
                         let _ = tx_notify.send(path);
                     }
@@ -461,7 +307,8 @@ fn background_loop(
         .watch(&cwd.join("Cargo.toml"), RecursiveMode::NonRecursive)
         .ok();
 
-    let mut child = do_build_launch(&shared, &cwd, &bin_name, options, None, emit_events, env);
+    // Initial build + launch
+    let mut child = do_build_launch(&shared, &cwd, &bin_name, options, None, emit_events);
 
     loop {
         if shutdown.load(Ordering::Relaxed) {
@@ -476,19 +323,22 @@ fn background_loop(
 
         match rx.recv_timeout(Duration::from_millis(200)) {
             Ok(changed_path) => {
+                // Emit file changed event
                 if emit_events {
                     CompilerEvent::file_changed(changed_path).emit();
                 }
 
+                // Debounce: drain events for 300 ms
                 let t = Instant::now();
                 while t.elapsed() < Duration::from_millis(300) {
                     while rx.try_recv().is_ok() {}
                     std::thread::sleep(Duration::from_millis(30));
                 }
                 eprintln!("  {} change detected — rebuilding…", crate::ui::arrow());
-                child = do_build_launch(&shared, &cwd, &bin_name, options, child, emit_events, env);
+                child = do_build_launch(&shared, &cwd, &bin_name, options, child, emit_events);
             }
             Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                // Check whether child exited on its own
                 if let Some(ref mut c) = child {
                     match c.try_wait() {
                         Ok(Some(status)) => {
@@ -515,7 +365,13 @@ fn background_loop(
     }
 }
 
+/// Find the compiled binary, checking the workspace root target dir first.
+///
+/// In a workspace, `cargo build` places binaries in `{workspace_root}/target/`
+/// rather than in the crate's own directory. We use `cargo locate-project
+/// --workspace` to find the workspace root, then fall back to `{cwd}/target/`.
 fn locate_binary(cwd: &std::path::Path, profile: &str, bin_name: &str) -> PathBuf {
+    // Ask cargo where the workspace root is
     let workspace_root = std::process::Command::new("cargo")
         .args(["locate-project", "--workspace", "--message-format", "plain"])
         .current_dir(cwd)
@@ -542,12 +398,13 @@ fn do_build_launch(
     options: BuildOptions,
     old_child: Option<Child>,
     emit_events: bool,
-    env: &[(String, String)],
 ) -> Option<Child> {
+    // Signal building
     if let Ok(mut s) = shared.lock() {
         s.status = DevStatus::Building;
     }
 
+    // Kill old child
     if let Some(mut c) = old_child {
         let pid = c.id();
         kill_child(&mut c);
@@ -556,6 +413,7 @@ fn do_build_launch(
         }
     }
 
+    // Emit compilation started
     if emit_events {
         CompilerEvent::compilation_started(vec![cwd.join("src")], Some("file_change".to_string()))
             .emit();
@@ -566,6 +424,7 @@ fn do_build_launch(
     let elapsed_ms = t0.elapsed().as_millis() as u64;
 
     if outcome.success {
+        // Emit compilation success
         if emit_events {
             let output = locate_binary(cwd, options.cargo_profile(), bin_name);
             CompilerEvent::compilation_success(elapsed_ms, output).emit();
@@ -581,12 +440,7 @@ fn do_build_launch(
             crate::ui::ok()
         );
 
-        let mut cmd = Command::new(&bin_path);
-        cmd.current_dir(cwd);
-        for (key, val) in env {
-            cmd.env(key, val);
-        }
-        match cmd.spawn() {
+        match Command::new(&bin_path).current_dir(cwd).spawn() {
             Ok(c) => {
                 if emit_events {
                     CompilerEvent::process_launched(c.id(), bin_path).emit();
@@ -609,6 +463,7 @@ fn do_build_launch(
             }
         }
     } else {
+        // Emit compilation error
         if emit_events {
             CompilerEvent::compilation_error(elapsed_ms, outcome.errors.clone()).emit();
         }

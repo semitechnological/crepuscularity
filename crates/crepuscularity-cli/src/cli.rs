@@ -39,11 +39,11 @@ pub enum Commands {
     },
     #[cfg(feature = "desktop")]
     Dev {
-        /// Target(s) with optional UnoCSS-style hints, e.g. "tui:h-1", "gpui:w-400px:h-20px".
-        /// Multiple targets run simultaneously: tui targets in background threads,
-        /// gpui target on the main thread (DevHUD). Hints are passed to the child
-        /// process as CREPUS_DEV_HEIGHT / CREPUS_DEV_WIDTH env vars.
-        targets: Vec<String>,
+        /// Target kind or id from crepus.toml (e.g. "gpui", "tui", "ios").
+        /// When given, resolves the target directory from crepus.toml
+        /// and runs the dev loop there. "tui" uses terminal-only mode
+        /// (no GPUI HUD); "gpui" opens the DevHUD window.
+        target: Option<String>,
         #[arg(long)]
         bin: Option<String>,
         #[arg(long)]
