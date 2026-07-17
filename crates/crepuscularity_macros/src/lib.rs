@@ -1261,6 +1261,17 @@ impl IntoTokenStreamHelper for syn::Expr {
 // ============================================================
 
 fn map_class(class: &str) -> Option<TokenStream2> {
+    // Target-conditional classes: gpui:h-2, tui:h-1, web:p-4
+    // GPUI macro always targets gpui — strip matching prefixes, skip others.
+    if let Some((prefix, rest)) = class.split_once(':') {
+        match prefix {
+            "gpui" | "gui" => return map_class(rest),
+            "tui" | "web" | "ios" | "android" | "macos" | "darwin" | "windows" | "win32"
+            | "linux" => return None,
+            _ => {}
+        }
+    }
+
     if let Some(rest) = class.strip_prefix("hover:") {
         let style = map_class_to_style(rest)?;
         return Some(quote! { .hover(|__s| __s #style) });

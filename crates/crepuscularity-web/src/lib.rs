@@ -885,32 +885,54 @@ pub fn escape_html_attr(s: &str) -> String {
 
 /// Build the `class="..."` attribute value: join classes with spaces, interpolate,
 /// and escape — in a single pass, avoiding the intermediate Vec + join + escape.
+/// Filters out target-conditional classes for non-web targets (tui:, gpui:, etc.).
 pub(crate) fn build_class_attr(
     base_classes: &[String],
     conditional: &[ConditionalClass],
     ctx: &TemplateContext,
 ) -> Result<Option<String>, CrepusError> {
-    // First pass: interpolate each class and collect into one space-joined string.
     let mut joined = String::new();
     let mut first = true;
     for class in base_classes {
-        if !first {
-            joined.push(' ');
-        }
-        joined.push_str(&ctx.interpolate(class)?);
-        first = false;
-    }
-    for cc in conditional {
-        if ctx.eval_condition(&cc.condition)? {
+        let interpolated = ctx.interpolate(class)?;
+        let filtered = filter_web_class(&interpolated);
+        if let Some(cls) = filtered {
             if !first {
                 joined.push(' ');
             }
-            joined.push_str(&ctx.interpolate(&cc.class)?);
+            joined.push_str(&cls);
             first = false;
+        }
+    }
+    for cc in conditional {
+        if ctx.eval_condition(&cc.condition)? {
+            let interpolated = ctx.interpolate(&cc.class)?;
+            let filtered = filter_web_class(&interpolated);
+            if let Some(cls) = filtered {
+                if !first {
+                    joined.push(' ');
+                }
+                joined.push_str(&cls);
+                first = false;
+            }
         }
     }
     if first {
         return Ok(None);
     }
     Ok(Some(escape_html(&joined)))
+}
+
+/// Filter target-conditional classes for the web renderer.
+/// `web:p-4` → `p-4`, `tui:h-1` → None, `gpui:h-2` → None, `p-4` → `p-4`.
+fn filter_web_class(class: &str) -> Option<String> {
+    if let Some((prefix, rest)) = class.split_once(':') {
+        return match prefix {
+            "web" => Some(rest.to_string()),
+            "tui" | "gpui" | "gui" | "ios" | "android" | "macos" | "darwin" | "windows"
+            | "win32" | "linux" => None,
+            _ => Some(class.to_string()),
+        };
+    }
+    Some(class.to_string())
 }
