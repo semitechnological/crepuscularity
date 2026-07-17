@@ -27,12 +27,12 @@ pub fn run(cli: Cli) -> Result<(), CrepusCliError> {
         }
         #[cfg(feature = "desktop")]
         Commands::Dev {
-            target,
+            targets,
             bin,
             emit_events,
             build,
         } => {
-            run_dev(target, bin, emit_events, build);
+            run_dev(targets, bin, emit_events, build);
             Ok(())
         }
         Commands::Build {
@@ -115,13 +115,13 @@ pub fn run(cli: Cli) -> Result<(), CrepusCliError> {
 
 #[cfg(feature = "desktop")]
 fn run_dev(
-    target: Option<String>,
+    targets: Vec<String>,
     bin: Option<String>,
     emit_events: bool,
     build: crate::build_options::BuildOptionsArgs,
 ) {
     let options = build.into_options_or_exit();
-    crate::dev::run(target, bin, options, emit_events);
+    crate::dev::run(targets, bin, options, emit_events);
 }
 
 fn run_benchmark(command: Option<BenchmarkCommands>, flat: BenchmarkRunArgs) {
