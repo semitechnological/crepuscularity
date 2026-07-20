@@ -105,7 +105,11 @@ pub fn run(
 
 /// Terminal-only dev loop — no GPUI HUD, just rebuild + relaunch on file change.
 fn run_terminal(cwd: PathBuf, bin_name: String, options: BuildOptions, emit_events: bool) {
-    eprintln!("  {} dev (terminal) — {bin_name} in {}", ui::arrow(), cwd.display());
+    eprintln!(
+        "  {} dev (terminal) — {bin_name} in {}",
+        ui::arrow(),
+        cwd.display()
+    );
 
     let (tx, rx) = std::sync::mpsc::channel::<PathBuf>();
     let tx_notify = tx.clone();
@@ -204,7 +208,10 @@ fn do_build_launch_terminal(
             CompilerEvent::compilation_success(elapsed_ms, output).emit();
         }
 
-        eprintln!("  {} built in {elapsed_ms} ms — launching {bin_name}", ui::ok());
+        eprintln!(
+            "  {} built in {elapsed_ms} ms — launching {bin_name}",
+            ui::ok()
+        );
 
         let bin_path = locate_binary(cwd, options.cargo_profile(), bin_name);
         match Command::new(&bin_path).current_dir(cwd).spawn() {

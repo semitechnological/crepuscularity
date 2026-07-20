@@ -174,7 +174,7 @@ fn scaffold_extension(name: &str) {
     scaffold::write_file(&base.join("views/ui.crepus"), WEBEXT_UI_CREPUS)
         .unwrap_or_else(|e| ui::error(&format!("write views/ui.crepus: {e}")));
 
-    let steps = vec![
+    let steps = [
         format!("cd {slug}"),
         "crepus build".to_string(),
         format!(
