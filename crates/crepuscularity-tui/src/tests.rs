@@ -1709,12 +1709,8 @@ mod buffer_renderer_api {
         out
     }
 
-
-
     use crate::BufferRenderer;
-    use crepuscularity_core::parser::{
-        parse_component_file, parse_template, ComponentDef,
-    };
+    use crepuscularity_core::parser::{parse_component_file, parse_template, ComponentDef};
 
     /// Render `template` into a fresh `Buffer` of `width x height` via the
     /// existing public Frame entry point, then clone every cell for comparison.
@@ -1827,7 +1823,9 @@ mod buffer_renderer_api {
             let mut buf = ratatui::buffer::Buffer::empty(area);
             renderer
                 .render_component(&component, &ctx, &mut buf, area)
-                .unwrap_or_else(|e| panic!("render_component failed on iteration {iteration}: {e}"));
+                .unwrap_or_else(|e| {
+                    panic!("render_component failed on iteration {iteration}: {e}")
+                });
 
             let text = buffer_text(&buf);
             assert!(
@@ -1950,8 +1948,7 @@ mod buffer_renderer_api {
 
         let stats_after_second = renderer.cache_stats();
         assert_eq!(
-            stats_after_second.invalidations,
-            1,
+            stats_after_second.invalidations, 1,
             "exactly one invalidation expected after editing the transitive include: {:?}",
             stats_after_second
         );
@@ -2020,6 +2017,7 @@ mod buffer_renderer_api {
     #[test]
     fn buffer_renderer_named_component_include_caching() {
         use crate::render::parse_inclusion_calls;
+        crate::render::reset_parse_counter();
 
         let mut ctx = TemplateContext::new();
         ctx.base_dir = Some(PathBuf::from("/virtual"));
@@ -2036,14 +2034,22 @@ mod buffer_renderer_api {
 
         // 1st render: miss — one parse.
         let mut buf1 = ratatui::buffer::Buffer::empty(area);
-        renderer.render_nodes(&nodes, &ctx, &mut buf1, area).unwrap();
+        renderer
+            .render_nodes(&nodes, &ctx, &mut buf1, area)
+            .unwrap();
         assert_eq!(parse_inclusion_calls(), 1, "first render: one parse");
         assert!(buffer_text(&buf1).contains("Untitled"));
 
         // 2nd render: hit — zero new parses.
         let mut buf2 = ratatui::buffer::Buffer::empty(area);
-        renderer.render_nodes(&nodes, &ctx, &mut buf2, area).unwrap();
-        assert_eq!(parse_inclusion_calls(), 1, "second render: hit, no new parse");
+        renderer
+            .render_nodes(&nodes, &ctx, &mut buf2, area)
+            .unwrap();
+        assert_eq!(
+            parse_inclusion_calls(),
+            1,
+            "second render: hit, no new parse"
+        );
         assert!(buffer_text(&buf2).contains("Untitled"));
 
         // 3rd render: source changed — one re-parse (invalidation).
@@ -2052,7 +2058,9 @@ mod buffer_renderer_api {
         std::sync::Arc::make_mut(&mut ctx.virtual_files)
             .insert("card.crepus".into(), new_content.into());
         let mut buf3 = ratatui::buffer::Buffer::empty(area);
-        renderer.render_nodes(&nodes, &ctx, &mut buf3, area).unwrap();
+        renderer
+            .render_nodes(&nodes, &ctx, &mut buf3, area)
+            .unwrap();
         assert_eq!(parse_inclusion_calls(), 2, "invalidation: one more parse");
         assert!(buffer_text(&buf3).contains("Changed"));
 
@@ -2069,5 +2077,43 @@ mod buffer_renderer_api {
             "explicit prop: still 2 parses, no new source"
         );
         assert!(buffer_text(&buf4).contains("Hello"), "explicit prop wins");
+    }
+
+    #[test]
+    fn buffer_renderer_evicts_stale_include_after_failed_invalidation() {
+        let mut ctx = TemplateContext::new();
+        ctx.base_dir = Some(PathBuf::from("/virtual"));
+        std::sync::Arc::make_mut(&mut ctx.virtual_files)
+            .insert("child.crepus".into(), "div\n  \"valid\"".into());
+        let nodes = parse_template("div\n include child.crepus").unwrap();
+        let mut renderer = BufferRenderer::new();
+        let area = Rect::new(0, 0, 30, 2);
+
+        let mut initial = ratatui::buffer::Buffer::empty(area);
+        renderer
+            .render_nodes(&nodes, &ctx, &mut initial, area)
+            .unwrap();
+        assert_eq!(renderer.cache_stats().misses, 1);
+
+        std::sync::Arc::make_mut(&mut ctx.virtual_files)
+            .insert("child.crepus".into(), "<< invalid".into());
+        let mut invalid = ratatui::buffer::Buffer::empty(area);
+        renderer
+            .render_nodes(&nodes, &ctx, &mut invalid, area)
+            .unwrap();
+        assert!(buffer_text(&invalid).contains('⚠'));
+
+        std::sync::Arc::make_mut(&mut ctx.virtual_files)
+            .insert("child.crepus".into(), "div\n  \"valid\"".into());
+        let mut restored = ratatui::buffer::Buffer::empty(area);
+        renderer
+            .render_nodes(&nodes, &ctx, &mut restored, area)
+            .unwrap();
+
+        assert_eq!(
+            renderer.cache_stats().misses,
+            2,
+            "restoring content after an invalidation failure must parse a fresh miss"
+        );
     }
 }

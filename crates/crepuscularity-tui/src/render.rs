@@ -370,9 +370,9 @@ impl BufferRenderer {
     }
 
     /// Resolve the parsed nodes for an include, consulting and updating the
-/// include cache. The returned `Arc<[Node]>` is owned by the cache and is
-/// safe to keep across subsequent renders because new nodes replace the
-/// cache entry wholesale.
+    /// include cache. The returned `Arc<[Node]>` is owned by the cache and is
+    /// safe to keep across subsequent renders because new nodes replace the
+    /// cache entry wholesale.
     fn load_include(
         &mut self,
         full_path: &Path,
@@ -404,7 +404,10 @@ impl BufferRenderer {
                     );
                     Ok(arc_nodes)
                 }
-                Err(error_nodes) => Err(error_nodes),
+                Err(error_nodes) => {
+                    self.include_cache.remove(&key);
+                    Err(error_nodes)
+                }
             }
         } else {
             // First successful parse: cache miss. Failures are NOT cached.
@@ -461,7 +464,14 @@ fn parse_included_source(
                     .map(|c| {
                         let mut nodes = c.nodes.clone();
                         for (k, v) in &c.meta.defaults {
-                            nodes.insert(0, Node::LetDecl(LetDecl { name: k.clone(), expr: v.clone(), is_default: true }));
+                            nodes.insert(
+                                0,
+                                Node::LetDecl(LetDecl {
+                                    name: k.clone(),
+                                    expr: v.clone(),
+                                    is_default: true,
+                                }),
+                            );
                         }
                         nodes
                     })
@@ -688,7 +698,9 @@ fn build_element(
     } else if el.children.is_empty() {
         build_empty_box(&hints, constraint, style)
     } else {
-        build_container_element(el, &hints, ctx, parent_dir, constraint, style, &classes, renderer)
+        build_container_element(
+            el, &hints, ctx, parent_dir, constraint, style, &classes, renderer,
+        )
     }
 }
 
@@ -1137,7 +1149,6 @@ fn prepare_include_context(
     child_ctx
 }
 
-
 fn build_include(
     inc: &IncludeNode,
     ctx: &TemplateContext,
@@ -1162,7 +1173,7 @@ fn build_include(
         Ok(c) => c,
         Err(e) => return error_children(&e.to_string()),
     };
-    let mut child_ctx = prepare_include_context(inc, ctx, &full_path);
+    let child_ctx = prepare_include_context(inc, ctx, &full_path);
 
     // Pull the cached parsed nodes (or parse + cache on miss / re-parse on
     // invalidation). Missing or invalid includes retain the existing inline
@@ -1171,9 +1182,6 @@ fn build_include(
         Ok(nodes) => nodes,
         Err(error_nodes) => return error_nodes,
     };
-
-
-
     build_children(&cached_nodes, &child_ctx, parent_dir, inherited, renderer)
 }
 
@@ -1246,7 +1254,6 @@ fn paint_node_buf(node: &WidgetNode, buf: &mut Buffer, area: Rect) {
         WidgetNode::Empty => {}
     }
 }
-
 
 fn paint_children_buf(
     children: &[WidgetChild],
