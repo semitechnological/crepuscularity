@@ -430,23 +430,48 @@ impl BufferRenderer {
 /// Parse an included source string. `file_path` is only used for error
 /// messages. The two callers — fresh miss and post-invalidation re-parse —
 /// share this implementation.
+
+#[cfg(test)]
+static PARSE_INCLUSION_CALLS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+#[cfg(test)]
+pub fn reset_parse_counter() {
+    PARSE_INCLUSION_CALLS.store(0, std::sync::atomic::Ordering::SeqCst);
+}
+
+#[cfg(test)]
+pub fn parse_inclusion_calls() -> u64 {
+    PARSE_INCLUSION_CALLS.load(std::sync::atomic::Ordering::SeqCst)
+}
 fn parse_included_source(
     component_name: Option<&str>,
     content: &str,
     file_path: &str,
 ) -> Result<Vec<Node>, Vec<WidgetChild>> {
     match component_name {
-        Some(name) => match parse_component_file(content) {
-            Ok(file) => file
-                .components
-                .get(name)
-                .map(|c| c.nodes.clone())
-                .ok_or_else(|| error_children(&format!("component not found: {name}"))),
-            Err(e) => Err(error_children(&format!(
-                "parse error in '{file_path}': {}",
-                e
-            ))),
-        },
+        Some(name) => {
+            #[cfg(test)]
+            {
+                PARSE_INCLUSION_CALLS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            }
+            match parse_component_file(content) {
+                Ok(file) => file
+                    .components
+                    .get(name)
+                    .map(|c| {
+                        let mut nodes = c.nodes.clone();
+                        for (k, v) in &c.meta.defaults {
+                            nodes.insert(0, Node::LetDecl(LetDecl { name: k.clone(), expr: v.clone(), is_default: true }));
+                        }
+                        nodes
+                    })
+                    .ok_or_else(|| error_children(&format!("component not found: {name}"))),
+                Err(e) => Err(error_children(&format!(
+                    "parse error in '{file_path}': {}",
+                    e
+                ))),
+            }
+        }
         None => match parse_template(content) {
             Ok(n) => Ok(n),
             Err(e) => Err(error_children(&format!(
@@ -455,33 +480,6 @@ fn parse_included_source(
             ))),
         },
     }
-}
-
-/// Apply per-include default expressions from a (cached) component file.
-/// Mirrors the prior `parse_included_nodes` helper but is invoked AFTER the
-/// cached nodes are loaded so we never re-parse on every render.
-fn apply_included_defaults(
-    component_name: Option<&str>,
-    content: &str,
-    file_path: &str,
-    child_ctx: &mut TemplateContext,
-) -> Result<(), Vec<WidgetChild>> {
-    if let Some(name) = component_name {
-        let file = parse_component_file(content)
-            .map_err(|e| error_children(&format!("parse error in '{file_path}': {}", e)))?;
-        let comp = file
-            .components
-            .get(name)
-            .ok_or_else(|| error_children(&format!("component not found: {name}")))?;
-        for (k, v) in &comp.meta.defaults {
-            if !child_ctx.vars.contains_key(k) {
-                child_ctx
-                    .vars
-                    .insert(k.clone(), eval_value(v, &TemplateContext::default()));
-            }
-        }
-    }
-    Ok(())
 }
 
 /// Parse `template` and paint it into `buf` within `area`. Equivalent to
@@ -1174,14 +1172,7 @@ fn build_include(
         Err(error_nodes) => return error_nodes,
     };
 
-    // Apply per-include default expressions from the cached component (if any)
-    // without re-parsing the file — this lets the cache hold only the parsed
-    // AST and mirrors the prior `parse_included_nodes` behaviour.
-    if let Err(error_nodes) =
-        apply_included_defaults(component_name, &content, file_path, &mut child_ctx)
-    {
-        return error_nodes;
-    }
+
 
     build_children(&cached_nodes, &child_ctx, parent_dir, inherited, renderer)
 }

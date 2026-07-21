@@ -2017,4 +2017,57 @@ mod buffer_renderer_api {
             stats
         );
     }
+    #[test]
+    fn buffer_renderer_named_component_include_caching() {
+        use crate::render::parse_inclusion_calls;
+
+        let mut ctx = TemplateContext::new();
+        ctx.base_dir = Some(PathBuf::from("/virtual"));
+        let component_file =
+            "+++\n[Card.defaults]\ntitle = \"Untitled\"\n+++\n\n--- Card\ndiv\n  \"{title}\"";
+        std::sync::Arc::make_mut(&mut ctx.virtual_files)
+            .insert("card.crepus".into(), component_file.into());
+
+        let template = "div\n include card.crepus#Card";
+        let nodes = parse_template(template).unwrap();
+
+        let mut renderer = BufferRenderer::new();
+        let area = Rect::new(0, 0, 30, 2);
+
+        // 1st render: miss — one parse.
+        let mut buf1 = ratatui::buffer::Buffer::empty(area);
+        renderer.render_nodes(&nodes, &ctx, &mut buf1, area).unwrap();
+        assert_eq!(parse_inclusion_calls(), 1, "first render: one parse");
+        assert!(buffer_text(&buf1).contains("Untitled"));
+
+        // 2nd render: hit — zero new parses.
+        let mut buf2 = ratatui::buffer::Buffer::empty(area);
+        renderer.render_nodes(&nodes, &ctx, &mut buf2, area).unwrap();
+        assert_eq!(parse_inclusion_calls(), 1, "second render: hit, no new parse");
+        assert!(buffer_text(&buf2).contains("Untitled"));
+
+        // 3rd render: source changed — one re-parse (invalidation).
+        let new_content =
+            "+++\n[Card.defaults]\ntitle = \"Changed\"\n+++\n\n--- Card\ndiv\n  \"{title}\"";
+        std::sync::Arc::make_mut(&mut ctx.virtual_files)
+            .insert("card.crepus".into(), new_content.into());
+        let mut buf3 = ratatui::buffer::Buffer::empty(area);
+        renderer.render_nodes(&nodes, &ctx, &mut buf3, area).unwrap();
+        assert_eq!(parse_inclusion_calls(), 2, "invalidation: one more parse");
+        assert!(buffer_text(&buf3).contains("Changed"));
+
+        // Explicit prop override: still cached at the same key, no re-parse.
+        let template_with_prop = "div\n include card.crepus#Card title=\"Hello\"";
+        let nodes_with_prop = parse_template(template_with_prop).unwrap();
+        let mut buf4 = ratatui::buffer::Buffer::empty(area);
+        renderer
+            .render_nodes(&nodes_with_prop, &ctx, &mut buf4, area)
+            .unwrap();
+        assert_eq!(
+            parse_inclusion_calls(),
+            2,
+            "explicit prop: still 2 parses, no new source"
+        );
+        assert!(buffer_text(&buf4).contains("Hello"), "explicit prop wins");
+    }
 }
