@@ -19,13 +19,15 @@ use ratatui::style::{Color, Style};
 use ratatui::text::{Line, Span, Text};
 use ratatui::widgets::{Block, BorderType, Borders, Padding, Paragraph, Widget, Wrap};
 use ratatui::Frame;
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use crepuscularity_core::ast::*;
 use crepuscularity_core::context::{value_to_str, TemplateContext, TemplateValue};
 use crepuscularity_core::eval::eval_expr;
 use crepuscularity_core::include_paths::resolve_include_path;
-use crepuscularity_core::parser::{parse_component_file, parse_template};
+use crepuscularity_core::parser::{parse_component_file, parse_template, ComponentDef};
 use crepuscularity_core::preprocess::slot_rotate_child_phrases;
 use crepuscularity_core::virtual_files::lookup_virtual_file;
 use crepuscularity_core::CrepusError;
@@ -129,8 +131,11 @@ pub fn render_template(
     frame: &mut Frame,
     area: Rect,
 ) -> Result<(), CrepusError> {
+    // Frame-based entry point — parse once, delegate to the shared Buffer
+    // painting pipeline through a transient BufferRenderer.
     let nodes = parse_template(template)?;
-    render_nodes(&nodes, ctx, frame, area)
+    let mut renderer = BufferRenderer::new();
+    renderer.render_nodes(&nodes, ctx, frame.buffer_mut(), area)
 }
 
 /// Walk a template source and collect the IDs of elements marked `focusable`,
@@ -189,14 +194,12 @@ pub fn render_nodes(
     frame: &mut Frame,
     area: Rect,
 ) -> Result<(), CrepusError> {
-    // The root is implicitly a vertical flex container filling the whole area.
-    let render_ctx = with_tui_target(ctx);
-    let children = build_children(nodes, &render_ctx, Direction::Vertical, Style::default());
-    paint_children(&children, frame, area, Direction::Vertical, 0, 0);
-    Ok(())
+    // Frame-based entry point — delegate to the same Buffer painting pipeline
+    // used by `BufferRenderer::render_nodes` through a transient renderer.
+    let mut renderer = BufferRenderer::new();
+    renderer.render_nodes(nodes, ctx, frame.buffer_mut(), area)
 }
 
-/// Parse a named component from a multi-component `.crepus` file and paint it.
 pub fn render_component(
     content: &str,
     component_name: &str,
@@ -204,21 +207,15 @@ pub fn render_component(
     frame: &mut Frame,
     area: Rect,
 ) -> Result<(), CrepusError> {
+    // Frame-based entry point — parse once, delegate to the shared Buffer
+    // painting pipeline through a transient BufferRenderer.
     let mut file = parse_component_file(content)?;
     let component = file
         .components
         .remove(component_name)
         .ok_or_else(|| CrepusError::render(format!("component not found: {component_name}")))?;
-
-    let mut child_ctx = with_tui_target(ctx);
-    for (key, expr) in component.meta.defaults {
-        child_ctx
-            .vars
-            .entry(key)
-            .or_insert_with(|| eval_value(&expr, &TemplateContext::default()));
-    }
-
-    render_nodes(&component.nodes, &child_ctx, frame, area)
+    let mut renderer = BufferRenderer::new();
+    renderer.render_component(&component, ctx, frame.buffer_mut(), area)
 }
 
 fn with_tui_target(ctx: &TemplateContext) -> TemplateContext {
@@ -268,6 +265,257 @@ fn with_tui_target(ctx: &TemplateContext) -> TemplateContext {
     ctx
 }
 
+// ─── Public Buffer rendering API ──────────────────────────────────────────────
+//
+// The Frame-based entry points above are source-compatible and continue to be
+// the primary API for terminal applications driving a `ratatui::Frame`.
+//
+// The Buffer-based API below is the additive public surface for callers that
+// own a `ratatui::buffer::Buffer` directly (custom drawing pipelines, embedded
+// use inside larger terminal apps, and unit tests that want to assert on cell
+// bytes without going through a Frame). The two entry points share the same
+// internal build/paint implementations; the Frame API delegates here.
+
+/// Statistics reported by a [`BufferRenderer`] about include-cache behaviour.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct RenderCacheStats {
+    /// Number of times a cached include was reused without re-parsing.
+    pub hits: u64,
+    /// Number of times an include was parsed for the first time and cached.
+    pub misses: u64,
+    /// Number of times a cached include's source changed and was re-parsed.
+    pub invalidations: u64,
+}
+
+/// Cache key for an included template.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+struct IncludeKey {
+    path: PathBuf,
+    component: Option<String>,
+}
+
+/// A successful cached include parse.
+#[derive(Debug)]
+struct CachedInclude {
+    source: Arc<str>,
+    nodes: Arc<[Node]>,
+}
+
+/// Public renderer that exposes the same Buffer-based painting pipeline as the
+/// Frame-based [`render_template`] / [`render_nodes`] / [`render_component`]
+/// API, but accepts and mutates a caller-owned `ratatui::buffer::Buffer`
+/// directly. Includes are cached by resolved path plus optional component
+/// name so transitive includes share one cache across renders.
+#[derive(Debug, Default)]
+pub struct BufferRenderer {
+    include_cache: HashMap<IncludeKey, CachedInclude>,
+    stats: RenderCacheStats,
+}
+
+impl BufferRenderer {
+    /// Create a new renderer with an empty include cache.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Paint `nodes` into `buf` within `area` using the shared Buffer pipeline.
+    pub fn render_nodes(
+        &mut self,
+        nodes: &[Node],
+        ctx: &TemplateContext,
+        buf: &mut Buffer,
+        area: Rect,
+    ) -> Result<(), CrepusError> {
+        let render_ctx = with_tui_target(ctx);
+        let children = build_children(
+            nodes,
+            &render_ctx,
+            Direction::Vertical,
+            Style::default(),
+            self,
+        );
+        paint_children_buf(&children, buf, area, Direction::Vertical, 0);
+        Ok(())
+    }
+
+    /// Paint a pre-parsed [`ComponentDef`] into `buf` within `area`. The
+    /// caller supplies the parsed `ComponentDef` so the multi-component file's
+    /// frontmatter and siblings need not be re-parsed for every render.
+    pub fn render_component(
+        &mut self,
+        component: &ComponentDef,
+        ctx: &TemplateContext,
+        buf: &mut Buffer,
+        area: Rect,
+    ) -> Result<(), CrepusError> {
+        let mut child_ctx = with_tui_target(ctx);
+        for (key, expr) in &component.meta.defaults {
+            child_ctx
+                .vars
+                .entry(key.clone())
+                .or_insert_with(|| eval_value(expr, &TemplateContext::default()));
+        }
+        self.render_nodes(&component.nodes, &child_ctx, buf, area)
+    }
+
+    /// Drop every cached include. Cache statistics are reset to zero.
+    pub fn clear_cache(&mut self) {
+        self.include_cache.clear();
+        self.stats = RenderCacheStats::default();
+    }
+
+    /// Snapshot the renderer's cache statistics.
+    pub fn cache_stats(&self) -> RenderCacheStats {
+        self.stats
+    }
+
+    /// Resolve the parsed nodes for an include, consulting and updating the
+/// include cache. The returned `Arc<[Node]>` is owned by the cache and is
+/// safe to keep across subsequent renders because new nodes replace the
+/// cache entry wholesale.
+    fn load_include(
+        &mut self,
+        full_path: &Path,
+        component_name: Option<&str>,
+        content: &str,
+    ) -> Result<Arc<[Node]>, Vec<WidgetChild>> {
+        let key = IncludeKey {
+            path: full_path.to_path_buf(),
+            component: component_name.map(str::to_owned),
+        };
+        if let Some(entry) = self.include_cache.get(&key) {
+            if entry.source.as_ref() == content {
+                // Exact source equality: cache hit.
+                self.stats.hits += 1;
+                return Ok(entry.nodes.clone());
+            }
+            // Source changed: re-parse and bump `invalidations`. We deliberately
+            // do NOT count this as a miss — the include was already cached.
+            match parse_included_source(component_name, content, &full_path.to_string_lossy()) {
+                Ok(nodes) => {
+                    self.stats.invalidations += 1;
+                    let arc_nodes: Arc<[Node]> = Arc::from(nodes.into_boxed_slice());
+                    self.include_cache.insert(
+                        key,
+                        CachedInclude {
+                            source: Arc::from(content),
+                            nodes: arc_nodes.clone(),
+                        },
+                    );
+                    Ok(arc_nodes)
+                }
+                Err(error_nodes) => Err(error_nodes),
+            }
+        } else {
+            // First successful parse: cache miss. Failures are NOT cached.
+            match parse_included_source(component_name, content, &full_path.to_string_lossy()) {
+                Ok(nodes) => {
+                    self.stats.misses += 1;
+                    let arc_nodes: Arc<[Node]> = Arc::from(nodes.into_boxed_slice());
+                    self.include_cache.insert(
+                        key,
+                        CachedInclude {
+                            source: Arc::from(content),
+                            nodes: arc_nodes.clone(),
+                        },
+                    );
+                    Ok(arc_nodes)
+                }
+                Err(error_nodes) => Err(error_nodes),
+            }
+        }
+    }
+}
+
+/// Parse an included source string. `file_path` is only used for error
+/// messages. The two callers — fresh miss and post-invalidation re-parse —
+/// share this implementation.
+fn parse_included_source(
+    component_name: Option<&str>,
+    content: &str,
+    file_path: &str,
+) -> Result<Vec<Node>, Vec<WidgetChild>> {
+    match component_name {
+        Some(name) => match parse_component_file(content) {
+            Ok(file) => file
+                .components
+                .get(name)
+                .map(|c| c.nodes.clone())
+                .ok_or_else(|| error_children(&format!("component not found: {name}"))),
+            Err(e) => Err(error_children(&format!(
+                "parse error in '{file_path}': {}",
+                e
+            ))),
+        },
+        None => match parse_template(content) {
+            Ok(n) => Ok(n),
+            Err(e) => Err(error_children(&format!(
+                "parse error in '{file_path}': {}",
+                e
+            ))),
+        },
+    }
+}
+
+/// Apply per-include default expressions from a (cached) component file.
+/// Mirrors the prior `parse_included_nodes` helper but is invoked AFTER the
+/// cached nodes are loaded so we never re-parse on every render.
+fn apply_included_defaults(
+    component_name: Option<&str>,
+    content: &str,
+    file_path: &str,
+    child_ctx: &mut TemplateContext,
+) -> Result<(), Vec<WidgetChild>> {
+    if let Some(name) = component_name {
+        let file = parse_component_file(content)
+            .map_err(|e| error_children(&format!("parse error in '{file_path}': {}", e)))?;
+        let comp = file
+            .components
+            .get(name)
+            .ok_or_else(|| error_children(&format!("component not found: {name}")))?;
+        for (k, v) in &comp.meta.defaults {
+            if !child_ctx.vars.contains_key(k) {
+                child_ctx
+                    .vars
+                    .insert(k.clone(), eval_value(v, &TemplateContext::default()));
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Parse `template` and paint it into `buf` within `area`. Equivalent to
+/// [`render_template`] but operates on a raw `Buffer` and uses a fresh
+/// short-lived [`BufferRenderer`] (no cross-render cache reuse).
+pub fn render_template_to_buffer(
+    template: &str,
+    ctx: &TemplateContext,
+    buf: &mut Buffer,
+    area: Rect,
+) -> Result<(), CrepusError> {
+    let nodes = parse_template(template)?;
+    let mut renderer = BufferRenderer::new();
+    renderer.render_nodes(&nodes, ctx, buf, area)
+}
+
+/// Parse a named component from a multi-component `.crepus` file and paint it
+/// into `buf` within `area`. Equivalent to [`render_component`] but operates
+/// on a raw `Buffer` and uses a fresh short-lived [`BufferRenderer`].
+pub fn render_component_to_buffer(
+    content: &str,
+    component_name: &str,
+    ctx: &TemplateContext,
+    buf: &mut Buffer,
+    area: Rect,
+) -> Result<(), CrepusError> {
+    let mut file = parse_component_file(content)?;
+    let component = file
+        .components
+        .remove(component_name)
+        .ok_or_else(|| CrepusError::render(format!("component not found: {component_name}")))?;
+    let mut renderer = BufferRenderer::new();
+    renderer.render_component(&component, ctx, buf, area)
+}
 // ─── Phase 1: Build ───────────────────────────────────────────────────────────
 
 /// Convert a slice of nodes into a list of `WidgetChild`s.
@@ -279,6 +527,7 @@ fn build_children(
     ctx: &TemplateContext,
     parent_dir: Direction,
     inherited: Style,
+    renderer: &mut BufferRenderer,
 ) -> Vec<WidgetChild> {
     let mut ctx = ctx.clone();
     let mut out: Vec<WidgetChild> = Vec::new();
@@ -314,23 +563,23 @@ fn build_children(
             // Structural nodes: flush buffered text first, then emit.
             Node::Element(el) => {
                 flush_text(&mut text_buf, &mut out, parent_dir, inherited);
-                out.push(build_element(el, &ctx, parent_dir, inherited));
+                out.push(build_element(el, &ctx, parent_dir, inherited, renderer));
             }
             Node::If(block) => {
                 flush_text(&mut text_buf, &mut out, parent_dir, inherited);
-                out.extend(build_if(block, &ctx, parent_dir, inherited));
+                out.extend(build_if(block, &ctx, parent_dir, inherited, renderer));
             }
             Node::For(block) => {
                 flush_text(&mut text_buf, &mut out, parent_dir, inherited);
-                out.extend(build_for(block, &ctx, parent_dir, inherited));
+                out.extend(build_for(block, &ctx, parent_dir, inherited, renderer));
             }
             Node::Match(block) => {
                 flush_text(&mut text_buf, &mut out, parent_dir, inherited);
-                out.extend(build_match(block, &ctx, parent_dir, inherited));
+                out.extend(build_match(block, &ctx, parent_dir, inherited, renderer));
             }
             Node::Include(inc) => {
                 flush_text(&mut text_buf, &mut out, parent_dir, inherited);
-                out.extend(build_include(inc, &ctx, parent_dir, inherited));
+                out.extend(build_include(inc, &ctx, parent_dir, inherited, renderer));
             }
             Node::Embed(_) => {
                 flush_text(&mut text_buf, &mut out, parent_dir, inherited);
@@ -376,10 +625,11 @@ fn build_element(
     ctx: &TemplateContext,
     parent_dir: Direction,
     inherited: Style,
+    renderer: &mut BufferRenderer,
 ) -> WidgetChild {
     // ── Special pseudo-elements ───────────────────────────────────────────────
     match el.tag.as_str() {
-        "slot" => return build_slot(el, ctx, parent_dir, inherited),
+        "slot" => return build_slot(el, ctx, parent_dir, inherited, renderer),
         "slot-rotate" => return build_slot_rotate(el, ctx, parent_dir, inherited),
         _ => {}
     }
@@ -440,7 +690,7 @@ fn build_element(
     } else if el.children.is_empty() {
         build_empty_box(&hints, constraint, style)
     } else {
-        build_container_element(el, &hints, ctx, parent_dir, constraint, style, &classes)
+        build_container_element(el, &hints, ctx, parent_dir, constraint, style, &classes, renderer)
     }
 }
 
@@ -547,9 +797,10 @@ fn build_container_element(
     constraint: Constraint,
     style: Style,
     classes: &[String],
+    renderer: &mut BufferRenderer,
 ) -> WidgetChild {
     let child_dir = hints.direction;
-    let children = build_children(&el.children, ctx, child_dir, style);
+    let children = build_children(&el.children, ctx, child_dir, style, renderer);
     let scroll_cfg = scroll_config(el, ctx, classes);
 
     // Resolve Fit constraints: measure the natural content size and
@@ -697,14 +948,14 @@ fn build_slot(
     ctx: &TemplateContext,
     _parent_dir: Direction,
     inherited: Style,
+    renderer: &mut BufferRenderer,
 ) -> WidgetChild {
     let (nodes, slot_ctx) = if let Some((slot_nodes, slot_ctx_box)) = &ctx.slot {
         (slot_nodes.as_slice(), slot_ctx_box.as_ref())
     } else {
         (el.children.as_slice(), ctx)
     };
-
-    let children = build_children(nodes, slot_ctx, Direction::Vertical, inherited);
+    let children = build_children(nodes, slot_ctx, Direction::Vertical, inherited, renderer);
     WidgetChild {
         node: WidgetNode::Container {
             direction: Direction::Vertical,
@@ -794,6 +1045,7 @@ fn build_if(
     ctx: &TemplateContext,
     parent_dir: Direction,
     inherited: Style,
+    renderer: &mut BufferRenderer,
 ) -> Vec<WidgetChild> {
     let body = if eval_condition(ctx, &block.condition) {
         &block.then_children
@@ -802,7 +1054,7 @@ fn build_if(
     } else {
         return vec![];
     };
-    build_children(body, ctx, parent_dir, inherited)
+    build_children(body, ctx, parent_dir, inherited, renderer)
 }
 
 fn build_for(
@@ -810,6 +1062,7 @@ fn build_for(
     ctx: &TemplateContext,
     parent_dir: Direction,
     inherited: Style,
+    renderer: &mut BufferRenderer,
 ) -> Vec<WidgetChild> {
     let items = ctx.get_list_ref(&block.iterator);
     let mut out = Vec::new();
@@ -839,6 +1092,7 @@ fn build_for(
             &child_ctx,
             parent_dir,
             inherited,
+            renderer,
         ));
     }
     out
@@ -849,6 +1103,7 @@ fn build_match(
     ctx: &TemplateContext,
     parent_dir: Direction,
     inherited: Style,
+    renderer: &mut BufferRenderer,
 ) -> Vec<WidgetChild> {
     let val = value_to_str(&eval_value(&block.expr, ctx));
     for arm in &block.arms {
@@ -861,7 +1116,7 @@ fn build_match(
             pattern == val
         };
         if matched {
-            return build_children(&arm.body, ctx, parent_dir, inherited);
+            return build_children(&arm.body, ctx, parent_dir, inherited, renderer);
         }
     }
     vec![]
@@ -884,47 +1139,13 @@ fn prepare_include_context(
     child_ctx
 }
 
-fn parse_included_nodes(
-    component_name: Option<&str>,
-    content: &str,
-    file_path: &str,
-    child_ctx: &mut TemplateContext,
-) -> Result<Vec<Node>, Vec<WidgetChild>> {
-    match component_name {
-        Some(name) => match parse_component_file(content) {
-            Ok(file) => match file.components.get(name) {
-                Some(comp) => {
-                    for (k, v) in &comp.meta.defaults {
-                        if !child_ctx.vars.contains_key(k) {
-                            child_ctx
-                                .vars
-                                .insert(k.clone(), eval_value(v, &TemplateContext::default()));
-                        }
-                    }
-                    Ok(comp.nodes.clone())
-                }
-                None => Err(error_children(&format!("component not found: {name}"))),
-            },
-            Err(e) => Err(error_children(&format!(
-                "parse error in '{file_path}': {}",
-                e
-            ))),
-        },
-        None => match parse_template(content) {
-            Ok(n) => Ok(n),
-            Err(e) => Err(error_children(&format!(
-                "parse error in '{file_path}': {}",
-                e
-            ))),
-        },
-    }
-}
 
 fn build_include(
     inc: &IncludeNode,
     ctx: &TemplateContext,
     parent_dir: Direction,
     inherited: Style,
+    renderer: &mut BufferRenderer,
 ) -> Vec<WidgetChild> {
     // Split `path#ComponentName` if present.
     let (file_path, component_name) = if let Some((f, c)) = inc.path.split_once('#') {
@@ -943,16 +1164,26 @@ fn build_include(
         Ok(c) => c,
         Err(e) => return error_children(&e.to_string()),
     };
-
     let mut child_ctx = prepare_include_context(inc, ctx, &full_path);
 
-    // Parse and recurse.
-    let nodes = match parse_included_nodes(component_name, &content, file_path, &mut child_ctx) {
+    // Pull the cached parsed nodes (or parse + cache on miss / re-parse on
+    // invalidation). Missing or invalid includes retain the existing inline
+    // warning-node behaviour and MUST NOT be cached.
+    let cached_nodes = match renderer.load_include(&full_path, component_name, &content) {
         Ok(nodes) => nodes,
         Err(error_nodes) => return error_nodes,
     };
 
-    build_children(&nodes, &child_ctx, parent_dir, inherited)
+    // Apply per-include default expressions from the cached component (if any)
+    // without re-parsing the file — this lets the cache hold only the parsed
+    // AST and mirrors the prior `parse_included_nodes` behaviour.
+    if let Err(error_nodes) =
+        apply_included_defaults(component_name, &content, file_path, &mut child_ctx)
+    {
+        return error_nodes;
+    }
+
+    build_children(&cached_nodes, &child_ctx, parent_dir, inherited, renderer)
 }
 
 // ─── Phase 2: Paint ───────────────────────────────────────────────────────────
@@ -1025,16 +1256,6 @@ fn paint_node_buf(node: &WidgetNode, buf: &mut Buffer, area: Rect) {
     }
 }
 
-fn paint_children(
-    children: &[WidgetChild],
-    frame: &mut Frame,
-    area: Rect,
-    direction: Direction,
-    gap: u16,
-    _scroll_offset: usize,
-) {
-    paint_children_buf(children, frame.buffer_mut(), area, direction, gap);
-}
 
 fn paint_children_buf(
     children: &[WidgetChild],

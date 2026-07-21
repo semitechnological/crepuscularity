@@ -1682,3 +1682,339 @@ mod component_model {
         );
     }
 }
+
+// ─── Public Buffer renderer ──────────────────────────────────────────────────
+//
+// These tests exercise the additive public `BufferRenderer` API introduced for
+// TUI applications that own a `ratatui::buffer::Buffer` directly (rather than
+// driving the render through a `Frame`). They follow red-green TDD discipline:
+// every test below must fail to compile (or fail at runtime) before the new
+// `BufferRenderer` implementation lands, and pass once it does.
+
+#[cfg(test)]
+mod buffer_renderer_api {
+    use super::*;
+    use crate::render::RenderCacheStats;
+    use ratatui::buffer::Cell;
+    use ratatui::layout::Rect;
+    /// Render every cell of `buf` into one concatenated String, row-major.
+    fn buffer_text(buf: &ratatui::buffer::Buffer) -> String {
+        let area = buf.area;
+        let mut out = String::with_capacity((area.width as usize) * (area.height as usize));
+        for y in 0..area.height {
+            for x in 0..area.width {
+                out.push_str(buf[(x, y)].symbol());
+            }
+        }
+        out
+    }
+
+
+
+    use crate::BufferRenderer;
+    use crepuscularity_core::parser::{
+        parse_component_file, parse_template, ComponentDef,
+    };
+
+    /// Render `template` into a fresh `Buffer` of `width x height` via the
+    /// existing public Frame entry point, then clone every cell for comparison.
+    fn frame_cells(width: u16, height: u16, template: &str, ctx: &TemplateContext) -> Vec<Cell> {
+        let backend = TestBackend::new(width, height);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal
+            .draw(|frame| {
+                let area = frame.area();
+                render_template(template, ctx, frame, area)
+                    .expect("render_template returned an error");
+            })
+            .unwrap();
+        let buf = terminal.backend().buffer();
+        let w = buf.area.width as usize;
+        let h = buf.area.height as usize;
+        let mut out = Vec::with_capacity(w * h);
+        for y in 0..h {
+            for x in 0..w {
+                out.push(buf[(x as u16, y as u16)].clone());
+            }
+        }
+        out
+    }
+
+    /// Render `nodes` into a fresh `Buffer` of `width x height` via the new
+    /// public `BufferRenderer::render_nodes` entry point.
+    fn buffer_cells(
+        width: u16,
+        height: u16,
+        nodes: &[crate::Node],
+        ctx: &TemplateContext,
+    ) -> Vec<Cell> {
+        let mut renderer = BufferRenderer::new();
+        let area = Rect::new(0, 0, width, height);
+        let mut buf = ratatui::buffer::Buffer::empty(area);
+        renderer
+            .render_nodes(nodes, ctx, &mut buf, area)
+            .expect("render_nodes returned an error");
+        let mut out = Vec::with_capacity((width as usize) * (height as usize));
+        for y in 0..height {
+            for x in 0..width {
+                out.push(buf[(x, y)].clone());
+            }
+        }
+        out
+    }
+
+    fn cells_to_text(cells: &[Cell], width: u16, height: u16) -> Vec<String> {
+        let w = width as usize;
+        (0..height as usize)
+            .map(|y| {
+                cells[y * w..(y + 1) * w]
+                    .iter()
+                    .map(|c| c.symbol())
+                    .collect::<String>()
+            })
+            .collect()
+    }
+
+    #[test]
+    fn buffer_renderer_matches_frame() {
+        // The Frame and Buffer renderers must produce identical cell streams
+        // for the same template + context.
+        let template = "div w-full h-full flex-col\n  div h-[1] text-white\n    \"hello\"\n  div h-[1] text-red-500\n    \"world\"";
+        let ctx = TemplateContext::new();
+        let nodes = parse_template(template).expect("template parses");
+
+        let frame = frame_cells(20, 4, template, &ctx);
+        let buf = buffer_cells(20, 4, &nodes, &ctx);
+
+        let frame_rows = cells_to_text(&frame, 20, 4);
+        let buf_rows = cells_to_text(&buf, 20, 4);
+        assert_eq!(buf_rows, frame_rows, "text rows differ");
+
+        for (i, (fc, bc)) in frame.iter().zip(buf.iter()).enumerate() {
+            assert_eq!(fc.symbol(), bc.symbol(), "symbol mismatch at cell {i}");
+            assert!(
+                fc.style() == bc.style(),
+                "style mismatch at cell {i}: frame={:?} buf={:?}",
+                fc.style(),
+                bc.style()
+            );
+        }
+    }
+
+    #[test]
+    fn buffer_renderer_renders_parsed_component_def_without_reparsing() {
+        // `render_component` accepts a pre-parsed `ComponentDef` so callers can
+        // parse a multi-component file once and render named components many
+        // times without re-traversing the frontmatter. The contract is:
+        //   1. the API accepts `&ComponentDef` (not a raw string),
+        //   2. rendering it never increments cache misses/invalidations (no
+        //      includes to parse, no AST to rebuild), and
+        //   3. successive renders of the same parsed `ComponentDef` are
+        //      idempotent (no hidden reparse between calls).
+        let content = "--- Card\ndiv border rounded p-1\n  slot\n    \"fallback\"";
+        let mut file = parse_component_file(content).expect("multi-component parses");
+        let component: ComponentDef = file
+            .components
+            .remove("Card")
+            .expect("Card component present");
+
+        let ctx = TemplateContext::new();
+        let mut renderer = BufferRenderer::new();
+        let area = Rect::new(0, 0, 30, 5);
+
+        // Render the same parsed `ComponentDef` twice in a row.
+        for iteration in 0..2 {
+            let mut buf = ratatui::buffer::Buffer::empty(area);
+            renderer
+                .render_component(&component, &ctx, &mut buf, area)
+                .unwrap_or_else(|e| panic!("render_component failed on iteration {iteration}: {e}"));
+
+            let text = buffer_text(&buf);
+            assert!(
+                text.contains("fallback"),
+                "rendered text missing 'fallback' on iteration {iteration}: {text}"
+            );
+        }
+
+        // No includes were traversed, so cache stats must remain untouched.
+        let stats = renderer.cache_stats();
+        assert_eq!(
+            stats,
+            RenderCacheStats::default(),
+            "ComponentDef render must not touch the include cache (no reparse, no includes): {:?}",
+            stats
+        );
+    }
+
+    #[test]
+    fn buffer_renderer_reuses_include_cache() {
+        // First render of an include is a miss; the second is a hit; nothing
+        // is invalidated because the virtual file did not change.
+        let mut ctx = TemplateContext::new();
+        ctx.base_dir = Some(PathBuf::from("/virtual"));
+        std::sync::Arc::make_mut(&mut ctx.virtual_files)
+            .insert("child.crepus".into(), "div\n  \"child text\"".into());
+
+        let template = "div\n include child.crepus";
+        let nodes = parse_template(template).expect("template parses");
+
+        let mut renderer = BufferRenderer::new();
+        let area = Rect::new(0, 0, 30, 3);
+        let mut buf1 = ratatui::buffer::Buffer::empty(area);
+        renderer
+            .render_nodes(&nodes, &ctx, &mut buf1, area)
+            .expect("first render_nodes returned an error");
+        let stats_after_first = renderer.cache_stats();
+        assert_eq!(
+            stats_after_first,
+            RenderCacheStats {
+                hits: 0,
+                misses: 1,
+                invalidations: 0
+            },
+            "first render should be exactly one miss"
+        );
+
+        let mut buf2 = ratatui::buffer::Buffer::empty(area);
+        renderer
+            .render_nodes(&nodes, &ctx, &mut buf2, area)
+            .expect("second render_nodes returned an error");
+        let stats_after_second = renderer.cache_stats();
+        assert_eq!(
+            stats_after_second,
+            RenderCacheStats {
+                hits: 1,
+                misses: 1,
+                invalidations: 0
+            },
+            "second render should be one miss + one hit and no invalidations"
+        );
+
+        // The two buffers must be byte-identical because the source is unchanged.
+        for y in 0..area.height {
+            for x in 0..area.width {
+                assert_eq!(
+                    buf1[(x, y)].symbol(),
+                    buf2[(x, y)].symbol(),
+                    "rendered text mismatch at ({x},{y})"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn buffer_renderer_invalidates_changed_include() {
+        // A transitive include edits the rendered output, produces exactly one
+        // cache invalidation, and leaves hits/misses counts intact for the
+        // unchanged outer include.
+        let mut ctx = TemplateContext::new();
+        ctx.base_dir = Some(PathBuf::from("/virtual"));
+        std::sync::Arc::make_mut(&mut ctx.virtual_files)
+            .insert("outer.crepus".into(), "div\n include inner.crepus".into());
+        std::sync::Arc::make_mut(&mut ctx.virtual_files)
+            .insert("inner.crepus".into(), "div\n  \"before\"".into());
+
+        let template = "div\n include outer.crepus";
+        let nodes = parse_template(template).expect("template parses");
+
+        let mut renderer = BufferRenderer::new();
+        let area = Rect::new(0, 0, 30, 4);
+
+        let mut buf1 = ratatui::buffer::Buffer::empty(area);
+        renderer
+            .render_nodes(&nodes, &ctx, &mut buf1, area)
+            .expect("first render_nodes returned an error");
+        let text1 = buffer_text(&buf1);
+        assert!(text1.contains("before"), "first render text: {text1}");
+        let stats_after_first = renderer.cache_stats();
+        assert_eq!(
+            stats_after_first.misses, 2,
+            "two misses on first render (outer + inner), got {:?}",
+            stats_after_first
+        );
+
+        // Mutate the transitive include.
+        std::sync::Arc::make_mut(&mut ctx.virtual_files)
+            .insert("inner.crepus".into(), "div\n  \"after\"".into());
+
+        let mut buf2 = ratatui::buffer::Buffer::empty(area);
+        renderer
+            .render_nodes(&nodes, &ctx, &mut buf2, area)
+            .expect("second render_nodes returned an error");
+        let text2 = buffer_text(&buf2);
+        assert!(text2.contains("after"), "second render text: {text2}");
+        assert!(
+            !text2.contains("before"),
+            "second render must not contain stale text: {text2}"
+        );
+
+        let stats_after_second = renderer.cache_stats();
+        assert_eq!(
+            stats_after_second.invalidations,
+            1,
+            "exactly one invalidation expected after editing the transitive include: {:?}",
+            stats_after_second
+        );
+        // misses must NOT have grown (the changed include was already cached and
+        // re-parsed on invalidation, not on first miss).
+        assert_eq!(
+            stats_after_second.misses, 2,
+            "misses must stay at the post-first-render count: {:?}",
+            stats_after_second
+        );
+    }
+
+    #[test]
+    fn buffer_renderer_keeps_inline_include_errors() {
+        // A missing include returns Ok, paints the existing ⚠ warning node, and
+        // must never panic or be cached.
+        let mut ctx = TemplateContext::new();
+        ctx.base_dir = Some(PathBuf::from("/virtual"));
+        // Note: "missing.crepus" is intentionally NOT inserted into virtual_files.
+
+        let template = "div\n include missing.crepus";
+        let nodes = parse_template(template).expect("template parses");
+
+        let mut renderer = BufferRenderer::new();
+        let area = Rect::new(0, 0, 80, 3);
+        let mut buf = ratatui::buffer::Buffer::empty(area);
+        let result = renderer.render_nodes(&nodes, &ctx, &mut buf, area);
+        assert!(
+            result.is_ok(),
+            "broken include must return Ok with inline warning: {:?}",
+            result.err()
+        );
+
+        let text = buffer_text(&buf);
+        assert!(
+            text.contains('⚠'),
+            "expected ⚠ warning glyph in rendered buffer: {text}"
+        );
+
+        // A second render with the same broken include must also stay Ok and
+        // still paint ⚠ — failures must not be cached.
+        let mut buf2 = ratatui::buffer::Buffer::empty(area);
+        renderer
+            .render_nodes(&nodes, &ctx, &mut buf2, area)
+            .expect("second render_nodes returned an error");
+        let text2 = buffer_text(&buf2);
+        assert!(text2.contains('⚠'), "second render lost the ⚠: {text2}");
+
+        let stats = renderer.cache_stats();
+        assert_eq!(
+            stats.misses, 0,
+            "failed includes must not be cached as misses: {:?}",
+            stats
+        );
+        assert_eq!(
+            stats.invalidations, 0,
+            "failed includes must not be cached as invalidations: {:?}",
+            stats
+        );
+        assert_eq!(
+            stats.hits, 0,
+            "failed includes must not produce cache hits: {:?}",
+            stats
+        );
+    }
+}
