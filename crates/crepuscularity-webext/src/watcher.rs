@@ -180,3 +180,75 @@ pub fn check_project_capabilities(project_dir: &Path) -> Result<Vec<Capability>,
         .cloned()
         .collect())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+    use std::fs;
+    use std::time::Duration;
+
+    #[test]
+    fn test_watcher_creation() {
+        let dir = tempdir().unwrap();
+        let watcher = CapabilityWatcher::new(dir.path()).unwrap();
+        assert!(watcher.recv_timeout(Duration::from_millis(10)).is_none());
+    }
+
+    #[test]
+    fn test_watcher_file_changed() {
+        let dir = tempdir().unwrap();
+        let watcher = CapabilityWatcher::new(dir.path()).unwrap();
+
+        let file_path = dir.path().join("test.crepus");
+        fs::write(&file_path, "div").unwrap();
+
+        let mut received = false;
+        let start = std::time::Instant::now();
+        while start.elapsed() < Duration::from_secs(2) {
+            if let Some(event) = watcher.recv_timeout(Duration::from_millis(100)) {
+                if let WatchEvent::FileChanged { path } = event {
+                    if path == file_path {
+                        received = true;
+                        break;
+                    }
+                }
+            }
+        }
+        assert!(received, "Did not receive FileChanged event");
+    }
+
+    #[test]
+    fn test_watcher_manifest_updated() {
+        let dir = tempdir().unwrap();
+        let watcher = CapabilityWatcher::new(dir.path()).unwrap();
+
+        let file_path = dir.path().join("webext.toml");
+        fs::write(&file_path, "name = \"test\"").unwrap();
+
+        let mut received = false;
+        let start = std::time::Instant::now();
+        while start.elapsed() < Duration::from_secs(2) {
+            if let Some(event) = watcher.recv_timeout(Duration::from_millis(100)) {
+                if let WatchEvent::ManifestUpdated { path } = event {
+                    if path == file_path {
+                        received = true;
+                        break;
+                    }
+                }
+            }
+        }
+        assert!(received, "Did not receive ManifestUpdated event");
+    }
+
+    #[test]
+    fn test_check_project_capabilities() {
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join("test.crepus");
+        fs::write(&file_path, "div on-click={browser.storage.local.get()}").unwrap();
+
+        let missing = check_project_capabilities(dir.path()).unwrap();
+        assert_eq!(missing.len(), 1);
+        assert_eq!(missing[0], Capability::Storage);
+    }
+}
