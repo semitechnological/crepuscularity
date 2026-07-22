@@ -60,7 +60,22 @@ mod tests {
     #[test]
     fn rejects_parent_dir() {
         let root = Path::new("/tmp/sandbox-test-root");
-        assert!(resolve_under_sandbox(root, "../etc/passwd").is_err());
+        let err = resolve_under_sandbox(root, "../etc/passwd").err().unwrap();
+        assert_eq!(err.code, "path_escape");
+    }
+
+    #[test]
+    fn rejects_absolute_path() {
+        let root = Path::new("/tmp/sandbox");
+        let err = resolve_under_sandbox(root, "/etc/passwd").err().unwrap();
+        assert_eq!(err.code, "path_not_relative");
+    }
+
+    #[test]
+    fn handles_current_dir() {
+        let root = Path::new("/tmp/sandbox");
+        let p = resolve_under_sandbox(root, "./a/./b/c.txt").unwrap();
+        assert_eq!(p, PathBuf::from("/tmp/sandbox/a/b/c.txt"));
     }
 
     #[test]
