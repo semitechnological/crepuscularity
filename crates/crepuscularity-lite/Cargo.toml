@@ -64,4 +64,5 @@ path = "src/bin/cl.rs"
 required-features = ["cli"]
 
 [dev-dependencies]
+gpui = { workspace = true, features = ["test-support"] }
 tempfile = { workspace = true }
