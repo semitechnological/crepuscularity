@@ -218,7 +218,7 @@ fn align_cross(_child: &EmbeddedNode, start: u16, size: u16, avail: u16, align: 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::document::{EmbeddedStyle};
+    use crate::document::EmbeddedStyle;
     #[cfg(not(feature = "std"))]
     use alloc::{string::String, vec};
     #[cfg(feature = "std")]
