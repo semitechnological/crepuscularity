@@ -977,8 +977,15 @@ fn run_shell(
 ) -> (bool, String, Option<u64>) {
     #[cfg(unix)]
     {
-        let mut cmd = Command::new("sh");
-        cmd.arg("-c").arg(script).current_dir(workdir).envs(envs);
+        let tokens = match shlex::split(script) {
+            Some(t) if !t.is_empty() => t,
+            _ => return (false, "Failed to parse command script".to_string(), None),
+        };
+        let mut cmd = Command::new(&tokens[0]);
+        if tokens.len() > 1 {
+            cmd.args(&tokens[1..]);
+        }
+        cmd.current_dir(workdir).envs(envs);
         match exec_tracked(&mut cmd, inherit_io, measure_memory) {
             Ok(x) => x,
             Err(e) => (false, e, None),
