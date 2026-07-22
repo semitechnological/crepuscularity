@@ -1,0 +1,15 @@
+--- crates/crepuscularity-tui/src/component.rs
++++ crates/crepuscularity-tui/src/component.rs
+@@ -39,10 +39,8 @@
+     }
+
+     pub fn with_props(&self, props: &[(String, TemplateValue)]) -> TemplateContext {
+-        let mut ctx = TemplateContext {
+-            vars: self.defaults.clone(),
+-            ..Default::default()
+-        };
++        let mut ctx = TemplateContext::new();
++        ctx.vars = self.defaults.clone();
+         for (key, value) in props {
+             ctx.vars.insert(key.clone(), value.clone());
+         }

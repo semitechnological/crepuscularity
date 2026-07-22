@@ -40,9 +40,7 @@ impl Component {
 
     pub fn with_props(&self, props: &[(String, TemplateValue)]) -> TemplateContext {
         let mut ctx = TemplateContext::new();
-        for (key, value) in &self.defaults {
-            ctx.vars.insert(key.clone(), value.clone());
-        }
+        ctx.vars = self.defaults.clone();
         for (key, value) in props {
             ctx.vars.insert(key.clone(), value.clone());
         }
