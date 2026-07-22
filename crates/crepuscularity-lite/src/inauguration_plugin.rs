@@ -94,11 +94,25 @@ fn which_in() -> Result<Value, BridgeError> {
 
 fn process_run(payload: &Value) -> Result<Value, BridgeError> {
     let command = require_str(payload, "command")?;
-    // Split on whitespace to avoid shell injection — no sh -c.
-    let parts: Vec<&str> = command.split_whitespace().collect();
+    let parts = shlex::split(&command)
+        .ok_or_else(|| BridgeError::new("invalid_argument", "malformed command string"))?;
     let (program, args) = parts
         .split_first()
         .ok_or_else(|| BridgeError::new("invalid_argument", "empty command"))?;
+
+    let is_in = std::path::Path::new(program)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .map(|n| n == "in" || n == "in.exe")
+        .unwrap_or(false);
+
+    if !is_in {
+        return Err(BridgeError::new(
+            "access_denied",
+            "inauguration plugin may only execute the `in` toolchain",
+        ));
+    }
+
     let output = Command::new(program)
         .args(args)
         .output()
@@ -152,5 +166,22 @@ mod tests {
         assert!(res.is_err());
         let err = res.err().unwrap();
         assert_eq!(err.code, "path_escape");
+    }
+
+    #[test]
+    fn rejects_arbitrary_commands() {
+        let p = InaugurationPlugin::new();
+        let payload = json!({ "command": "echo hello" });
+        let res = p.invoke("processRun", &payload);
+        assert!(res.is_err());
+        let err = res.err().unwrap();
+        assert_eq!(err.code, "access_denied");
+
+        // Also reject arbitrary commands with spaces or quotes handled improperly previously
+        let payload = json!({ "command": "rm -rf /" });
+        let res = p.invoke("processRun", &payload);
+        assert!(res.is_err());
+        let err = res.err().unwrap();
+        assert_eq!(err.code, "access_denied");
     }
 }
