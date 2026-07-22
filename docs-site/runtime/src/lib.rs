@@ -122,34 +122,31 @@ fn aggregate_daily_downloads(payloads: &[DownloadsResponse]) -> Vec<DailyDownloa
         .collect()
 }
 
-fn cumulative_downloads(series: &[DailyDownloads]) -> Vec<DailyDownloads> {
+fn cumulative_downloads(series: impl IntoIterator<Item = DailyDownloads>) -> Vec<DailyDownloads> {
     let mut running_total = 0;
     series
-        .iter()
-        .map(|row| {
+        .into_iter()
+        .map(|mut row| {
             running_total += row.downloads;
-            DailyDownloads {
-                date: row.date.clone(),
-                downloads: running_total,
-            }
+            row.downloads = running_total;
+            row
         })
         .collect()
 }
 
-fn overall_cumulative_downloads(series: &[DailyDownloads], total: u64) -> Vec<DailyDownloads> {
-    let series_total = series.iter().map(|row| row.downloads).sum::<u64>();
+fn overall_cumulative_downloads(
+    series: impl IntoIterator<Item = DailyDownloads>,
+    total: u64,
+) -> Vec<DailyDownloads> {
+    let mut cumulative: Vec<_> = series.into_iter().collect();
+    let series_total = cumulative.iter().map(|row| row.downloads).sum::<u64>();
     let effective_total = total.max(series_total);
     let mut running_total = effective_total.saturating_sub(series_total);
-    let mut cumulative = series
-        .iter()
-        .map(|row| {
-            running_total = running_total.saturating_add(row.downloads);
-            DailyDownloads {
-                date: row.date.clone(),
-                downloads: running_total,
-            }
-        })
-        .collect::<Vec<_>>();
+
+    for row in &mut cumulative {
+        running_total = running_total.saturating_add(row.downloads);
+        row.downloads = running_total;
+    }
 
     if let Some(last) = cumulative.last_mut() {
         last.downloads = effective_total;
@@ -650,7 +647,7 @@ fn render_downloads(
         .last()
         .map(|row| row.date.as_str())
         .unwrap_or("live");
-    let cumulative_series = overall_cumulative_downloads(&data.series, reported_total);
+    let cumulative_series = overall_cumulative_downloads(data.series.clone(), reported_total);
     let total = cumulative_series
         .last()
         .map(|row| row.downloads)
@@ -1306,7 +1303,7 @@ mod tests {
 
     #[test]
     fn turns_daily_downloads_into_cumulative_totals() {
-        let series = cumulative_downloads(&[
+        let series = cumulative_downloads([
             DailyDownloads {
                 date: "2026-06-01".to_string(),
                 downloads: 4,
@@ -1343,7 +1340,7 @@ mod tests {
     #[test]
     fn anchors_visible_cumulative_history_to_all_time_total() {
         let series = overall_cumulative_downloads(
-            &[
+            [
                 DailyDownloads {
                     date: "2026-06-01".to_string(),
                     downloads: 4,
@@ -1374,7 +1371,7 @@ mod tests {
     #[test]
     fn lets_daily_cumulative_history_advance_past_stale_reported_total() {
         let series = overall_cumulative_downloads(
-            &[
+            [
                 DailyDownloads {
                     date: "2026-06-05".to_string(),
                     downloads: 4,
