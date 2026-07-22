@@ -453,3 +453,45 @@ pub fn explicit_fixture_output_paths(root: &Path, explicit: &[PathBuf]) -> Vec<P
         })
         .collect()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crepuscularity_native::{ViewIr, ViewNode};
+
+    #[test]
+    fn test_stringify_ir_pretty() {
+        let ir = ViewIr {
+            version: 5,
+            root: vec![ViewNode::Text {
+                content: "hello".into(),
+                bind: None,
+                style: None,
+            }],
+        };
+
+        let json = stringify_ir(&ir, true).unwrap();
+        assert!(json.contains("hello"));
+        assert!(json.contains("kind"));
+        assert!(json.contains("text"));
+        assert!(json.contains("\n"));
+    }
+
+    #[test]
+    fn test_stringify_ir_compact() {
+        let ir = ViewIr {
+            version: 5,
+            root: vec![ViewNode::Text {
+                content: "hello".into(),
+                bind: None,
+                style: None,
+            }],
+        };
+
+        let json = stringify_ir(&ir, false).unwrap();
+        assert!(json.contains("hello"));
+        assert!(json.contains("kind"));
+        assert!(json.contains("text"));
+        assert!(!json.contains("\n"));
+    }
+}
