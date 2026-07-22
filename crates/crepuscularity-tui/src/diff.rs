@@ -81,7 +81,9 @@ impl DiffTracker {
 
     pub fn update(&mut self, ctx: &TemplateContext) {
         if let Some(snapshot) = &mut self.last {
-            snapshot.fingerprints.retain(|k, _| ctx.vars.contains_key(k));
+            snapshot
+                .fingerprints
+                .retain(|k, _| ctx.vars.contains_key(k));
             for (key, value) in &ctx.vars {
                 let mut hasher = std::collections::hash_map::DefaultHasher::new();
                 hash_value(value, &mut hasher);
