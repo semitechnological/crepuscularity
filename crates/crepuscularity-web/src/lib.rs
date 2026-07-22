@@ -674,6 +674,22 @@ fn node_is_dynamic(node: &Node) -> bool {
 ///   variables encoded as base64.
 ///
 /// Enable with the `hydration` cargo feature.
+///
+/// # Examples
+///
+/// ```rust
+/// use crepuscularity_core::TemplateContext;
+/// use crepuscularity_web::render_template_to_html_with_hydration;
+///
+/// let mut ctx = TemplateContext::new();
+/// ctx.set("count", 42i64);
+///
+/// let tpl = "div\n  span\n    \"Count: {count}\"";
+/// let html = render_template_to_html_with_hydration(tpl, &ctx).unwrap();
+///
+/// assert!(html.contains("id=\"__crepus_hydration__\""));
+/// assert!(html.contains("data-crepus-id="));
+/// ```
 #[cfg(feature = "hydration")]
 pub fn render_template_to_html_with_hydration(
     template: &str,
