@@ -101,3 +101,16 @@ pub fn spinner_err(pb: &ProgressBar, msg: &str) -> ! {
     pb.finish_and_clear();
     error(msg);
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_ui_symbols() {
+        assert_eq!(console::strip_ansi_codes(&ok().to_string()), "✓");
+        assert_eq!(console::strip_ansi_codes(&err().to_string()), "✗");
+        assert_eq!(console::strip_ansi_codes(&warn().to_string()), "!");
+        assert_eq!(console::strip_ansi_codes(&arrow().to_string()), "→");
+    }
+}
