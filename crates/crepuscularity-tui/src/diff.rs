@@ -40,7 +40,7 @@ impl RenderSnapshot {
     pub fn from_context(ctx: &TemplateContext) -> Self {
         let mut fingerprints = HashMap::new();
         for (key, value) in &ctx.vars {
-            let mut hasher = std::collections::hash_map::DefaultHasher::new();
+            let mut hasher = rustc_hash::FxHasher::default();
             hash_value(value, &mut hasher);
             fingerprints.insert(key.clone(), hasher.finish());
         }
@@ -66,7 +66,7 @@ impl DiffTracker {
                     return true;
                 }
                 for (key, value) in &ctx.vars {
-                    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+                    let mut hasher = rustc_hash::FxHasher::default();
                     hash_value(value, &mut hasher);
                     let fingerprint = hasher.finish();
                     match snapshot.fingerprints.get(key) {
