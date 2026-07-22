@@ -425,3 +425,37 @@ pub fn share_extension_target(
         rust_target_script = platform.rust_target_script(),
     )
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    #[test]
+    fn test_scaffold_native_app_at() {
+        let temp = tempfile::tempdir().unwrap();
+        let root = temp.path().join("my_app");
+
+        // First run: should succeed
+        assert!(scaffold_native_app_at(&root).is_ok());
+
+        // Check that .gitignore was created with correct contents
+        let gitignore_path = root.join(".gitignore");
+        assert!(gitignore_path.exists());
+        let gitignore_contents = fs::read_to_string(&gitignore_path).unwrap();
+        assert_eq!(
+            gitignore_contents,
+            "ios/.build/\nandroid/.gradle/\nandroid/build/\nandroid/app/build/\n"
+        );
+
+        // Check that all template files were created
+        for (rel, _content) in TEMPLATE_FILES {
+            let target = root.join(rel);
+            assert!(target.exists(), "template file {} missing", rel);
+        }
+
+        // Second run: should fail because destination already exists
+        let err = scaffold_native_app_at(&root).err().unwrap();
+        assert!(err.contains("already exists"));
+    }
+}
