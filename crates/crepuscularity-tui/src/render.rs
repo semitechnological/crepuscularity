@@ -1146,7 +1146,7 @@ impl<'a> Scrollable<'a> {
                 break;
             }
             for x in 0..self.viewport.width {
-                let cell = virtual_buf[(x, src_y)].clone();
+                let cell = std::mem::take(&mut virtual_buf[(x, src_y)]);
                 buf[(self.viewport.x + x, self.viewport.y + y)] = cell;
             }
         }

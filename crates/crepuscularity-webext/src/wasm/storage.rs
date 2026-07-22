@@ -176,3 +176,28 @@ impl StorageArea {
 fn area_value(area: StorageAreaName) -> Result<JsValue> {
     core::get_path(&namespace()?, area.as_str())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_local() {
+        assert_eq!(local().name, StorageAreaName::Local);
+    }
+
+    #[test]
+    fn test_sync() {
+        assert_eq!(sync().name, StorageAreaName::Sync);
+    }
+
+    #[test]
+    fn test_session() {
+        assert_eq!(session().name, StorageAreaName::Session);
+    }
+
+    #[test]
+    fn test_managed() {
+        assert_eq!(managed().name, StorageAreaName::Managed);
+    }
+}
