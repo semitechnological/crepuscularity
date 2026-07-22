@@ -41,3 +41,26 @@ impl CrepusError {
         Self::Render(message.into())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_error_display() {
+        let parse_err = CrepusError::parse("unexpected token");
+        assert_eq!(parse_err.to_string(), "parse error: unexpected token");
+
+        let eval_err = CrepusError::eval("1 + 1", "variable not found");
+        assert_eq!(eval_err.to_string(), "eval error in `1 + 1`: variable not found");
+
+        let include_err = CrepusError::include_path("file not found");
+        assert_eq!(include_err.to_string(), "include path error: file not found");
+
+        let render_err = CrepusError::render("missing template");
+        assert_eq!(render_err.to_string(), "render error: missing template");
+
+        let io_err = CrepusError::Io(std::io::Error::new(std::io::ErrorKind::NotFound, "file missing"));
+        assert_eq!(io_err.to_string(), "I/O error: file missing");
+    }
+}
