@@ -53,6 +53,10 @@ pub fn resolve_under_sandbox(root: &Path, relative: &str) -> Result<PathBuf, Bri
     Ok(out)
 }
 
+pub fn read_file_to_string(path: &Path) -> Result<String, BridgeError> {
+    std::fs::read_to_string(path).map_err(|e| BridgeError::new("io_error", format!("read `{}`: {}", path.display(), e)))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -91,5 +95,26 @@ mod tests {
         assert!(resolve_under_sandbox(&root, "link/file.txt").is_err());
         let _ = std::fs::remove_dir_all(&root);
         let _ = std::fs::remove_dir_all(&outside);
+    }
+
+    #[test]
+    fn read_file_to_string_non_existent() {
+        let path = std::env::temp_dir().join(format!("crepus-lite-sandbox-non-existent-{}", std::process::id()));
+        let _ = std::fs::remove_file(&path); // Ensure it does not exist
+        let res = read_file_to_string(&path);
+        assert!(res.is_err());
+        let err = res.err().unwrap();
+        assert_eq!(err.code, "io_error");
+    }
+
+    #[test]
+    fn read_file_to_string_directory() {
+        let path = std::env::temp_dir().join(format!("crepus-lite-sandbox-dir-{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&path);
+        let res = read_file_to_string(&path);
+        assert!(res.is_err());
+        let err = res.err().unwrap();
+        assert_eq!(err.code, "io_error");
+        let _ = std::fs::remove_dir_all(&path);
     }
 }
