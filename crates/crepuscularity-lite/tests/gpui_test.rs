@@ -76,8 +76,8 @@ fn test_apply_window_deferred(cx: &mut TestAppContext) {
 #[test]
 fn test_take_app_exit_request() {
     let bridge = Bridge::default_arc();
-    assert_eq!(take_app_exit_request(&bridge), false);
+    assert!(!take_app_exit_request(&bridge));
     let _ = bridge.invoke_envelope("app", "exit", &serde_json::json!({}));
-    assert_eq!(take_app_exit_request(&bridge), true);
-    assert_eq!(take_app_exit_request(&bridge), false);
+    assert!(take_app_exit_request(&bridge));
+    assert!(!take_app_exit_request(&bridge));
 }
