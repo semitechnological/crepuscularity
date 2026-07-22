@@ -253,7 +253,10 @@ fn render_element(
     let tag = map_tag(&el.tag, text.as_deref(), children.is_empty());
     if let Some(text) = text {
         if tag == "lv_button" {
-            children.insert(0, label_node(text));
+            let mut new_children = Vec::with_capacity(children.len() + 1);
+            new_children.push(label_node(text));
+            new_children.extend(children);
+            children = new_children;
         } else {
             attrs.push(("text".into(), text));
         }
