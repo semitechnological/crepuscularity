@@ -119,4 +119,12 @@ mod tests {
         assert_eq!(format_duration(Duration::from_millis(1500)), "1.5s");
         assert_eq!(format_duration(Duration::from_millis(10050)), "10.1s");
     }
+
+    #[test]
+    fn test_ui_symbols() {
+        assert_eq!(console::strip_ansi_codes(&ok().to_string()), "✓");
+        assert_eq!(console::strip_ansi_codes(&err().to_string()), "✗");
+        assert_eq!(console::strip_ansi_codes(&warn().to_string()), "!");
+        assert_eq!(console::strip_ansi_codes(&arrow().to_string()), "→");
+    }
 }
