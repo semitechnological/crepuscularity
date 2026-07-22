@@ -29,7 +29,10 @@ pub(crate) fn parse_element_line(line: &str, children: Vec<Node>) -> Element {
         tokens.len()
     };
     if let Some(text) = inline_text {
-        children.insert(0, Node::Text(parse_text_template(&text)));
+        let mut new_children = Vec::with_capacity(children.len() + 1);
+        new_children.push(Node::Text(parse_text_template(&text)));
+        new_children.extend(children);
+        children = new_children;
     }
 
     let mut id = None;
