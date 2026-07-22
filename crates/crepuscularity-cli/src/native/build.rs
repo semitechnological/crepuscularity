@@ -628,3 +628,18 @@ pub fn discover_java_home() -> Option<String> {
         None
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::Path;
+
+    #[test]
+    fn test_find_xcodeproj_invalid_dir() {
+        let non_existent = Path::new("this_path_does_not_exist_12345");
+        assert_eq!(find_xcodeproj(non_existent), None);
+
+        let file_path = Path::new("Cargo.toml");
+        assert_eq!(find_xcodeproj(file_path), None);
+    }
+}
