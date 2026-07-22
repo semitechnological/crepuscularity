@@ -80,23 +80,39 @@ impl DiffTracker {
     }
 
     pub fn update(&mut self, ctx: &TemplateContext) {
-        self.last = Some(RenderSnapshot::from_context(ctx));
+        if let Some(snapshot) = &mut self.last {
+            snapshot.fingerprints.retain(|k, _| ctx.vars.contains_key(k));
+            for (key, value) in &ctx.vars {
+                let mut hasher = std::collections::hash_map::DefaultHasher::new();
+                hash_value(value, &mut hasher);
+                let fp = hasher.finish();
+                if let Some(v) = snapshot.fingerprints.get_mut(key) {
+                    *v = fp;
+                } else {
+                    snapshot.fingerprints.insert(key.clone(), fp);
+                }
+            }
+        } else {
+            self.last = Some(RenderSnapshot::from_context(ctx));
+        }
     }
 
     pub fn changed_keys(&self, ctx: &TemplateContext) -> Vec<String> {
-        let current = RenderSnapshot::from_context(ctx);
         match &self.last {
-            None => current.fingerprints.keys().cloned().collect(),
+            None => ctx.vars.keys().cloned().collect(),
             Some(snapshot) => {
                 let mut changed = Vec::new();
-                for (key, fingerprint) in &current.fingerprints {
+                for (key, value) in &ctx.vars {
+                    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+                    hash_value(value, &mut hasher);
+                    let fingerprint = hasher.finish();
                     match snapshot.fingerprints.get(key) {
-                        Some(prev) if *prev == *fingerprint => {}
+                        Some(prev) if *prev == fingerprint => {}
                         _ => changed.push(key.clone()),
                     }
                 }
                 for key in snapshot.fingerprints.keys() {
-                    if !current.fingerprints.contains_key(key) {
+                    if !ctx.vars.contains_key(key) {
                         changed.push(key.clone());
                     }
                 }
