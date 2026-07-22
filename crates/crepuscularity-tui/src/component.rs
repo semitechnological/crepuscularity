@@ -79,23 +79,23 @@ impl ComponentRegistry {
 
         let (_, body, _) = split_frontmatter_parts(&content);
         let sections = split_component_body_sections(body);
-        let section_sources: HashMap<String, String> = sections
+        let mut section_sources: HashMap<String, String> = sections
             .into_iter()
             .map(|(name, source, _)| (name, source))
             .collect();
 
-        for (name, def) in &file.components {
-            let source = section_sources.get(name).cloned().unwrap_or_default();
+        for (name, def) in file.components {
+            let source = section_sources.remove(&name).unwrap_or_default();
             let defaults: HashMap<String, TemplateValue> = def
                 .meta
                 .defaults
-                .iter()
-                .map(|(k, expr)| (k.clone(), eval_default(expr)))
+                .into_iter()
+                .map(|(k, expr)| (k, eval_default(&expr)))
                 .collect();
             self.components.insert(
                 name.clone(),
                 Component {
-                    name: name.clone(),
+                    name,
                     source,
                     defaults,
                 },
