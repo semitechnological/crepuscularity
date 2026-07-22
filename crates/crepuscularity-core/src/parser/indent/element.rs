@@ -59,14 +59,26 @@ pub(crate) fn parse_element_line(line: &str, children: Vec<Node>) -> Element {
         } else if let Some(rest) = token.strip_prefix("when:") {
             if let Some((condition, raw_classes)) = parse_when_attribute_suffix(rest) {
                 let classes_src = strip_optional_quotes(raw_classes.trim());
-                for class in classes_src.split_whitespace() {
-                    if class.is_empty() {
-                        continue;
+                let mut iter = classes_src.split_whitespace();
+                if let Some(first) = iter.next() {
+                    let mut prev = first;
+                    for next in iter {
+                        if prev.is_empty() {
+                            prev = next;
+                            continue;
+                        }
+                        conditional_classes.push(ConditionalClass {
+                            class: prev.to_string(),
+                            condition: condition.clone(),
+                        });
+                        prev = next;
                     }
-                    conditional_classes.push(ConditionalClass {
-                        class: class.to_string(),
-                        condition: condition.clone(),
-                    });
+                    if !prev.is_empty() {
+                        conditional_classes.push(ConditionalClass {
+                            class: prev.to_string(),
+                            condition,
+                        });
+                    }
                 }
             }
         } else if let Some(rest) = token.strip_prefix("class:") {

@@ -61,14 +61,26 @@ pub(crate) fn jsx_build_element(tag: &str, attrs: Vec<JsxAttr>, children: Vec<No
             }
             match &attr.value {
                 JsxAttrValue::Str(s) => {
-                    for class in s.split_whitespace() {
-                        if class.is_empty() {
-                            continue;
+                    let mut iter = s.split_whitespace();
+                    if let Some(first) = iter.next() {
+                        let mut prev = first;
+                        for next in iter {
+                            if prev.is_empty() {
+                                prev = next;
+                                continue;
+                            }
+                            conditional_classes.push(ConditionalClass {
+                                class: prev.to_string(),
+                                condition: condition.clone(),
+                            });
+                            prev = next;
                         }
-                        conditional_classes.push(ConditionalClass {
-                            class: class.to_string(),
-                            condition: condition.clone(),
-                        });
+                        if !prev.is_empty() {
+                            conditional_classes.push(ConditionalClass {
+                                class: prev.to_string(),
+                                condition,
+                            });
+                        }
                     }
                 }
                 JsxAttrValue::Expr(_) | JsxAttrValue::Bool(_) => {}
