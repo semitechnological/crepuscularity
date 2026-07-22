@@ -135,7 +135,9 @@ mod tests;
 
 pub use component::{Component, ComponentRegistry, ComponentState, StateKey};
 pub use crepuscularity_core::{
-    build, parse_component_file, parse_template, CrepusError, TemplateContext, TemplateValue,
+    ast::Node,
+    build, parse_component_file, parse_template, ComponentDef, ComponentFile, CrepusError,
+    TemplateContext, TemplateValue,
 };
 pub use crepuscularity_macros::template_refs;
 pub use diff::{DiffTracker, RenderSnapshot};
@@ -143,7 +145,8 @@ pub use event::{DispatchResult, Event, EventDispatcher, FocusManager};
 pub use hot_reload::{HotTemplate, ReloadOutcome};
 pub use ratatui;
 pub use render::{
-    collect_focusable_ids, paint_node, render_component, render_nodes, render_template,
+    collect_focusable_ids, paint_node, render_component, render_component_to_buffer, render_nodes,
+    render_template, render_template_to_buffer, BufferRenderer, RenderCacheStats,
 };
 pub use style::parse_classes;
 pub use template::{draw, template, ElementRef, EventResult, Template};
