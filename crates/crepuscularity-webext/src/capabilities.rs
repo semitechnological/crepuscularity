@@ -186,6 +186,28 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_missing_from() {
+        let set1: CapabilitySet = vec![Capability::Storage, Capability::Tabs].into_iter().collect();
+        let set2: CapabilitySet = vec![Capability::Storage].into_iter().collect();
+
+        // Elements in set1 missing from set2 (Tabs)
+        let missing = set1.missing_from(&set2);
+        assert_eq!(missing.len(), 1);
+        assert!(missing.contains(&&Capability::Tabs));
+
+        // Elements in set2 missing from set1 (None)
+        let missing_from_1 = set2.missing_from(&set1);
+        assert!(missing_from_1.is_empty());
+
+        // Missing from empty set
+        let empty_set: CapabilitySet = vec![].into_iter().collect();
+        let missing_from_empty = set1.missing_from(&empty_set);
+        assert_eq!(missing_from_empty.len(), 2);
+        assert!(missing_from_empty.contains(&&Capability::Storage));
+        assert!(missing_from_empty.contains(&&Capability::Tabs));
+    }
+
+    #[test]
     fn test_to_permission_string() {
         assert_eq!(
             Capability::ContentScript.to_permission_string(),
