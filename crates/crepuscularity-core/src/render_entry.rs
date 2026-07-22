@@ -39,12 +39,14 @@ where
         .get(name)
         .ok_or_else(|| CrepusError::render(format!("component not found: {name}")))?;
 
-    let mut child_ctx = ctx.clone();
+    let mut child_ctx = std::borrow::Cow::Borrowed(ctx);
     for (key, expr) in &component.meta.defaults {
-        if !child_ctx.vars.contains_key(key) {
-            child_ctx
-                .vars
-                .insert(key.clone(), eval_expr(expr, &TemplateContext::new())?);
+        if !ctx.vars.contains_key(key) {
+            let eval_result = eval_expr(expr, &TemplateContext::new())?;
+            if let std::borrow::Cow::Borrowed(_) = child_ctx {
+                child_ctx = std::borrow::Cow::Owned(ctx.clone());
+            }
+            child_ctx.to_mut().vars.insert(key.clone(), eval_result);
         }
     }
 
