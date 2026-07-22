@@ -424,7 +424,7 @@ fn color_from_name(name: &str) -> Option<Color> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::document::{EmbeddedStyle, SizeHint, FlexDir, Align};
+    use crate::document::{Align, EmbeddedStyle, FlexDir, SizeHint};
 
     #[test]
     fn test_apply_class_spacing() {
