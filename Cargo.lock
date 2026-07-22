@@ -1963,6 +1963,7 @@ dependencies = [
  "crossterm 0.29.0",
  "notify",
  "ratatui",
+ "rustc-hash 2.1.3",
  "tempfile",
 ]
 
