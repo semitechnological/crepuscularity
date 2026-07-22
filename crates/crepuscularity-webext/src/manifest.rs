@@ -1258,4 +1258,21 @@ matches = ["<all_urls>"]
             .contains(&"pages/vomnibar.html".to_string()));
         assert_eq!(mv3.web_accessible_resources[0].matches, vec!["<all_urls>"]);
     }
+
+    #[test]
+    fn test_browser_target_parse() {
+        assert_eq!(BrowserTarget::parse("chromium"), Some(BrowserTarget::Chromium));
+        assert_eq!(BrowserTarget::parse("chrome"), Some(BrowserTarget::Chromium));
+        assert_eq!(BrowserTarget::parse("edge"), Some(BrowserTarget::Chromium));
+        assert_eq!(BrowserTarget::parse("brave"), Some(BrowserTarget::Chromium));
+        assert_eq!(BrowserTarget::parse("opera"), Some(BrowserTarget::Chromium));
+        assert_eq!(BrowserTarget::parse("firefox"), Some(BrowserTarget::Firefox));
+        assert_eq!(BrowserTarget::parse("gecko"), Some(BrowserTarget::Firefox));
+        assert_eq!(BrowserTarget::parse("safari"), Some(BrowserTarget::Safari));
+
+        assert_eq!(BrowserTarget::parse("CHROMIUM"), None);
+        assert_eq!(BrowserTarget::parse("unknown"), None);
+        assert_eq!(BrowserTarget::parse(""), None);
+        assert_eq!(BrowserTarget::parse("Chrome"), None);
+    }
 }
