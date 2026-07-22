@@ -420,3 +420,39 @@ fn color_from_name(name: &str) -> Option<Color> {
     }
     lookup_named_color(name).and_then(crate::color::parse_hex)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::document::{EmbeddedStyle, SizeHint, FlexDir, Align};
+
+    #[test]
+    fn test_apply_class_spacing() {
+        let mut s = EmbeddedStyle::default();
+        apply_class("p-4", &mut s, None);
+        assert_eq!(s.padding, 16);
+
+        apply_class("px-2", &mut s, None);
+        assert_eq!(s.padding_x, 8);
+    }
+
+    #[test]
+    fn test_apply_class_size() {
+        let mut s = EmbeddedStyle::default();
+        apply_class("w-full", &mut s, None);
+        assert_eq!(s.width, SizeHint::Fill);
+
+        apply_class("h-4", &mut s, None);
+        assert_eq!(s.height, SizeHint::Fixed(16));
+    }
+
+    #[test]
+    fn test_apply_class_flex() {
+        let mut s = EmbeddedStyle::default();
+        apply_class("flex-col", &mut s, None);
+        assert_eq!(s.flex_dir, FlexDir::Column);
+
+        apply_class("items-center", &mut s, None);
+        assert_eq!(s.align, Align::Center);
+    }
+}
