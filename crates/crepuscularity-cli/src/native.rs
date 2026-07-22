@@ -294,6 +294,27 @@ android {
     }
 
     #[test]
+    fn gradle_kts_value_edge_cases() {
+        // Missing equal sign
+        assert_eq!(gradle_kts_value("applicationId \"dev.app\"", "applicationId"), None);
+        // Key as prefix of another key
+        assert_eq!(gradle_kts_value("applicationIdSuffix = \"-dev\"", "applicationId"), None);
+        // Different spacing
+        assert_eq!(gradle_kts_value("  applicationId   =   \"dev.app\"  ", "applicationId"), Some("dev.app".to_string()));
+        // No spacing
+        assert_eq!(gradle_kts_value("applicationId=\"dev.app\"", "applicationId"), Some("dev.app".to_string()));
+        // Missing quotes
+        assert_eq!(gradle_kts_value("applicationId = dev.app", "applicationId"), Some("dev.app".to_string()));
+        // Empty value inside quotes
+        assert_eq!(gradle_kts_value("applicationId = \"\"", "applicationId"), Some("".to_string()));
+        // Not found
+        assert_eq!(gradle_kts_value("versionCode = 1", "applicationId"), None);
+        // First match wins
+        let src = "applicationId = \"dev.app1\"\napplicationId = \"dev.app2\"";
+        assert_eq!(gradle_kts_value(src, "applicationId"), Some("dev.app1".to_string()));
+    }
+
+    #[test]
     fn android_component_uses_generated_shell_package() {
         assert_eq!(
             android_main_activity_component("hk.tsc.acme"),
