@@ -214,3 +214,62 @@ fn align_cross(_child: &EmbeddedNode, start: u16, size: u16, avail: u16, align: 
         _ => start,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::document::EmbeddedStyle;
+    #[cfg(not(feature = "std"))]
+    use alloc::{string::String, vec};
+    #[cfg(feature = "std")]
+    use std::{string::String, vec};
+
+    #[test]
+    fn test_layout_tree_sets_bounds() {
+        let mut root = EmbeddedNode {
+            id: None,
+            tag: String::from("div"),
+            text: None,
+            on_click: None,
+            style: EmbeddedStyle::default(),
+            bounds: Rect::new(0, 0, 0, 0),
+            children: vec![],
+        };
+        let screen = ScreenSize::new(800, 600);
+        layout_tree(&mut root, screen);
+
+        assert_eq!(root.bounds, Rect::new(0, 0, 800, 600));
+    }
+
+    #[test]
+    fn test_layout_document_layouts_all_roots_and_reindexes() {
+        let node1 = EmbeddedNode {
+            id: Some(String::from("node1")),
+            tag: String::from("div"),
+            text: None,
+            on_click: None,
+            style: EmbeddedStyle::default(),
+            bounds: Rect::new(0, 0, 0, 0),
+            children: vec![],
+        };
+        let node2 = EmbeddedNode {
+            id: Some(String::from("node2")),
+            tag: String::from("div"),
+            text: None,
+            on_click: None,
+            style: EmbeddedStyle::default(),
+            bounds: Rect::new(0, 0, 0, 0),
+            children: vec![],
+        };
+        let mut doc = EmbeddedDocument::new(vec![node1, node2], ScreenSize::new(1024, 768));
+
+        doc.screen = ScreenSize::new(1920, 1080);
+        layout_document(&mut doc);
+
+        assert_eq!(doc.root[0].bounds, Rect::new(0, 0, 1920, 1080));
+        assert_eq!(doc.root[1].bounds, Rect::new(0, 0, 1920, 1080));
+
+        assert!(doc.by_id.contains_key("node1"));
+        assert!(doc.by_id.contains_key("node2"));
+    }
+}
