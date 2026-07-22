@@ -180,3 +180,68 @@ impl FromIterator<Capability> for CapabilitySet {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_to_permission_string() {
+        assert_eq!(
+            Capability::ContentScript.to_permission_string(),
+            "content_scripts"
+        );
+        assert_eq!(
+            Capability::BackgroundScript.to_permission_string(),
+            "background"
+        );
+        assert_eq!(Capability::Storage.to_permission_string(), "storage");
+        assert_eq!(Capability::Messaging.to_permission_string(), "runtime");
+        assert_eq!(
+            Capability::Clipboard.to_permission_string(),
+            "clipboardRead"
+        );
+        assert_eq!(
+            Capability::Notifications.to_permission_string(),
+            "notifications"
+        );
+        assert_eq!(Capability::Tabs.to_permission_string(), "tabs");
+        assert_eq!(Capability::History.to_permission_string(), "history");
+        assert_eq!(Capability::Bookmarks.to_permission_string(), "bookmarks");
+        assert_eq!(Capability::Downloads.to_permission_string(), "downloads");
+        assert_eq!(Capability::WebRequest.to_permission_string(), "webRequest");
+        assert_eq!(Capability::Cookies.to_permission_string(), "cookies");
+        assert_eq!(
+            Capability::Geolocation.to_permission_string(),
+            "geolocation"
+        );
+        assert_eq!(Capability::Identity.to_permission_string(), "identity");
+        assert_eq!(Capability::ActiveTab.to_permission_string(), "activeTab");
+        assert_eq!(Capability::Scripting.to_permission_string(), "scripting");
+        assert_eq!(Capability::Alarms.to_permission_string(), "alarms");
+        assert_eq!(
+            Capability::NativeMessaging.to_permission_string(),
+            "nativeMessaging"
+        );
+        assert_eq!(
+            Capability::ContextMenus.to_permission_string(),
+            "contextMenus"
+        );
+        assert_eq!(Capability::Sessions.to_permission_string(), "sessions");
+        assert_eq!(
+            Capability::WebNavigation.to_permission_string(),
+            "webNavigation"
+        );
+        assert_eq!(Capability::Search.to_permission_string(), "search");
+        assert_eq!(Capability::Favicon.to_permission_string(), "favicon");
+        assert_eq!(
+            Capability::HostPermission("https://*.example.com/*".to_string())
+                .to_permission_string(),
+            "https://*.example.com/*"
+        );
+        assert_eq!(
+            Capability::Custom("custom_perm".to_string()).to_permission_string(),
+            "custom_perm"
+        );
+    }
+}
