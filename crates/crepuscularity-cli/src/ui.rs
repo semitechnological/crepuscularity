@@ -101,3 +101,30 @@ pub fn spinner_err(pb: &ProgressBar, msg: &str) -> ! {
     pb.finish_and_clear();
     error(msg);
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::Duration;
+
+    #[test]
+    fn test_format_duration() {
+        // Under 1000ms
+        assert_eq!(format_duration(Duration::from_millis(0)), "0ms");
+        assert_eq!(format_duration(Duration::from_millis(500)), "500ms");
+        assert_eq!(format_duration(Duration::from_millis(999)), "999ms");
+
+        // 1000ms and above
+        assert_eq!(format_duration(Duration::from_millis(1000)), "1.0s");
+        assert_eq!(format_duration(Duration::from_millis(1500)), "1.5s");
+        assert_eq!(format_duration(Duration::from_millis(10050)), "10.1s");
+    }
+
+    #[test]
+    fn test_ui_symbols() {
+        assert_eq!(console::strip_ansi_codes(&ok().to_string()), "✓");
+        assert_eq!(console::strip_ansi_codes(&err().to_string()), "✗");
+        assert_eq!(console::strip_ansi_codes(&warn().to_string()), "!");
+        assert_eq!(console::strip_ansi_codes(&arrow().to_string()), "→");
+    }
+}
