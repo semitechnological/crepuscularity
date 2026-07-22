@@ -67,7 +67,11 @@ mod tests {
     #[test]
     fn rejects_absolute_path() {
         let root = Path::new("/tmp/sandbox");
-        let err = resolve_under_sandbox(root, "/etc/passwd").err().unwrap();
+        #[cfg(not(windows))]
+        let abs_path = "/etc/passwd";
+        #[cfg(windows)]
+        let abs_path = "C:\\etc\\passwd";
+        let err = resolve_under_sandbox(root, abs_path).err().unwrap();
         assert_eq!(err.code, "path_not_relative");
     }
 
