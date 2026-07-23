@@ -1,7 +1,5 @@
-name: crepuscularity_flutter
-description: >-
-  Flutter runtime renderer for Crepuscularity View IR and .crepus source. The
-  Flutter counterpart to the SwiftUI / Jetpack Compose native shells.
+name: crepuscularity_flutter_example
+description: Minimal example rendering .crepus source to Flutter widgets.
 version: 0.1.0
 publish_to: 'none'
 
@@ -12,6 +10,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  crepuscularity_flutter:
+    path: ../
 
 dev_dependencies:
   flutter_test:

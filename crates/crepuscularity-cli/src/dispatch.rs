@@ -110,6 +110,7 @@ pub fn run(cli: Cli) -> Result<(), CrepusCliError> {
             crate::plugins::execute(command);
             Ok(())
         }
+        Commands::Flutter { command } => crate::flutter::execute(command),
     }
 }
 

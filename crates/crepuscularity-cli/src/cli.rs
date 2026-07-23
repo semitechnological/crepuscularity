@@ -144,6 +144,36 @@ pub enum Commands {
         #[command(subcommand)]
         command: PluginsCommands,
     },
+    /// Flutter runtime renderer (`crepuscularity-flutter`) dependency helper.
+    Flutter {
+        #[command(subcommand)]
+        command: FlutterCommands,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+pub enum FlutterCommands {
+    /// Print the pubspec dependency spec for the Flutter renderer (for CI).
+    Dep {
+        /// Emit a hosted pub.dev dependency at this version instead of a git ref.
+        #[arg(long)]
+        version: Option<String>,
+        /// Git ref to pin when emitting a git dependency (default: main).
+        #[arg(long, default_value = "main")]
+        git_ref: String,
+    },
+    /// Add the Flutter renderer dependency to a Flutter app's pubspec.yaml.
+    Add {
+        /// App directory containing pubspec.yaml (default: current directory).
+        #[arg(long)]
+        dir: Option<PathBuf>,
+        /// Emit a hosted pub.dev dependency at this version instead of a git ref.
+        #[arg(long)]
+        version: Option<String>,
+        /// Git ref to pin when adding a git dependency (default: main).
+        #[arg(long, default_value = "main")]
+        git_ref: String,
+    },
 }
 
 #[derive(Subcommand, Debug)]

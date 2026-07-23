@@ -17,6 +17,7 @@ mod embedded;
 mod error;
 #[cfg(feature = "desktop")]
 pub mod events;
+mod flutter;
 #[cfg(feature = "desktop")]
 mod hud;
 mod inspect;
