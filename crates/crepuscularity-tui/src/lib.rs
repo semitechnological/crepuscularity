@@ -135,9 +135,8 @@ mod tests;
 
 pub use component::{Component, ComponentRegistry, ComponentState, StateKey};
 pub use crepuscularity_core::{
-    ast::Node,
-    build, parse_component_file, parse_template, ComponentDef, ComponentFile, CrepusError,
-    TemplateContext, TemplateValue,
+    ast::Node, build, parse_component_file, parse_template, ComponentDef, ComponentFile,
+    CrepusError, TemplateContext, TemplateValue,
 };
 pub use crepuscularity_macros::template_refs;
 pub use diff::{DiffTracker, RenderSnapshot};

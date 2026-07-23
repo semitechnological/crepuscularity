@@ -187,7 +187,9 @@ mod tests {
 
     #[test]
     fn test_missing_from() {
-        let set1: CapabilitySet = vec![Capability::Storage, Capability::Tabs].into_iter().collect();
+        let set1: CapabilitySet = vec![Capability::Storage, Capability::Tabs]
+            .into_iter()
+            .collect();
         let set2: CapabilitySet = vec![Capability::Storage].into_iter().collect();
 
         // Elements in set1 missing from set2 (Tabs)

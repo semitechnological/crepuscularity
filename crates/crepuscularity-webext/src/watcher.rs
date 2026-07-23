@@ -184,9 +184,9 @@ pub fn check_project_capabilities(project_dir: &Path) -> Result<Vec<Capability>,
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::tempdir;
     use std::fs;
     use std::time::Duration;
+    use tempfile::tempdir;
 
     #[test]
     fn test_watcher_creation() {

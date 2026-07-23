@@ -54,7 +54,8 @@ pub fn resolve_under_sandbox(root: &Path, relative: &str) -> Result<PathBuf, Bri
 }
 
 pub fn read_file_to_string(path: &Path) -> Result<String, BridgeError> {
-    std::fs::read_to_string(path).map_err(|e| BridgeError::new("io_error", format!("read `{}`: {}", path.display(), e)))
+    std::fs::read_to_string(path)
+        .map_err(|e| BridgeError::new("io_error", format!("read `{}`: {}", path.display(), e)))
 }
 
 #[cfg(test)]
@@ -118,7 +119,10 @@ mod tests {
 
     #[test]
     fn read_file_to_string_non_existent() {
-        let path = std::env::temp_dir().join(format!("crepus-lite-sandbox-non-existent-{}", std::process::id()));
+        let path = std::env::temp_dir().join(format!(
+            "crepus-lite-sandbox-non-existent-{}",
+            std::process::id()
+        ));
         let _ = std::fs::remove_file(&path); // Ensure it does not exist
         let res = read_file_to_string(&path);
         assert!(res.is_err());
@@ -128,7 +132,8 @@ mod tests {
 
     #[test]
     fn read_file_to_string_directory() {
-        let path = std::env::temp_dir().join(format!("crepus-lite-sandbox-dir-{}", std::process::id()));
+        let path =
+            std::env::temp_dir().join(format!("crepus-lite-sandbox-dir-{}", std::process::id()));
         let _ = std::fs::create_dir_all(&path);
         let res = read_file_to_string(&path);
         assert!(res.is_err());
