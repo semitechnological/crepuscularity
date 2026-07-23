@@ -430,10 +430,6 @@ impl BufferRenderer {
     }
 }
 
-/// Parse an included source string. `file_path` is only used for error
-/// messages. The two callers — fresh miss and post-invalidation re-parse —
-/// share this implementation.
-
 #[cfg(test)]
 static PARSE_INCLUSION_CALLS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
