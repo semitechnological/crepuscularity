@@ -415,7 +415,9 @@ class _Element {
 
   double? number(String key) {
     final value = attrs[key];
-    return value == null ? null : double.tryParse(value);
+    if (value == null) return null;
+    final parsed = double.tryParse(value);
+    return parsed != null && parsed.isFinite ? parsed : null;
   }
 
   String label() => optionalLabel() ?? '';

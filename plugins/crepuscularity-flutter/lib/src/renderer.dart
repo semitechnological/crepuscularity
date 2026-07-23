@@ -312,7 +312,8 @@ class _Renderer {
       : Divider(height: 1, color: theme.borderColor);
 
   Widget _spacer(SpacerNode node) {
-    final size = node.size ?? 8;
+    final raw = node.size ?? 8;
+    final size = raw.isFinite && raw > 0 ? raw : 0.0;
     return SizedBox(width: size, height: size);
   }
 
@@ -443,18 +444,29 @@ class _Renderer {
     final padding = _padding(style);
     if (padding != null) result = Padding(padding: padding, child: result);
     final bg = _color(style.backgroundColor);
-    if (bg != null || style.cornerRadius != null || style.borderColor != null) {
+    final borderColor = _color(style.borderColor);
+    final radius = style.cornerRadius;
+    final safeRadius = radius != null && radius.isFinite && radius > 0
+        ? radius
+        : null;
+    if (bg != null || safeRadius != null || borderColor != null) {
+      final borderWidth = style.borderWidth;
       result = DecoratedBox(
         decoration: BoxDecoration(
           color: bg,
-          borderRadius: style.cornerRadius == null
+          borderRadius: safeRadius == null
               ? null
-              : BorderRadius.circular(style.cornerRadius!),
-          border: style.borderColor == null
+              : BorderRadius.circular(safeRadius),
+          border: borderColor == null
               ? null
               : Border.all(
-                  color: _color(style.borderColor)!,
-                  width: style.borderWidth ?? 1,
+                  color: borderColor,
+                  width:
+                      borderWidth != null &&
+                          borderWidth.isFinite &&
+                          borderWidth >= 0
+                      ? borderWidth
+                      : 1,
                 ),
         ),
         child: result,
@@ -549,10 +561,13 @@ class _Renderer {
     _ => null,
   };
 
+  /// Row cross-axis. `stretch` is deliberately NOT honored here: a stretched
+  /// [Row] demands a bounded height, and the renderer's own outer [Column] is
+  /// `mainAxisSize.min`, so `stack row items-stretch` would throw an unbounded
+  /// -constraint assertion on otherwise valid model-authored input.
   CrossAxisAlignment _crossAxis(String? align) => switch (align) {
     'center' => CrossAxisAlignment.center,
     'end' => CrossAxisAlignment.end,
-    'stretch' => CrossAxisAlignment.stretch,
     _ => CrossAxisAlignment.start,
   };
 

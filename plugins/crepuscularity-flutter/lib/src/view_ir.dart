@@ -48,10 +48,17 @@ enum StackAxis { row, column }
 StackAxis _axisFromString(Object? value) =>
     value == 'row' ? StackAxis.row : StackAxis.column;
 
+/// Coerce a JSON scalar to a finite double. NaN and ±Infinity — reachable from
+/// both raw JSON numbers and strings like `"nan"` — are rejected so no
+/// non-finite value can ever reach a Flutter layout constraint.
 double? _asDouble(Object? value) {
-  if (value is num) return value.toDouble();
-  if (value is String) return double.tryParse(value);
-  return null;
+  final parsed = switch (value) {
+    num() => value.toDouble(),
+    String() => double.tryParse(value),
+    _ => null,
+  };
+  if (parsed == null || !parsed.isFinite) return null;
+  return parsed;
 }
 
 String? _asString(Object? value) => value is String ? value : null;
