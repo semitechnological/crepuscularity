@@ -53,6 +53,7 @@ pub fn resolve_under_sandbox(root: &Path, relative: &str) -> Result<PathBuf, Bri
     Ok(out)
 }
 
+#[allow(dead_code)]
 pub fn read_file_to_string(path: &Path) -> Result<String, BridgeError> {
     std::fs::read_to_string(path)
         .map_err(|e| BridgeError::new("io_error", format!("read `{}`: {}", path.display(), e)))
