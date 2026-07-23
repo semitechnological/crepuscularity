@@ -206,7 +206,9 @@ mod tests {
         let mut received = false;
         let start = std::time::Instant::now();
         while start.elapsed() < Duration::from_secs(2) {
-            if let Some(WatchEvent::FileChanged { path }) = watcher.recv_timeout(Duration::from_millis(100)) {
+            if let Some(WatchEvent::FileChanged { path }) =
+                watcher.recv_timeout(Duration::from_millis(100))
+            {
                 if path == file_path {
                     received = true;
                     break;
@@ -227,7 +229,9 @@ mod tests {
         let mut received = false;
         let start = std::time::Instant::now();
         while start.elapsed() < Duration::from_secs(2) {
-            if let Some(WatchEvent::ManifestUpdated { path }) = watcher.recv_timeout(Duration::from_millis(100)) {
+            if let Some(WatchEvent::ManifestUpdated { path }) =
+                watcher.recv_timeout(Duration::from_millis(100))
+            {
                 if path == file_path {
                     received = true;
                     break;
