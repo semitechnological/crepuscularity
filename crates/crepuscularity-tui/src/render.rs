@@ -799,6 +799,7 @@ fn build_empty_box(hints: &StyleHints, constraint: Constraint, style: Style) -> 
 }
 
 /// Element with structural children → split its area for each child.
+#[allow(clippy::too_many_arguments)]
 fn build_container_element(
     el: &Element,
     hints: &StyleHints,
