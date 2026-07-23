@@ -411,7 +411,17 @@ class _Element {
     return el;
   }
 
-  bool flag(String name) => classes.contains(name) || attrs.containsKey(name);
+  bool flag(String name) {
+    if (classes.contains(name)) return true;
+    final value = attrs[name];
+    if (value == null) return false;
+    final lower = value.trim().toLowerCase();
+    return !(lower.isEmpty ||
+        lower == 'false' ||
+        lower == '0' ||
+        lower == 'no' ||
+        lower == 'off');
+  }
 
   double? number(String key) {
     final value = attrs[key];

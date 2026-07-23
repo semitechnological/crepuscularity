@@ -912,13 +912,21 @@ void main() {
       }
     });
 
-    testWidgets('a bare `true` literal is a lookup, not a constant', (
-      tester,
-    ) async {
-      // Documented behaviour, not a bug: a bare condition is always a scope
-      // lookup, so `if true` is falsy unless `true` is bound. Literals are
-      // only recognised on the right of a comparison.
+    testWidgets('a bare literal is resolved the same way as a comparison '
+        'operand', (tester) async {
       await pumpIf(tester, 'true', const {});
+      expect(find.text('THEN'), findsOneWidget);
+      await pumpIf(tester, 'false', const {});
+      expect(find.text('ELSE'), findsOneWidget);
+      await pumpIf(tester, '1', const {});
+      expect(find.text('THEN'), findsOneWidget);
+      await pumpIf(tester, '0', const {});
+      expect(find.text('ELSE'), findsOneWidget);
+      await pumpIf(tester, '"lit"', const {});
+      expect(find.text('THEN'), findsOneWidget);
+      await pumpIf(tester, '""', const {});
+      expect(find.text('ELSE'), findsOneWidget);
+      await pumpIf(tester, '!true', const {});
       expect(find.text('ELSE'), findsOneWidget);
       await pumpIf(tester, 'x == true', const {'x': true});
       expect(find.text('THEN'), findsOneWidget);

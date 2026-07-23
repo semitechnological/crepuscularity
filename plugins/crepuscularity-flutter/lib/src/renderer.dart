@@ -16,6 +16,22 @@ import 'view_ir.dart';
 /// the string in any way; the host decides what (if anything) it means.
 typedef CrepusActionCallback = void Function(String action);
 
+/// Width used for a progress/meter bar whose parent supplies unbounded width.
+const double _unboundedBarWidth = 120;
+
+/// Upper bound applied to every model-authored layout magnitude (padding,
+/// spacing, spacer size, corner radius, border width). It is far larger than
+/// any real viewport, so legitimate documents are untouched, but it stops an
+/// absurd finite value like `1e9` from producing an unusable, overflowing
+/// render. Non-finite values are already rejected at decode time.
+const double _maxLayoutExtent = 4000;
+
+/// Largest font size honoured, for the same reason as [_maxLayoutExtent].
+const double _maxFontSize = 400;
+
+double _extent(double value) =>
+    value <= 0 ? 0 : (value > _maxLayoutExtent ? _maxLayoutExtent : value);
+
 /// Theming knobs. Defaults are derived from the ambient [ThemeData] so the
 /// renderer looks reasonable with zero configuration; a host (e.g. omi's hub)
 /// can override to match its palette.
@@ -144,7 +160,7 @@ class _Renderer {
       content,
       style: TextStyle(
         color: _color(style?.foregroundColor) ?? theme.textColor,
-        fontSize: style?.fontSize ?? theme.baseFontSize,
+        fontSize: _fontSize(style?.fontSize),
         fontWeight: _weight(style?.fontWeight),
         fontStyle: style?.italic == true ? FontStyle.italic : null,
         decoration: _decoration(style),
@@ -245,15 +261,7 @@ class _Renderer {
             padding: const EdgeInsets.only(bottom: 4),
             child: Text(node.label!, style: _mutedStyle()),
           ),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(4),
-          child: LinearProgressIndicator(
-            value: fraction.toDouble(),
-            minHeight: 6,
-            backgroundColor: theme.borderColor,
-            valueColor: AlwaysStoppedAnimation(theme.accentColor!),
-          ),
-        ),
+        _bar(fraction.toDouble()),
       ],
     );
   }
@@ -272,18 +280,30 @@ class _Renderer {
             padding: const EdgeInsets.only(bottom: 4),
             child: Text(node.label!, style: _mutedStyle()),
           ),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(4),
-          child: LinearProgressIndicator(
-            value: fraction.toDouble(),
-            minHeight: 6,
-            backgroundColor: theme.borderColor,
-            valueColor: AlwaysStoppedAnimation(theme.accentColor!),
-          ),
-        ),
+        _bar(fraction.toDouble()),
       ],
     );
   }
+
+  /// The shared progress/meter bar. [LinearProgressIndicator] has no intrinsic
+  /// width, so inside a horizontal `stack`/`scroll` — which hands its children
+  /// unbounded width — it would size to infinity and fail layout. Fall back to
+  /// a fixed width whenever the incoming constraints are unbounded.
+  Widget _bar(double fraction) => LayoutBuilder(
+    builder: (context, constraints) {
+      final bar = ClipRRect(
+        borderRadius: BorderRadius.circular(4),
+        child: LinearProgressIndicator(
+          value: fraction,
+          minHeight: 6,
+          backgroundColor: theme.borderColor,
+          valueColor: AlwaysStoppedAnimation(theme.accentColor!),
+        ),
+      );
+      if (constraints.hasBoundedWidth) return bar;
+      return SizedBox(width: _unboundedBarWidth, child: bar);
+    },
+  );
 
   Widget _badge(BadgeNode node) {
     final tone = _toneColor(node.tone);
@@ -312,8 +332,7 @@ class _Renderer {
       : Divider(height: 1, color: theme.borderColor);
 
   Widget _spacer(SpacerNode node) {
-    final raw = node.size ?? 8;
-    final size = raw.isFinite && raw > 0 ? raw : 0.0;
+    final size = _extent(node.size ?? 8);
     return SizedBox(width: size, height: size);
   }
 
@@ -348,15 +367,24 @@ class _Renderer {
       items.add(
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 2),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(right: 6),
-                child: Text(marker, style: _mutedStyle()),
-              ),
-              Flexible(child: rendered),
-            ],
+          // A `Flexible` child cannot lay out under unbounded width, which is
+          // exactly what a horizontal `stack`/`scroll` parent supplies, so the
+          // marker row degrades to a rigid, intrinsically-sized row there.
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final bounded = constraints.hasBoundedWidth;
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: bounded ? MainAxisSize.max : MainAxisSize.min,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: Text(marker, style: _mutedStyle()),
+                  ),
+                  if (bounded) Flexible(child: rendered) else rendered,
+                ],
+              );
+            },
           ),
         ),
       );
@@ -447,7 +475,7 @@ class _Renderer {
     final borderColor = _color(style.borderColor);
     final radius = style.cornerRadius;
     final safeRadius = radius != null && radius.isFinite && radius > 0
-        ? radius
+        ? _extent(radius)
         : null;
     if (bg != null || safeRadius != null || borderColor != null) {
       final borderWidth = style.borderWidth;
@@ -465,7 +493,7 @@ class _Renderer {
                       borderWidth != null &&
                           borderWidth.isFinite &&
                           borderWidth >= 0
-                      ? borderWidth
+                      ? _extent(borderWidth)
                       : 1,
                 ),
         ),
@@ -488,11 +516,17 @@ class _Renderer {
         s.paddingRight == null) {
       return null;
     }
+    // `EdgeInsets` asserts non-negative insets, so a model-authored negative
+    // padding would otherwise crash layout. Clamp instead of throwing.
+    double side(double? a, double? b, double? c) {
+      return _extent(a ?? b ?? c ?? 0);
+    }
+
     return EdgeInsets.only(
-      top: s.paddingTop ?? s.paddingVertical ?? s.padding ?? 0,
-      bottom: s.paddingBottom ?? s.paddingVertical ?? s.padding ?? 0,
-      left: s.paddingLeft ?? s.paddingHorizontal ?? s.padding ?? 0,
-      right: s.paddingRight ?? s.paddingHorizontal ?? s.padding ?? 0,
+      top: side(s.paddingTop, s.paddingVertical, s.padding),
+      bottom: side(s.paddingBottom, s.paddingVertical, s.padding),
+      left: side(s.paddingLeft, s.paddingHorizontal, s.padding),
+      right: side(s.paddingRight, s.paddingHorizontal, s.padding),
     );
   }
 
@@ -502,15 +536,22 @@ class _Renderer {
     StackAxis axis,
   ) {
     if (spacing == null || spacing <= 0 || children.length < 2) return children;
+    final size = _extent(spacing);
     final gap = axis == StackAxis.row
-        ? SizedBox(width: spacing)
-        : SizedBox(height: spacing);
+        ? SizedBox(width: size)
+        : SizedBox(height: size);
     final out = <Widget>[];
     for (var i = 0; i < children.length; i++) {
       if (i > 0) out.add(gap);
       out.add(children[i]);
     }
     return out;
+  }
+
+  double _fontSize(double? size) {
+    if (size == null) return theme.baseFontSize;
+    if (size <= 0) return theme.baseFontSize;
+    return size > _maxFontSize ? _maxFontSize : size;
   }
 
   TextStyle _bodyStyle() =>
@@ -632,7 +673,8 @@ class _Renderer {
   }
 
   /// Evaluate a constrained `if` condition WITHOUT eval. Supports: a bare
-  /// variable (truthy), `!var`, and `left == "value"` / `left != "value"`.
+  /// operand (a literal, or a scope lookup, tested for truthiness), `!operand`,
+  /// and `left == "value"` / `left != "value"`.
   bool _evalCondition(String condition, Map<String, Object?> scope) {
     var expr = condition.trim();
     if (expr.isEmpty) return false;
@@ -646,9 +688,9 @@ class _Renderer {
       }
     }
     if (expr.startsWith('!')) {
-      return !_truthy(_lookup(expr.substring(1).trim(), scope));
+      return !_truthy(_operand(expr.substring(1).trim(), scope));
     }
-    return _truthy(_lookup(expr, scope));
+    return _truthy(_operand(expr, scope));
   }
 
   Object? _operand(String token, Map<String, Object?> scope) {

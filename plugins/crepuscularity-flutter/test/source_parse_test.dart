@@ -457,9 +457,20 @@ stack col
             .checked,
         isTrue,
       );
-      // Any presence of the attribute counts — value is not parsed.
+      // An explicitly falsy value is honored (matching the IR decoder, which
+      // treats anything other than JSON `true` as unchecked).
+      for (final falsy in const ['false', 'FALSE', '0', 'no', 'off', '""']) {
+        expect(
+          (viewIrFromSource('toggle "L" checked=$falsy').root.single
+                  as ToggleNode)
+              .checked,
+          isFalse,
+          reason: falsy,
+        );
+      }
+      // Any other value still counts as set.
       expect(
-        (viewIrFromSource('toggle "L" checked=false').root.single as ToggleNode)
+        (viewIrFromSource('toggle "L" checked=yes').root.single as ToggleNode)
             .checked,
         isTrue,
       );
