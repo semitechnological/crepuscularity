@@ -35,11 +35,16 @@ pub(crate) fn generate_docs(
             .unwrap_or_default();
         let content = std::fs::read_to_string(&path)?;
         let (title, body_html) = render_md(&content);
-        pages.push((stem.clone(), title.clone()));
-        let nav = render_nav(&pages, &stem);
+        let out_stem = if stem.eq_ignore_ascii_case("README") {
+            "index".to_string()
+        } else {
+            stem.clone()
+        };
+        pages.push((out_stem.clone(), title.clone()));
+        let nav = render_nav(&pages, &out_stem);
         let html = render_shell(&body_html, &title, &nav, theme, site_name);
         std::fs::create_dir_all(out_dir)?;
-        std::fs::write(out_dir.join(format!("{stem}.html")), html)?;
+        std::fs::write(out_dir.join(format!("{out_stem}.html")), html)?;
     }
 
     if pages.is_empty() {
