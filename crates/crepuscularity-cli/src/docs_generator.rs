@@ -20,7 +20,9 @@ pub(crate) fn generate_docs(
         return Ok(());
     }
 
+    // First pass: collect all pages
     let mut pages: Vec<(String, String)> = Vec::new();
+    let mut bodies: Vec<(String, String, String)> = Vec::new(); // (out_stem, title, body_html)
 
     for entry in std::fs::read_dir(src_dir)? {
         let entry = entry?;
@@ -41,9 +43,14 @@ pub(crate) fn generate_docs(
             stem.clone()
         };
         pages.push((out_stem.clone(), title.clone()));
-        let nav = render_nav(&pages, &out_stem);
-        let html = render_shell(&body_html, &title, &nav, theme, site_name);
-        std::fs::create_dir_all(out_dir)?;
+        bodies.push((out_stem, title, body_html));
+    }
+
+    // Second pass: generate HTML with full nav for every page
+    std::fs::create_dir_all(out_dir)?;
+    for (out_stem, title, body_html) in &bodies {
+        let nav = render_nav(&pages, out_stem);
+        let html = render_shell(body_html, title, &nav, theme, site_name);
         std::fs::write(out_dir.join(format!("{out_stem}.html")), html)?;
     }
 
