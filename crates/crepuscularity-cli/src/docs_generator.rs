@@ -10,6 +10,40 @@ use pulldown_cmark::{html, Options, Parser};
 
 use crate::web::ThemeCss;
 
+/// Sidebar section: (group_label, list of page_stems in display order).
+const SECTIONS: &[(&str, &[&str])] = &[
+    ("Getting Started", &["index", "dsl", "components", "cli"]),
+    (
+        "Targets",
+        &[
+            "gpui",
+            "native",
+            "tui",
+            "embedded",
+            "lvgl",
+            "lite",
+            "aurorality",
+            "webext",
+            "webext-policy",
+        ],
+    ),
+    (
+        "Reference",
+        &[
+            "view-ir-contract",
+            "plugin-surface",
+            "polyglot",
+            "production",
+            "observability",
+            "timing-profile",
+            "ide-extensions",
+            "runtime",
+            "react-native-adaptation",
+            "tauri-compatibility",
+        ],
+    ),
+];
+
 pub(crate) fn generate_docs(
     src_dir: &Path,
     out_dir: &Path,
@@ -21,8 +55,8 @@ pub(crate) fn generate_docs(
     }
 
     // First pass: collect all pages
-    let mut pages: Vec<(String, String)> = Vec::new();
-    let mut bodies: Vec<(String, String, String)> = Vec::new(); // (out_stem, title, body_html)
+    let mut page_map: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+    let mut bodies: Vec<(String, String, String)> = Vec::new();
 
     for entry in std::fs::read_dir(src_dir)? {
         let entry = entry?;
@@ -42,24 +76,24 @@ pub(crate) fn generate_docs(
         } else {
             stem.clone()
         };
-        pages.push((out_stem.clone(), title.clone()));
+        page_map.insert(out_stem.clone(), title.clone());
         bodies.push((out_stem, title, body_html));
     }
 
-    // Second pass: generate HTML with full nav for every page
+    // Second pass: generate HTML with full grouped nav
     std::fs::create_dir_all(out_dir)?;
     for (out_stem, title, body_html) in &bodies {
-        let nav = render_nav(&pages, out_stem);
+        let nav = render_nav(&page_map, out_stem);
         let html = render_shell(body_html, title, &nav, theme, site_name);
         std::fs::write(out_dir.join(format!("{out_stem}.html")), html)?;
     }
 
-    if pages.is_empty() {
+    if page_map.is_empty() {
         return Ok(());
     }
 
     // Search index
-    let idx: Vec<serde_json::Value> = pages
+    let idx: Vec<serde_json::Value> = page_map
         .iter()
         .map(|(stem, title)| serde_json::json!({"path": format!("{stem}.html"), "title": title}))
         .collect();
@@ -92,24 +126,74 @@ fn render_md(md: &str) -> (String, String) {
     (title, body)
 }
 
-fn render_nav(pages: &[(String, String)], current: &str) -> String {
-    let mut items = String::new();
-    for (stem, page_title) in pages {
-        let active = if stem == current {
-            " class=\"active\""
-        } else {
-            ""
-        };
-        items.push_str(&format!(
-            "<li><a href=\"{stem}.html\"{active}>{}</a></li>",
-            esc(page_title)
+fn render_nav(page_map: &std::collections::HashMap<String, String>, current: &str) -> String {
+    let mut sections_html = String::new();
+
+    for (group_label, stems) in SECTIONS {
+        // Only include pages that exist
+        let items: Vec<String> = stems
+            .iter()
+            .filter(|s| page_map.contains_key(**s))
+            .map(|s| {
+                let title = page_map.get(*s).map(String::as_str).unwrap_or(s);
+                let active = if *s == current {
+                    " class=\"active\""
+                } else {
+                    ""
+                };
+                format!("<li><a href=\"{s}.html\"{active}>{}</a></li>", esc(title))
+            })
+            .collect();
+
+        if items.is_empty() {
+            continue;
+        }
+
+        // Expand the section that contains the current page
+        let expanded = stems.iter().any(|s| *s == current);
+        let open = if expanded { " open" } else { "" };
+
+        sections_html.push_str(&format!(
+            "<details class=\"nav-section\"{open}>\
+<summary>{}</summary>\
+<ul>{}</ul>\
+</details>",
+            esc(group_label),
+            items.join("")
         ));
     }
+
+    // Pages not in any section get an "Other" group
+    let assigned: std::collections::HashSet<&str> = SECTIONS
+        .iter()
+        .flat_map(|(_, stems)| stems.iter().copied())
+        .collect();
+    let other_items: Vec<String> = page_map
+        .keys()
+        .filter(|s| !assigned.contains(s.as_str()))
+        .map(|s| {
+            let title = page_map.get(s.as_str()).map(String::as_str).unwrap_or(s);
+            let active = if s.as_str() == current {
+                " class=\"active\""
+            } else {
+                ""
+            };
+            format!("<li><a href=\"{s}.html\"{active}>{}</a></li>", esc(title))
+        })
+        .collect();
+
+    if !other_items.is_empty() {
+        sections_html.push_str(&format!(
+            "<details class=\"nav-section\"><summary>Other</summary><ul>{}</ul></details>",
+            other_items.join("")
+        ));
+    }
+
     format!(
         "<nav aria-label=\"Documentation\">\
 <div class=\"doc-search\"><input type=\"text\" id=\"doc-search-input\" placeholder=\"Search docs…\" autocomplete=\"off\">\
 <div id=\"doc-search-results\" class=\"doc-search-results\"></div></div>\
-<ul class=\"doc-nav\" id=\"doc-nav-list\">{items}</ul></nav>"
+{sections_html}</nav>"
     )
 }
 
@@ -135,9 +219,11 @@ fn render_shell(body: &str, title: &str, nav: &str, theme: &ThemeCss, site_name:
   a{{color:color-mix(in srgb,{t} 88%,transparent);text-decoration:none}}
   a:hover{{color:{t};text-decoration:underline;text-underline-offset:3px}}
   .doc-shell{{display:grid;grid-template-columns:minmax(220px,280px) 1fr;min-height:100vh}}
-  aside{{position:sticky;top:0;height:100vh;overflow-y:auto;padding:1.5rem;border-right:1px solid {b};background:color-mix(in srgb,{s} 92%,white 8%)}}
+  aside{{position:sticky;top:0;height:100vh;overflow-y:auto;padding:1.25rem;border-right:1px solid {b};background:color-mix(in srgb,{s} 92%,white 8%)}}
   .brand{{font-weight:700;font-size:.95rem;color:{t};display:block;margin-bottom:1rem}}
   .brand:hover{{opacity:.85;text-decoration:none}}
+
+  /* Search */
   .doc-search{{margin-bottom:1rem;position:relative}}
   .doc-search input{{width:100%;padding:.5rem .75rem;border:1px solid {b};border-radius:6px;background:color-mix(in srgb,{t} 6%,{s});color:{t};font-size:.85rem;outline:none;transition:border-color .15s}}
   .doc-search input:focus{{border-color:{a}}}
@@ -148,11 +234,21 @@ fn render_shell(body: &str, title: &str, nav: &str, theme: &ThemeCss, site_name:
   .doc-search-results a:last-child{{border-bottom:none}}
   .doc-search-results a:hover,.doc-search-results a.focused{{background:color-mix(in srgb,{a} 14%,transparent);color:{t};text-decoration:none}}
   .doc-search-results .no-match{{padding:.75rem;color:{m};font-size:.8rem;font-style:italic}}
-  .doc-nav{{list-style:none;padding:0;margin:0;font-size:.875rem}}
-  .doc-nav li{{margin:.25rem 0}}
-  .doc-nav a{{display:block;padding:.3rem .5rem;border-radius:5px;color:{m};transition:background .12s,color .12s}}
-  .doc-nav a.active{{color:{a};font-weight:600;background:color-mix(in srgb,{a} 12%,transparent)}}
-  .doc-nav a:hover{{color:{t};background:color-mix(in srgb,{t} 6%,transparent);text-decoration:none}}
+
+  /* Sidebar sections */
+  .nav-section{{margin-bottom:.25rem}}
+  .nav-section summary{{cursor:pointer;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:{m};padding:.45rem .5rem;border-radius:5px;list-style:none;display:flex;align-items:center;gap:.4rem;transition:color .12s,background .12s;user-select:none}}
+  .nav-section summary::-webkit-details-marker{{display:none}}
+  .nav-section summary::before{{content:"▸";font-size:.6rem;transition:transform .15s;opacity:.5}}
+  .nav-section[open] summary::before{{transform:rotate(90deg)}}
+  .nav-section summary:hover{{color:{t};background:color-mix(in srgb,{t} 5%,transparent)}}
+  .nav-section ul{{list-style:none;padding:0 0 0 .35rem;margin:.15rem 0 .5rem}}
+  .nav-section li{{margin:.15rem 0}}
+  .nav-section a{{display:block;padding:.25rem .5rem;border-radius:4px;font-size:.85rem;color:{m};transition:background .12s,color .12s}}
+  .nav-section a.active{{color:{a};font-weight:600;background:color-mix(in srgb,{a} 12%,transparent)}}
+  .nav-section a:hover{{color:{t};background:color-mix(in srgb,{t} 6%,transparent);text-decoration:none}}
+
+  /* Content */
   article{{max-width:45rem;margin:0 auto;padding:1.5rem 2rem 3rem}}
   article h1,h2,h3{{color:{t}}}
   article h1{{font-size:1.75rem}}
@@ -165,6 +261,7 @@ fn render_shell(body: &str, title: &str, nav: &str, theme: &ThemeCss, site_name:
   article table{{width:100%;border-collapse:collapse;margin:1rem 0;font-size:.875rem}}
   article th,td{{padding:.5rem .75rem;border:1px solid {b}}}
   article th{{background:color-mix(in srgb,{t} 6%,transparent);color:{t}}}
+
   @media(max-width:640px){{
     .doc-shell{{grid-template-columns:1fr}}
     aside{{position:static;height:auto;border-right:none;border-bottom:1px solid {b}}}
@@ -183,7 +280,6 @@ fn render_shell(body: &str, title: &str, nav: &str, theme: &ThemeCss, site_name:
   fetch('../docs/docs-search-index.json').then(function(r){{return r.json()}}).then(function(d){{idx=d}}).catch(function(){{}});
   var input=document.getElementById('doc-search-input');
   var results=document.getElementById('doc-search-results');
-  var navList=document.getElementById('doc-nav-list');
   var focusIdx=-1;
   if(!input||!results)return;
   function fuzzy(q,s){{
@@ -195,11 +291,18 @@ fn render_shell(body: &str, title: &str, nav: &str, theme: &ThemeCss, site_name:
     }}
     return qi===q.length?0.5:0;
   }}
+  function showAll(){{
+    var sections=document.querySelectorAll('.nav-section');
+    for(var i=0;i<sections.length;i++){{
+      var lis=sections[i].querySelectorAll('li');
+      for(var j=0;j<lis.length;j++)lis[j].style.display='';
+    }}
+  }}
   function render(q){{
     if(!q.trim()){{
       results.className='doc-search-results';
       results.innerHTML='';
-      if(navList){{var items=navList.querySelectorAll('li');for(var i=0;i<items.length;i++)items[i].style.display=''}}
+      showAll();
       return;
     }}
     var scored=[];
@@ -208,14 +311,20 @@ fn render_shell(body: &str, title: &str, nav: &str, theme: &ThemeCss, site_name:
       if(s>0)scored.push({{item:idx[i],score:s}});
     }}
     scored.sort(function(a,b){{return b.score-a.score}});
-    if(navList){{
-      var items=navList.querySelectorAll('li');
-      var matchPaths=scored.map(function(s){{return s.item.path}});
-      for(var i=0;i<items.length;i++){{
-        var a=items[i].querySelector('a');
+    /* filter sidebar */
+    var matchPaths=scored.map(function(s){{return s.item.path}});
+    var sections=document.querySelectorAll('.nav-section');
+    for(var i=0;i<sections.length;i++){{
+      var lis=sections[i].querySelectorAll('li');
+      var anyVisible=false;
+      for(var j=0;j<lis.length;j++){{
+        var a=lis[j].querySelector('a');
         var href=a?a.getAttribute('href'):'';
-        items[i].style.display=matchPaths.indexOf(href)!==-1?'':'none';
+        var show=matchPaths.indexOf(href)!==-1;
+        lis[j].style.display=show?'':'none';
+        if(show)anyVisible=true;
       }}
+      sections[i].open=anyVisible;
     }}
     if(scored.length===0){{
       results.innerHTML='<div class="no-match">No results</div>';
