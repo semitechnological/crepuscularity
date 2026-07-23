@@ -55,6 +55,12 @@ jobs:
         if: runner.os == 'macOS'
         run: echo "SDKROOT=$(xcrun --show-sdk-path)" >> $GITHUB_ENV
 
+      - name: Install system dependencies (Ubuntu)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev
+
       - name: WASM target and wasm-bindgen (crepus web build integration tests)
         run: |
           rustup target add wasm32-unknown-unknown
@@ -93,6 +99,12 @@ jobs:
       - name: Set SDKROOT (macOS)
         if: runner.os == 'macOS'
         run: echo "SDKROOT=$(xcrun --show-sdk-path)" >> $GITHUB_ENV
+
+      - name: Install system dependencies (Ubuntu)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev
 
       - name: Build weather example
         run: cargo build --locked
