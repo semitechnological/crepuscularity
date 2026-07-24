@@ -150,7 +150,7 @@ fn render_nav(page_map: &std::collections::HashMap<String, String>, current: &st
         }
 
         // Expand the section that contains the current page
-        let expanded = stems.iter().any(|s| *s == current);
+        let expanded = stems.contains(&current);
         let open = if expanded { " open" } else { "" };
 
         sections_html.push_str(&format!(
