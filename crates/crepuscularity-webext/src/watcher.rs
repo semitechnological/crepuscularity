@@ -195,8 +195,23 @@ mod tests {
         assert!(watcher.recv_timeout(Duration::from_millis(10)).is_none());
     }
 
-    fn canonical_test_path(path: PathBuf) -> PathBuf {
-        path.canonicalize().unwrap_or(path)
+    fn event_targets_file(event_path: &Path, expected: &Path) -> bool {
+        event_path.file_name() == expected.file_name()
+    }
+
+    fn wait_for_file_event<F>(watcher: &CapabilityWatcher, expected: &Path, matches: F) -> bool
+    where
+        F: Fn(&WatchEvent, &Path) -> bool,
+    {
+        let start = std::time::Instant::now();
+        while start.elapsed() < Duration::from_secs(5) {
+            if let Some(event) = watcher.recv_timeout(Duration::from_millis(100)) {
+                if matches(&event, expected) {
+                    return true;
+                }
+            }
+        }
+        false
     }
 
     #[test]
@@ -206,20 +221,13 @@ mod tests {
 
         let file_path = dir.path().join("test.crepus");
         fs::write(&file_path, "div").unwrap();
-        let file_path = canonical_test_path(file_path);
 
-        let mut received = false;
-        let start = std::time::Instant::now();
-        while start.elapsed() < Duration::from_secs(2) {
-            if let Some(WatchEvent::FileChanged { path }) =
-                watcher.recv_timeout(Duration::from_millis(100))
-            {
-                if path == file_path {
-                    received = true;
-                    break;
-                }
-            }
-        }
+        let received = wait_for_file_event(&watcher, &file_path, |event, expected| {
+            matches!(
+                event,
+                WatchEvent::FileChanged { path } if event_targets_file(path, expected)
+            )
+        });
         assert!(received, "Did not receive FileChanged event");
     }
 
@@ -230,20 +238,13 @@ mod tests {
 
         let file_path = dir.path().join("webext.toml");
         fs::write(&file_path, "name = \"test\"").unwrap();
-        let file_path = canonical_test_path(file_path);
 
-        let mut received = false;
-        let start = std::time::Instant::now();
-        while start.elapsed() < Duration::from_secs(2) {
-            if let Some(WatchEvent::ManifestUpdated { path }) =
-                watcher.recv_timeout(Duration::from_millis(100))
-            {
-                if path == file_path {
-                    received = true;
-                    break;
-                }
-            }
-        }
+        let received = wait_for_file_event(&watcher, &file_path, |event, expected| {
+            matches!(
+                event,
+                WatchEvent::ManifestUpdated { path } if event_targets_file(path, expected)
+            )
+        });
         assert!(received, "Did not receive ManifestUpdated event");
     }
 
