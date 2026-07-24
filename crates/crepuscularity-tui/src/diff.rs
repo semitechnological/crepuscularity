@@ -85,7 +85,7 @@ impl DiffTracker {
                 .fingerprints
                 .retain(|k, _| ctx.vars.contains_key(k));
             for (key, value) in &ctx.vars {
-                let mut hasher = std::collections::hash_map::DefaultHasher::new();
+                let mut hasher = rustc_hash::FxHasher::default();
                 hash_value(value, &mut hasher);
                 let fp = hasher.finish();
                 if let Some(v) = snapshot.fingerprints.get_mut(key) {
@@ -105,7 +105,7 @@ impl DiffTracker {
             Some(snapshot) => {
                 let mut changed = Vec::new();
                 for (key, value) in &ctx.vars {
-                    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+                    let mut hasher = rustc_hash::FxHasher::default();
                     hash_value(value, &mut hasher);
                     let fingerprint = hasher.finish();
                     match snapshot.fingerprints.get(key) {
