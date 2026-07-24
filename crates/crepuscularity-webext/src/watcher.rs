@@ -195,6 +195,10 @@ mod tests {
         assert!(watcher.recv_timeout(Duration::from_millis(10)).is_none());
     }
 
+    fn canonical_test_path(path: PathBuf) -> PathBuf {
+        path.canonicalize().unwrap_or(path)
+    }
+
     #[test]
     fn test_watcher_file_changed() {
         let dir = tempdir().unwrap();
@@ -202,6 +206,7 @@ mod tests {
 
         let file_path = dir.path().join("test.crepus");
         fs::write(&file_path, "div").unwrap();
+        let file_path = canonical_test_path(file_path);
 
         let mut received = false;
         let start = std::time::Instant::now();
@@ -225,6 +230,7 @@ mod tests {
 
         let file_path = dir.path().join("webext.toml");
         fs::write(&file_path, "name = \"test\"").unwrap();
+        let file_path = canonical_test_path(file_path);
 
         let mut received = false;
         let start = std::time::Instant::now();
