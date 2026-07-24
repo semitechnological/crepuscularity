@@ -16,6 +16,11 @@
 
 ### Fixed
 
+- `listitem` / `li` inline `"..."` and `label=` text now render instead of
+  producing empty bullets; empty list items are skipped entirely.
+- `text bind=` resolves against the host `data` scope before interpolation.
+- `listitem onclick=` dispatches through the same action seam as buttons.
+- `progress` and `meter` always show a percentage beside the bar.
 - A `progress` or `meter` inside a horizontal `stack`/`scroll` no longer fails
   layout: the bar falls back to a fixed width when its parent supplies
   unbounded width.

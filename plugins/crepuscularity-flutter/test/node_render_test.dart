@@ -48,9 +48,9 @@ void main() {
       expect(text.textAlign, TextAlign.center);
     });
 
-    testWidgets('empty content still produces a Text widget', (tester) async {
+    testWidgets('empty content renders nothing', (tester) async {
       await tester.pumpWidget(_one(const {'kind': 'text', 'content': ''}));
-      expect(find.byType(Text), findsOneWidget);
+      expect(find.byType(Text), findsNothing);
     });
 
     testWidgets('unresolved interpolation collapses to empty', (tester) async {
@@ -588,15 +588,26 @@ void main() {
       );
       expect(find.text('Setup'), findsOneWidget);
       await tester.pumpWidget(
-        _one(const {'kind': 'progress', 'label': '', 'value': 1}),
+        _one(const {'kind': 'progress', 'label': '', 'value': 1, 'max': 100}),
       );
-      expect(
-        find.descendant(
-          of: find.byType(CrepusView),
-          matching: find.byType(Text),
-        ),
-        findsNothing,
+      expect(find.text('Setup'), findsNothing);
+      expect(find.text('1%'), findsOneWidget);
+    });
+
+    testWidgets('progress and meter always show a percentage', (tester) async {
+      await tester.pumpWidget(
+        _one(const {'kind': 'progress', 'value': 2, 'max': 5}),
       );
+      expect(find.text('40%'), findsOneWidget);
+      await tester.pumpWidget(
+        _one(const {
+          'kind': 'meter',
+          'value': 3,
+          'min': 0,
+          'max': 10,
+        }),
+      );
+      expect(find.text('30%'), findsOneWidget);
     });
 
     testWidgets('meter maps value across min..max', (tester) async {
@@ -854,7 +865,7 @@ void main() {
       expect(actions, ['item:held']);
     });
 
-    testWidgets('an empty listItem still occupies a numbered slot', (
+    testWidgets('an empty listItem does not consume a numbered slot', (
       tester,
     ) async {
       await tester.pumpWidget(
@@ -868,7 +879,56 @@ void main() {
         }),
       );
       expect(find.text('1.'), findsOneWidget);
-      expect(find.text('2.'), findsOneWidget);
+      expect(find.text('2.'), findsNothing);
+      expect(find.text('second'), findsOneWidget);
+    });
+
+    testWidgets('listitem inline text renders without nested children', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _host(
+          CrepusView.fromSource('''
+list
+  listitem "Email from Sam"
+  listitem label="Invoice reminder"
+'''),
+        ),
+      );
+      expect(find.text('Email from Sam'), findsOneWidget);
+      expect(find.text('Invoice reminder'), findsOneWidget);
+      expect(find.text('•'), findsNWidgets(2));
+    });
+
+    testWidgets('listitem onclick dispatches through onAction', (tester) async {
+      final actions = <String>[];
+      await tester.pumpWidget(
+        _one(const {
+          'kind': 'list',
+          'children': [
+            {
+              'kind': 'listItem',
+              'onClick': 'prompt:Open the thread',
+              'children': [
+                {'kind': 'text', 'content': 'Tap me'},
+              ],
+            },
+          ],
+        }, onAction: actions.add),
+      );
+      await tester.tap(find.text('Tap me'));
+      expect(actions, ['prompt:Open the thread']);
+    });
+
+    testWidgets('text bind resolves from the data scope', (tester) async {
+      await tester.pumpWidget(
+        _one(const {
+          'kind': 'text',
+          'content': '',
+          'bind': 'subject',
+        }, data: const {'subject': 'Hello inbox'}),
+      );
+      expect(find.text('Hello inbox'), findsOneWidget);
     });
   });
 

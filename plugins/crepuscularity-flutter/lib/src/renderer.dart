@@ -153,9 +153,15 @@ class _Renderer {
 
   // ── Leaf + container renderers ────────────────────────────────────────────
 
-  Widget _text(TextNode node, Map<String, Object?> scope) {
+  Widget? _text(TextNode node, Map<String, Object?> scope) {
+    var content = node.content;
+    if (node.bind != null && node.bind!.isNotEmpty) {
+      final bound = _lookup(node.bind!, scope);
+      if (bound != null) content = '$bound';
+    }
+    content = _interpolate(content, scope);
+    if (content.isEmpty) return null;
     final style = node.style;
-    final content = _interpolate(node.content, scope);
     return Text(
       content,
       style: TextStyle(
@@ -252,6 +258,7 @@ class _Renderer {
 
   Widget _progress(ProgressNode node) {
     final fraction = node.max <= 0 ? 0.0 : (node.value / node.max).clamp(0, 1);
+    final percent = (fraction * 100).round();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -261,7 +268,7 @@ class _Renderer {
             padding: const EdgeInsets.only(bottom: 4),
             child: Text(node.label!, style: _mutedStyle()),
           ),
-        _bar(fraction.toDouble()),
+        _labeledBar(fraction.toDouble(), '$percent%'),
       ],
     );
   }
@@ -271,6 +278,7 @@ class _Renderer {
     final fraction = span <= 0
         ? 0.0
         : ((node.value - node.min) / span).clamp(0, 1);
+    final percent = (fraction * 100).round();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -280,10 +288,37 @@ class _Renderer {
             padding: const EdgeInsets.only(bottom: 4),
             child: Text(node.label!, style: _mutedStyle()),
           ),
-        _bar(fraction.toDouble()),
+        _labeledBar(fraction.toDouble(), '$percent%'),
       ],
     );
   }
+
+  /// Progress/meter bar plus a percentage label. Avoids [Expanded] under
+  /// unbounded horizontal constraints (horizontal stack/scroll parents).
+  Widget _labeledBar(double fraction, String label) => LayoutBuilder(
+    builder: (context, constraints) {
+      final bar = _bar(fraction);
+      final percentText = Padding(
+        padding: const EdgeInsets.only(left: 8),
+        child: Text(label, style: _mutedStyle()),
+      );
+      if (constraints.hasBoundedWidth) {
+        return Row(
+          children: [
+            Expanded(child: bar),
+            percentText,
+          ],
+        );
+      }
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(width: _unboundedBarWidth, child: bar),
+          percentText,
+        ],
+      );
+    },
+  );
 
   /// The shared progress/meter bar. [LinearProgressIndicator] has no intrinsic
   /// width, so inside a horizontal `stack`/`scroll` — which hands its children
@@ -397,14 +432,15 @@ class _Renderer {
     );
   }
 
-  Widget _listItem(ListItemNode node, Map<String, Object?> scope) {
+  Widget? _listItem(ListItemNode node, Map<String, Object?> scope) {
     final children = renderList(node.children, scope);
+    if (children.isEmpty) return null;
     final widget = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: children,
     );
-    return _withLongPress(widget, node.onLongPress);
+    return _withTap(_withLongPress(widget, node.onLongPress), node.onClick);
   }
 
   Widget? _ifNode(IfNode node, Map<String, Object?> scope) {
@@ -462,6 +498,11 @@ class _Renderer {
   Widget _withLongPress(Widget child, String? action) {
     if (action == null || action.isEmpty) return child;
     return GestureDetector(onLongPress: () => _dispatch(action), child: child);
+  }
+
+  Widget _withTap(Widget child, String? action) {
+    if (action == null || action.isEmpty) return child;
+    return GestureDetector(onTap: () => _dispatch(action), child: child);
   }
 
   // ── Style + helpers ───────────────────────────────────────────────────────

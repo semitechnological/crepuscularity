@@ -279,6 +279,7 @@ sealed class ViewNode {
         );
       case 'listItem':
         return ListItemNode(
+          onClick: _asString(raw['onClick']),
           onLongPress: _asString(raw['onLongPress']),
           children: _childList(raw['children']),
           style: style,
@@ -445,7 +446,13 @@ class ListNode extends ViewNode {
 }
 
 class ListItemNode extends ViewNode {
-  const ListItemNode({this.onLongPress, required this.children, super.style});
+  const ListItemNode({
+    this.onClick,
+    this.onLongPress,
+    required this.children,
+    super.style,
+  });
+  final String? onClick;
   final String? onLongPress;
   final List<ViewNode> children;
 }

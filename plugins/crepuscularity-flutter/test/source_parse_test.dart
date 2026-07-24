@@ -250,6 +250,29 @@ stack col
       }
     });
 
+    test('listitem inline text and label become text children', () {
+      final quoted =
+          viewIrFromSource('list\n  listitem "Email from Sam"').root.single
+              as ListNode;
+      final quotedItem = quoted.children.single as ListItemNode;
+      expect(quotedItem.children, hasLength(1));
+      expect((quotedItem.children.single as TextNode).content, 'Email from Sam');
+
+      final labeled =
+          viewIrFromSource('list\n  listitem label="Invoice"').root.single
+              as ListNode;
+      final labeledItem = labeled.children.single as ListItemNode;
+      expect((labeledItem.children.single as TextNode).content, 'Invoice');
+    });
+
+    test('container aliases map to nested stacks', () {
+      for (final tag in const ['stack', 'card', 'section', 'panel', 'group']) {
+        final node = viewIrFromSource('$tag\n  text "child"').root.single;
+        expect(node, isA<StackNode>(), reason: tag);
+        expect((node as StackNode).children, hasLength(1));
+      }
+    });
+
     test('image aliases and attributes', () {
       for (final tag in const ['img', 'image']) {
         final node =

@@ -307,6 +307,24 @@ ViewNode _mapNode(_Raw raw) {
     case 'list-item':
     case 'listitem':
       return ListItemNode(
+        onClick: el.events['click'],
+        onLongPress: el.events['longpress'],
+        children: _listItemChildren(raw, el, style),
+        style: style,
+      );
+    case 'stack':
+    case 'card':
+    case 'section':
+    case 'panel':
+    case 'group':
+    case 'view':
+      return StackNode(
+        axis: tag == 'view'
+            ? StackAxis.column
+            : (tag == 'row' ? StackAxis.row : _axisOf(el.classes)),
+        spacing: _gap(el.classes),
+        alignItems: _alignItems(el.classes),
+        justifyContent: _justify(el.classes),
         onLongPress: el.events['longpress'],
         children: _mapSiblings(raw.children),
         style: style,
@@ -373,6 +391,22 @@ String? _firstTextChild(_Element el) {
     if (_isTextLine(child)) return _unquote(child.line.tokens.first);
   }
   return null;
+}
+
+/// Inline `"..."` / `label=` on a list item becomes a text child when no
+/// indented children were authored — matching how labels work on buttons.
+List<ViewNode> _listItemChildren(_Raw raw, _Element el, ViewStyle? style) {
+  final mapped = _mapSiblings(raw.children);
+  if (mapped.isNotEmpty) return mapped;
+  final bind = el.attrs['bind'];
+  if (bind != null && bind.isNotEmpty) {
+    return [TextNode(content: '', bind: bind, style: style)];
+  }
+  final label = el.optionalLabel();
+  if (label != null && label.isNotEmpty) {
+    return [TextNode(content: label, style: style)];
+  }
+  return const [];
 }
 
 // ── Parsed element (tag + classes + attrs + events + inline text) ───────────
