@@ -1,0 +1,11 @@
+{
+  "name": "@crepuscularity/packages",
+  "private": true,
+  "workspaces": [
+    "moonshine",
+    "moonshine-crepus"
+  ],
+  "scripts": {
+    "test": "bun test moonshine moonshine-crepus"
+  }
+}
