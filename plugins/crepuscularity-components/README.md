@@ -1,11 +1,16 @@
 # crepuscularity-components
 
-Shared UI component catalog for Crepuscularity targets (Flutter, Svelte, Moonshine, GPUI).
+Multi-target dither / primitive / motion component registry for Crepuscularity
+(Flutter, Svelte, Moonshine, GPUI, and `.crepus`).
 
-## Catalog
+## Layout
 
-- `catalog/components.json` — component ids, descriptions, and per-target path hints
-- `catalog/themes/` — named theme JSON files
+| Path | Role |
+|------|------|
+| `catalog/components.json` | Component registry (ids, specs, platforms, themes) |
+| `catalog/themes/` | Named theme JSON |
+| `specs/` | Per-component source-of-truth specs |
+| `packages/{flutter,svelte,moonshine,gpui}/` | Target implementations |
 
 ## CLI
 
@@ -13,6 +18,5 @@ Shared UI component catalog for Crepuscularity targets (Flutter, Svelte, Moonshi
 crepus components list
 crepus components themes
 crepus components add button --target moonshine
+crepus moonshine dep   # @crepuscularity/components snippet
 ```
-
-Path hints point at the files under this package. Copy or wire them into your app; the CLI prints install guidance rather than rewriting your project for every target.

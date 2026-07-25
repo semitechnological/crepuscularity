@@ -149,6 +149,16 @@ pub enum Commands {
         #[command(subcommand)]
         command: FlutterCommands,
     },
+    /// Shared UI component catalog (`crepuscularity-components`).
+    Components {
+        #[command(subcommand)]
+        command: ComponentsCommands,
+    },
+    /// Moonshine + Crepuscularity web runtime helper.
+    Moonshine {
+        #[command(subcommand)]
+        command: MoonshineCommands,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -177,6 +187,51 @@ pub enum FlutterCommands {
 }
 
 #[derive(Subcommand, Debug)]
+pub enum ComponentsCommands {
+    /// List components from plugins/crepuscularity-components/catalog/components.json.
+    List,
+    /// Print install / path hints for a catalog component.
+    Add {
+        /// Component id from the catalog (e.g. `button`).
+        id: String,
+        /// Restrict hints to one target runtime.
+        #[arg(long, value_enum)]
+        target: Option<ComponentTarget>,
+    },
+    /// List theme names under catalog/themes/.
+    Themes,
+}
+
+#[derive(Clone, Copy, Debug, ValueEnum, PartialEq, Eq)]
+pub enum ComponentTarget {
+    Flutter,
+    Svelte,
+    Moonshine,
+    Gpui,
+}
+
+#[derive(Subcommand, Debug)]
+pub enum MoonshineCommands {
+    /// Scaffold a minimal Moonshine + Crepus app under cwd.
+    New {
+        name: String,
+    },
+    /// Print package.json dependency snippets for moonshine + crepus packages.
+    Dep,
+}
+
+/// Output target for `crepus web build --emit`.
+#[derive(Clone, Copy, Debug, ValueEnum, PartialEq, Eq, Default)]
+pub enum WebEmitTarget {
+    #[default]
+    Html,
+    Moonshine,
+    Svelte,
+    Solid,
+    React,
+}
+
+#[derive(Subcommand, Debug)]
 pub enum WebCommands {
     New {
         name: String,
@@ -196,6 +251,9 @@ pub enum WebCommands {
         target_id: Option<String>,
         #[arg(long)]
         manifest: Option<PathBuf>,
+        /// Framework emit target (default: html WASM site). Non-html writes a stub under dist/.
+        #[arg(long, value_enum, default_value_t = WebEmitTarget::Html)]
+        emit: WebEmitTarget,
     },
     #[command(alias = "serve")]
     Dev {
@@ -211,6 +269,9 @@ pub enum WebCommands {
         manifest: Option<PathBuf>,
         #[arg(long)]
         axum: bool,
+        /// Accepted for parity with `web build`; only `html` is meaningful for the dev server.
+        #[arg(long, value_enum, default_value_t = WebEmitTarget::Html)]
+        emit: WebEmitTarget,
     },
     #[command(name = "build-full")]
     BuildFull {
@@ -220,6 +281,9 @@ pub enum WebCommands {
         wasm: bool,
         #[arg(long)]
         server: bool,
+        /// Accepted for parity with `web build`; `build-full` always emits the HTML/WASM site.
+        #[arg(long, value_enum, default_value_t = WebEmitTarget::Html)]
+        emit: WebEmitTarget,
     },
 }
 
@@ -620,4 +684,77 @@ pub enum PluginsCommands {
 
 pub fn parse() -> Cli {
     Cli::parse()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use clap::Parser;
+
+    #[test]
+    fn parses_components_list() {
+        let cli = Cli::try_parse_from(["crepus", "components", "list"]).expect("parse");
+        assert!(matches!(
+            cli.command,
+            Some(Commands::Components {
+                command: ComponentsCommands::List
+            })
+        ));
+    }
+
+    #[test]
+    fn parses_components_add_with_target() {
+        let cli = Cli::try_parse_from([
+            "crepus",
+            "components",
+            "add",
+            "button",
+            "--target",
+            "moonshine",
+        ])
+        .expect("parse");
+        match cli.command {
+            Some(Commands::Components {
+                command: ComponentsCommands::Add { id, target },
+            }) => {
+                assert_eq!(id, "button");
+                assert_eq!(target, Some(ComponentTarget::Moonshine));
+            }
+            other => panic!("unexpected: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parses_moonshine_dep() {
+        let cli = Cli::try_parse_from(["crepus", "moonshine", "dep"]).expect("parse");
+        assert!(matches!(
+            cli.command,
+            Some(Commands::Moonshine {
+                command: MoonshineCommands::Dep
+            })
+        ));
+    }
+
+    #[test]
+    fn parses_web_build_emit_moonshine() {
+        let cli = Cli::try_parse_from(["crepus", "web", "build", "--emit", "moonshine"])
+            .expect("parse");
+        match cli.command {
+            Some(Commands::Web {
+                command: WebCommands::Build { emit, .. },
+            }) => assert_eq!(emit, WebEmitTarget::Moonshine),
+            other => panic!("unexpected: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn web_build_emit_defaults_to_html() {
+        let cli = Cli::try_parse_from(["crepus", "web", "build"]).expect("parse");
+        match cli.command {
+            Some(Commands::Web {
+                command: WebCommands::Build { emit, .. },
+            }) => assert_eq!(emit, WebEmitTarget::Html),
+            other => panic!("unexpected: {other:?}"),
+        }
+    }
 }

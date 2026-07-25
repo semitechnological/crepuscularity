@@ -1,5 +1,12 @@
 # Changelog — `crepuscularity-cli`
 
+## 0.11.0
+
+- **`crepus components`:** `list` / `add <id> [--target flutter|svelte|moonshine|gpui]` / `themes` for the `plugins/crepuscularity-components` catalog (graceful when missing).
+- **`crepus moonshine`:** `new <name>` scaffolds a minimal Moonshine + Crepus app; `dep` prints `package.json` snippets for `moonshine`, `@crepuscularity/moonshine`, and `@crepuscularity/components`.
+- **`crepus web build --emit`:** accepts `html` (default), `moonshine`, `svelte`, `solid`, `react`. Non-html emits write View IR JSON plus a framework stub under `dist/`; the HTML/WASM path is unchanged.
+- Workspace note: Moonshine runtime packages live under `packages/` (owned separately); this CLI only scaffolds and emits stubs.
+
 ## 0.9.15
 
 - CI: Zig **0.16.0** in plugin-smoke; restore `zig build test` for plugins.

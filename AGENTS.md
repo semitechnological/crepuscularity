@@ -20,7 +20,11 @@ crepuscularity/
     crepuscularity-runtime/  — hot-reload + shared runtime
         crepuscularity-lite/     — V8-based JS runtime
     crepuscularity-macros/   — proc macros
-      examples/
+  plugins/
+    crepuscularity-flutter/      — Flutter View IR / .crepus renderer
+    crepuscularity-components/   — shared component catalog + themes
+  packages/                  — Moonshine runtime (when present; separate ownership)
+  examples/
     web-site/                — reference site: index.crepus + runtime/
     counter/                 — SSR counter
     todo-web/                — SSR todo
@@ -93,6 +97,30 @@ crepuscularity/
 - `crepus init <kind> <name>` — same as `crepus <kind> new <name>`
 - GPUI apps use `view! {}` macro with `.crepus` string templates
 
+### `crepus moonshine` — Moonshine + Crepus web apps
+
+- Scaffold: `crepus moonshine new <name>` → Vite shell + `index.crepus` + `package.json`
+- Dep snippets: `crepus moonshine dep` → `moonshine`, `@crepuscularity/moonshine`, `@crepuscularity/components`
+- Runtime packages live under `packages/` (separate ownership); CLI scaffolds and emits stubs only
+- Emit stub: `crepus web build --emit moonshine --site .` → `dist/crepus-emit.moonshine.ts` + View IR JSON
+
+### `crepus components` — shared UI catalog (`crepuscularity-components`)
+
+- Catalog: `plugins/crepuscularity-components/catalog/components.json` + `catalog/themes/`
+- `crepus components list` — list component ids (graceful if catalog missing)
+- `crepus components add <id> [--target flutter|svelte|moonshine|gpui]` — path hints / install guidance
+- `crepus components themes` — theme names from `catalog/themes/`
+
+### `crepus web build --emit`
+
+- `--emit html` (default) — existing WASM site build (`index.html` + `pkg/`)
+- `--emit moonshine|svelte|solid|react` — stub/generated file in `dist/` mapping basic View IR kinds to the target framework (not a full runtime)
+
+### `crepus flutter` — Flutter renderer dependency helper
+
+- Package: `plugins/crepuscularity-flutter` (pub name `crepuscularity_flutter`)
+- `crepus flutter dep` / `crepus flutter add` — print or insert pubspec dependency block
+
 ## Core CLI
 
 | Command | Purpose |
@@ -103,6 +131,10 @@ crepuscularity/
 | `crepus build [--target]` | Build crepus.toml targets |
 | `crepus preview <file>` | Live-preview (GPUI) |
 | `crepus render <file>` | Render to HTML stdout |
+| `crepus components …` | Shared component catalog |
+| `crepus moonshine …` | Moonshine scaffold + deps |
+| `crepus flutter …` | Flutter renderer deps |
+| `crepus web build --emit …` | HTML or framework emit stub |
 
 ## Common Error Patterns
 

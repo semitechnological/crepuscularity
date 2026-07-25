@@ -17,11 +17,13 @@ mod embedded;
 mod error;
 #[cfg(feature = "desktop")]
 pub mod events;
+mod components;
 mod flutter;
 #[cfg(feature = "desktop")]
 mod hud;
 mod inspect;
 mod ios;
+mod moonshine;
 mod native;
 mod new;
 mod plugins;

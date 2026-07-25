@@ -2,6 +2,15 @@
 
 These plugins demonstrate the polyglot contract: spawn `crepus native ir`, read View IR JSON from stdout, decode it into host-language types, and create UI from that tree. The portable reference UI output is HTML; platform-specific packages can map the same node model to native controls. For in-process sessions and event dispatch, wrap `crates/crepuscularity-abi/include/crepuscularity_abi.h`. Native workspace files live next to the reference packages so a host project can drop in the matching package and use Crepus without adopting Rust.
 
+## Shared packages in this tree
+
+| Path | Role |
+|------|------|
+| `crepuscularity-flutter/` | Flutter runtime renderer (`crepus flutter dep` / `add`) |
+| `crepuscularity-components/` | Shared UI component catalog + themes (`crepus components list` / `add` / `themes`) |
+
+Moonshine runtime packages (`moonshine`, `@crepuscularity/moonshine`) live under `packages/` when present; use `crepus moonshine new` / `crepus moonshine dep` from the CLI.
+
 Workspace entrypoints:
 
 ```bash

@@ -373,7 +373,7 @@ fn load_all_crepus(root: &Path, dir: &Path, map: &mut HashMap<String, String>) {
         if path.is_dir() {
             // Skip output and cargo targets
             let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-            if matches!(name, "dist" | "target" | ".git" | "node_modules") {
+            if matches!(name, "dist" | "target" | ".git" | "node_modules" | ".crepus-dev") {
                 continue;
             }
             load_all_crepus(root, &path, map);
@@ -384,6 +384,35 @@ fn load_all_crepus(root: &Path, dir: &Path, map: &mut HashMap<String, String>) {
                 map.insert(key, normalized);
             }
         }
+    }
+}
+
+/// Public wrapper used by `--emit` stubs (same walk as the WASM site builder).
+pub(crate) fn load_all_crepus_public(root: &Path, dir: &Path, map: &mut HashMap<String, String>) {
+    load_all_crepus(root, dir, map);
+}
+
+pub(crate) struct EmitPaths {
+    pub(crate) site_dir: PathBuf,
+    pub(crate) out_dir: PathBuf,
+    pub(crate) entry: String,
+}
+
+/// Resolve site/out/entry for non-html `--emit` builds (no runtime/ WASM required).
+pub(crate) fn resolve_emit_paths(
+    site: Option<PathBuf>,
+    out_dir: Option<PathBuf>,
+    entry: Option<String>,
+) -> EmitPaths {
+    let site_dir = site.unwrap_or_else(|| {
+        std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
+    });
+    let out_dir = out_dir.unwrap_or_else(|| site_dir.join("dist"));
+    let entry = entry.unwrap_or_else(|| "index.crepus".into());
+    EmitPaths {
+        site_dir,
+        out_dir,
+        entry,
     }
 }
 

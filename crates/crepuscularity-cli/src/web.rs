@@ -9,13 +9,14 @@
 
 use std::path::PathBuf;
 
-use crate::cli::WebCommands;
+use crate::cli::{WebCommands, WebEmitTarget};
 use crate::ui;
 
 const WEB_INDEX_HTML: &str = include_str!("../assets/web/index.html");
 const WEB_APP_JS: &str = include_str!("../assets/web/app.js");
 
 pub mod build;
+pub mod emit;
 pub mod full;
 pub mod scaffold;
 
@@ -44,7 +45,12 @@ pub fn execute(cmd: WebCommands) {
             entry,
             target_id,
             manifest,
+            emit,
         } => {
+            if emit != WebEmitTarget::Html {
+                emit::build_emit_stub(emit, site, out_dir.or(output), entry);
+                return;
+            }
             let b = build::WebBuildArgs {
                 site_dir: site,
                 out_dir: out_dir.or(output),
@@ -63,11 +69,29 @@ pub fn execute(cmd: WebCommands) {
             target_id,
             manifest,
             axum,
+            emit,
         } => {
+            if emit != WebEmitTarget::Html {
+                ui::warning(&format!(
+                    "`crepus web dev --emit {:?}` is ignored; the dev server always serves the HTML/WASM site",
+                    emit
+                ));
+            }
             let opts = resolve_dev_options(site, port, entry, target_id, manifest, axum);
             crate::web_serve::run(opts);
         }
-        WebCommands::BuildFull { site, wasm, server } => {
+        WebCommands::BuildFull {
+            site,
+            wasm,
+            server,
+            emit,
+        } => {
+            if emit != WebEmitTarget::Html {
+                ui::warning(&format!(
+                    "`crepus web build-full --emit {:?}` is ignored; build-full always emits HTML/WASM",
+                    emit
+                ));
+            }
             let site_dir = site.unwrap_or_else(|| {
                 std::env::current_dir().unwrap_or_else(|e| {
                     ui::error(&format!("cannot determine current directory: {e}"));
