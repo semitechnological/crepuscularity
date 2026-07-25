@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.0
+
+- Depend on `crepuscularity_components` for dither charts/primitives (extracted from this package).
+- Add `sparkline` View IR / `.crepus` node backed by full-width dither sparklines.
+- Re-export dither helpers (`DitherSparkline`, palette parsers) from the components package.
+
 ## Unreleased
 
 ### Behaviour changes

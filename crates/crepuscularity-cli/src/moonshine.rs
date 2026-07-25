@@ -47,7 +47,7 @@ const INDEX_HTML: &str = r#"<!doctype html>
 "#;
 
 const MAIN_TS: &str = r#"// Minimal Moonshine + Crepuscularity shell.
-// Wire `@crepuscularity/moonshine` once the package is available locally or on npm.
+// Wire `@crepuscularity/moonshine` once the package is available locally or published.
 import "./app.css";
 
 const root = document.getElementById("app");
@@ -119,8 +119,8 @@ const README: &str = r#"# {{name}}
 Minimal Moonshine + Crepuscularity app scaffolded by `crepus moonshine new`.
 
 ```bash
-npm install
-npm run dev
+bun install
+bun run dev
 ```
 
 Dependency snippets (kept in sync with the CLI):
@@ -207,8 +207,8 @@ fn scaffold_app(name: &str) {
         &base,
         &[
             &format!("cd {slug}"),
-            "npm install",
-            "npm run dev",
+            "bun install",
+            "bun run dev",
             "crepus moonshine dep   # dependency snippets",
             "crepus web build --emit moonshine --site .",
         ],
