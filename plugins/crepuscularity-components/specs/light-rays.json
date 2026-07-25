@@ -20,7 +20,9 @@
   "themes": [
     "dither-kit",
     "night",
-    "aurora"
+    "aurora",
+    "dawn",
+    "zinc"
   ],
   "platforms": [
     "flutter",

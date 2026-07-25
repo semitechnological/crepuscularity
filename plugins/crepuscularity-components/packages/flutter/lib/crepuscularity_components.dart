@@ -30,5 +30,8 @@ export 'src/dither/sparkline.dart'
         parseSparklineValues;
 export 'src/primitives/badge.dart' show DitherBadge, DitherBadgeTone;
 export 'src/primitives/button.dart' show DitherButton, DitherButtonVariant;
+export 'src/primitives/empty_state.dart' show DitherEmptyState;
 export 'src/primitives/gradient.dart' show DitherGradient;
+export 'src/primitives/separator.dart' show DitherSeparator;
+export 'src/primitives/skeleton.dart' show DitherSkeleton;
 export 'src/themes/themes.dart' show ComponentTheme, ComponentThemes;

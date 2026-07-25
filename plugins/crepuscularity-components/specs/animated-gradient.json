@@ -16,7 +16,9 @@
     "dither-kit",
     "night",
     "aurora",
-    "chalk"
+    "chalk",
+    "dawn",
+    "zinc"
   ],
   "platforms": [
     "flutter",

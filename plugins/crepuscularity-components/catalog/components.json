@@ -1,13 +1,15 @@
 {
   "name": "crepuscularity-components",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Multi-target dither / primitive / motion component registry",
   "themes": [
     "dither-kit",
     "kumo",
     "night",
     "chalk",
-    "aurora"
+    "aurora",
+    "dawn",
+    "zinc"
   ],
   "platforms": [
     "flutter",
@@ -35,7 +37,9 @@
         "kumo",
         "night",
         "chalk",
-        "aurora"
+        "aurora",
+        "dawn",
+        "zinc"
       ]
     },
     {
@@ -55,7 +59,9 @@
         "dither-kit",
         "night",
         "aurora",
-        "chalk"
+        "chalk",
+        "dawn",
+        "zinc"
       ]
     },
     {
@@ -76,7 +82,9 @@
         "kumo",
         "night",
         "chalk",
-        "aurora"
+        "aurora",
+        "dawn",
+        "zinc"
       ]
     },
     {
@@ -97,7 +105,9 @@
         "kumo",
         "night",
         "chalk",
-        "aurora"
+        "aurora",
+        "dawn",
+        "zinc"
       ]
     },
     {
@@ -118,7 +128,9 @@
         "kumo",
         "night",
         "chalk",
-        "aurora"
+        "aurora",
+        "dawn",
+        "zinc"
       ]
     },
     {
@@ -139,7 +151,32 @@
         "kumo",
         "night",
         "chalk",
-        "aurora"
+        "aurora",
+        "dawn",
+        "zinc"
+      ]
+    },
+    {
+      "id": "breadcrumb",
+      "category": "primitive",
+      "title": "Breadcrumb",
+      "description": "Hierarchical path navigation trail.",
+      "spec": "specs/breadcrumb.json",
+      "platforms": [
+        "flutter",
+        "svelte",
+        "moonshine",
+        "gpui",
+        "crepus"
+      ],
+      "themes": [
+        "dither-kit",
+        "kumo",
+        "night",
+        "chalk",
+        "aurora",
+        "dawn",
+        "zinc"
       ]
     },
     {
@@ -160,7 +197,9 @@
         "kumo",
         "night",
         "chalk",
-        "aurora"
+        "aurora",
+        "dawn",
+        "zinc"
       ]
     },
     {
@@ -181,7 +220,9 @@
         "kumo",
         "night",
         "chalk",
-        "aurora"
+        "aurora",
+        "dawn",
+        "zinc"
       ]
     },
     {
@@ -202,7 +243,55 @@
         "kumo",
         "night",
         "chalk",
-        "aurora"
+        "aurora",
+        "dawn",
+        "zinc"
+      ]
+    },
+    {
+      "id": "command-palette",
+      "category": "primitive",
+      "title": "Command Palette",
+      "description": "Searchable command / action palette (Spell-inspired).",
+      "spec": "specs/command-palette.json",
+      "platforms": [
+        "flutter",
+        "svelte",
+        "moonshine",
+        "gpui",
+        "crepus"
+      ],
+      "themes": [
+        "dither-kit",
+        "kumo",
+        "night",
+        "chalk",
+        "aurora",
+        "dawn",
+        "zinc"
+      ]
+    },
+    {
+      "id": "context-menu",
+      "category": "primitive",
+      "title": "Context Menu",
+      "description": "Pointer-triggered contextual action menu.",
+      "spec": "specs/context-menu.json",
+      "platforms": [
+        "flutter",
+        "svelte",
+        "moonshine",
+        "gpui",
+        "crepus"
+      ],
+      "themes": [
+        "dither-kit",
+        "kumo",
+        "night",
+        "chalk",
+        "aurora",
+        "dawn",
+        "zinc"
       ]
     },
     {
@@ -223,7 +312,55 @@
         "kumo",
         "night",
         "chalk",
-        "aurora"
+        "aurora",
+        "dawn",
+        "zinc"
+      ]
+    },
+    {
+      "id": "dropdown-menu",
+      "category": "primitive",
+      "title": "Dropdown Menu",
+      "description": "Menu of actions triggered from a button (Base UI Menu).",
+      "spec": "specs/dropdown-menu.json",
+      "platforms": [
+        "flutter",
+        "svelte",
+        "moonshine",
+        "gpui",
+        "crepus"
+      ],
+      "themes": [
+        "dither-kit",
+        "kumo",
+        "night",
+        "chalk",
+        "aurora",
+        "dawn",
+        "zinc"
+      ]
+    },
+    {
+      "id": "empty-state",
+      "category": "layout",
+      "title": "Empty State",
+      "description": "Placeholder for vacant lists, panels, or search results.",
+      "spec": "specs/empty-state.json",
+      "platforms": [
+        "flutter",
+        "svelte",
+        "moonshine",
+        "gpui",
+        "crepus"
+      ],
+      "themes": [
+        "dither-kit",
+        "kumo",
+        "night",
+        "chalk",
+        "aurora",
+        "dawn",
+        "zinc"
       ]
     },
     {
@@ -244,7 +381,55 @@
         "kumo",
         "night",
         "chalk",
-        "aurora"
+        "aurora",
+        "dawn",
+        "zinc"
+      ]
+    },
+    {
+      "id": "heatmap",
+      "category": "chart",
+      "title": "Heatmap",
+      "description": "2D dithered intensity grid for matrix / calendar data.",
+      "spec": "specs/heatmap.json",
+      "platforms": [
+        "flutter",
+        "svelte",
+        "moonshine",
+        "gpui",
+        "crepus"
+      ],
+      "themes": [
+        "dither-kit",
+        "kumo",
+        "night",
+        "chalk",
+        "aurora",
+        "dawn",
+        "zinc"
+      ]
+    },
+    {
+      "id": "hover-card",
+      "category": "primitive",
+      "title": "Hover Card",
+      "description": "Rich preview card shown on hover/focus (Base UI Hover Card).",
+      "spec": "specs/hover-card.json",
+      "platforms": [
+        "flutter",
+        "svelte",
+        "moonshine",
+        "gpui",
+        "crepus"
+      ],
+      "themes": [
+        "dither-kit",
+        "kumo",
+        "night",
+        "chalk",
+        "aurora",
+        "dawn",
+        "zinc"
       ]
     },
     {
@@ -265,7 +450,9 @@
         "kumo",
         "night",
         "chalk",
-        "aurora"
+        "aurora",
+        "dawn",
+        "zinc"
       ]
     },
     {
@@ -284,7 +471,9 @@
       "themes": [
         "dither-kit",
         "night",
-        "aurora"
+        "aurora",
+        "dawn",
+        "zinc"
       ]
     },
     {
@@ -305,7 +494,9 @@
         "kumo",
         "night",
         "chalk",
-        "aurora"
+        "aurora",
+        "dawn",
+        "zinc"
       ]
     },
     {
@@ -326,7 +517,32 @@
         "kumo",
         "night",
         "chalk",
-        "aurora"
+        "aurora",
+        "dawn",
+        "zinc"
+      ]
+    },
+    {
+      "id": "pagination",
+      "category": "primitive",
+      "title": "Pagination",
+      "description": "Page navigation controls for lists and tables.",
+      "spec": "specs/pagination.json",
+      "platforms": [
+        "flutter",
+        "svelte",
+        "moonshine",
+        "gpui",
+        "crepus"
+      ],
+      "themes": [
+        "dither-kit",
+        "kumo",
+        "night",
+        "chalk",
+        "aurora",
+        "dawn",
+        "zinc"
       ]
     },
     {
@@ -347,7 +563,55 @@
         "kumo",
         "night",
         "chalk",
-        "aurora"
+        "aurora",
+        "dawn",
+        "zinc"
+      ]
+    },
+    {
+      "id": "pixel-grid",
+      "category": "chart",
+      "title": "Pixel Grid",
+      "description": "Fixed-resolution Bayer pixel plane driven by density or mask data.",
+      "spec": "specs/pixel-grid.json",
+      "platforms": [
+        "flutter",
+        "svelte",
+        "moonshine",
+        "gpui",
+        "crepus"
+      ],
+      "themes": [
+        "dither-kit",
+        "kumo",
+        "night",
+        "chalk",
+        "aurora",
+        "dawn",
+        "zinc"
+      ]
+    },
+    {
+      "id": "popover",
+      "category": "primitive",
+      "title": "Popover",
+      "description": "Anchored floating surface for rich content (Base UI Popover).",
+      "spec": "specs/popover.json",
+      "platforms": [
+        "flutter",
+        "svelte",
+        "moonshine",
+        "gpui",
+        "crepus"
+      ],
+      "themes": [
+        "dither-kit",
+        "kumo",
+        "night",
+        "chalk",
+        "aurora",
+        "dawn",
+        "zinc"
       ]
     },
     {
@@ -368,7 +632,9 @@
         "kumo",
         "night",
         "chalk",
-        "aurora"
+        "aurora",
+        "dawn",
+        "zinc"
       ]
     },
     {
@@ -389,7 +655,55 @@
         "kumo",
         "night",
         "chalk",
-        "aurora"
+        "aurora",
+        "dawn",
+        "zinc"
+      ]
+    },
+    {
+      "id": "radio-group",
+      "category": "primitive",
+      "title": "Radio Group",
+      "description": "Single-selection radio set (Base UI Radio Group).",
+      "spec": "specs/radio-group.json",
+      "platforms": [
+        "flutter",
+        "svelte",
+        "moonshine",
+        "gpui",
+        "crepus"
+      ],
+      "themes": [
+        "dither-kit",
+        "kumo",
+        "night",
+        "chalk",
+        "aurora",
+        "dawn",
+        "zinc"
+      ]
+    },
+    {
+      "id": "scroll-area",
+      "category": "primitive",
+      "title": "Scroll Area",
+      "description": "Scrollable viewport with optional dithered scrollbars.",
+      "spec": "specs/scroll-area.json",
+      "platforms": [
+        "flutter",
+        "svelte",
+        "moonshine",
+        "gpui",
+        "crepus"
+      ],
+      "themes": [
+        "dither-kit",
+        "kumo",
+        "night",
+        "chalk",
+        "aurora",
+        "dawn",
+        "zinc"
       ]
     },
     {
@@ -410,7 +724,78 @@
         "kumo",
         "night",
         "chalk",
-        "aurora"
+        "aurora",
+        "dawn",
+        "zinc"
+      ]
+    },
+    {
+      "id": "separator",
+      "category": "primitive",
+      "title": "Separator",
+      "description": "Horizontal or vertical visual divider (Base UI Separator).",
+      "spec": "specs/separator.json",
+      "platforms": [
+        "flutter",
+        "svelte",
+        "moonshine",
+        "gpui",
+        "crepus"
+      ],
+      "themes": [
+        "dither-kit",
+        "kumo",
+        "night",
+        "chalk",
+        "aurora",
+        "dawn",
+        "zinc"
+      ]
+    },
+    {
+      "id": "sheet",
+      "category": "primitive",
+      "title": "Sheet",
+      "description": "Slide-over panel from an edge (mobile-friendly dialog alternative).",
+      "spec": "specs/sheet.json",
+      "platforms": [
+        "flutter",
+        "svelte",
+        "moonshine",
+        "gpui",
+        "crepus"
+      ],
+      "themes": [
+        "dither-kit",
+        "kumo",
+        "night",
+        "chalk",
+        "aurora",
+        "dawn",
+        "zinc"
+      ]
+    },
+    {
+      "id": "skeleton",
+      "category": "primitive",
+      "title": "Skeleton",
+      "description": "Placeholder shimmer / dither pulse while content loads.",
+      "spec": "specs/skeleton.json",
+      "platforms": [
+        "flutter",
+        "svelte",
+        "moonshine",
+        "gpui",
+        "crepus"
+      ],
+      "themes": [
+        "dither-kit",
+        "kumo",
+        "night",
+        "chalk",
+        "aurora",
+        "dawn",
+        "zinc"
       ]
     },
     {
@@ -431,7 +816,32 @@
         "kumo",
         "night",
         "chalk",
-        "aurora"
+        "aurora",
+        "dawn",
+        "zinc"
+      ]
+    },
+    {
+      "id": "spark-bars",
+      "category": "chart",
+      "title": "Spark Bars",
+      "description": "Compact dithered column spark for a short numeric series.",
+      "spec": "specs/spark-bars.json",
+      "platforms": [
+        "flutter",
+        "svelte",
+        "moonshine",
+        "gpui",
+        "crepus"
+      ],
+      "themes": [
+        "dither-kit",
+        "kumo",
+        "night",
+        "chalk",
+        "aurora",
+        "dawn",
+        "zinc"
       ]
     },
     {
@@ -452,7 +862,32 @@
         "kumo",
         "night",
         "chalk",
-        "aurora"
+        "aurora",
+        "dawn",
+        "zinc"
+      ]
+    },
+    {
+      "id": "switch",
+      "category": "primitive",
+      "title": "Switch",
+      "description": "Binary on/off switch control (distinct from Toggle pressable).",
+      "spec": "specs/switch.json",
+      "platforms": [
+        "flutter",
+        "svelte",
+        "moonshine",
+        "gpui",
+        "crepus"
+      ],
+      "themes": [
+        "dither-kit",
+        "kumo",
+        "night",
+        "chalk",
+        "aurora",
+        "dawn",
+        "zinc"
       ]
     },
     {
@@ -473,7 +908,32 @@
         "kumo",
         "night",
         "chalk",
-        "aurora"
+        "aurora",
+        "dawn",
+        "zinc"
+      ]
+    },
+    {
+      "id": "textarea",
+      "category": "primitive",
+      "title": "Textarea",
+      "description": "Multi-line text field.",
+      "spec": "specs/textarea.json",
+      "platforms": [
+        "flutter",
+        "svelte",
+        "moonshine",
+        "gpui",
+        "crepus"
+      ],
+      "themes": [
+        "dither-kit",
+        "kumo",
+        "night",
+        "chalk",
+        "aurora",
+        "dawn",
+        "zinc"
       ]
     },
     {
@@ -494,7 +954,32 @@
         "kumo",
         "night",
         "chalk",
-        "aurora"
+        "aurora",
+        "dawn",
+        "zinc"
+      ]
+    },
+    {
+      "id": "toast",
+      "category": "primitive",
+      "title": "Toast",
+      "description": "Transient notification surface (Spell / Base UI toast pattern).",
+      "spec": "specs/toast.json",
+      "platforms": [
+        "flutter",
+        "svelte",
+        "moonshine",
+        "gpui",
+        "crepus"
+      ],
+      "themes": [
+        "dither-kit",
+        "kumo",
+        "night",
+        "chalk",
+        "aurora",
+        "dawn",
+        "zinc"
       ]
     },
     {
@@ -515,7 +1000,9 @@
         "kumo",
         "night",
         "chalk",
-        "aurora"
+        "aurora",
+        "dawn",
+        "zinc"
       ]
     },
     {
@@ -536,7 +1023,9 @@
         "kumo",
         "night",
         "chalk",
-        "aurora"
+        "aurora",
+        "dawn",
+        "zinc"
       ]
     }
   ]

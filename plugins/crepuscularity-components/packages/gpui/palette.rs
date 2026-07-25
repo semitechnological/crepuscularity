@@ -81,4 +81,12 @@ pub const KUMO_CATEGORICAL: &[Rgb] = &[
     KUMO_ORANGE,
 ];
 
-pub const THEME_NAMES: &[&str] = &["dither-kit", "kumo", "night", "chalk", "aurora"];
+pub const THEME_NAMES: &[&str] = &[
+    "dither-kit",
+    "kumo",
+    "night",
+    "chalk",
+    "aurora",
+    "dawn",
+    "zinc",
+];

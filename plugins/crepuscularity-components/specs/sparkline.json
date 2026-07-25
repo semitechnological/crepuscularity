@@ -36,7 +36,9 @@
     "kumo",
     "night",
     "chalk",
-    "aurora"
+    "aurora",
+    "dawn",
+    "zinc"
   ],
   "platforms": [
     "flutter",

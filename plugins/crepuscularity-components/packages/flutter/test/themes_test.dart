@@ -9,6 +9,8 @@ void main() {
       'night',
       'chalk',
       'aurora',
+      'dawn',
+      'zinc',
     ]));
   });
 

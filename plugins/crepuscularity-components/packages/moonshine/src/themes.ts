@@ -103,6 +103,22 @@ export const themes: Record<string, Theme> = {
       grey: { fill: [80, 100, 110], line: [120, 140, 150], star: [160, 175, 185] },
     },
   },
+  dawn: {
+    name: "dawn",
+    background: "#1c1410",
+    foreground: "#f5ebe0",
+    muted: "#c4a484",
+    accent: "#e8a87c",
+    seeds: { ...PALETTE },
+  },
+  zinc: {
+    name: "zinc",
+    background: "#09090b",
+    foreground: "#fafafa",
+    muted: "#a1a1aa",
+    accent: "#e4e4e7",
+    seeds: { ...PALETTE },
+  },
 };
 
 export const rgb = ([r, g, b]: Rgb, k = 1, a = 1) =>

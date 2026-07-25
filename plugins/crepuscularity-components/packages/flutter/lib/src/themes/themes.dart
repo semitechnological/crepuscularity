@@ -106,12 +106,32 @@ abstract final class ComponentThemes {
     },
   );
 
+  static final dawn = ComponentTheme(
+    name: 'dawn',
+    background: _hex('#1c1410'),
+    foreground: _hex('#f5ebe0'),
+    muted: _hex('#c4a484'),
+    accent: _hex('#e8a87c'),
+    seeds: ditherKit.seeds,
+  );
+
+  static final zinc = ComponentTheme(
+    name: 'zinc',
+    background: _hex('#09090b'),
+    foreground: _hex('#fafafa'),
+    muted: _hex('#a1a1aa'),
+    accent: _hex('#e4e4e7'),
+    seeds: ditherKit.seeds,
+  );
+
   static final Map<String, ComponentTheme> byName = {
     ditherKit.name: ditherKit,
     kumo.name: kumo,
     night.name: night,
     chalk.name: chalk,
     aurora.name: aurora,
+    dawn.name: dawn,
+    zinc.name: zinc,
   };
 
   static ComponentTheme of(String name) => byName[name] ?? ditherKit;
