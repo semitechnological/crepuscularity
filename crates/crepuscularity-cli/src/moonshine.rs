@@ -1,8 +1,11 @@
 //! `crepus moonshine` — scaffold and dependency helper for Moonshine + Crepus apps.
 //!
 //! Moonshine is an external product: <https://github.com/tschk/moonshine>
+//! (local checkout often at `~/projects/moonshine`). Prefer the `moonshine` CLI
+//! from that repo when available; `crepus moonshine` remains a working fallback.
+//!
 //! Crepuscularity compiles `.crepus` → View IR and emits apps that import
-//! `@tschk/crepus-moonshine`.
+//! `@tschk/crepus-moonshine` (`crepus-emit.moonshine.tsx`).
 //!
 //! - `crepus moonshine new <name>` scaffolds a React + Vite app under cwd.
 //! - `crepus moonshine dep` prints package.json dependency snippets.
@@ -119,11 +122,9 @@ const INDEX_HTML: &str = r#"<!doctype html>
 </html>
 "#;
 
-const MAIN_TSX: &str = r##"import { StrictMode } from "react";
-import { createRoot } from "react-dom/client";
+const MAIN_TSX: &str = r##"import { createApp } from "@tschk/moonshine/react";
 import { renderCrepusIr } from "@tschk/crepus-moonshine";
-import type { CrepusIr } from "@tschk/crepus-moonshine";
-// When @tschk/crepus-moonshine exports `ViewIr`, prefer: import type { ViewIr } from "@tschk/crepus-moonshine";
+import type { ViewIr } from "@tschk/crepus-moonshine";
 import { Sparkline } from "@tschk/moonshine-components";
 import "./app.css";
 
@@ -158,7 +159,7 @@ const sampleIr = {
       ],
     },
   ],
-} as const satisfies CrepusIr;
+} as const satisfies ViewIr;
 
 function App() {
   return (
@@ -174,13 +175,7 @@ function App() {
   );
 }
 
-const el = document.getElementById("app");
-if (!el) throw new Error("#app missing");
-createRoot(el).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-);
+createApp({ root: App }).mount("#app");
 "##;
 
 const APP_CSS: &str = r#":root {
@@ -257,6 +252,10 @@ fn readme_template(local_hint: &str) -> String {
 React + Vite app scaffolded by `crepus moonshine new`.
 
 Moonshine is a separate product: https://github.com/tschk/moonshine
+(local checkout often at `~/projects/moonshine`).
+
+When available, prefer the `moonshine` CLI from tschk/moonshine for new apps.
+`crepus moonshine` remains a supported Crepuscularity fallback.
 
 ## Setup
 
@@ -267,7 +266,7 @@ bun install
 bun run dev
 ```
 
-Emit a View IR app entry from `.crepus`:
+Emit a View IR app entry from `.crepus` (`dist/crepus-emit.moonshine.tsx`):
 
 ```bash
 crepus web build --emit moonshine --site .
@@ -437,6 +436,10 @@ git clone https://github.com/tschk/moonshine.git ../moonshine
     scaffold::write_template(&base.join("README.md"), &readme, &[("{{name}}", name)])
         .unwrap_or_else(|e| ui::error(&format!("write README.md: {e}")));
 
+    eprintln!(
+        "  {} prefer `moonshine` CLI (tschk/moonshine) when available; `crepus moonshine` stays supported",
+        ui::dim("→")
+    );
     scaffold::scaffold_success(
         &slug,
         &base,

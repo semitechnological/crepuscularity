@@ -100,14 +100,14 @@ crepuscularity/
 
 ### `crepus moonshine` — Moonshine + Crepus web apps
 
-**Moonshine is a separate product:** [`github.com/tschk/moonshine`](https://github.com/tschk/moonshine) (`@tschk/moonshine`). Crepuscularity compiles `.crepus` → View IR and emits apps that import `@tschk/crepus-moonshine`.
+**Moonshine is a separate product:** [`github.com/tschk/moonshine`](https://github.com/tschk/moonshine) (`@tschk/moonshine`; local checkout often `~/projects/moonshine`). Prefer the `moonshine` CLI from that repo when available; `crepus moonshine` remains a working Crepuscularity fallback. Crepuscularity compiles `.crepus` → View IR and emits apps that import `@tschk/crepus-moonshine`.
 
-- Scaffold: `crepus moonshine new <name>` → Vite shell + `index.crepus` + `package.json`
+- Scaffold: `crepus moonshine new <name>` → Vite shell + `index.crepus` + `package.json` (imports `@tschk/moonshine/react`)
 - Dep snippets: `crepus moonshine dep` →
   - `@tschk/moonshine` → `github:tschk/moonshine#path:packages/core`
   - `@tschk/crepus-moonshine` → `github:tschk/moonshine#path:packages/crepus-moonshine`
   - `@tschk/moonshine-components` → `github:tschk/moonshine#path:components`
-- Emit: `crepus web build --emit moonshine --site .` → `dist/crepus-emit.moonshine.ts` (calls `renderCrepusIr`) + `crepus-view-ir.json`
+- Emit: `crepus web build --emit moonshine --site .` → `dist/crepus-emit.moonshine.tsx` (`renderCrepusIr` + `createApp` from `@tschk/moonshine/react`) + `crepus-view-ir.json`
 - React component implementations: `moonshine/components/` as `@tschk/moonshine-components` (not in this repo)
 
 ### `crepus components` — shared UI catalog (`crepuscularity-components`)
@@ -121,7 +121,7 @@ crepuscularity/
 ### `crepus web build --emit`
 
 - `--emit html` (default) — existing WASM site build (`index.html` + `pkg/`)
-- `--emit moonshine` — real emit importing `@tschk/crepus-moonshine` (`renderCrepusIr` + embedded View IR)
+- `--emit moonshine` — real TSX emit (`crepus-emit.moonshine.tsx`) importing `@tschk/crepus-moonshine` + `@tschk/moonshine/react`
 - `--emit svelte|solid|react` — stub/generated file in `dist/` mapping basic View IR kinds to the target framework (not a full runtime)
 
 ### `crepus flutter` — Flutter renderer dependency helper
