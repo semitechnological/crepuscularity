@@ -194,6 +194,7 @@ fn web_build_emit_moonshine_writes_entry() {
     assert!(entry.contains("@tschk/crepus-moonshine"));
     assert!(entry.contains("renderCrepusIr"));
     assert!(entry.contains("export function App"));
-    assert!(entry.contains("satisfies CrepusIr"));
+    assert!(entry.contains("satisfies ViewIr"));
+    assert!(entry.contains("import type { ViewIr }"));
     assert!(entry.contains("as const satisfies"));
 }

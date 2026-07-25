@@ -55,47 +55,19 @@ fn canonicalize_or_self(path: &Path) -> PathBuf {
 }
 
 /// `file:` dependency paths for the three @tschk packages.
-fn file_dep_paths(moonshine_root: &Path, from: Option<&Path>) -> (String, String, String) {
+///
+/// Always uses absolute `file:` URLs so scaffolds outside the moonshine tree
+/// (e.g. `/tmp/app`) don't get broken `../../Users/...` relatives.
+fn file_dep_paths(moonshine_root: &Path, _from: Option<&Path>) -> (String, String, String) {
     let core = moonshine_root.join("packages/core");
     let crepus = moonshine_root.join("packages/crepus-moonshine");
     let components = moonshine_root.join("components");
 
     let fmt = |target: &Path| -> String {
-        if let Some(base) = from {
-            if let Some(rel) = pathdiff_relative(base, target) {
-                return format!("file:{rel}");
-            }
-        }
-        format!("file:{}", target.display())
+        format!("file:{}", canonicalize_or_self(target).display())
     };
 
     (fmt(&core), fmt(&crepus), fmt(&components))
-}
-
-/// Minimal relative path helper (no external crate).
-fn pathdiff_relative(from: &Path, to: &Path) -> Option<String> {
-    let from = canonicalize_or_self(from);
-    let to = canonicalize_or_self(to);
-    let from_comps: Vec<_> = from.components().collect();
-    let to_comps: Vec<_> = to.components().collect();
-    let mutual = from_comps
-        .iter()
-        .zip(to_comps.iter())
-        .take_while(|(a, b)| a == b)
-        .count();
-    if mutual == 0 {
-        return None;
-    }
-    let ups = from_comps.len().saturating_sub(mutual);
-    let mut parts: Vec<String> = (0..ups).map(|_| "..".to_string()).collect();
-    for c in &to_comps[mutual..] {
-        parts.push(c.as_os_str().to_string_lossy().into_owned());
-    }
-    if parts.is_empty() {
-        Some(".".to_string())
-    } else {
-        Some(parts.join("/"))
-    }
 }
 
 fn package_json_template(core: &str, crepus: &str, components: &str) -> String {
