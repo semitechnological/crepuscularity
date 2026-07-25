@@ -40,3 +40,4 @@ crates/crepuscularity-cli/templates/native/android/.gradle/
 .pi-subagents/
 PR-REVIEW-*.md
 node_modules/
+-tmp-moonshine-smoke/
