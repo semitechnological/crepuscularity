@@ -1,0 +1,32 @@
+{
+  "id": "select",
+  "category": "primitive",
+  "title": "Select",
+  "description": "Single-select dropdown.",
+  "props": {
+    "options": {
+      "type": "array",
+      "required": true
+    },
+    "value": {
+      "type": "string"
+    },
+    "placeholder": {
+      "type": "string"
+    }
+  },
+  "themes": [
+    "dither-kit",
+    "kumo",
+    "night",
+    "chalk",
+    "aurora"
+  ],
+  "platforms": [
+    "flutter",
+    "svelte",
+    "moonshine",
+    "gpui",
+    "crepus"
+  ]
+}

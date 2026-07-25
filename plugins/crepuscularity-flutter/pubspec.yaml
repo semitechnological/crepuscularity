@@ -21,6 +21,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  crepuscularity_components:
+    path: ../crepuscularity-components/packages/flutter
 
 dev_dependencies:
   flutter_test:

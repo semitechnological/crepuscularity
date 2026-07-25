@@ -17,6 +17,7 @@ const Set<String> kAllowedKinds = {
   'checkbox',
   'progress',
   'meter',
+  'sparkline',
   'badge',
   'divider',
   'spacer',
@@ -59,6 +60,22 @@ double? _asDouble(Object? value) {
   };
   if (parsed == null || !parsed.isFinite) return null;
   return parsed;
+}
+
+List<double> _doubleList(Object? value) {
+  if (value is List) {
+    return value.map(_asDouble).whereType<double>().toList(growable: false);
+  }
+  if (value is String) {
+    return value
+        .replaceAll('[', '')
+        .replaceAll(']', '')
+        .split(RegExp(r'[,\s]+'))
+        .map((part) => _asDouble(part.trim()))
+        .whereType<double>()
+        .toList(growable: false);
+  }
+  return const [];
 }
 
 String? _asString(Object? value) => value is String ? value : null;
@@ -238,6 +255,13 @@ sealed class ViewNode {
           max: _asDouble(raw['max']) ?? 100,
           style: style,
         );
+      case 'sparkline':
+        return SparklineNode(
+          values: _doubleList(raw['values']),
+          color: _asString(raw['color']),
+          variant: _asString(raw['variant']),
+          style: style,
+        );
       case 'badge':
         return BadgeNode(
           label: _asString(raw['label']) ?? '',
@@ -390,6 +414,18 @@ class MeterNode extends ViewNode {
   final double value;
   final double min;
   final double max;
+}
+
+class SparklineNode extends ViewNode {
+  const SparklineNode({
+    required this.values,
+    this.color,
+    this.variant,
+    super.style,
+  });
+  final List<double> values;
+  final String? color;
+  final String? variant;
 }
 
 class BadgeNode extends ViewNode {

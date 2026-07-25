@@ -1,0 +1,32 @@
+{
+  "id": "input",
+  "category": "primitive",
+  "title": "Input",
+  "description": "Single-line text field.",
+  "props": {
+    "value": {
+      "type": "string"
+    },
+    "placeholder": {
+      "type": "string"
+    },
+    "disabled": {
+      "type": "boolean",
+      "default": false
+    }
+  },
+  "themes": [
+    "dither-kit",
+    "kumo",
+    "night",
+    "chalk",
+    "aurora"
+  ],
+  "platforms": [
+    "flutter",
+    "svelte",
+    "moonshine",
+    "gpui",
+    "crepus"
+  ]
+}

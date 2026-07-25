@@ -1,0 +1,30 @@
+{
+  "id": "checkbox",
+  "category": "primitive",
+  "title": "Checkbox",
+  "description": "Binary checkbox control.",
+  "props": {
+    "checked": {
+      "type": "boolean",
+      "default": false
+    },
+    "disabled": {
+      "type": "boolean",
+      "default": false
+    }
+  },
+  "themes": [
+    "dither-kit",
+    "kumo",
+    "night",
+    "chalk",
+    "aurora"
+  ],
+  "platforms": [
+    "flutter",
+    "svelte",
+    "moonshine",
+    "gpui",
+    "crepus"
+  ]
+}

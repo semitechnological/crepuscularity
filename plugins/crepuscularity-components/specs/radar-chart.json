@@ -1,0 +1,34 @@
+{
+  "id": "radar-chart",
+  "category": "chart",
+  "title": "Radar Chart",
+  "description": "Dithered polar radar / spider chart.",
+  "props": {
+    "axes": {
+      "type": "string[]",
+      "required": true
+    },
+    "values": {
+      "type": "number[]",
+      "required": true
+    },
+    "color": {
+      "type": "string",
+      "default": "blue"
+    }
+  },
+  "themes": [
+    "dither-kit",
+    "kumo",
+    "night",
+    "chalk",
+    "aurora"
+  ],
+  "platforms": [
+    "flutter",
+    "svelte",
+    "moonshine",
+    "gpui",
+    "crepus"
+  ]
+}

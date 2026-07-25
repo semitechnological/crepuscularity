@@ -1,0 +1,29 @@
+{
+  "id": "pie-chart",
+  "category": "chart",
+  "title": "Pie Chart",
+  "description": "Dithered polar slices for categorical proportions.",
+  "props": {
+    "slices": {
+      "type": "array",
+      "required": true
+    },
+    "colors": {
+      "type": "string[]"
+    }
+  },
+  "themes": [
+    "dither-kit",
+    "kumo",
+    "night",
+    "chalk",
+    "aurora"
+  ],
+  "platforms": [
+    "flutter",
+    "svelte",
+    "moonshine",
+    "gpui",
+    "crepus"
+  ]
+}

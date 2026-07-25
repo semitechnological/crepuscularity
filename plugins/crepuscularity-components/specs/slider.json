@@ -1,0 +1,38 @@
+{
+  "id": "slider",
+  "category": "primitive",
+  "title": "Slider",
+  "description": "Continuous or stepped range input.",
+  "props": {
+    "value": {
+      "type": "number",
+      "required": true
+    },
+    "min": {
+      "type": "number",
+      "default": 0
+    },
+    "max": {
+      "type": "number",
+      "default": 100
+    },
+    "step": {
+      "type": "number",
+      "default": 1
+    }
+  },
+  "themes": [
+    "dither-kit",
+    "kumo",
+    "night",
+    "chalk",
+    "aurora"
+  ],
+  "platforms": [
+    "flutter",
+    "svelte",
+    "moonshine",
+    "gpui",
+    "crepus"
+  ]
+}

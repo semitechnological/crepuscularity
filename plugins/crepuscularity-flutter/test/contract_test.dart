@@ -74,6 +74,7 @@ void main() {
         'checkbox',
         'progress',
         'meter',
+        'sparkline',
         'badge',
         'divider',
         'spacer',
@@ -83,7 +84,7 @@ void main() {
         'list',
         'listItem',
       });
-      expect(kAllowedKinds, hasLength(16));
+      expect(kAllowedKinds, hasLength(17));
     });
 
     test('every executing/disallowed kind decodes to UnsupportedNode', () {

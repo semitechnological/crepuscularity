@@ -1,0 +1,28 @@
+{
+  "id": "animated-gradient",
+  "category": "motion",
+  "title": "Animated Gradient",
+  "description": "Moving dither/mesh gradient plane.",
+  "props": {
+    "colors": {
+      "type": "string[]"
+    },
+    "speed": {
+      "type": "number",
+      "default": 1
+    }
+  },
+  "themes": [
+    "dither-kit",
+    "night",
+    "aurora",
+    "chalk"
+  ],
+  "platforms": [
+    "flutter",
+    "svelte",
+    "moonshine",
+    "gpui",
+    "crepus"
+  ]
+}

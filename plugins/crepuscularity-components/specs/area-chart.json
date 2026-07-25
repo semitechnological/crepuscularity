@@ -1,0 +1,40 @@
+{
+  "id": "area-chart",
+  "category": "chart",
+  "title": "Area Chart",
+  "description": "Dithered area fill under a series line.",
+  "props": {
+    "values": {
+      "type": "number[]",
+      "required": true
+    },
+    "color": {
+      "type": "string",
+      "default": "blue"
+    },
+    "variant": {
+      "type": "enum",
+      "values": [
+        "gradient",
+        "dotted",
+        "hatched",
+        "solid"
+      ],
+      "default": "gradient"
+    }
+  },
+  "themes": [
+    "dither-kit",
+    "kumo",
+    "night",
+    "chalk",
+    "aurora"
+  ],
+  "platforms": [
+    "flutter",
+    "svelte",
+    "moonshine",
+    "gpui",
+    "crepus"
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "id": "tabs",
+  "category": "primitive",
+  "title": "Tabs",
+  "description": "Tab list + panels.",
+  "props": {
+    "tabs": {
+      "type": "array",
+      "required": true
+    },
+    "value": {
+      "type": "string"
+    }
+  },
+  "themes": [
+    "dither-kit",
+    "kumo",
+    "night",
+    "chalk",
+    "aurora"
+  ],
+  "platforms": [
+    "flutter",
+    "svelte",
+    "moonshine",
+    "gpui",
+    "crepus"
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "id": "card",
+  "category": "layout",
+  "title": "Card",
+  "description": "Surface container for interactive content groups.",
+  "props": {
+    "title": {
+      "type": "string"
+    },
+    "padding": {
+      "type": "number",
+      "default": 16
+    }
+  },
+  "themes": [
+    "dither-kit",
+    "kumo",
+    "night",
+    "chalk",
+    "aurora"
+  ],
+  "platforms": [
+    "flutter",
+    "svelte",
+    "moonshine",
+    "gpui",
+    "crepus"
+  ]
+}

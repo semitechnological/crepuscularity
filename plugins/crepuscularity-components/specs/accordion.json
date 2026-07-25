@@ -1,0 +1,34 @@
+{
+  "id": "accordion",
+  "category": "primitive",
+  "title": "Accordion",
+  "description": "Collapsible sections.",
+  "props": {
+    "items": {
+      "type": "array",
+      "required": true
+    },
+    "type": {
+      "type": "enum",
+      "values": [
+        "single",
+        "multiple"
+      ],
+      "default": "single"
+    }
+  },
+  "themes": [
+    "dither-kit",
+    "kumo",
+    "night",
+    "chalk",
+    "aurora"
+  ],
+  "platforms": [
+    "flutter",
+    "svelte",
+    "moonshine",
+    "gpui",
+    "crepus"
+  ]
+}

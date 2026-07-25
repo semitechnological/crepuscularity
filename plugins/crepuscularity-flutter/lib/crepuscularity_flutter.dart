@@ -10,6 +10,14 @@
 /// evaluates them.
 library;
 
+export 'package:crepuscularity_components/crepuscularity_components.dart'
+    show
+        DitherSparkline,
+        DitherColor,
+        DitherVariant,
+        ditherColorFromName,
+        ditherVariantFromName,
+        parseSparklineValues;
 export 'src/crepus_parser.dart' show viewIrFromSource, IR_VERSION;
 export 'src/renderer.dart' show CrepusView, CrepusTheme, CrepusActionCallback;
 export 'src/view_ir.dart'
@@ -30,6 +38,7 @@ export 'src/view_ir.dart'
         CheckboxNode,
         ProgressNode,
         MeterNode,
+        SparklineNode,
         BadgeNode,
         DividerNode,
         SpacerNode,

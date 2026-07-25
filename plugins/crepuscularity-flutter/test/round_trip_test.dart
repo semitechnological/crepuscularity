@@ -32,6 +32,11 @@ Object _shape(ViewNode node) => switch (node) {
     'min': min,
     'max': max,
   },
+  SparklineNode(:final values, :final color, :final variant) => {
+    'sparkline': values,
+    'color': color,
+    'variant': variant,
+  },
   BadgeNode(:final label, :final tone) => {'badge': label, 'tone': tone},
   DividerNode(:final axis) => {'divider': axis.name},
   SpacerNode(:final size) => {'spacer': size},

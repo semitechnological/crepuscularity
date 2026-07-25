@@ -125,7 +125,7 @@ void main() {
           reason: 'kind=$kind should decode',
         );
       }
-      expect(kAllowedKinds, hasLength(16));
+      expect(kAllowedKinds, hasLength(17));
     });
 
     test('a missing or non-string kind is UnsupportedNode', () {

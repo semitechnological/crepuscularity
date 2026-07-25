@@ -1,0 +1,30 @@
+{
+  "id": "marquee",
+  "category": "motion",
+  "title": "Marquee",
+  "description": "Horizontal looping marquee track.",
+  "props": {
+    "speed": {
+      "type": "number",
+      "default": 40
+    },
+    "pauseOnHover": {
+      "type": "boolean",
+      "default": true
+    }
+  },
+  "themes": [
+    "dither-kit",
+    "kumo",
+    "night",
+    "chalk",
+    "aurora"
+  ],
+  "platforms": [
+    "flutter",
+    "svelte",
+    "moonshine",
+    "gpui",
+    "crepus"
+  ]
+}

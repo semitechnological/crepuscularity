@@ -276,6 +276,13 @@ ViewNode _mapNode(_Raw raw) {
         max: el.number('max') ?? 100,
         style: style,
       );
+    case 'sparkline':
+      return SparklineNode(
+        values: _parseSparklineValues(el.attrs['values']),
+        color: el.attrs['color'],
+        variant: el.attrs['variant'],
+        style: style,
+      );
     case 'badge':
       return BadgeNode(label: el.label(), tone: el.attrs['tone'], style: style);
     case 'divider':
@@ -709,3 +716,14 @@ const Map<String, String> _palette = {
   'amber-500': '#f59e0b',
   'slate-500': '#64748b',
 };
+
+List<double> _parseSparklineValues(String? raw) {
+  if (raw == null || raw.trim().isEmpty) return const [];
+  final cleaned = raw.replaceAll('[', '').replaceAll(']', '');
+  return cleaned
+      .split(RegExp(r'[,\s]+'))
+      .map((part) => double.tryParse(part.trim()))
+      .whereType<double>()
+      .where((value) => value.isFinite)
+      .toList(growable: false);
+}

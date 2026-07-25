@@ -9,6 +9,8 @@ library;
 
 import 'package:flutter/material.dart';
 
+import 'package:crepuscularity_components/crepuscularity_components.dart';
+
 import 'crepus_parser.dart';
 import 'view_ir.dart';
 
@@ -136,6 +138,7 @@ class _Renderer {
       CheckboxNode() => _checkbox(node),
       ProgressNode() => _progress(node),
       MeterNode() => _meter(node),
+      SparklineNode() => _sparkline(node),
       BadgeNode() => _badge(node),
       DividerNode() => _divider(node),
       SpacerNode() => _spacer(node),
@@ -290,6 +293,16 @@ class _Renderer {
           ),
         _labeledBar(fraction.toDouble(), '$percent%'),
       ],
+    );
+  }
+
+  Widget? _sparkline(SparklineNode node) {
+    if (node.values.length < 2) return null;
+    return DitherSparkline(
+      values: node.values,
+      color: ditherColorFromName(node.color),
+      variant: ditherVariantFromName(node.variant),
+      height: 64,
     );
   }
 

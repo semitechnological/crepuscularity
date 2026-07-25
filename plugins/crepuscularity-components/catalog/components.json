@@ -1,0 +1,543 @@
+{
+  "name": "crepuscularity-components",
+  "version": "0.1.0",
+  "description": "Multi-target dither / primitive / motion component registry",
+  "themes": [
+    "dither-kit",
+    "kumo",
+    "night",
+    "chalk",
+    "aurora"
+  ],
+  "platforms": [
+    "flutter",
+    "svelte",
+    "moonshine",
+    "gpui",
+    "crepus"
+  ],
+  "components": [
+    {
+      "id": "accordion",
+      "category": "primitive",
+      "title": "Accordion",
+      "description": "Collapsible sections.",
+      "spec": "specs/accordion.json",
+      "platforms": [
+        "flutter",
+        "svelte",
+        "moonshine",
+        "gpui",
+        "crepus"
+      ],
+      "themes": [
+        "dither-kit",
+        "kumo",
+        "night",
+        "chalk",
+        "aurora"
+      ]
+    },
+    {
+      "id": "animated-gradient",
+      "category": "motion",
+      "title": "Animated Gradient",
+      "description": "Moving dither/mesh gradient plane.",
+      "spec": "specs/animated-gradient.json",
+      "platforms": [
+        "flutter",
+        "svelte",
+        "moonshine",
+        "gpui",
+        "crepus"
+      ],
+      "themes": [
+        "dither-kit",
+        "night",
+        "aurora",
+        "chalk"
+      ]
+    },
+    {
+      "id": "area-chart",
+      "category": "chart",
+      "title": "Area Chart",
+      "description": "Dithered area fill under a series line.",
+      "spec": "specs/area-chart.json",
+      "platforms": [
+        "flutter",
+        "svelte",
+        "moonshine",
+        "gpui",
+        "crepus"
+      ],
+      "themes": [
+        "dither-kit",
+        "kumo",
+        "night",
+        "chalk",
+        "aurora"
+      ]
+    },
+    {
+      "id": "avatar",
+      "category": "primitive",
+      "title": "Avatar",
+      "description": "Circular or rounded avatar with dither fallback initials.",
+      "spec": "specs/avatar.json",
+      "platforms": [
+        "flutter",
+        "svelte",
+        "moonshine",
+        "gpui",
+        "crepus"
+      ],
+      "themes": [
+        "dither-kit",
+        "kumo",
+        "night",
+        "chalk",
+        "aurora"
+      ]
+    },
+    {
+      "id": "badge",
+      "category": "primitive",
+      "title": "Badge",
+      "description": "Compact status / count badge.",
+      "spec": "specs/badge.json",
+      "platforms": [
+        "flutter",
+        "svelte",
+        "moonshine",
+        "gpui",
+        "crepus"
+      ],
+      "themes": [
+        "dither-kit",
+        "kumo",
+        "night",
+        "chalk",
+        "aurora"
+      ]
+    },
+    {
+      "id": "bar-chart",
+      "category": "chart",
+      "title": "Bar Chart",
+      "description": "Dithered vertical bars for discrete values.",
+      "spec": "specs/bar-chart.json",
+      "platforms": [
+        "flutter",
+        "svelte",
+        "moonshine",
+        "gpui",
+        "crepus"
+      ],
+      "themes": [
+        "dither-kit",
+        "kumo",
+        "night",
+        "chalk",
+        "aurora"
+      ]
+    },
+    {
+      "id": "button",
+      "category": "primitive",
+      "title": "Button",
+      "description": "Base UI–style pressable button with dither accent options.",
+      "spec": "specs/button.json",
+      "platforms": [
+        "flutter",
+        "svelte",
+        "moonshine",
+        "gpui",
+        "crepus"
+      ],
+      "themes": [
+        "dither-kit",
+        "kumo",
+        "night",
+        "chalk",
+        "aurora"
+      ]
+    },
+    {
+      "id": "card",
+      "category": "layout",
+      "title": "Card",
+      "description": "Surface container for interactive content groups.",
+      "spec": "specs/card.json",
+      "platforms": [
+        "flutter",
+        "svelte",
+        "moonshine",
+        "gpui",
+        "crepus"
+      ],
+      "themes": [
+        "dither-kit",
+        "kumo",
+        "night",
+        "chalk",
+        "aurora"
+      ]
+    },
+    {
+      "id": "checkbox",
+      "category": "primitive",
+      "title": "Checkbox",
+      "description": "Binary checkbox control.",
+      "spec": "specs/checkbox.json",
+      "platforms": [
+        "flutter",
+        "svelte",
+        "moonshine",
+        "gpui",
+        "crepus"
+      ],
+      "themes": [
+        "dither-kit",
+        "kumo",
+        "night",
+        "chalk",
+        "aurora"
+      ]
+    },
+    {
+      "id": "dialog",
+      "category": "primitive",
+      "title": "Dialog",
+      "description": "Modal dialog surface (Base UI pattern).",
+      "spec": "specs/dialog.json",
+      "platforms": [
+        "flutter",
+        "svelte",
+        "moonshine",
+        "gpui",
+        "crepus"
+      ],
+      "themes": [
+        "dither-kit",
+        "kumo",
+        "night",
+        "chalk",
+        "aurora"
+      ]
+    },
+    {
+      "id": "gradient",
+      "category": "primitive",
+      "title": "Dither Gradient",
+      "description": "Ordered-dither gradient plane for fills and backgrounds.",
+      "spec": "specs/gradient.json",
+      "platforms": [
+        "flutter",
+        "svelte",
+        "moonshine",
+        "gpui",
+        "crepus"
+      ],
+      "themes": [
+        "dither-kit",
+        "kumo",
+        "night",
+        "chalk",
+        "aurora"
+      ]
+    },
+    {
+      "id": "input",
+      "category": "primitive",
+      "title": "Input",
+      "description": "Single-line text field.",
+      "spec": "specs/input.json",
+      "platforms": [
+        "flutter",
+        "svelte",
+        "moonshine",
+        "gpui",
+        "crepus"
+      ],
+      "themes": [
+        "dither-kit",
+        "kumo",
+        "night",
+        "chalk",
+        "aurora"
+      ]
+    },
+    {
+      "id": "light-rays",
+      "category": "motion",
+      "title": "Light Rays",
+      "description": "Spell UI–inspired animated light-ray backdrop.",
+      "spec": "specs/light-rays.json",
+      "platforms": [
+        "flutter",
+        "svelte",
+        "moonshine",
+        "gpui",
+        "crepus"
+      ],
+      "themes": [
+        "dither-kit",
+        "night",
+        "aurora"
+      ]
+    },
+    {
+      "id": "marquee",
+      "category": "motion",
+      "title": "Marquee",
+      "description": "Horizontal looping marquee track.",
+      "spec": "specs/marquee.json",
+      "platforms": [
+        "flutter",
+        "svelte",
+        "moonshine",
+        "gpui",
+        "crepus"
+      ],
+      "themes": [
+        "dither-kit",
+        "kumo",
+        "night",
+        "chalk",
+        "aurora"
+      ]
+    },
+    {
+      "id": "meter",
+      "category": "primitive",
+      "title": "Meter",
+      "description": "Scalar meter with optional min/max.",
+      "spec": "specs/meter.json",
+      "platforms": [
+        "flutter",
+        "svelte",
+        "moonshine",
+        "gpui",
+        "crepus"
+      ],
+      "themes": [
+        "dither-kit",
+        "kumo",
+        "night",
+        "chalk",
+        "aurora"
+      ]
+    },
+    {
+      "id": "pie-chart",
+      "category": "chart",
+      "title": "Pie Chart",
+      "description": "Dithered polar slices for categorical proportions.",
+      "spec": "specs/pie-chart.json",
+      "platforms": [
+        "flutter",
+        "svelte",
+        "moonshine",
+        "gpui",
+        "crepus"
+      ],
+      "themes": [
+        "dither-kit",
+        "kumo",
+        "night",
+        "chalk",
+        "aurora"
+      ]
+    },
+    {
+      "id": "progress",
+      "category": "primitive",
+      "title": "Progress",
+      "description": "Determinate progress bar (0–1).",
+      "spec": "specs/progress.json",
+      "platforms": [
+        "flutter",
+        "svelte",
+        "moonshine",
+        "gpui",
+        "crepus"
+      ],
+      "themes": [
+        "dither-kit",
+        "kumo",
+        "night",
+        "chalk",
+        "aurora"
+      ]
+    },
+    {
+      "id": "radar-chart",
+      "category": "chart",
+      "title": "Radar Chart",
+      "description": "Dithered polar radar / spider chart.",
+      "spec": "specs/radar-chart.json",
+      "platforms": [
+        "flutter",
+        "svelte",
+        "moonshine",
+        "gpui",
+        "crepus"
+      ],
+      "themes": [
+        "dither-kit",
+        "kumo",
+        "night",
+        "chalk",
+        "aurora"
+      ]
+    },
+    {
+      "id": "select",
+      "category": "primitive",
+      "title": "Select",
+      "description": "Single-select dropdown.",
+      "spec": "specs/select.json",
+      "platforms": [
+        "flutter",
+        "svelte",
+        "moonshine",
+        "gpui",
+        "crepus"
+      ],
+      "themes": [
+        "dither-kit",
+        "kumo",
+        "night",
+        "chalk",
+        "aurora"
+      ]
+    },
+    {
+      "id": "slider",
+      "category": "primitive",
+      "title": "Slider",
+      "description": "Continuous or stepped range input.",
+      "spec": "specs/slider.json",
+      "platforms": [
+        "flutter",
+        "svelte",
+        "moonshine",
+        "gpui",
+        "crepus"
+      ],
+      "themes": [
+        "dither-kit",
+        "kumo",
+        "night",
+        "chalk",
+        "aurora"
+      ]
+    },
+    {
+      "id": "sparkline",
+      "category": "chart",
+      "title": "Sparkline",
+      "description": "Compact dithered area sparkline for a single numeric series.",
+      "spec": "specs/sparkline.json",
+      "platforms": [
+        "flutter",
+        "svelte",
+        "moonshine",
+        "gpui",
+        "crepus"
+      ],
+      "themes": [
+        "dither-kit",
+        "kumo",
+        "night",
+        "chalk",
+        "aurora"
+      ]
+    },
+    {
+      "id": "tabs",
+      "category": "primitive",
+      "title": "Tabs",
+      "description": "Tab list + panels.",
+      "spec": "specs/tabs.json",
+      "platforms": [
+        "flutter",
+        "svelte",
+        "moonshine",
+        "gpui",
+        "crepus"
+      ],
+      "themes": [
+        "dither-kit",
+        "kumo",
+        "night",
+        "chalk",
+        "aurora"
+      ]
+    },
+    {
+      "id": "tilt-card",
+      "category": "motion",
+      "title": "Tilt Card",
+      "description": "Pointer-reactive 3D tilt surface.",
+      "spec": "specs/tilt-card.json",
+      "platforms": [
+        "flutter",
+        "svelte",
+        "moonshine",
+        "gpui",
+        "crepus"
+      ],
+      "themes": [
+        "dither-kit",
+        "kumo",
+        "night",
+        "chalk",
+        "aurora"
+      ]
+    },
+    {
+      "id": "toggle",
+      "category": "primitive",
+      "title": "Toggle",
+      "description": "Binary switch.",
+      "spec": "specs/toggle.json",
+      "platforms": [
+        "flutter",
+        "svelte",
+        "moonshine",
+        "gpui",
+        "crepus"
+      ],
+      "themes": [
+        "dither-kit",
+        "kumo",
+        "night",
+        "chalk",
+        "aurora"
+      ]
+    },
+    {
+      "id": "tooltip",
+      "category": "primitive",
+      "title": "Tooltip",
+      "description": "Hover/focus tooltip.",
+      "spec": "specs/tooltip.json",
+      "platforms": [
+        "flutter",
+        "svelte",
+        "moonshine",
+        "gpui",
+        "crepus"
+      ],
+      "themes": [
+        "dither-kit",
+        "kumo",
+        "night",
+        "chalk",
+        "aurora"
+      ]
+    }
+  ]
+}

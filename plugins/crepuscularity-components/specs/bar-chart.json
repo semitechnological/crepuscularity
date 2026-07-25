@@ -1,0 +1,40 @@
+{
+  "id": "bar-chart",
+  "category": "chart",
+  "title": "Bar Chart",
+  "description": "Dithered vertical bars for discrete values.",
+  "props": {
+    "values": {
+      "type": "number[]",
+      "required": true
+    },
+    "color": {
+      "type": "string",
+      "default": "blue"
+    },
+    "variant": {
+      "type": "enum",
+      "values": [
+        "gradient",
+        "dotted",
+        "hatched",
+        "solid"
+      ],
+      "default": "gradient"
+    }
+  },
+  "themes": [
+    "dither-kit",
+    "kumo",
+    "night",
+    "chalk",
+    "aurora"
+  ],
+  "platforms": [
+    "flutter",
+    "svelte",
+    "moonshine",
+    "gpui",
+    "crepus"
+  ]
+}
