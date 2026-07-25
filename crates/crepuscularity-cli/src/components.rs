@@ -1,7 +1,8 @@
 //! `crepus components` — list / add / themes for **`crepuscularity-components`**.
 //!
-//! Catalog lives at `plugins/crepuscularity-components/catalog/`. Commands are
-//! resilient when the catalog is missing (prints guidance instead of failing hard).
+//! Prefer the embedded `crepuscularity-components` crate registry. Fall back to
+//! `plugins/crepuscularity-components/catalog/` on disk when needed (e.g. add
+//! path hints, or a custom checkout without the crate catalog).
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -101,6 +102,16 @@ fn load_catalog(root: &Path) -> Result<Option<Catalog>, CrepusCliError> {
 }
 
 fn list() -> Result<(), CrepusCliError> {
+    // Prefer embedded crate registry.
+    let from_crate = crepuscularity_components::list_components();
+    if !from_crate.is_empty() {
+        for c in from_crate {
+            println!("{:<16} {}", c.id, c.title);
+        }
+        return Ok(());
+    }
+
+    // Filesystem fallback.
     let root = repo_root();
     let path = catalog_path(&root);
     match load_catalog(&root)? {
@@ -168,22 +179,35 @@ fn path_for_target(comp: &CatalogComponent, t: ComponentTarget) -> Option<String
 
 fn add(id: &str, target: Option<ComponentTarget>) -> Result<(), CrepusCliError> {
     let root = repo_root();
-    let Some(catalog) = load_catalog(&root)? else {
-        eprintln!(
-            "{} catalog missing — cannot resolve component {id:?}",
-            ui::warn()
-        );
-        eprintln!("  expected {}", catalog_path(&root).display());
-        return Ok(());
-    };
 
-    let Some(comp) = catalog.components.iter().find(|c| c.id == id) else {
-        let ids: Vec<&str> = catalog.components.iter().map(|c| c.id.as_str()).collect();
+    // Prefer crate for existence / display; filesystem for path hints.
+    let crate_meta = crepuscularity_components::list_components()
+        .into_iter()
+        .find(|c| c.id == id);
+
+    let disk_catalog = load_catalog(&root)?;
+    let disk_comp = disk_catalog
+        .as_ref()
+        .and_then(|c| c.components.iter().find(|c| c.id == id));
+
+    if crate_meta.is_none() && disk_comp.is_none() {
+        let mut ids: Vec<&str> = crepuscularity_components::component_ids().to_vec();
+        if ids.is_empty() {
+            if let Some(cat) = &disk_catalog {
+                ids = cat.components.iter().map(|c| c.id.as_str()).collect();
+            }
+        }
         return Err(CrepusCliError::context(format!(
             "unknown component {id:?}; known: {}",
             ids.join(", ")
         )));
-    };
+    }
+
+    let display = crate_meta
+        .as_ref()
+        .map(|c| c.title.as_str())
+        .or_else(|| disk_comp.map(|c| c.display_name()))
+        .unwrap_or(id);
 
     let wanted: Vec<ComponentTarget> = match target {
         Some(t) => vec![t],
@@ -195,10 +219,27 @@ fn add(id: &str, target: Option<ComponentTarget>) -> Result<(), CrepusCliError> 
         ],
     };
 
-    let selected: Vec<(ComponentTarget, String)> = wanted
-        .into_iter()
-        .filter_map(|t| path_for_target(comp, t).map(|p| (t, p)))
-        .collect();
+    let selected: Vec<(ComponentTarget, String)> = if let Some(comp) = disk_comp {
+        wanted
+            .into_iter()
+            .filter_map(|t| path_for_target(comp, t).map(|p| (t, p)))
+            .collect()
+    } else if let Some(meta) = &crate_meta {
+        wanted
+            .into_iter()
+            .filter_map(|t| {
+                let key = target_key(t);
+                let supported = meta.platforms.is_empty()
+                    || meta.platforms.iter().any(|p| p == key);
+                if !supported {
+                    return None;
+                }
+                Some((t, format!("{PKG_ROOT}/packages/{key}")))
+            })
+            .collect()
+    } else {
+        vec![]
+    };
 
     if selected.is_empty() {
         return Err(CrepusCliError::context(format!(
@@ -207,16 +248,18 @@ fn add(id: &str, target: Option<ComponentTarget>) -> Result<(), CrepusCliError> 
         )));
     }
 
-    println!("component: {}", comp.id);
-    println!("name:      {}", comp.display_name());
-    if let Some(desc) = &comp.description {
-        println!("about:     {desc}");
-    }
-    if let Some(spec) = &comp.spec {
-        let spec_path = format!("{PKG_ROOT}/{spec}");
-        let abs = root.join(&spec_path);
-        let status = if abs.is_file() { "ok" } else { "missing" };
-        println!("spec:      {spec_path}  [{status}]");
+    println!("component: {id}");
+    println!("name:      {display}");
+    if let Some(comp) = disk_comp {
+        if let Some(desc) = &comp.description {
+            println!("about:     {desc}");
+        }
+        if let Some(spec) = &comp.spec {
+            let spec_path = format!("{PKG_ROOT}/{spec}");
+            let abs = root.join(&spec_path);
+            let status = if abs.is_file() { "ok" } else { "missing" };
+            println!("spec:      {spec_path}  [{status}]");
+        }
     }
     println!();
     println!("Install / copy path hints (relative to repo root):");
@@ -229,13 +272,26 @@ fn add(id: &str, target: Option<ComponentTarget>) -> Result<(), CrepusCliError> 
     println!("Guidance:");
     println!("  • Copy or symlink the target package into your app, or depend on it once published.");
     println!("  • Spec JSON under plugins/crepuscularity-components/specs/ is the source of truth.");
-    println!("  • Moonshine/Svelte: see `crepus moonshine dep` for @crepuscularity/components.");
+    println!(
+        "  • Moonshine/React: `@tschk/moonshine-components` (github.com/tschk/moonshine components/)."
+    );
     println!("  • Flutter: wire via crepuscularity_flutter + the flutter package path.");
     println!("  • GPUI: include the gpui package module from your desktop crate.");
+    println!("  • See `crepus moonshine dep` for @tschk package snippets.");
     Ok(())
 }
 
 fn themes() -> Result<(), CrepusCliError> {
+    // Prefer embedded crate registry.
+    let from_crate = crepuscularity_components::theme_names();
+    if !from_crate.is_empty() {
+        for name in from_crate {
+            println!("{name}");
+        }
+        return Ok(());
+    }
+
+    // Filesystem fallback.
     let root = repo_root();
     let dir = themes_dir(&root);
     if !dir.is_dir() {
@@ -312,5 +368,10 @@ mod tests {
             Some("plugins/crepuscularity-components/packages/moonshine")
         );
         assert!(path_for_target(c, ComponentTarget::Svelte).is_none());
+    }
+
+    #[test]
+    fn crate_registry_has_button() {
+        assert!(crepuscularity_components::component_ids().contains(&"button"));
     }
 }

@@ -10,6 +10,7 @@ crepuscularity/
     crepuscularity/          — manifest/target build (crepus.toml)
     crepuscularity-cli/      — `crepus` CLI (main entrypoint)
     crepuscularity-core/     — parser, eval, AST, context, error types
+    crepuscularity-components/ — Rust component catalog registry (CLI)
     crepuscularity-web/      — HTML/WASM rendering (web + SSR)
     crepuscularity-webext/   — browser extension builds (MV3)
     crepuscularity-tui/      — Ratatui terminal rendering
@@ -22,8 +23,8 @@ crepuscularity/
     crepuscularity-macros/   — proc macros
   plugins/
     crepuscularity-flutter/      — Flutter View IR / .crepus renderer
-    crepuscularity-components/   — shared component catalog + themes
-  packages/                  — Moonshine runtime (when present; separate ownership)
+    crepuscularity-components/   — Flutter/Svelte packages + catalog source (omi path deps)
+  packages/                  — local moonshine bridge (legacy; product is external)
   examples/
     web-site/                — reference site: index.crepus + runtime/
     counter/                 — SSR counter
@@ -99,22 +100,29 @@ crepuscularity/
 
 ### `crepus moonshine` — Moonshine + Crepus web apps
 
+**Moonshine is a separate product:** [`github.com/tschk/moonshine`](https://github.com/tschk/moonshine) (`@tschk/moonshine`). Crepuscularity compiles `.crepus` → View IR and emits apps that import `@tschk/crepus-moonshine`.
+
 - Scaffold: `crepus moonshine new <name>` → Vite shell + `index.crepus` + `package.json`
-- Dep snippets: `crepus moonshine dep` → `moonshine`, `@crepuscularity/moonshine`, `@crepuscularity/components`
-- Runtime packages live under `packages/` (separate ownership); CLI scaffolds and emits stubs only
-- Emit stub: `crepus web build --emit moonshine --site .` → `dist/crepus-emit.moonshine.ts` + View IR JSON
+- Dep snippets: `crepus moonshine dep` →
+  - `@tschk/moonshine` → `github:tschk/moonshine#path:packages/core`
+  - `@tschk/crepus-moonshine` → `github:tschk/moonshine#path:packages/crepus-moonshine`
+  - `@tschk/moonshine-components` → `github:tschk/moonshine#path:components`
+- Emit: `crepus web build --emit moonshine --site .` → `dist/crepus-emit.moonshine.ts` (calls `renderCrepusIr`) + `crepus-view-ir.json`
+- React component implementations: `moonshine/components/` as `@tschk/moonshine-components` (not in this repo)
 
 ### `crepus components` — shared UI catalog (`crepuscularity-components`)
 
-- Catalog: `plugins/crepuscularity-components/catalog/components.json` + `catalog/themes/`
-- `crepus components list` — list component ids (graceful if catalog missing)
+- Rust registry: `crates/crepuscularity-components` (embedded `catalog/components.json`; sync from plugin)
+- Plugin source (Flutter/Svelte packages kept for omi path deps): `plugins/crepuscularity-components/`
+- `crepus components list` — list component ids (crate first, filesystem fallback)
 - `crepus components add <id> [--target flutter|svelte|moonshine|gpui]` — path hints / install guidance
-- `crepus components themes` — theme names from `catalog/themes/`
+- `crepus components themes` — theme names (crate first, then `catalog/themes/`)
 
 ### `crepus web build --emit`
 
 - `--emit html` (default) — existing WASM site build (`index.html` + `pkg/`)
-- `--emit moonshine|svelte|solid|react` — stub/generated file in `dist/` mapping basic View IR kinds to the target framework (not a full runtime)
+- `--emit moonshine` — real emit importing `@tschk/crepus-moonshine` (`renderCrepusIr` + embedded View IR)
+- `--emit svelte|solid|react` — stub/generated file in `dist/` mapping basic View IR kinds to the target framework (not a full runtime)
 
 ### `crepus flutter` — Flutter renderer dependency helper
 

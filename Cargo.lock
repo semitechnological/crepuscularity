@@ -1755,6 +1755,7 @@ dependencies = [
  "axum",
  "clap",
  "console",
+ "crepuscularity-components",
  "crepuscularity-core",
  "crepuscularity-embedded",
  "crepuscularity-lvgl",
@@ -1781,6 +1782,14 @@ dependencies = [
  "toml 1.1.2+spec-1.1.0",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "crepuscularity-components"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

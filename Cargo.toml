@@ -22,6 +22,7 @@ members = [
     "crates/crepuscularity_macros",
     "crates/crepuscularity-runtime",
     "crates/crepuscularity-cli",
+    "crates/crepuscularity-components",
     "crates/crepuscularity-reactive",
     "crates/crepuscularity-plugin-bindgen",
     "crates/crepuscularity-tui",

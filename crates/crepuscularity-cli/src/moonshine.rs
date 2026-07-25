@@ -1,5 +1,9 @@
 //! `crepus moonshine` — scaffold and dependency helper for Moonshine + Crepus apps.
 //!
+//! Moonshine is an external product: <https://github.com/tschk/moonshine>
+//! Crepuscularity compiles `.crepus` → View IR and emits apps that import
+//! `@tschk/crepus-moonshine`.
+//!
 //! - `crepus moonshine new <name>` scaffolds a minimal app under cwd.
 //! - `crepus moonshine dep` prints package.json dependency snippets.
 
@@ -22,9 +26,9 @@ const PACKAGE_JSON: &str = r#"{
     "preview": "vite preview"
   },
   "dependencies": {
-    "moonshine": "*",
-    "@crepuscularity/moonshine": "*",
-    "@crepuscularity/components": "*"
+    "@tschk/moonshine": "github:tschk/moonshine#path:packages/core",
+    "@tschk/crepus-moonshine": "github:tschk/moonshine#path:packages/crepus-moonshine",
+    "@tschk/moonshine-components": "github:tschk/moonshine#path:components"
   },
   "devDependencies": {
     "vite": "^6.0.0"
@@ -47,7 +51,7 @@ const INDEX_HTML: &str = r#"<!doctype html>
 "#;
 
 const MAIN_TS: &str = r#"// Minimal Moonshine + Crepuscularity shell.
-// Wire `@crepuscularity/moonshine` once the package is available locally or published.
+// Wire `@tschk/crepus-moonshine` (see `crepus moonshine dep`).
 import "./app.css";
 
 const root = document.getElementById("app");
@@ -55,7 +59,7 @@ if (root) {
   root.innerHTML = `
     <main class="shell">
       <h1>{{name}}</h1>
-      <p>Load <code>index.crepus</code> via <code>@crepuscularity/moonshine</code>.</p>
+      <p>Load <code>index.crepus</code> via <code>@tschk/crepus-moonshine</code>.</p>
       <pre id="crepus-source"></pre>
     </main>
   `;
@@ -118,6 +122,8 @@ const README: &str = r#"# {{name}}
 
 Minimal Moonshine + Crepuscularity app scaffolded by `crepus moonshine new`.
 
+Moonshine is a separate product: https://github.com/tschk/moonshine
+
 ```bash
 bun install
 bun run dev
@@ -127,6 +133,12 @@ Dependency snippets (kept in sync with the CLI):
 
 ```bash
 crepus moonshine dep
+```
+
+Emit a View IR app entry:
+
+```bash
+crepus web build --emit moonshine --site .
 ```
 "#;
 
@@ -145,24 +157,31 @@ pub fn execute(cmd: MoonshineCommands) -> Result<(), CrepusCliError> {
 
 fn dependency_snippets() -> String {
     r#"# package.json dependencies for Moonshine + Crepuscularity
+#
+# Moonshine lives at https://github.com/tschk/moonshine (separate product).
+# Bun/npm git+path form (when the monorepo uses package.json workspaces):
 
 {
   "dependencies": {
-    "moonshine": "*",
-    "@crepuscularity/moonshine": "*",
-    "@crepuscularity/components": "*"
+    "@tschk/moonshine": "github:tschk/moonshine#path:packages/core",
+    "@tschk/crepus-moonshine": "github:tschk/moonshine#path:packages/crepus-moonshine",
+    "@tschk/moonshine-components": "github:tschk/moonshine#path:components"
   }
 }
 
-# Local workspace (when developing against this monorepo):
+# If bun cannot resolve nested #path:… workspaces, clone the repo and use file: /
+# workspace protocol instead:
 #
 # {
 #   "dependencies": {
-#     "moonshine": "workspace:*",
-#     "@crepuscularity/moonshine": "workspace:*",
-#     "@crepuscularity/components": "file:../../plugins/crepuscularity-components"
+#     "@tschk/moonshine": "file:../moonshine/packages/core",
+#     "@tschk/crepus-moonshine": "file:../moonshine/packages/crepus-moonshine",
+#     "@tschk/moonshine-components": "file:../moonshine/components"
 #   }
 # }
+#
+# Or depend on the whole git repo and import via its workspace packages:
+#   "moonshine": "github:tschk/moonshine"
 "#
     .to_string()
 }
@@ -223,8 +242,8 @@ mod tests {
     #[test]
     fn dep_mentions_moonshine_packages() {
         let snip = dependency_snippets();
-        assert!(snip.contains("\"moonshine\""));
-        assert!(snip.contains("\"@crepuscularity/moonshine\""));
-        assert!(snip.contains("\"@crepuscularity/components\""));
+        assert!(snip.contains("\"@tschk/moonshine\""));
+        assert!(snip.contains("\"@tschk/crepus-moonshine\""));
+        assert!(snip.contains("\"@tschk/moonshine-components\""));
     }
 }

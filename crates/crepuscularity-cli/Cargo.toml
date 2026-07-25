@@ -60,6 +60,7 @@ crepuscularity-plugin-bindgen = { path = "../crepuscularity-plugin-bindgen", ver
 crepuscularity-webext  = { path = "../crepuscularity-webext", version = "0.3.5" }
 crepuscularity-tauri = { path = "../crepuscularity-tauri", version = "0.1.13", features = ["native"] }
 crepuscularity-native = { path = "../crepuscularity-native", version = "0.5.14" }
+crepuscularity-components = { path = "../crepuscularity-components", version = "0.1.0" }
 crepuscularity-embedded = { path = "../crepuscularity-embedded", version = "0.1.22" }
 crepuscularity-lvgl = { path = "../crepuscularity-lvgl", version = "0.1.10" }
 notify                 = { workspace = true }

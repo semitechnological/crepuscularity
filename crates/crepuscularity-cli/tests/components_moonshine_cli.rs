@@ -22,13 +22,11 @@ fn components_list_runs() {
         String::from_utf8_lossy(&output.stderr)
     );
     let stdout = String::from_utf8_lossy(&output.stdout);
-    // Catalog ships with the repo; if missing, command still exits 0 with a warning on stderr.
-    if !stdout.is_empty() {
-        assert!(
-            stdout.contains("button") || stdout.contains("(no components"),
-            "unexpected stdout: {stdout}"
-        );
-    }
+    // Embedded crepuscularity-components crate always has a catalog.
+    assert!(
+        stdout.contains("button") || stdout.contains("(no components"),
+        "unexpected stdout: {stdout}"
+    );
 }
 
 #[test]
@@ -71,9 +69,9 @@ fn moonshine_dep_prints_packages() {
         String::from_utf8_lossy(&output.stderr)
     );
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("moonshine"));
-    assert!(stdout.contains("@crepuscularity/moonshine"));
-    assert!(stdout.contains("@crepuscularity/components"));
+    assert!(stdout.contains("@tschk/moonshine"));
+    assert!(stdout.contains("@tschk/crepus-moonshine"));
+    assert!(stdout.contains("@tschk/moonshine-components"));
 }
 
 #[test]
@@ -94,7 +92,9 @@ fn moonshine_new_scaffolds_app() {
     assert!(app.join("index.crepus").is_file());
     assert!(app.join("src/main.ts").is_file());
     let pkg = std::fs::read_to_string(app.join("package.json")).expect("package.json");
-    assert!(pkg.contains("@crepuscularity/moonshine"));
+    assert!(pkg.contains("@tschk/crepus-moonshine"));
+    assert!(pkg.contains("@tschk/moonshine"));
+    assert!(pkg.contains("@tschk/moonshine-components"));
 }
 
 #[test]
@@ -129,6 +129,8 @@ fn web_build_emit_moonshine_writes_stub() {
     assert!(status.success(), "emit moonshine should succeed without WASM");
     assert!(out.join("crepus-emit.moonshine.ts").is_file());
     assert!(out.join("crepus-view-ir.json").is_file());
-    let stub = std::fs::read_to_string(out.join("crepus-emit.moonshine.ts")).expect("stub");
-    assert!(stub.contains("renderNode"));
+    let stub = std::fs::read_to_string(out.join("crepus-emit.moonshine.ts")).expect("emit");
+    assert!(stub.contains("@tschk/crepus-moonshine"));
+    assert!(stub.contains("renderCrepusIr"));
+    assert!(stub.contains("export function App"));
 }

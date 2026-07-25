@@ -3,6 +3,21 @@
 Multi-target dither / primitive / motion component registry for Crepuscularity
 (Flutter, Svelte, Moonshine, GPUI, and `.crepus`).
 
+## Ownership / Moonshine
+
+**Moonshine React implementations live in a separate product:**
+[`github.com/tschk/moonshine`](https://github.com/tschk/moonshine) under `components/`,
+published as `@tschk/moonshine-components`.
+
+This plugin tree keeps:
+
+- Catalog + specs (source of truth; synced into `crates/crepuscularity-components`)
+- Flutter + Svelte packages (still used by omi and other path-dep consumers)
+- A local `packages/moonshine/` package for historical / in-tree tests — prefer
+  `@tschk/moonshine-components` for new React work
+
+Rust CLI registry: `crates/crepuscularity-components` (embed via `include_str!`).
+
 ## Layout
 
 | Path | Role |
@@ -10,7 +25,7 @@ Multi-target dither / primitive / motion component registry for Crepuscularity
 | `catalog/components.json` | Component registry (ids, specs, platforms, themes) |
 | `catalog/themes/` | Named theme JSON (7 themes) |
 | `specs/` | Per-component source-of-truth specs (44) |
-| `packages/{flutter,svelte,moonshine,gpui}/` | Target implementations |
+| `packages/{flutter,svelte,moonshine,gpui}/` | Target implementations (Flutter/Svelte kept; Moonshine → tschk/moonshine) |
 
 ## Themes
 
@@ -22,7 +37,14 @@ Multi-target dither / primitive / motion component registry for Crepuscularity
 crepus components list
 crepus components themes
 crepus components add button --target moonshine
-crepus moonshine dep   # @crepuscularity/components snippet
+crepus moonshine dep   # @tschk/moonshine* snippets
+```
+
+## Sync catalog → Rust crate
+
+```bash
+cp plugins/crepuscularity-components/catalog/components.json \
+   crates/crepuscularity-components/catalog/components.json
 ```
 
 ## Validate / test
@@ -33,4 +55,5 @@ bun run scripts/validate-catalog.ts
 (cd packages/svelte && bun test)
 (cd packages/moonshine && bun test)
 cargo test --manifest-path packages/gpui/Cargo.toml
+cargo test -p crepuscularity-components
 ```
