@@ -172,6 +172,12 @@ fn path_for_target(comp: &CatalogComponent, t: ComponentTarget) -> Option<String
         return None;
     }
 
+    // React implementations live in tschk/moonshine (`@tschk/moonshine-components`),
+    // not the thin plugins/crepuscularity-components/packages/moonshine package.
+    if matches!(t, ComponentTarget::Moonshine) {
+        return Some("@tschk/moonshine-components".to_string());
+    }
+
     // Conventional layout used by crepuscularity-components:
     //   packages/<target>/… and specs/<id>.json
     Some(format!("{PKG_ROOT}/packages/{key}"))
@@ -234,6 +240,9 @@ fn add(id: &str, target: Option<ComponentTarget>) -> Result<(), CrepusCliError> 
                 if !supported {
                     return None;
                 }
+                if matches!(t, ComponentTarget::Moonshine) {
+                    return Some((t, "@tschk/moonshine-components".to_string()));
+                }
                 Some((t, format!("{PKG_ROOT}/packages/{key}")))
             })
             .collect()
@@ -262,8 +271,16 @@ fn add(id: &str, target: Option<ComponentTarget>) -> Result<(), CrepusCliError> 
         }
     }
     println!();
-    println!("Install / copy path hints (relative to repo root):");
+    println!("Install / copy path hints:");
     for (t, path) in &selected {
+        if matches!(t, ComponentTarget::Moonshine) {
+            println!(
+                "  {:<10} {}  [external: github.com/tschk/moonshine → components/]",
+                target_key(*t),
+                path
+            );
+            continue;
+        }
         let abs = root.join(path);
         let status = if abs.exists() { "ok" } else { "missing" };
         println!("  {:<10} {}  [{status}]", target_key(*t), path);
@@ -273,7 +290,7 @@ fn add(id: &str, target: Option<ComponentTarget>) -> Result<(), CrepusCliError> 
     println!("  • Copy or symlink the target package into your app, or depend on it once published.");
     println!("  • Spec JSON under plugins/crepuscularity-components/specs/ is the source of truth.");
     println!(
-        "  • Moonshine/React: `@tschk/moonshine-components` (github.com/tschk/moonshine components/)."
+        "  • Moonshine/React: install `@tschk/moonshine-components` from tschk/moonshine (`components/`), not plugins/crepuscularity-components."
     );
     println!("  • Flutter: wire via crepuscularity_flutter + the flutter package path.");
     println!("  • GPUI: include the gpui package module from your desktop crate.");
@@ -365,7 +382,7 @@ mod tests {
         assert_eq!(c.display_name(), "Button");
         assert_eq!(
             path_for_target(c, ComponentTarget::Moonshine).as_deref(),
-            Some("plugins/crepuscularity-components/packages/moonshine")
+            Some("@tschk/moonshine-components")
         );
         assert!(path_for_target(c, ComponentTarget::Svelte).is_none());
     }

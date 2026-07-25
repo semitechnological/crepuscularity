@@ -58,6 +58,32 @@ fn components_themes_runs() {
     windows,
     ignore = "default desktop crepus.exe does not spawn reliably on Windows CI"
 )]
+fn components_add_moonshine_hints_tschk_package() {
+    let output = crepus()
+        .args(["components", "add", "sparkline", "--target", "moonshine"])
+        .output()
+        .expect("spawn crepus components add");
+    assert!(
+        output.status.success(),
+        "stderr={}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("@tschk/moonshine-components"),
+        "expected @tschk/moonshine-components hint, got: {stdout}"
+    );
+    assert!(
+        !stdout.contains("plugins/crepuscularity-components/packages/moonshine"),
+        "should not point at thin plugin package: {stdout}"
+    );
+}
+
+#[test]
+#[cfg_attr(
+    windows,
+    ignore = "default desktop crepus.exe does not spawn reliably on Windows CI"
+)]
 fn moonshine_dep_prints_packages() {
     let output = crepus()
         .args(["moonshine", "dep"])
@@ -72,6 +98,12 @@ fn moonshine_dep_prints_packages() {
     assert!(stdout.contains("@tschk/moonshine"));
     assert!(stdout.contains("@tschk/crepus-moonshine"));
     assert!(stdout.contains("@tschk/moonshine-components"));
+    assert!(stdout.contains("file:"));
+    assert!(stdout.contains("git clone https://github.com/tschk/moonshine"));
+    assert!(
+        !stdout.contains("#path:packages/"),
+        "must not use broken bun github nested-path form: {stdout}"
+    );
 }
 
 #[test]
@@ -81,8 +113,13 @@ fn moonshine_dep_prints_packages() {
 )]
 fn moonshine_new_scaffolds_app() {
     let tmp = tempfile::tempdir().expect("tempdir");
+    // Isolate from the developer's ~/projects/moonshine so the scaffold uses
+    // placeholder file: paths (still valid package.json content).
     let status = crepus()
         .current_dir(tmp.path())
+        .env_remove("MOONSHINE_PATH")
+        .env("HOME", tmp.path())
+        .env("USERPROFILE", tmp.path())
         .args(["moonshine", "new", "Demo App"])
         .status()
         .expect("spawn crepus moonshine new");
@@ -90,11 +127,35 @@ fn moonshine_new_scaffolds_app() {
     let app = tmp.path().join("demo-app");
     assert!(app.join("package.json").is_file());
     assert!(app.join("index.crepus").is_file());
-    assert!(app.join("src/main.ts").is_file());
+    assert!(app.join("index.html").is_file());
+    assert!(app.join("vite.config.ts").is_file());
+    assert!(
+        app.join("src/main.tsx").is_file(),
+        "scaffold must write src/main.tsx"
+    );
+    assert!(!app.join("src/main.ts").exists());
+
     let pkg = std::fs::read_to_string(app.join("package.json")).expect("package.json");
     assert!(pkg.contains("@tschk/crepus-moonshine"));
     assert!(pkg.contains("@tschk/moonshine"));
     assert!(pkg.contains("@tschk/moonshine-components"));
+    assert!(pkg.contains("\"react\""));
+    assert!(pkg.contains("\"react-dom\""));
+    assert!(pkg.contains("@vitejs/plugin-react"));
+    assert!(pkg.contains("file:"));
+    assert!(!pkg.contains("#path:packages/"));
+
+    let main = std::fs::read_to_string(app.join("src/main.tsx")).expect("main.tsx");
+    assert!(main.contains("createRoot"));
+    assert!(main.contains("renderCrepusIr"));
+    assert!(main.contains("Sparkline"));
+    assert!(main.contains("@tschk/moonshine-components"));
+
+    let html = std::fs::read_to_string(app.join("index.html")).expect("index.html");
+    assert!(html.contains("/src/main.tsx"));
+
+    let vite = std::fs::read_to_string(app.join("vite.config.ts")).expect("vite");
+    assert!(vite.contains("@vitejs/plugin-react"));
 }
 
 #[test]
@@ -102,7 +163,7 @@ fn moonshine_new_scaffolds_app() {
     windows,
     ignore = "default desktop crepus.exe does not spawn reliably on Windows CI"
 )]
-fn web_build_emit_moonshine_writes_stub() {
+fn web_build_emit_moonshine_writes_entry() {
     let tmp = tempfile::tempdir().expect("tempdir");
     let site = tmp.path().join("site");
     std::fs::create_dir_all(&site).expect("mkdir");
@@ -129,8 +190,10 @@ fn web_build_emit_moonshine_writes_stub() {
     assert!(status.success(), "emit moonshine should succeed without WASM");
     assert!(out.join("crepus-emit.moonshine.ts").is_file());
     assert!(out.join("crepus-view-ir.json").is_file());
-    let stub = std::fs::read_to_string(out.join("crepus-emit.moonshine.ts")).expect("emit");
-    assert!(stub.contains("@tschk/crepus-moonshine"));
-    assert!(stub.contains("renderCrepusIr"));
-    assert!(stub.contains("export function App"));
+    let entry = std::fs::read_to_string(out.join("crepus-emit.moonshine.ts")).expect("emit");
+    assert!(entry.contains("@tschk/crepus-moonshine"));
+    assert!(entry.contains("renderCrepusIr"));
+    assert!(entry.contains("export function App"));
+    assert!(entry.contains("satisfies CrepusIr"));
+    assert!(entry.contains("as const satisfies"));
 }
