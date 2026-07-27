@@ -30,7 +30,9 @@ fn resolve_moonshine_root() -> Option<PathBuf> {
         }
     }
 
-    let cwd_sibling = env::current_dir().ok().map(|cwd| cwd.join("..").join("moonshine"));
+    let cwd_sibling = env::current_dir()
+        .ok()
+        .map(|cwd| cwd.join("..").join("moonshine"));
     if let Some(p) = cwd_sibling {
         if looks_like_moonshine_checkout(&p) {
             return Some(canonicalize_or_self(&p));
@@ -49,7 +51,9 @@ fn resolve_moonshine_root() -> Option<PathBuf> {
 
 fn looks_like_moonshine_checkout(root: &Path) -> bool {
     root.join("packages/core/package.json").is_file()
-        && root.join("packages/crepus-moonshine/package.json").is_file()
+        && root
+            .join("packages/crepus-moonshine/package.json")
+            .is_file()
         && root.join("components/package.json").is_file()
 }
 
@@ -66,9 +70,8 @@ fn file_dep_paths(moonshine_root: &Path, _from: Option<&Path>) -> (String, Strin
     let crepus = moonshine_root.join("packages/crepus-moonshine");
     let components = moonshine_root.join("components");
 
-    let fmt = |target: &Path| -> String {
-        format!("file:{}", canonicalize_or_self(target).display())
-    };
+    let fmt =
+        |target: &Path| -> String { format!("file:{}", canonicalize_or_self(target).display()) };
 
     (fmt(&core), fmt(&crepus), fmt(&components))
 }
@@ -471,7 +474,8 @@ mod tests {
 
     #[test]
     fn package_json_includes_react() {
-        let pkg = package_json_template(PLACEHOLDER_CORE, PLACEHOLDER_CREPUS, PLACEHOLDER_COMPONENTS);
+        let pkg =
+            package_json_template(PLACEHOLDER_CORE, PLACEHOLDER_CREPUS, PLACEHOLDER_COMPONENTS);
         assert!(pkg.contains("\"react\""));
         assert!(pkg.contains("\"react-dom\""));
         assert!(pkg.contains("@vitejs/plugin-react"));
@@ -480,6 +484,8 @@ mod tests {
 
     #[test]
     fn looks_like_moonshine_rejects_empty() {
-        assert!(!looks_like_moonshine_checkout(Path::new("/tmp/nope-moonshine-xyz")));
+        assert!(!looks_like_moonshine_checkout(Path::new(
+            "/tmp/nope-moonshine-xyz"
+        )));
     }
 }

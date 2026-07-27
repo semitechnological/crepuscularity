@@ -53,11 +53,7 @@ fn parsed() -> &'static ParsedCatalog {
         let file: CatalogFile =
             serde_json::from_str(CATALOG_JSON).expect("embedded components.json must parse");
 
-        let ids: Vec<&'static str> = file
-            .components
-            .iter()
-            .map(|c| leak_str(&c.id))
-            .collect();
+        let ids: Vec<&'static str> = file.components.iter().map(|c| leak_str(&c.id)).collect();
 
         let themes: Vec<&'static str> = if file.themes.is_empty() {
             // Fallback names matching catalog/themes/*.json
@@ -78,10 +74,7 @@ fn parsed() -> &'static ParsedCatalog {
             .components
             .into_iter()
             .map(|c| {
-                let title = c
-                    .title
-                    .or(c.name)
-                    .unwrap_or_else(|| c.id.clone());
+                let title = c.title.or(c.name).unwrap_or_else(|| c.id.clone());
                 ComponentMeta {
                     id: c.id,
                     category: c.category,

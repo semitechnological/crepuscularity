@@ -189,7 +189,10 @@ fn web_build_emit_moonshine_writes_entry() {
         ])
         .status()
         .expect("spawn crepus web build --emit moonshine");
-    assert!(status.success(), "emit moonshine should succeed without WASM");
+    assert!(
+        status.success(),
+        "emit moonshine should succeed without WASM"
+    );
     assert!(out.join("crepus-emit.moonshine.tsx").is_file());
     assert!(!out.join("crepus-emit.moonshine.ts").exists());
     assert!(out.join("crepus-view-ir.json").is_file());

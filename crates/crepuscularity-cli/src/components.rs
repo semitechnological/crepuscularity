@@ -95,9 +95,8 @@ fn load_catalog(root: &Path) -> Result<Option<Catalog>, CrepusCliError> {
         return Ok(None);
     }
     let raw = fs::read_to_string(&path).map_err(|err| CrepusCliError::io(err, path.clone()))?;
-    let catalog: Catalog = serde_json::from_str(&raw).map_err(|err| {
-        CrepusCliError::context(format!("parse {}: {err}", path.display()))
-    })?;
+    let catalog: Catalog = serde_json::from_str(&raw)
+        .map_err(|err| CrepusCliError::context(format!("parse {}: {err}", path.display())))?;
     Ok(Some(catalog))
 }
 
@@ -235,8 +234,8 @@ fn add(id: &str, target: Option<ComponentTarget>) -> Result<(), CrepusCliError> 
             .into_iter()
             .filter_map(|t| {
                 let key = target_key(t);
-                let supported = meta.platforms.is_empty()
-                    || meta.platforms.iter().any(|p| p == key);
+                let supported =
+                    meta.platforms.is_empty() || meta.platforms.iter().any(|p| p == key);
                 if !supported {
                     return None;
                 }
@@ -287,8 +286,12 @@ fn add(id: &str, target: Option<ComponentTarget>) -> Result<(), CrepusCliError> 
     }
     println!();
     println!("Guidance:");
-    println!("  • Copy or symlink the target package into your app, or depend on it once published.");
-    println!("  • Spec JSON under plugins/crepuscularity-components/specs/ is the source of truth.");
+    println!(
+        "  • Copy or symlink the target package into your app, or depend on it once published."
+    );
+    println!(
+        "  • Spec JSON under plugins/crepuscularity-components/specs/ is the source of truth."
+    );
     println!(
         "  • Moonshine/React: install `@tschk/moonshine-components` from tschk/moonshine (`components/`), not plugins/crepuscularity-components."
     );
@@ -356,7 +359,8 @@ mod tests {
 
     #[test]
     fn catalog_deserializes_minimal_targets() {
-        let raw = r#"{"components":[{"id":"button","name":"Button","targets":{"moonshine":"x.ts"}}]}"#;
+        let raw =
+            r#"{"components":[{"id":"button","name":"Button","targets":{"moonshine":"x.ts"}}]}"#;
         let catalog: Catalog = serde_json::from_str(raw).unwrap();
         assert_eq!(catalog.components.len(), 1);
         assert_eq!(catalog.components[0].id, "button");

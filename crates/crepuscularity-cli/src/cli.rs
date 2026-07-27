@@ -213,9 +213,7 @@ pub enum ComponentTarget {
 #[derive(Subcommand, Debug)]
 pub enum MoonshineCommands {
     /// Scaffold a minimal Moonshine + Crepus app under cwd.
-    New {
-        name: String,
-    },
+    New { name: String },
     /// Print package.json dependency snippets for moonshine + crepus packages.
     Dep,
 }
@@ -737,8 +735,8 @@ mod tests {
 
     #[test]
     fn parses_web_build_emit_moonshine() {
-        let cli = Cli::try_parse_from(["crepus", "web", "build", "--emit", "moonshine"])
-            .expect("parse");
+        let cli =
+            Cli::try_parse_from(["crepus", "web", "build", "--emit", "moonshine"]).expect("parse");
         match cli.command {
             Some(Commands::Web {
                 command: WebCommands::Build { emit, .. },

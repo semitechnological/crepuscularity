@@ -8,6 +8,7 @@ mod build_options;
 #[cfg(feature = "desktop")]
 mod builder;
 mod cli;
+mod components;
 mod crepus_toml;
 #[cfg(feature = "desktop")]
 mod dev;
@@ -17,7 +18,6 @@ mod embedded;
 mod error;
 #[cfg(feature = "desktop")]
 pub mod events;
-mod components;
 mod flutter;
 #[cfg(feature = "desktop")]
 mod hud;
