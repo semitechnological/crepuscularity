@@ -600,12 +600,7 @@ void main() {
       );
       expect(find.text('40%'), findsOneWidget);
       await tester.pumpWidget(
-        _one(const {
-          'kind': 'meter',
-          'value': 3,
-          'min': 0,
-          'max': 10,
-        }),
+        _one(const {'kind': 'meter', 'value': 3, 'min': 0, 'max': 10}),
       );
       expect(find.text('30%'), findsOneWidget);
     });
@@ -922,11 +917,10 @@ list
 
     testWidgets('text bind resolves from the data scope', (tester) async {
       await tester.pumpWidget(
-        _one(const {
-          'kind': 'text',
-          'content': '',
-          'bind': 'subject',
-        }, data: const {'subject': 'Hello inbox'}),
+        _one(
+          const {'kind': 'text', 'content': '', 'bind': 'subject'},
+          data: const {'subject': 'Hello inbox'},
+        ),
       );
       expect(find.text('Hello inbox'), findsOneWidget);
     });
