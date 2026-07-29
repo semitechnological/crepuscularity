@@ -8,6 +8,7 @@ use serde::Deserialize;
 use serde_json::json;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use rayon::prelude::*;
 use std::time::Instant;
 
 use crate::build_options::BuildOptions;
@@ -1000,12 +1001,12 @@ fn write_llms_files(
             ));
         }
     }
-    for source in &llms.sources {
+    let formatted_bodies: Vec<_> = llms.sources.par_iter().map(|source| {
         let rel = source.path.trim_start_matches('/');
         let path = site_dir.join(rel);
         let body = std::fs::read_to_string(&path).unwrap_or_else(|_| String::new());
         let label = source.title.as_deref().unwrap_or(rel);
-        full.push_str(&format!("\n---\n\n# {label}\n\n{body}\n"));
+        let formatted = format!("\n---\n\n# {label}\n\n{body}\n");
         if !body.is_empty() && !rel.split('/').any(|part| part == "..") {
             if let Some(parent) = Path::new(rel).parent() {
                 std::fs::create_dir_all(out_dir.join(parent))
@@ -1014,6 +1015,11 @@ fn write_llms_files(
             std::fs::write(out_dir.join(rel), body)
                 .unwrap_or_else(|e| ui::error(&format!("write {rel}: {e}")));
         }
+        formatted
+    }).collect();
+
+    for formatted in formatted_bodies {
+        full.push_str(&formatted);
     }
 
     std::fs::write(out_dir.join("llms.txt"), index)
