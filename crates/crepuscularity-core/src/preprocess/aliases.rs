@@ -97,7 +97,8 @@ pub fn expand_class_aliases_in_nodes(nodes: &mut [Node], aliases: &HashMap<Strin
                 el.classes.reserve(old_classes.len());
                 for c in old_classes {
                     if let Some(exp) = aliases.get(c.as_str()) {
-                        el.classes.extend(exp.split_whitespace().map(|s| s.to_string()));
+                        el.classes
+                            .extend(exp.split_whitespace().map(|s| s.to_string()));
                     } else {
                         el.classes.push(c);
                     }
