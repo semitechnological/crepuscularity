@@ -4,12 +4,12 @@ use crepuscularity_core::preprocess::{
     merge_unique_font_families, strip_indent_decorators,
 };
 use crepuscularity_core::{DriverCache, Fingerprint};
+use rayon::prelude::*;
 use serde::Deserialize;
 use serde_json::json;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
-use rayon::prelude::*;
 
 use crate::build_options::BuildOptions;
 use crate::docs_generator;
