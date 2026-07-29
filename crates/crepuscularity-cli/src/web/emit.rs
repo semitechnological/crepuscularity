@@ -192,7 +192,7 @@ fn emit_react(ir: &ViewIr) -> String {
         .iter()
         .map(|k| {
             format!(
-                "    case {k:?}:\n      return <div data-crepus-kind={k:?}>{{/* TODO: react {k} */}}</div>;\n"
+                "    case {k:?}:\n      return (\n        <div data-crepus-kind={k:?}>\n          {{node.content}}\n          {{node.children?.map((child, i) => (\n            <Node key={{i}} node={{child}} />\n          ))}}\n        </div>\n      );\n"
             )
         })
         .collect();
