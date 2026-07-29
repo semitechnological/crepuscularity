@@ -158,7 +158,7 @@ fn emit_solid(ir: &ViewIr) -> String {
         .iter()
         .map(|k| {
             format!(
-                "    case {k:?}:\n      return <div data-crepus-kind={k:?}>{{/* TODO: solid {k} */}}</div>;\n"
+                "    case {k:?}:\n      return (\n        <div data-crepus-kind={k:?}>\n          {{props.node.content}}\n          <For each={{props.node.children}}>{{(child) => <Node node={{child}} />}}</For>\n        </div>\n      );\n"
             )
         })
         .collect();
