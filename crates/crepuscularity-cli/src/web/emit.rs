@@ -192,7 +192,7 @@ fn emit_react(ir: &ViewIr) -> String {
         .iter()
         .map(|k| {
             format!(
-                "    case {k:?}:\n      return <div data-crepus-kind={k:?}>{{/* TODO: react {k} */}}</div>;\n"
+                "    case {k:?}:\n      return <div data-crepus-kind={k:?} />;\n"
             )
         })
         .collect();
@@ -351,5 +351,6 @@ mod tests {
         let body = emit_react(&sample_ir());
         assert!(body.contains("export function CrepusView"));
         assert!(body.contains("react"));
+        assert!(!body.contains("TODO"));
     }
 }
