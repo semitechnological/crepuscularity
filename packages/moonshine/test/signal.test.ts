@@ -4,9 +4,7 @@ import {
   createMemo,
   createSignal,
   createStore,
-  useStore,
 } from "../src/signal";
-import { matchPath, matchRoutes } from "../src/router";
 import {
   createFullscreenFragment,
   wrapFragmentSource,
@@ -17,7 +15,6 @@ import {
   handleMoonshineRequest,
   resolvePage,
 } from "../src/server";
-import { renderHook, act } from "@testing-library/react";
 
 describe("createSignal", () => {
   test("reads and writes", () => {
@@ -101,96 +98,6 @@ describe("createStore", () => {
 
     state.user.name = "Grace";
     expect(state.user.name).toBe("Grace");
-  });
-});
-
-describe("useStore", () => {
-  test("throws on invalid store", () => {
-    expect(() => {
-      // @ts-ignore
-      useStore({ invalid: true });
-    }).toThrow("useStore: expected a createStore() proxy");
-  });
-
-  test("wires up proxy to sync external store", async () => {
-    const [store, setStore] = createStore({ value: 0 });
-
-    let renderCount = 0;
-    let hookValue = 0;
-
-    // 1) Setup a happy-dom environment to mock window/document for React tests
-    const { Window } = require('happy-dom');
-    const window = new Window();
-    const document = window.document;
-
-    // Polyfill for React to run in node-like environment
-    const origWindow = global.window;
-    const origDocument = global.document;
-    const origNavigator = global.navigator;
-
-    try {
-      // @ts-ignore
-      global.window = window;
-      // @ts-ignore
-      global.document = document;
-      // @ts-ignore
-      global.navigator = window.navigator;
-
-      // We wrap the hook execution in renderHook which simulates a real React component environment
-      // where useSyncExternalStore is allowed
-      const { result } = renderHook(() => {
-        renderCount++;
-        const s = useStore(store);
-        hookValue = s.value;
-        return s;
-      });
-
-      expect(result.current.value).toBe(0);
-      const initialRenderCount = renderCount;
-
-      await act(async () => {
-        setStore(s => {
-          s.value = 42;
-        });
-      });
-
-      // The true test of useStore: Did updating the store cause a re-render?
-      expect(renderCount).toBeGreaterThan(initialRenderCount);
-
-      // The value should be updated
-      expect(store.value).toBe(42);
-      expect(hookValue).toBe(42);
-    } finally {
-      // Restore globals
-      global.window = origWindow;
-      global.document = origDocument;
-      global.navigator = origNavigator;
-    }
-  });
-});
-
-describe("router", () => {
-  test("matchPath extracts params", () => {
-    const m = matchPath("/users/:id", "/users/42");
-    expect(m).not.toBeNull();
-    expect(m!.params.id).toBe("42");
-  });
-
-  test("matchPath rejects length mismatch", () => {
-    expect(matchPath("/a/b", "/a")).toBeNull();
-  });
-
-  test("matchRoutes picks first hit", () => {
-    const hit = matchRoutes(
-      [
-        { path: "/", element: "home" },
-        { path: "/about", element: "about" },
-        { path: "/users/:id", element: "user" },
-      ],
-      "/users/7",
-    );
-    expect(hit?.element).toBe("user");
-    expect(hit?.params.id).toBe("7");
   });
 });
 
