@@ -77,6 +77,7 @@ class CrepusView extends StatelessWidget {
     this.onAction,
     this.theme = const CrepusTheme(),
     this.data = const {},
+    this.allowNetworkImages = false,
     CrepusLimits limits = CrepusLimits.defaults,
   }) : _ir = ViewIr.fromJson(ir, limits: limits);
 
@@ -87,6 +88,7 @@ class CrepusView extends StatelessWidget {
     this.onAction,
     this.theme = const CrepusTheme(),
     this.data = const {},
+    this.allowNetworkImages = false,
     CrepusLimits limits = CrepusLimits.defaults,
   }) : _ir = viewIrFromSource(source, limits: limits);
 
@@ -97,13 +99,15 @@ class CrepusView extends StatelessWidget {
   /// Runtime scope for `{...}` interpolation and `if`/`forEach` bindings.
   final Map<String, Object?> data;
 
+  final bool allowNetworkImages;
+
   /// The decoded document (exposed for tests / introspection).
   ViewIr get ir => _ir;
 
   @override
   Widget build(BuildContext context) {
     final resolved = theme._resolved(context);
-    final renderer = _Renderer(resolved, onAction);
+    final renderer = _Renderer(resolved, onAction, allowNetworkImages);
     final children = renderer.renderList(_ir.root, data);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -114,10 +118,11 @@ class CrepusView extends StatelessWidget {
 }
 
 class _Renderer {
-  _Renderer(this.theme, this.onAction);
+  _Renderer(this.theme, this.onAction, this.allowNetworkImages);
 
   final CrepusTheme theme;
   final CrepusActionCallback? onAction;
+  final bool allowNetworkImages;
 
   List<Widget> renderList(List<ViewNode> nodes, Map<String, Object?> scope) {
     final widgets = <Widget>[];
@@ -389,7 +394,7 @@ class _Renderer {
     final isNetwork =
         uri != null && (uri.scheme == 'http' || uri.scheme == 'https');
     final placeholder = _imagePlaceholder(node);
-    final image = isNetwork
+    final image = isNetwork && allowNetworkImages
         ? Image.network(
             node.src,
             fit: BoxFit.cover,
