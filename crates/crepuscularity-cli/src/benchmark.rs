@@ -1537,19 +1537,38 @@ fn copy_dir_all(src: &Path, dst: &Path) -> std::io::Result<()> {
 }
 
 fn copy_rec(src: &Path, dst: &Path) -> std::io::Result<()> {
+    use rayon::prelude::*;
     use std::fs;
-    if src.is_dir() {
-        fs::create_dir_all(dst)?;
-        for e in fs::read_dir(src)? {
-            let e = e?;
-            copy_rec(&e.path(), &dst.join(e.file_name()))?;
-        }
-    } else {
+    use walkdir::WalkDir;
+
+    if src.is_file() {
         if let Some(p) = dst.parent() {
             fs::create_dir_all(p)?;
         }
         fs::copy(src, dst)?;
+        return Ok(());
     }
+
+    let entries: Vec<_> = WalkDir::new(src)
+        .into_iter()
+        .collect::<Result<Vec<_>, walkdir::Error>>()
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+
+    for entry in entries.iter().filter(|e| e.file_type().is_dir()) {
+        let relative_path = entry.path().strip_prefix(src).unwrap();
+        let target_path = dst.join(relative_path);
+        fs::create_dir_all(&target_path)?;
+    }
+
+    entries
+        .par_iter()
+        .filter(|e| !e.file_type().is_dir())
+        .try_for_each(|entry| -> std::io::Result<()> {
+            let relative_path = entry.path().strip_prefix(src).unwrap();
+            let target_path = dst.join(relative_path);
+            fs::copy(entry.path(), &target_path).map(|_| ())
+        })?;
+
     Ok(())
 }
 
