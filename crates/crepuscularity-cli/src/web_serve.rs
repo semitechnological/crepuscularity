@@ -190,25 +190,26 @@ fn walk_crepus_files(dir: &Path, out: &mut Vec<PathBuf>) {
 /// Walk `site_dir` and parse every `.crepus` file, printing pass/fail per file.
 fn validate_templates(site_dir: &std::path::Path) {
     use crepuscularity_core::parser::parse_template_with_path;
-    let mut found = false;
     let mut files = Vec::new();
     walk_crepus_files(site_dir, &mut files);
-    for path in &files {
-        found = true;
-        let rel = path.strip_prefix(site_dir).unwrap_or(path);
-        match std::fs::read_to_string(path).map(|s| parse_template_with_path(&s, Some(path))) {
-            Ok(Ok(_)) => eprintln!("  {} {}", console::style("✓").green(), rel.display()),
-            Ok(Err(e)) => eprintln!("  {} {} — {}", console::style("✗").red(), rel.display(), e),
-            Err(e) => eprintln!(
-                "  {} {} — read error: {}",
-                console::style("✗").red(),
-                rel.display(),
-                e
-            ),
-        }
-    }
-    if !found {
+    if files.is_empty() {
         eprintln!("  {} no .crepus files found", console::style("⚠").yellow());
+    } else {
+        files.par_iter().for_each(|path| {
+            let rel = path.strip_prefix(site_dir).unwrap_or(path);
+            match std::fs::read_to_string(path).map(|s| parse_template_with_path(&s, Some(path))) {
+                Ok(Ok(_)) => eprintln!("  {} {}", console::style("✓").green(), rel.display()),
+                Ok(Err(e)) => {
+                    eprintln!("  {} {} — {}", console::style("✗").red(), rel.display(), e)
+                }
+                Err(e) => eprintln!(
+                    "  {} {} — read error: {}",
+                    console::style("✗").red(),
+                    rel.display(),
+                    e
+                ),
+            }
+        });
     }
 }
 
