@@ -52,3 +52,42 @@ pub fn slot_rotate_words_json_attr(phrases: &[String]) -> String {
     s.push(']');
     s
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ast::{Node, TextPart};
+
+    #[test]
+    fn test_slot_rotate_child_phrases_happy_path() {
+        let nodes = vec![
+            Node::Text(vec![TextPart::Literal(" hello ".to_string())]),
+            Node::Text(vec![TextPart::Literal("world".to_string())]),
+        ];
+        let result = slot_rotate_child_phrases(&nodes);
+        assert_eq!(result, Ok(vec!["hello".to_string(), "world".to_string()]));
+    }
+
+    #[test]
+    fn test_slot_rotate_child_phrases_error_expr() {
+        let nodes = vec![Node::Text(vec![
+            TextPart::Literal("hello ".to_string()),
+            TextPart::Expr("name".to_string()),
+        ])];
+        let result = slot_rotate_child_phrases(&nodes);
+        assert_eq!(
+            result,
+            Err("slot-rotate children must be plain text (no `{…}` expressions)".into())
+        );
+    }
+
+    #[test]
+    fn test_slot_rotate_child_phrases_error_non_text() {
+        let nodes = vec![Node::RawText("hello".to_string())];
+        let result = slot_rotate_child_phrases(&nodes);
+        assert_eq!(
+            result,
+            Err("slot-rotate only allows quoted text lines as children".into())
+        );
+    }
+}
