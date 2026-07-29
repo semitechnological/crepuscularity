@@ -1293,19 +1293,21 @@ async fn sse_handler(
 }
 
 fn load_vfm(site_dir: &Path) -> Arc<RwLock<HashMap<String, String>>> {
-    let mut files = HashMap::new();
     let mut paths = Vec::new();
     walk_crepus_files(site_dir, &mut paths);
-    for path in &paths {
-        let rel = path
-            .strip_prefix(site_dir)
-            .unwrap_or(path)
-            .to_string_lossy()
-            .to_string();
-        if let Ok(content) = std::fs::read_to_string(path) {
-            files.insert(rel, content);
-        }
-    }
+    let files: HashMap<String, String> = paths
+        .par_iter()
+        .filter_map(|path| {
+            let rel = path
+                .strip_prefix(site_dir)
+                .unwrap_or(path)
+                .to_string_lossy()
+                .to_string();
+            std::fs::read_to_string(path)
+                .ok()
+                .map(|content| (rel, content))
+        })
+        .collect();
     Arc::new(RwLock::new(files))
 }
 
