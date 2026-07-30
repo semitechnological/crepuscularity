@@ -1552,7 +1552,7 @@ fn copy_rec(src: &Path, dst: &Path) -> std::io::Result<()> {
     let entries: Vec<_> = WalkDir::new(src)
         .into_iter()
         .collect::<Result<Vec<_>, walkdir::Error>>()
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+        .map_err(std::io::Error::other)?;
 
     for entry in entries.iter().filter(|e| e.file_type().is_dir()) {
         let relative_path = entry.path().strip_prefix(src).unwrap();
