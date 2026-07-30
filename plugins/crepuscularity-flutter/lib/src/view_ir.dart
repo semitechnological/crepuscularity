@@ -16,6 +16,7 @@ const Set<String> kAllowedKinds = {
   'toggle',
   'checkbox',
   'progress',
+  'timer',
   'meter',
   'sparkline',
   'badge',
@@ -247,6 +248,14 @@ sealed class ViewNode {
           max: _asDouble(raw['max']) ?? 100,
           style: style,
         );
+      case 'timer':
+        return TimerNode(
+          label: _asString(raw['label']),
+          duration: parseCrepusDuration(_asString(raw['duration'])),
+          autostart: _asBool(raw['autostart']),
+          countUp: _asBool(raw['countUp']),
+          style: style,
+        );
       case 'meter':
         return MeterNode(
           label: _asString(raw['label']),
@@ -402,6 +411,31 @@ class ProgressNode extends ViewNode {
   final double max;
 }
 
+/// A clock the renderer runs, rather than a number the author wrote once.
+///
+/// Every other node here is a still frame: `progress value=4` is four percent
+/// forever. A timer owns elapsed time, so the bar it draws actually moves and
+/// the remaining figure actually counts down. Duration accepts `90s`, `25m`,
+/// `1h`, or a bare number of seconds.
+class TimerNode extends ViewNode {
+  const TimerNode({
+    this.label,
+    required this.duration,
+    this.autostart = false,
+    this.countUp = false,
+    super.style,
+  });
+  final String? label;
+  final Duration duration;
+
+  /// Whether it starts running as soon as it appears, rather than waiting to
+  /// be started.
+  final bool autostart;
+
+  /// Count up from zero instead of down to it. Stopwatch rather than egg timer.
+  final bool countUp;
+}
+
 class MeterNode extends ViewNode {
   const MeterNode({
     this.label,
@@ -555,3 +589,22 @@ List<ViewNode> childrenOf(ViewNode node) => switch (node) {
   ForEachNode(:final itemBody) => itemBody,
   _ => const [],
 };
+
+/// Reads `90s`, `25m`, `1h`, `500ms`, or a bare number of seconds. Anything
+/// unparseable is a zero duration rather than a throw: a malformed artifact
+/// should render a dead timer, not take the message down with it.
+Duration parseCrepusDuration(String? raw) {
+  final text = raw?.trim().toLowerCase();
+  if (text == null || text.isEmpty) return Duration.zero;
+  final match = RegExp(r'^([0-9]*\.?[0-9]+)\s*(ms|s|m|h)?$').firstMatch(text);
+  if (match == null) return Duration.zero;
+  final amount = double.tryParse(match.group(1)!);
+  if (amount == null || amount <= 0) return Duration.zero;
+  final micros = switch (match.group(2)) {
+    'ms' => amount * 1000,
+    'm' => amount * 60 * 1000000,
+    'h' => amount * 3600 * 1000000,
+    _ => amount * 1000000,
+  };
+  return Duration(microseconds: micros.round());
+}
