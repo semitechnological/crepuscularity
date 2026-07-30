@@ -1392,7 +1392,7 @@ mod tests {
         let messages = super::template_validation_messages(site.path());
 
         assert!(messages[0].ends_with(" a.crepus"));
-        assert!(messages[1].ends_with(" nested/m.crepus"));
+        assert!(messages[1].ends_with(&format!(" nested{}m.crepus", std::path::MAIN_SEPARATOR)));
         assert!(messages[2].ends_with(" z.crepus"));
     }
 
