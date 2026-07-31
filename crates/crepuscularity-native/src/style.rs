@@ -33,13 +33,7 @@ pub(crate) fn extract_stack_hints(
 pub(crate) fn extract_text_style(classes: &[String], ctx: Option<&TemplateContext>) -> ViewStyle {
     let mut s = ViewStyle::default();
     for c in classes {
-        apply_text_class(&mut s, c, ctx);
-        apply_position_class(&mut s, c);
-        apply_transform_class(&mut s, c);
-        apply_shadow_class(&mut s, c);
-        apply_text_layout_class(&mut s, c);
-        apply_cursor_class(&mut s, c);
-        apply_user_select_class(&mut s, c);
+        apply_presentation_class(&mut s, c, ctx);
     }
     s.classes = classes.to_vec();
     s
@@ -551,6 +545,12 @@ fn apply_layout_class(hints: &mut StackLayoutHints, class: &str, ctx: Option<&Te
     }
 
     // Fall through to text/typography (text-color, font-size, etc.)
+    apply_presentation_class(s, class, ctx);
+}
+
+/// Class families that apply to any element. Both entry points route through
+/// here so a family added for one cannot silently go missing from the other.
+fn apply_presentation_class(s: &mut ViewStyle, class: &str, ctx: Option<&TemplateContext>) {
     apply_text_class(s, class, ctx);
     apply_position_class(s, class);
     apply_transform_class(s, class);
