@@ -27,6 +27,40 @@ use serde_json::{json, Value};
 
 pub type BindMap = serde_json::Map<String, Value>;
 
+/// Maximum include nesting depth to prevent infinite recursion / stack overflow.
+/// The marker-emitting render path costs ~36 KB of stack per include level in a
+/// debug build (measured), so the budget is set to stay well inside the 1 MiB
+/// stack a `wasm32` instance gets by default.
+const MAX_INCLUDE_DEPTH: usize = 16;
+
+thread_local! {
+    static INCLUDE_DEPTH: Cell<usize> = const { Cell::new(0) };
+}
+
+/// RAII depth counter: the SSR renderer recurses through `pub` entry points, so the
+/// budget is tracked out of band rather than threaded through their signatures.
+struct IncludeDepthGuard;
+
+impl IncludeDepthGuard {
+    fn enter(path: &str) -> Result<Self, CrepusError> {
+        INCLUDE_DEPTH.with(|depth| {
+            if depth.get() >= MAX_INCLUDE_DEPTH {
+                return Err(CrepusError::render(format!(
+                    "maximum include depth ({MAX_INCLUDE_DEPTH}) exceeded; possible circular include involving '{path}'"
+                )));
+            }
+            depth.set(depth.get() + 1);
+            Ok(Self)
+        })
+    }
+}
+
+impl Drop for IncludeDepthGuard {
+    fn drop(&mut self) {
+        INCLUDE_DEPTH.with(|depth| depth.set(depth.get().saturating_sub(1)));
+    }
+}
+
 use crepuscularity_core::analysis::{classify_node, Region};
 use crepuscularity_core::ast::*;
 use crepuscularity_core::context::{value_to_str, TemplateContext, TemplateValue};
@@ -716,6 +750,7 @@ fn render_include_ssr(
     counter: &Cell<u32>,
     bind: &mut BindMap,
 ) -> Result<String, CrepusError> {
+    let _depth_guard = IncludeDepthGuard::enter(&inc.path)?;
     let id = alloc_binding(
         counter,
         bind,
