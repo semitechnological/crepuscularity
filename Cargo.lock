@@ -1978,6 +1978,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "crepuscularity-wasm"
+version = "0.1.0"
+dependencies = [
+ "crepuscularity-core",
+ "crepuscularity-native",
+ "serde_json",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "crepuscularity-web"
 version = "0.4.20"
 dependencies = [

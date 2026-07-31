@@ -26,6 +26,7 @@ members = [
     "crates/crepuscularity-reactive",
     "crates/crepuscularity-plugin-bindgen",
     "crates/crepuscularity-tui",
+    "crates/crepuscularity-wasm",
     # GPUI desktop shell with embedded V8 runtime (build V8 on demand):
     #   cargo build -p crepuscularity-lite
     #   cargo check --workspace --exclude crepuscularity-lite

@@ -1,0 +1,31 @@
+{
+  "name": "@tschk/crepus-wasm",
+  "version": "0.1.0",
+  "description": "WASM build of the crepuscularity .crepus parser — source .crepus to View IR",
+  "license": "ISC",
+  "type": "module",
+  "main": "./index.ts",
+  "types": "./index.ts",
+  "exports": {
+    ".": "./index.ts",
+    "./types": "./types.ts"
+  },
+  "files": [
+    "index.ts",
+    "types.ts",
+    "wasm",
+    "README.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tschk/crepuscularity.git",
+    "directory": "crates/crepuscularity-wasm"
+  },
+  "keywords": [
+    "crepuscularity",
+    "crepus",
+    "wasm",
+    "parser",
+    "view-ir"
+  ]
+}
