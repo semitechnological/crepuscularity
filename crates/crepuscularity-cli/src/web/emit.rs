@@ -79,7 +79,7 @@ pub(crate) fn build_emit_stub(
     match emit {
         WebEmitTarget::Moonshine => {
             eprintln!(
-                "  {} Moonshine emit: App() → renderCrepusIr(ir); install via `crepus moonshine dep`",
+                "  {} Moonshine emit: App() → JSX with className; install via `crepus moonshine dep`",
                 ui::dim("→")
             );
         }
