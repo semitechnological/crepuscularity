@@ -150,6 +150,7 @@ export function createMemo<T>(compute: () => T): Memo<T> {
 export type StoreSetter<T extends object> = (fn: (state: T) => void) => void;
 
 const storeRoots = new WeakMap<object, Trackable>();
+const storeSnapshots = new WeakMap<object, object>();
 
 /**
  * Nested reactive store (Solid-inspired).
@@ -184,19 +185,30 @@ export function createStore<T extends object>(initial: T): [T, StoreSetter<T>] {
         const prev = Reflect.get(obj, prop, receiver);
         if (Object.is(prev, value)) return true;
         const ok = Reflect.set(obj, prop, value, receiver);
-        if (ok) notify();
+        if (ok) {
+          // Update the snapshot reference so useSyncExternalStore detects the change
+          const currentSnapshot = storeSnapshots.get(proxy) || {};
+          storeSnapshots.set(proxy, { ...currentSnapshot });
+          notify();
+        }
         return ok;
       },
       deleteProperty(obj, prop) {
         if (!Object.prototype.hasOwnProperty.call(obj, prop)) return true;
         const ok = Reflect.deleteProperty(obj, prop);
-        if (ok) notify();
+        if (ok) {
+          // Update the snapshot reference so useSyncExternalStore detects the change
+          const currentSnapshot = storeSnapshots.get(proxy) || {};
+          storeSnapshots.set(proxy, { ...currentSnapshot });
+          notify();
+        }
         return ok;
       },
     });
 
   const proxy = wrap(state);
   storeRoots.set(proxy, node);
+  storeSnapshots.set(proxy, {});
 
   const setStore: StoreSetter<T> = (fn) => {
     batch(() => {
@@ -223,6 +235,9 @@ export function useStore<T extends object>(store: T): T {
   if (!node) {
     throw new Error("useStore: expected a createStore() proxy");
   }
-  useSyncExternalStore(node.subscribe, () => store, () => store);
+  // We use the snapshot map to return a new object reference on every mutation,
+  // tricking React's Object.is equality check into re-rendering the component,
+  // while still returning the original store proxy to the user.
+  useSyncExternalStore(node.subscribe, () => storeSnapshots.get(store as object) || store, () => storeSnapshots.get(store as object) || store);
   return store;
 }
