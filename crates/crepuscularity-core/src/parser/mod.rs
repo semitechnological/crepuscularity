@@ -2,6 +2,7 @@
 /// Mirrors the compile-time proc-macro parser but operates on strings at runtime.
 mod indent;
 mod jsx;
+mod svelte;
 
 use std::collections::HashMap;
 
@@ -11,6 +12,8 @@ pub use indent::{parse_when_attribute_suffix, unescape_crepus_text_literal};
 
 pub(crate) use indent::{collect_lines, parse_nodes};
 pub(crate) use jsx::parse_jsx_template;
+pub(crate) use svelte::parse_svelte_template;
+pub use svelte::{parse_svelte_component, SvelteComponent};
 
 #[derive(Debug, Clone)]
 pub(crate) struct RawParseError {
@@ -246,7 +249,9 @@ pub(crate) fn parse_template_raw_with_path(
     template: &str,
     path: Option<&std::path::Path>,
 ) -> Result<Vec<Node>, RawParseError> {
-    if is_jsx_mode(template, path) {
+    if is_svelte_mode(path) {
+        parse_svelte_template(template)
+    } else if is_jsx_mode(template, path) {
         parse_jsx_template(template)
     } else {
         let dec = crate::preprocess::strip_indent_decorators(template);
@@ -255,6 +260,14 @@ pub(crate) fn parse_template_raw_with_path(
         crate::preprocess::expand_class_aliases_in_nodes(&mut nodes, &dec.class_aliases);
         Ok(nodes)
     }
+}
+
+/// Returns true when the file path has the `.svelte` extension, activating the
+/// Svelte template frontend.
+pub(crate) fn is_svelte_mode(path: Option<&std::path::Path>) -> bool {
+    path.and_then(|p| p.extension())
+        .and_then(|e| e.to_str())
+        .is_some_and(|e| e.eq_ignore_ascii_case("svelte"))
 }
 
 /// Returns true when the first non-blank, non-comment, non-`$:` line starts with `<`

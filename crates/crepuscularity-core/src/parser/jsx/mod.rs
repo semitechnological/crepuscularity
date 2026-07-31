@@ -4,11 +4,11 @@
 //! line starts with `<`). Produces the same `Node`/`Element` AST as the indentation
 //! parser, so every backend — GPUI, web, webext — works unchanged.
 
-mod attrs;
-mod builders;
+pub(crate) mod attrs;
+pub(crate) mod builders;
 mod tags;
 mod template;
-mod text;
+pub(crate) mod text;
 
 use super::RawParseError;
 use crate::ast::Node;

@@ -817,3 +817,177 @@ div bg-gradient-to-r from-blue-500 to-red-500
         crate::colors::lookup_named_color("red-500").unwrap()
     );
 }
+
+// ── Svelte frontend → View IR ────────────────────────────────────────────────
+
+fn render_svelte(src: &str, ctx: &TemplateContext) -> ViewIr {
+    let nodes = crepuscularity_core::parser::parse_template_with_path(
+        src,
+        Some(std::path::Path::new("Card.svelte")),
+    )
+    .expect("svelte template should parse");
+    crate::render_nodes_to_ir(&nodes, ctx).expect("svelte AST should lower")
+}
+
+#[test]
+fn svelte_text_interpolation_lowers_to_text() {
+    let mut ctx = TemplateContext::new();
+    ctx.set("name", "Ada");
+    let ir = render_svelte(
+        "<div class=\"flex flex-col gap-4\"><span>Hello {name}</span></div>",
+        &ctx,
+    );
+    let expected = json!({
+        "version": IR_VERSION,
+        "root": [{
+            "kind": "stack",
+            "axis": "column",
+            "spacing": 16.0,
+            "style": {
+                "classes": ["flex", "flex-col", "gap-4"],
+                "flexDirection": "column"
+            },
+            "children": [{
+                "kind": "text",
+                "content": "Hello Ada"
+            }]
+        }]
+    });
+    assert_eq!(serde_json::to_value(&ir).unwrap(), expected);
+}
+
+#[test]
+fn svelte_if_block_lowers_to_if_node() {
+    let ir = render_svelte(
+        "<div>{#if ready}<span>go</span>{:else}<span>wait</span>{/if}</div>",
+        &TemplateContext::new(),
+    );
+    let v = serde_json::to_value(&ir).unwrap();
+    assert_eq!(v["root"][0]["children"][0]["kind"], "if");
+    assert_eq!(v["root"][0]["children"][0]["condition"], "ready");
+    assert_eq!(
+        v["root"][0]["children"][0]["elseChildren"][0]["content"],
+        "wait"
+    );
+    round_trip(&ir);
+}
+
+#[test]
+fn svelte_each_block_lowers_to_for_each() {
+    let ir = render_svelte(
+        "<div>{#each items as item}<span>{item}</span>{/each}</div>",
+        &TemplateContext::new(),
+    );
+    let v = serde_json::to_value(&ir).unwrap();
+    assert_eq!(v["root"][0]["children"][0]["kind"], "forEach");
+    assert_eq!(v["root"][0]["children"][0]["bind"], "items");
+    assert_eq!(v["root"][0]["children"][0]["itemName"], "item");
+    assert_eq!(v["root"][0]["children"][0]["itemBody"][0]["bind"], "item");
+    round_trip(&ir);
+}
+
+#[test]
+fn svelte_events_and_bindings_reach_the_ir() {
+    let ir = render_svelte(
+        "<div><button on:click={increment}>+</button><input bind:value={draft} /></div>",
+        &TemplateContext::new(),
+    );
+    let v = serde_json::to_value(&ir).unwrap();
+    assert_eq!(v["root"][0]["children"][0]["kind"], "button");
+    assert_eq!(v["root"][0]["children"][0]["onClick"], "increment");
+    assert_eq!(v["root"][0]["children"][1]["kind"], "input");
+    assert_eq!(v["root"][0]["children"][1]["bind"], "draft");
+    round_trip(&ir);
+}
+
+#[test]
+fn svelte_anchor_lowers_to_link_with_class_tokens() {
+    let ir = render_svelte(
+        r#"<a class="text-blue-400 underline" href="https://example.com" target="_blank">Docs</a>"#,
+        &TemplateContext::new(),
+    );
+    let v = serde_json::to_value(&ir).unwrap();
+    assert_eq!(v["root"][0]["kind"], "link");
+    assert_eq!(v["root"][0]["href"], "https://example.com");
+    assert_eq!(v["root"][0]["target"], "_blank");
+    assert_eq!(
+        v["root"][0]["style"]["classes"],
+        json!(["text-blue-400", "underline"])
+    );
+    assert_eq!(v["root"][0]["children"][0]["content"], "Docs");
+    round_trip(&ir);
+}
+
+#[test]
+fn svelte_component_golden_lowers_to_expected_ir() {
+    let src = r#"<script>
+  let count = $state(0);
+  const increment = () => count++;
+</script>
+
+<style>
+  .card { border-radius: 8px; }
+</style>
+
+<!-- a representative card -->
+<div class="flex flex-col gap-4 p-4">
+  <h1 class="text-2xl font-bold">{title}</h1>
+  {#if count}
+    <span class="text-sm">Clicked {count} times</span>
+  {:else}
+    <span class="text-sm">Never clicked</span>
+  {/if}
+  <button class="px-4 py-2" on:click={increment}>Add</button>
+  <ul>
+    {#each items as item}
+      <li>{item}</li>
+    {/each}
+  </ul>
+  <a class="underline" href="https://example.com">Docs</a>
+</div>
+"#;
+    let mut ctx = TemplateContext::new();
+    ctx.set("title", "Counter");
+    ctx.set("count", "0");
+    let ir = render_svelte(src, &ctx);
+    let v = serde_json::to_value(&ir).unwrap();
+
+    assert_eq!(v["version"], IR_VERSION);
+    let root = &v["root"][0];
+    assert_eq!(root["kind"], "stack");
+    assert_eq!(root["axis"], "column");
+    assert_eq!(root["spacing"], 16.0);
+    assert_eq!(
+        root["style"]["classes"],
+        json!(["flex", "flex-col", "gap-4", "p-4"])
+    );
+
+    let kids = root["children"].as_array().unwrap();
+    assert_eq!(kids.len(), 5, "script/style/comment must not become nodes");
+
+    assert_eq!(kids[0]["kind"], "text");
+    assert_eq!(kids[0]["content"], "Counter");
+    assert_eq!(
+        kids[0]["style"]["classes"],
+        json!(["text-2xl", "font-bold"])
+    );
+
+    assert_eq!(kids[1]["kind"], "if");
+    assert_eq!(kids[1]["condition"], "count");
+    assert_eq!(kids[1]["thenChildren"][0]["content"], "Clicked 0 times");
+    assert_eq!(kids[1]["elseChildren"][0]["content"], "Never clicked");
+
+    assert_eq!(kids[2]["kind"], "button");
+    assert_eq!(kids[2]["onClick"], "increment");
+    assert_eq!(kids[2]["style"]["classes"], json!(["px-4", "py-2"]));
+
+    assert_eq!(kids[3]["kind"], "list");
+    assert_eq!(kids[3]["children"][0]["kind"], "forEach");
+    assert_eq!(kids[3]["children"][0]["bind"], "items");
+    assert_eq!(kids[3]["children"][0]["itemName"], "item");
+
+    assert_eq!(kids[4]["kind"], "link");
+    assert_eq!(kids[4]["href"], "https://example.com");
+    assert_eq!(kids[4]["style"]["classes"], json!(["underline"]));
+
+    round_trip(&ir);

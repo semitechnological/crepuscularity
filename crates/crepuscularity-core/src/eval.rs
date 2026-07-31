@@ -67,16 +67,19 @@ fn tokenize(input: &str) -> Vec<Token> {
             while i < len && bytes[i] != quote {
                 if bytes[i] == b'\\' && i + 1 < len {
                     i += 1;
-                    match bytes[i] {
-                        b'n' => s.push('\n'),
-                        b't' => s.push('\t'),
-                        b'\\' => s.push('\\'),
+                    // The escaped item is a codepoint, not a byte: advancing by one byte
+                    // past a multi-byte char would leave `i` mid-codepoint.
+                    let esc = input[i..].chars().next().unwrap_or('\\');
+                    match esc {
+                        'n' => s.push('\n'),
+                        't' => s.push('\t'),
+                        '\\' => s.push('\\'),
                         c => {
                             s.push('\\');
-                            s.push(c as char);
+                            s.push(c);
                         }
                     }
-                    i += 1;
+                    i += esc.len_utf8();
                 } else {
                     let ch = input[i..]
                         .chars()
@@ -205,9 +208,15 @@ fn tokenize(input: &str) -> Vec<Token> {
 
 // ── Parser ───────────────────────────────────────────────────────────────────
 
+/// Maximum recursive descent depth. Every recursion cycle in the grammar passes
+/// through `parse_unary`, so bounding it there bounds total stack usage.
+const MAX_EXPR_DEPTH: usize = 128;
+
 struct Parser<'a> {
     tokens: Vec<Token>,
     pos: usize,
+    depth: usize,
+    depth_exceeded: bool,
     ctx: &'a TemplateContext,
 }
 
@@ -216,6 +225,8 @@ impl<'a> Parser<'a> {
         Self {
             tokens,
             pos: 0,
+            depth: 0,
+            depth_exceeded: false,
             ctx,
         }
     }
@@ -322,6 +333,17 @@ impl<'a> Parser<'a> {
 
     // unary = "!" una | "-" una | post
     fn parse_unary(&mut self) -> TemplateValue {
+        if self.depth >= MAX_EXPR_DEPTH {
+            self.depth_exceeded = true;
+            return TemplateValue::Null;
+        }
+        self.depth += 1;
+        let value = self.parse_unary_inner();
+        self.depth -= 1;
+        value
+    }
+
+    fn parse_unary_inner(&mut self) -> TemplateValue {
         if self.eat(&Token::Bang) {
             let v = self.parse_unary();
             return TemplateValue::Bool(!is_truthy(&v));
@@ -535,6 +557,12 @@ pub fn eval_expr(expr: &str, ctx: &TemplateContext) -> Result<TemplateValue, Cre
     let tokens = tokenize(expr);
     let mut parser = Parser::new(tokens, ctx);
     let value = parser.parse_expr();
+    if parser.depth_exceeded {
+        return Err(CrepusError::eval(
+            expr,
+            "expression nesting too deep to evaluate",
+        ));
+    }
     if parser.is_at_end() {
         Ok(value)
     } else {
