@@ -78,7 +78,7 @@ test "renderIr decodes ViewIr" {
     const allocator = std.testing.allocator;
     const ir = try renderIr(allocator, "../fixtures/hello.crepus");
     defer allocator.free(ir.json);
-    try std.testing.expectEqual(@as(u32, 4), ir.version);
+    try std.testing.expectEqual(@as(u32, 6), ir.version);
 }
 
 test "renderHtml outputs valid HTML" {

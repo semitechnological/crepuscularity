@@ -51,7 +51,7 @@ static std::string crepus_bin() {
 ViewIr render_ir(const std::string& path) {
     std::string bin = crepus_bin();
     std::string json = exec_argv(bin.c_str(), path.c_str());
-    int version = json.find("\"version\":5") != std::string::npos || json.find("\"version\": 5") != std::string::npos ? 5 : -1;
+    int version = json.find("\"version\":6") != std::string::npos || json.find("\"version\": 6") != std::string::npos ? 6 : -1;
     return {version, json};
 }
 
@@ -72,5 +72,5 @@ int main(int argc, char** argv) {
     if (argc != 2) {
         return 2;
     }
-    return render_ir(argv[1]).version == 5 && render_html(argv[1]).find("data-crepus-kind=\"stack\"") != std::string::npos ? 0 : 1;
+    return render_ir(argv[1]).version == 6 && render_html(argv[1]).find("data-crepus-kind=\"stack\"") != std::string::npos ? 0 : 1;
 }
