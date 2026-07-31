@@ -991,3 +991,114 @@ fn svelte_component_golden_lowers_to_expected_ir() {
     assert_eq!(kids[4]["style"]["classes"], json!(["underline"]));
 
     round_trip(&ir);
+}
+
+fn vue_ir(source: &str, ctx: &TemplateContext) -> ViewIr {
+    let nodes = crepuscularity_core::parser::parse_template_with_path(
+        source,
+        Some(std::path::Path::new("Component.vue")),
+    )
+    .unwrap();
+    crate::render_nodes_to_ir(&nodes, ctx).unwrap()
+}
+
+#[test]
+fn vue_sfc_lowers_to_view_ir_with_class_tokens() {
+    let mut ctx = TemplateContext::new();
+    ctx.set("title", "Vue Panel");
+    ctx.set("count", "2");
+    ctx.set("query", "");
+    ctx.set("loggedIn", "yes");
+    let mut item_a = TemplateContext::new();
+    item_a.set("value", "alpha");
+    let mut item_b = TemplateContext::new();
+    item_b.set("value", "beta");
+    ctx.vars.insert(
+        "items".into(),
+        crepuscularity_core::context::TemplateValue::List(vec![item_a, item_b]),
+    );
+
+    let source = r#"<template>
+  <div class="flex flex-col gap-4 p-4">
+    <h1 class="text-lg font-bold">{{ title }}</h1>
+    <p v-if="loggedIn">Signed in</p>
+    <p v-else>Signed out</p>
+    <button class="px-4 py-2" @click.prevent="increment">Add</button>
+    <input type="text" v-model="query" />
+    <ul class="list">
+      <li v-for="(item, i) in items" class="row">{{ item }}</li>
+    </ul>
+  </div>
+</template>
+
+<script setup>
+const increment = () => {}
+</script>
+
+<style scoped>
+.row { color: red; }
+</style>
+"#;
+
+    let ir = vue_ir(source, &ctx);
+    assert_eq!(ir.version, IR_VERSION);
+
+    let v = serde_json::to_value(&ir).unwrap();
+    let root = &v["root"][0];
+    assert_eq!(root["kind"], "stack");
+    assert_eq!(root["axis"], "column");
+    assert_eq!(
+        root["style"]["classes"],
+        json!(["flex", "flex-col", "gap-4", "p-4"])
+    );
+
+    let kids = &root["children"];
+    assert_eq!(kids[0]["content"], "Vue Panel");
+    assert_eq!(kids[0]["style"]["classes"], json!(["text-lg", "font-bold"]));
+
+    assert_eq!(kids[1]["kind"], "if");
+    assert_eq!(kids[1]["condition"], "loggedIn");
+    assert_eq!(kids[1]["thenChildren"][0]["content"], "Signed in");
+    assert_eq!(kids[1]["elseChildren"][0]["content"], "Signed out");
+
+    assert_eq!(kids[2]["kind"], "button");
+    assert_eq!(kids[2]["label"], "Add");
+    assert_eq!(kids[2]["onClick"], "increment");
+    assert_eq!(kids[2]["style"]["classes"], json!(["px-4", "py-2"]));
+
+    assert_eq!(kids[3]["kind"], "input");
+    assert_eq!(kids[3]["bind"], "query");
+
+    assert_eq!(kids[4]["children"][0]["kind"], "forEach");
+    assert_eq!(kids[4]["children"][0]["bind"], "items");
+    assert_eq!(kids[4]["children"][0]["itemName"], "item");
+    assert_eq!(kids[4]["kind"], "list");
+    assert_eq!(kids[4]["style"]["classes"], json!(["list"]));
+    assert_eq!(
+        kids[4]["children"][0]["itemBody"][0]["style"]["classes"],
+        json!(["row"])
+    );
+    assert_eq!(
+        kids[4]["children"][0]["itemBody"][0]["children"][0]["bind"],
+        "item"
+    );
+
+    round_trip(&ir);
+}
+
+#[test]
+fn vue_conditional_classes_lower_to_active_classes() {
+    let mut ctx = TemplateContext::new();
+    ctx.set("isOn", "1");
+    ctx.set("visible", "");
+    let ir = vue_ir(
+        r#"<template>
+  <div class="base" :class="{ 'font-bold': isOn, dimmed: visible }" v-show="visible"></div>
+</template>"#,
+        &ctx,
+    );
+    let v = serde_json::to_value(&ir).unwrap();
+    let classes = &v["root"][0]["style"]["classes"];
+    assert_eq!(classes, &json!(["base", "font-bold", "hidden"]));
+    round_trip(&ir);
+}

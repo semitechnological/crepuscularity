@@ -12,7 +12,10 @@ pub(crate) mod text;
 
 use super::RawParseError;
 use crate::ast::Node;
+
+pub(crate) use attrs::{jsx_parse_attrs, JsxAttr, JsxAttrValue};
 use template::parse_jsx_template as parse_jsx_template_inner;
+pub(crate) use text::{jsx_close, jsx_err};
 
 /// Maximum nesting depth for JSX tag recursion.
 /// Prevents stack overflow on pathologically deep input.

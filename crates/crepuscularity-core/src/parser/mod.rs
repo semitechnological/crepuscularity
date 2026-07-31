@@ -3,12 +3,14 @@
 mod indent;
 mod jsx;
 mod svelte;
+mod vue;
 
 use std::collections::HashMap;
 
 use crate::ast::*;
 
 pub use indent::{parse_when_attribute_suffix, unescape_crepus_text_literal};
+pub use vue::{parse_vue_sfc, VueScriptBlock, VueSfc, VueStyleBlock};
 
 pub(crate) use indent::{collect_lines, parse_nodes};
 pub(crate) use jsx::parse_jsx_template;
@@ -249,7 +251,9 @@ pub(crate) fn parse_template_raw_with_path(
     template: &str,
     path: Option<&std::path::Path>,
 ) -> Result<Vec<Node>, RawParseError> {
-    if is_svelte_mode(path) {
+    if is_vue_mode(path) {
+        vue::parse_vue_file(template)
+    } else if is_svelte_mode(path) {
         parse_svelte_template(template)
     } else if is_jsx_mode(template, path) {
         parse_jsx_template(template)
@@ -268,6 +272,15 @@ pub(crate) fn is_svelte_mode(path: Option<&std::path::Path>) -> bool {
     path.and_then(|p| p.extension())
         .and_then(|e| e.to_str())
         .is_some_and(|e| e.eq_ignore_ascii_case("svelte"))
+}
+
+/// Returns true when the file path has the `.vue` extension, activating the
+/// Vue single-file-component frontend.
+pub(crate) fn is_vue_mode(path: Option<&std::path::Path>) -> bool {
+    path.and_then(|p| p.extension())
+        .and_then(|e| e.to_str())
+        .map(|e| e.eq_ignore_ascii_case("vue"))
+        .unwrap_or(false)
 }
 
 /// Returns true when the first non-blank, non-comment, non-`$:` line starts with `<`
