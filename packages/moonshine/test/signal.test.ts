@@ -16,6 +16,7 @@ import {
   definePage,
   handleMoonshineRequest,
   resolvePage,
+  toMoonshineRequest,
 } from "../src/server";
 import { renderHook, act } from "@testing-library/react";
 
@@ -250,5 +251,49 @@ describe("server", () => {
       pages: {},
     });
     expect(res.status).toBe(404);
+  });
+
+  describe("toMoonshineRequest", () => {
+    test("normalizes a standard request", () => {
+      const req = new Request("http://localhost:3000/api/users?limit=10", {
+        method: "POST",
+        headers: {
+          "x-custom-header": "test-value"
+        }
+      });
+
+      const result = toMoonshineRequest(req);
+
+      expect(result.url).toBe("http://localhost:3000/api/users?limit=10");
+      expect(result.method).toBe("POST");
+      expect(result.headers.get("x-custom-header")).toBe("test-value");
+      expect(result.pathname).toBe("/api/users");
+      expect(result.searchParams.get("limit")).toBe("10");
+    });
+
+    test("strips trailing slashes from pathname", () => {
+      const req = new Request("http://localhost:3000/about/");
+      const result = toMoonshineRequest(req);
+      expect(result.pathname).toBe("/about");
+    });
+
+    test("strips multiple trailing slashes from pathname", () => {
+      const req = new Request("http://localhost:3000/about///");
+      const result = toMoonshineRequest(req);
+      expect(result.pathname).toBe("/about");
+    });
+
+    test("preserves single slash for root", () => {
+      const req = new Request("http://localhost:3000/");
+      const result = toMoonshineRequest(req);
+      expect(result.pathname).toBe("/");
+    });
+
+    test("preserves single slash for root with query params", () => {
+      const req = new Request("http://localhost:3000/?foo=bar");
+      const result = toMoonshineRequest(req);
+      expect(result.pathname).toBe("/");
+      expect(result.searchParams.get("foo")).toBe("bar");
+    });
   });
 });
