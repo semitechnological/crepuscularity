@@ -10,6 +10,7 @@ Widget _one(
   Map<String, Object?> node, {
   CrepusActionCallback? onAction,
   Map<String, Object?> data = const {},
+  bool allowNetworkImages = false,
 }) => _host(
   CrepusView.fromIr(
     {
@@ -18,6 +19,7 @@ Widget _one(
     },
     onAction: onAction,
     data: data,
+    allowNetworkImages: allowNetworkImages,
   ),
 );
 
@@ -600,12 +602,7 @@ void main() {
       );
       expect(find.text('40%'), findsOneWidget);
       await tester.pumpWidget(
-        _one(const {
-          'kind': 'meter',
-          'value': 3,
-          'min': 0,
-          'max': 10,
-        }),
+        _one(const {'kind': 'meter', 'value': 3, 'min': 0, 'max': 10}),
       );
       expect(find.text('30%'), findsOneWidget);
     });
@@ -770,16 +767,69 @@ void main() {
       }
     });
 
-    testWidgets('an http/https src becomes a network image', (tester) async {
-      for (final src in const [
-        'http://example.com/a.png',
-        'https://example.com/a.png',
-      ]) {
+    testWidgets(
+      'http/https src defaults to the non-fetch placeholder, not Image.network',
+      (tester) async {
+        for (final src in const [
+          'http://example.com/a.png',
+          'https://example.com/a.png',
+        ]) {
+          await tester.pumpWidget(
+            _one({'kind': 'image', 'src': src, 'alt': 'ALT'}),
+          );
+          expect(find.byType(Image), findsNothing, reason: src);
+          expect(find.text('ALT'), findsOneWidget, reason: src);
+        }
+      },
+    );
+
+    testWidgets(
+      'allowNetworkImages: true opts in to Image.network for http/https (fromIr)',
+      (tester) async {
+        for (final src in const [
+          'http://example.com/a.png',
+          'https://example.com/a.png',
+        ]) {
+          await tester.pumpWidget(
+            _one({
+              'kind': 'image',
+              'src': src,
+              'alt': 'ALT',
+            }, allowNetworkImages: true),
+          );
+          expect(find.byType(Image), findsOneWidget, reason: src);
+        }
+      },
+    );
+
+    testWidgets(
+      'allowNetworkImages: true opts in fromSource the same as fromIr',
+      (tester) async {
         await tester.pumpWidget(
-          _one({'kind': 'image', 'src': src, 'alt': 'ALT'}),
+          _host(
+            CrepusView.fromSource(
+              'image src="https://example.com/a.png" alt="ALT"',
+              allowNetworkImages: true,
+            ),
+          ),
         );
-        expect(find.byType(Image), findsOneWidget, reason: src);
-      }
+        expect(find.byType(Image), findsOneWidget);
+        expect(find.text('ALT'), findsNothing);
+      },
+    );
+
+    testWidgets('fromSource defaults to non-fetch placeholder for http/https', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _host(
+          CrepusView.fromSource(
+            'image src="https://example.com/a.png" alt="ALT"',
+          ),
+        ),
+      );
+      expect(find.byType(Image), findsNothing);
+      expect(find.text('ALT'), findsOneWidget);
     });
 
     testWidgets('a missing alt renders an empty placeholder', (tester) async {
@@ -922,11 +972,10 @@ list
 
     testWidgets('text bind resolves from the data scope', (tester) async {
       await tester.pumpWidget(
-        _one(const {
-          'kind': 'text',
-          'content': '',
-          'bind': 'subject',
-        }, data: const {'subject': 'Hello inbox'}),
+        _one(
+          const {'kind': 'text', 'content': '', 'bind': 'subject'},
+          data: const {'subject': 'Hello inbox'},
+        ),
       );
       expect(find.text('Hello inbox'), findsOneWidget);
     });

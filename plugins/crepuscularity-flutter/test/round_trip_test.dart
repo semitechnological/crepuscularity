@@ -18,6 +18,11 @@ Object _shape(ViewNode node) => switch (node) {
     'children': childrenOf(node).map(_shape).toList(),
   },
   ButtonNode(:final label, :final onClick) => {'button': label, 'on': onClick},
+  TimerNode(:final label, :final duration, :final autostart) => {
+    'timer': label,
+    'duration': duration.inMilliseconds,
+    'autostart': autostart,
+  },
   ToggleNode(:final label, :final checked) => {
     'toggle': label,
     'checked': checked,

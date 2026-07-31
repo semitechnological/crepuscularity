@@ -3,6 +3,32 @@ use std::cell::Cell;
 use crepuscularity_core::TemplateContext;
 use crepuscularity_web::{render_ssr_document_with_nodes, SsrDocument};
 
+#[tokio::test]
+async fn stream_ssr_escapes_body_class() {
+    use axum::body::to_bytes;
+    use crepuscularity_web::stream_ssr_response_with_nodes;
+
+    let nodes = crepuscularity_core::ast_cache::parse_content(r#"div "ok""#).unwrap();
+    let doc = SsrDocument {
+        title: "Test",
+        body_class: Some(r#"x" onload="alert(1)"#),
+        ..Default::default()
+    };
+
+    let response = stream_ssr_response_with_nodes(nodes, TemplateContext::new(), doc).await;
+    let body = to_bytes(response.into_body(), 1 << 20).await.unwrap();
+    let html = String::from_utf8(body.to_vec()).unwrap();
+
+    assert!(
+        !html.contains(r#"onload="alert(1)""#),
+        "body class XSS: {html}"
+    );
+    assert!(
+        html.contains("&quot;"),
+        "double quote must be escaped: {html}"
+    );
+}
+
 #[test]
 fn ssr_renders_template() {
     let template = r#"div p-4

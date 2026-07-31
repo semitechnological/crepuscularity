@@ -65,6 +65,13 @@ void main() {
     test('the allowlist is exactly the audited set', () {
       // Widening this set is a deliberate security decision; it must not happen
       // as a side effect of an unrelated change.
+      //
+      // `timer` was added deliberately. It is the first node that owns a clock
+      // rather than rendering a constant, so it is worth being explicit about
+      // what it can and cannot do: it runs a local periodic callback, reads no
+      // input, reaches no network, evaluates nothing, and honours
+      // MediaQuery.disableAnimations. Its only capability beyond a static
+      // `progress` is repainting itself.
       expect(kAllowedKinds, {
         'text',
         'stack',
@@ -73,6 +80,7 @@ void main() {
         'toggle',
         'checkbox',
         'progress',
+        'timer',
         'meter',
         'sparkline',
         'badge',
@@ -84,7 +92,7 @@ void main() {
         'list',
         'listItem',
       });
-      expect(kAllowedKinds, hasLength(17));
+      expect(kAllowedKinds, hasLength(18));
     });
 
     test('every executing/disallowed kind decodes to UnsupportedNode', () {
