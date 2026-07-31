@@ -268,6 +268,14 @@ ViewNode _mapNode(_Raw raw) {
         max: el.number('max') ?? 100,
         style: style,
       );
+    case 'timer':
+      return TimerNode(
+        label: el.optionalLabel(),
+        duration: parseCrepusDuration(el.attrs['duration']),
+        autostart: el.flag('autostart'),
+        countUp: el.flag('countup'),
+        style: style,
+      );
     case 'meter':
       return MeterNode(
         label: el.optionalLabel(),

@@ -256,7 +256,10 @@ stack col
               as ListNode;
       final quotedItem = quoted.children.single as ListItemNode;
       expect(quotedItem.children, hasLength(1));
-      expect((quotedItem.children.single as TextNode).content, 'Email from Sam');
+      expect(
+        (quotedItem.children.single as TextNode).content,
+        'Email from Sam',
+      );
 
       final labeled =
           viewIrFromSource('list\n  listitem label="Invoice"').root.single
