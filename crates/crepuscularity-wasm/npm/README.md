@@ -1,11 +1,11 @@
-# @tschk/crepus-wasm
+# @tschk/crepuscularity-wasm
 
 The crepuscularity `.crepus` parser, compiled to WebAssembly. This is the same
 Rust code that backs the `crepus` CLI — not a reimplementation — so JavaScript
 consumers and native targets lower templates identically.
 
 ```ts
-import { parseCrepus, IR_VERSION } from "@tschk/crepus-wasm";
+import { parseCrepus, IR_VERSION } from "@tschk/crepuscularity-wasm";
 
 const ir = parseCrepus(`div flex flex-col gap-4\n  span text-lg\n    "hello"`);
 // { version: 6, root: [ { kind: "stack", ... } ] }

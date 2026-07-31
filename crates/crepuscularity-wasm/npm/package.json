@@ -1,5 +1,5 @@
 {
-  "name": "@tschk/crepus-wasm",
+  "name": "@tschk/crepuscularity-wasm",
   "version": "0.1.0",
   "description": "WASM build of the crepuscularity .crepus parser — source .crepus to View IR",
   "license": "ISC",
