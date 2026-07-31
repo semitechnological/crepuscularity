@@ -249,3 +249,23 @@ pub fn android_ndk_clang(ndk: &Path) -> Option<PathBuf> {
         })
         .find(|path| path.exists())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_java_major_valid() {
+        assert_eq!(parse_java_major("17.0.2"), Some(17));
+        assert_eq!(parse_java_major("11"), Some(11));
+        assert_eq!(parse_java_major("1.8.0_292"), Some(1));
+    }
+
+    #[test]
+    fn test_parse_java_major_invalid() {
+        assert_eq!(parse_java_major(""), None);
+        assert_eq!(parse_java_major("abc"), None);
+        assert_eq!(parse_java_major("abc.def"), None);
+        assert_eq!(parse_java_major("  "), None);
+    }
+}

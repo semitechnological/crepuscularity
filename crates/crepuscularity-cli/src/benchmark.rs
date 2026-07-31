@@ -1537,19 +1537,41 @@ fn copy_dir_all(src: &Path, dst: &Path) -> std::io::Result<()> {
 }
 
 fn copy_rec(src: &Path, dst: &Path) -> std::io::Result<()> {
+    use rayon::prelude::*;
     use std::fs;
-    if src.is_dir() {
-        fs::create_dir_all(dst)?;
-        for e in fs::read_dir(src)? {
-            let e = e?;
-            copy_rec(&e.path(), &dst.join(e.file_name()))?;
-        }
-    } else {
+    use walkdir::WalkDir;
+
+    if src.is_file() {
         if let Some(p) = dst.parent() {
             fs::create_dir_all(p)?;
         }
         fs::copy(src, dst)?;
+        return Ok(());
     }
+
+    // `Path::is_dir` in the previous recursive implementation followed directory symlinks.
+    // Preserve that behavior so benchmark fixtures can contain linked directories.
+    let entries: Vec<_> = WalkDir::new(src)
+        .follow_links(true)
+        .into_iter()
+        .collect::<Result<Vec<_>, walkdir::Error>>()
+        .map_err(std::io::Error::other)?;
+
+    for entry in entries.iter().filter(|e| e.file_type().is_dir()) {
+        let relative_path = entry.path().strip_prefix(src).unwrap();
+        let target_path = dst.join(relative_path);
+        fs::create_dir_all(&target_path)?;
+    }
+
+    entries
+        .par_iter()
+        .filter(|e| !e.file_type().is_dir())
+        .try_for_each(|entry| -> std::io::Result<()> {
+            let relative_path = entry.path().strip_prefix(src).unwrap();
+            let target_path = dst.join(relative_path);
+            fs::copy(entry.path(), &target_path).map(|_| ())
+        })?;
+
     Ok(())
 }
 
@@ -2011,5 +2033,32 @@ pub fn execute_check(opts: CheckOptions) {
 
     if !required_targets_ok {
         std::process::exit(1);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::copy_dir_all;
+    use std::fs;
+    #[cfg(unix)]
+    use std::os::unix::fs::symlink;
+
+    #[test]
+    #[cfg(unix)]
+    fn copy_dir_all_copies_contents_of_symlinked_directories() {
+        let temp = tempfile::tempdir().expect("temporary directory");
+        let source = temp.path().join("source");
+        let target = source.join("target");
+        fs::create_dir_all(&target).expect("source target directory");
+        fs::write(target.join("nested.txt"), "copied through symlink").expect("source target file");
+        symlink("target", source.join("linked")).expect("directory symlink");
+
+        let destination = temp.path().join("destination");
+        copy_dir_all(&source, &destination).expect("copy source directory");
+
+        assert_eq!(
+            fs::read_to_string(destination.join("linked/nested.txt")).expect("copied symlink file"),
+            "copied through symlink"
+        );
     }
 }
