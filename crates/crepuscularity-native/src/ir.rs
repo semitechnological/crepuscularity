@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 /// Bumped when the JSON schema gains incompatible fields; shells should check `version`.
 /// Bumped for onLongPress field added to ViewNode variants.
-pub const IR_VERSION: u32 = 5;
+pub const IR_VERSION: u32 = 6;
 
 /// Root document from parsing + lowering (see `crepuscularity_native::render_template_to_ir`).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -27,6 +27,12 @@ pub struct ViewIr {
 #[cfg_attr(feature = "schema", derive(JsonSchema))]
 #[serde(rename_all = "camelCase")]
 pub struct ViewStyle {
+    // ── Source classes ───────────────────────────────────────────────────
+    /// Original class tokens from the template, preserved verbatim so web
+    /// targets can emit `className` instead of re-deriving CSS from hints.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub classes: Vec<String>,
+
     // ── Padding ──────────────────────────────────────────────────────────
     #[serde(skip_serializing_if = "Option::is_none")]
     pub padding: Option<f32>,
@@ -212,7 +218,8 @@ pub struct ViewStyle {
 
 impl ViewStyle {
     fn is_effectively_empty(&self) -> bool {
-        self.padding.is_none()
+        self.classes.is_empty()
+            && self.padding.is_none()
             && self.padding_horizontal.is_none()
             && self.padding_vertical.is_none()
             && self.padding_top.is_none()
@@ -467,6 +474,17 @@ pub enum ViewNode {
         on_long_press: Option<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
         style: Option<ViewStyle>,
+    },
+    #[serde(rename = "link")]
+    Link {
+        href: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        target: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        rel: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        style: Option<ViewStyle>,
+        children: Vec<ViewNode>,
     },
     #[serde(rename = "webView")]
     WebView {

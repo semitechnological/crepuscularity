@@ -412,6 +412,15 @@ fn swiftui_node(
             swiftui_style(&mut out, style.as_ref(), false, indent);
             out
         }
+        ViewNode::Link {
+            style, children, ..
+        } => {
+            let inner = swiftui_children(children, indent + 1, scope_name, scope_var);
+            let mut out =
+                format!("{pad}VStack(alignment: .leading, spacing: 0.0) {{\n{inner}\n{pad}}}");
+            swiftui_style(&mut out, style.as_ref(), false, indent);
+            out
+        }
         ViewNode::SlotRotate { phrases, style, .. } => {
             let mut out = format!(
                 "{pad}Text(\"{}\")",
@@ -1254,6 +1263,10 @@ fn compose_node_with_base(
             format!("{pad}LazyColumn{modifier} {{\n{rows}\n{pad}}}")
         }
         ViewNode::ListItem { children, .. } => {
+            let inner = compose_children(children, indent + 1, scope_name, scope_var);
+            format!("{pad}Column {{\n{inner}\n{pad}}}")
+        }
+        ViewNode::Link { children, .. } => {
             let inner = compose_children(children, indent + 1, scope_name, scope_var);
             format!("{pad}Column {{\n{inner}\n{pad}}}")
         }

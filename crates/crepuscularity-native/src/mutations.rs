@@ -400,6 +400,7 @@ fn node_mut_in_list<'a>(nodes: &'a mut [ViewNode], path: &[usize]) -> Option<&'a
         | ViewNode::Scroll { children, .. }
         | ViewNode::Dropzone { children, .. }
         | ViewNode::List { children, .. }
+        | ViewNode::Link { children, .. }
         | ViewNode::ListItem { children, .. } => children,
         _ => return None,
     };
@@ -419,6 +420,7 @@ fn children_mut<'a>(
         | ViewNode::Scroll { children, .. }
         | ViewNode::Dropzone { children, .. }
         | ViewNode::List { children, .. }
+        | ViewNode::Link { children, .. }
         | ViewNode::ListItem { children, .. } => Ok(children),
         other => Err(format!(
             "node at {:?} cannot contain children: {other:?}",
@@ -446,6 +448,7 @@ fn node_style_mut(node: &mut ViewNode) -> Option<&mut Option<ViewStyle>> {
         | ViewNode::WebView { style, .. }
         | ViewNode::Scroll { style, .. }
         | ViewNode::List { style, .. }
+        | ViewNode::Link { style, .. }
         | ViewNode::ListItem { style, .. }
         | ViewNode::SlotRotate { style, .. }
         | ViewNode::Input { style, .. }

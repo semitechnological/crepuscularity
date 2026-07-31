@@ -1,11 +1,12 @@
 {
-  "version": 5,
+  "version": 6,
   "root": [
     {
       "kind": "stack",
       "axis": "column",
       "spacing": 8.0,
       "style": {
+        "classes": ["flex", "flex-col", "gap-2"],
         "flexDirection": "column"
       },
       "children": [
@@ -13,6 +14,7 @@
           "kind": "text",
           "content": "Hi",
           "style": {
+            "classes": ["text-sm"],
             "fontSize": 14.0
           }
         }

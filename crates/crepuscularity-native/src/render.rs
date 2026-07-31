@@ -450,6 +450,17 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<ViewNode, Crepu
         });
     }
 
+    if tag == "a" || tag == "link" {
+        let hints = style::extract_stack_hints(&classes, Some(ctx));
+        return Ok(ViewNode::Link {
+            href: binding_string(el, "href", ctx).unwrap_or_default(),
+            target: binding_string(el, "target", ctx),
+            rel: binding_string(el, "rel", ctx),
+            style: hints.style.opt(),
+            children: render_nodes_list(&el.children, ctx)?,
+        });
+    }
+
     if tag == "ul" || tag == "ol" || tag == "list" || tag == "flatlist" {
         let hints = style::extract_stack_hints(&classes, Some(ctx));
         return Ok(ViewNode::List {

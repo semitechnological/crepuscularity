@@ -197,13 +197,12 @@ fn web_build_emit_moonshine_writes_entry() {
     assert!(!out.join("crepus-emit.moonshine.ts").exists());
     assert!(out.join("crepus-view-ir.json").is_file());
     let entry = std::fs::read_to_string(out.join("crepus-emit.moonshine.tsx")).expect("emit");
-    assert!(entry.contains("@tschk/crepus-moonshine"));
     assert!(entry.contains("@tschk/moonshine/react"));
     assert!(entry.contains("createApp"));
-    assert!(entry.contains("renderCrepusIr"));
     assert!(entry.contains("export function App"));
     assert!(entry.contains("export function mount"));
-    assert!(entry.contains("satisfies ViewIr"));
-    assert!(entry.contains("import type { ViewIr }"));
-    assert!(entry.contains("as const satisfies"));
+    assert!(entry.contains("data-crepus-root=\"true\""));
+    assert!(entry.contains("className={"));
+    assert!(!entry.contains("renderCrepusIr"));
+    assert!(!entry.contains("satisfies ViewIr"));
 }

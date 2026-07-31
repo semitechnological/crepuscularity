@@ -25,7 +25,10 @@ fn plain_text_stack() {
             "kind": "stack",
             "axis": "column",
             "spacing": 16.0,
-            "style": { "flexDirection": "column" },
+            "style": {
+                "classes": ["flex", "flex-col", "gap-4"],
+                "flexDirection": "column"
+            },
             "children": [{
                 "kind": "text",
                 "content": "Hello Ada"

@@ -26,6 +26,7 @@ pub(crate) fn extract_stack_hints(
     for c in classes {
         apply_layout_class(&mut hints, c, ctx);
     }
+    hints.style.classes = classes.to_vec();
     hints
 }
 
@@ -40,6 +41,7 @@ pub(crate) fn extract_text_style(classes: &[String], ctx: Option<&TemplateContex
         apply_cursor_class(&mut s, c);
         apply_user_select_class(&mut s, c);
     }
+    s.classes = classes.to_vec();
     s
 }
 
