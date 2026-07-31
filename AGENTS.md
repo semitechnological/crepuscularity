@@ -24,7 +24,6 @@ crepuscularity/
   plugins/
     crepuscularity-flutter/      — Flutter View IR / .crepus renderer
     crepuscularity-components/   — Flutter/Svelte packages + catalog source (omi path deps)
-  packages/                  — local moonshine bridge (legacy; product is external)
   examples/
     web-site/                — reference site: index.crepus + runtime/
     counter/                 — SSR counter
