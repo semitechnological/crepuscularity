@@ -187,28 +187,44 @@ fn walk_crepus_files(dir: &Path, out: &mut Vec<PathBuf>) {
     }
 }
 
-/// Walk `site_dir` and parse every `.crepus` file, printing pass/fail per file.
-fn validate_templates(site_dir: &std::path::Path) {
+/// Parse every `.crepus` file and return pass/fail lines sorted by relative path.
+///
+/// Reading and parsing remain parallel, but collecting from Rayon preserves the
+/// indexed input order so startup output is repeatable.
+fn template_validation_messages(site_dir: &Path) -> Vec<String> {
     use crepuscularity_core::parser::parse_template_with_path;
-    let mut found = false;
+
     let mut files = Vec::new();
     walk_crepus_files(site_dir, &mut files);
-    for path in &files {
-        found = true;
-        let rel = path.strip_prefix(site_dir).unwrap_or(path);
-        match std::fs::read_to_string(path).map(|s| parse_template_with_path(&s, Some(path))) {
-            Ok(Ok(_)) => eprintln!("  {} {}", console::style("✓").green(), rel.display()),
-            Ok(Err(e)) => eprintln!("  {} {} — {}", console::style("✗").red(), rel.display(), e),
-            Err(e) => eprintln!(
-                "  {} {} — read error: {}",
-                console::style("✗").red(),
-                rel.display(),
-                e
-            ),
-        }
-    }
-    if !found {
+    files.sort_unstable();
+
+    files
+        .par_iter()
+        .map(|path| {
+            let rel = path.strip_prefix(site_dir).unwrap_or(path);
+            match std::fs::read_to_string(path).map(|s| parse_template_with_path(&s, Some(path))) {
+                Ok(Ok(_)) => format!("  {} {}", console::style("✓").green(), rel.display()),
+                Ok(Err(e)) => format!("  {} {} — {}", console::style("✗").red(), rel.display(), e),
+                Err(e) => format!(
+                    "  {} {} — read error: {}",
+                    console::style("✗").red(),
+                    rel.display(),
+                    e
+                ),
+            }
+        })
+        .collect()
+}
+
+/// Walk `site_dir` and parse every `.crepus` file, printing pass/fail per file.
+fn validate_templates(site_dir: &Path) {
+    let messages = template_validation_messages(site_dir);
+    if messages.is_empty() {
         eprintln!("  {} no .crepus files found", console::style("⚠").yellow());
+    } else {
+        for message in messages {
+            eprintln!("{message}");
+        }
     }
 }
 
@@ -1364,6 +1380,21 @@ fn watch_crepus_files(
 mod tests {
     use crate::crepus_toml::WebTargetMeta;
     use std::collections::HashMap;
+
+    #[test]
+    fn template_validation_messages_are_sorted_by_relative_path() {
+        let site = tempfile::tempdir().expect("tempdir");
+        std::fs::create_dir(site.path().join("nested")).expect("mkdir nested");
+        for path in ["z.crepus", "a.crepus", "nested/m.crepus"] {
+            std::fs::write(site.path().join(path), "div").expect("write template");
+        }
+
+        let messages = super::template_validation_messages(site.path());
+
+        assert!(messages[0].ends_with(" a.crepus"));
+        assert!(messages[1].ends_with(&format!(" nested{}m.crepus", std::path::MAIN_SEPARATOR)));
+        assert!(messages[2].ends_with(" z.crepus"));
+    }
 
     #[test]
     fn resolve_static_file_rejects_parent_segments() {

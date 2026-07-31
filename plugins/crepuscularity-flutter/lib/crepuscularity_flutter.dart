@@ -37,6 +37,8 @@ export 'src/view_ir.dart'
         ToggleNode,
         CheckboxNode,
         ProgressNode,
+        TimerNode,
+        parseCrepusDuration,
         MeterNode,
         SparklineNode,
         BadgeNode,

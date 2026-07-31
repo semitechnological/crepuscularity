@@ -7,6 +7,8 @@
 /// nothing.
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'package:crepuscularity_components/crepuscularity_components.dart';
@@ -77,6 +79,7 @@ class CrepusView extends StatelessWidget {
     this.onAction,
     this.theme = const CrepusTheme(),
     this.data = const {},
+    this.allowNetworkImages = false,
     CrepusLimits limits = CrepusLimits.defaults,
   }) : _ir = ViewIr.fromJson(ir, limits: limits);
 
@@ -87,6 +90,7 @@ class CrepusView extends StatelessWidget {
     this.onAction,
     this.theme = const CrepusTheme(),
     this.data = const {},
+    this.allowNetworkImages = false,
     CrepusLimits limits = CrepusLimits.defaults,
   }) : _ir = viewIrFromSource(source, limits: limits);
 
@@ -97,13 +101,15 @@ class CrepusView extends StatelessWidget {
   /// Runtime scope for `{...}` interpolation and `if`/`forEach` bindings.
   final Map<String, Object?> data;
 
+  final bool allowNetworkImages;
+
   /// The decoded document (exposed for tests / introspection).
   ViewIr get ir => _ir;
 
   @override
   Widget build(BuildContext context) {
     final resolved = theme._resolved(context);
-    final renderer = _Renderer(resolved, onAction);
+    final renderer = _Renderer(resolved, onAction, allowNetworkImages);
     final children = renderer.renderList(_ir.root, data);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -114,10 +120,11 @@ class CrepusView extends StatelessWidget {
 }
 
 class _Renderer {
-  _Renderer(this.theme, this.onAction);
+  _Renderer(this.theme, this.onAction, this.allowNetworkImages);
 
   final CrepusTheme theme;
   final CrepusActionCallback? onAction;
+  final bool allowNetworkImages;
 
   List<Widget> renderList(List<ViewNode> nodes, Map<String, Object?> scope) {
     final widgets = <Widget>[];
@@ -137,6 +144,7 @@ class _Renderer {
       ToggleNode() => _toggle(node),
       CheckboxNode() => _checkbox(node),
       ProgressNode() => _progress(node),
+      TimerNode() => _timer(node),
       MeterNode() => _meter(node),
       SparklineNode() => _sparkline(node),
       BadgeNode() => _badge(node),
@@ -276,6 +284,12 @@ class _Renderer {
     );
   }
 
+  Widget _timer(TimerNode node) => CrepusTimer(
+    node: node,
+    barBuilder: _labeledBar,
+    labelStyle: _mutedStyle(),
+  );
+
   Widget _meter(MeterNode node) {
     final span = node.max - node.min;
     final fraction = span <= 0
@@ -389,7 +403,7 @@ class _Renderer {
     final isNetwork =
         uri != null && (uri.scheme == 'http' || uri.scheme == 'https');
     final placeholder = _imagePlaceholder(node);
-    final image = isNetwork
+    final image = isNetwork && allowNetworkImages
         ? Image.network(
             node.src,
             fit: BoxFit.cover,
@@ -766,5 +780,143 @@ class _Renderer {
     if (value is Iterable) return value.isNotEmpty;
     if (value is Map) return value.isNotEmpty;
     return true;
+  }
+}
+
+/// The one node that owns a clock.
+///
+/// Everything else the renderer produces is a still frame built from constants
+/// the author wrote. This ticks: a `Ticker`-free periodic timer moves the bar
+/// and the remaining figure, and start / pause / reset are real controls rather
+/// than round trips through the model. It stops itself when it reaches the end
+/// and stops when the widget goes away.
+class CrepusTimer extends StatefulWidget {
+  const CrepusTimer({
+    required this.node,
+    required this.barBuilder,
+    required this.labelStyle,
+    super.key,
+  });
+
+  final TimerNode node;
+  final Widget Function(double fraction, String label) barBuilder;
+  final TextStyle? labelStyle;
+
+  @override
+  State<CrepusTimer> createState() => _CrepusTimerState();
+}
+
+class _CrepusTimerState extends State<CrepusTimer> {
+  Timer? _ticker;
+  Duration _elapsed = Duration.zero;
+  bool _running = false;
+
+  /// Fine enough that the seconds figure never visibly stalls, coarse enough
+  /// that an idle artifact is not repainting at frame rate.
+  static const _tick = Duration(milliseconds: 200);
+
+  bool _autostarted = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Autostart lives here rather than initState because it consults
+    // MediaQuery, which is not available until dependencies resolve.
+    if (_autostarted) return;
+    _autostarted = true;
+    if (widget.node.autostart) _start();
+  }
+
+  @override
+  void didUpdateWidget(covariant CrepusTimer old) {
+    super.didUpdateWidget(old);
+    // A re-rendered artifact with a different duration is a different timer.
+    if (old.node.duration != widget.node.duration) _reset();
+  }
+
+  bool get _animationsOff =>
+      MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+
+  void _start() {
+    if (_running || widget.node.duration <= Duration.zero) return;
+    if (_animationsOff) return;
+    _running = true;
+    _ticker?.cancel();
+    _ticker = Timer.periodic(_tick, (_) {
+      if (!mounted) return;
+      setState(() {
+        _elapsed += _tick;
+        if (_elapsed >= widget.node.duration) {
+          _elapsed = widget.node.duration;
+          _stop();
+        }
+      });
+    });
+  }
+
+  void _stop() {
+    _ticker?.cancel();
+    _ticker = null;
+    _running = false;
+  }
+
+  void _reset() {
+    _stop();
+    if (mounted) setState(() => _elapsed = Duration.zero);
+  }
+
+  @override
+  void dispose() {
+    _stop();
+    super.dispose();
+  }
+
+  String _clock(Duration d) {
+    final total = d.inSeconds;
+    final minutes = (total ~/ 60).toString().padLeft(2, '0');
+    final seconds = (total % 60).toString().padLeft(2, '0');
+    return '$minutes:$seconds';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final total = widget.node.duration;
+    final fraction = total <= Duration.zero
+        ? 0.0
+        : (_elapsed.inMicroseconds / total.inMicroseconds).clamp(0.0, 1.0);
+    final shown = widget.node.countUp ? _elapsed : total - _elapsed;
+    final done = total > Duration.zero && _elapsed >= total;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (widget.node.label case final label? when label.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: Text(label, style: widget.labelStyle),
+          ),
+        widget.barBuilder(fraction, _clock(shown)),
+        Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (!done)
+                TextButton(
+                  onPressed: _running ? () => setState(_stop) : _start,
+                  child: Text(_running ? 'Pause' : 'Start'),
+                ),
+              TextButton(onPressed: _reset, child: const Text('Reset')),
+              if (done)
+                Padding(
+                  padding: const EdgeInsets.only(left: 4),
+                  child: Text('Done', style: widget.labelStyle),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 }
