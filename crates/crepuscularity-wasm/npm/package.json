@@ -1,7 +1,7 @@
 {
   "name": "@tschk/crepuscularity-wasm",
-  "version": "0.1.0",
-  "description": "WASM build of the crepuscularity .crepus parser — source .crepus to View IR",
+  "version": "0.1.1",
+  "description": "WASM build of the crepuscularity parser — .crepus, JSX, Svelte and Vue templates to View IR",
   "license": "ISC",
   "type": "module",
   "main": "./index.ts",

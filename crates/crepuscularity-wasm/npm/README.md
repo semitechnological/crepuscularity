@@ -1,8 +1,8 @@
 # @tschk/crepuscularity-wasm
 
-The crepuscularity `.crepus` parser, compiled to WebAssembly. This is the same
-Rust code that backs the `crepus` CLI — not a reimplementation — so JavaScript
-consumers and native targets lower templates identically.
+The crepuscularity parser, compiled to WebAssembly. This is the same Rust code
+that backs the `crepus` CLI — not a reimplementation — so JavaScript consumers
+and native targets lower templates identically.
 
 ```ts
 import { parseCrepus, IR_VERSION } from "@tschk/crepuscularity-wasm";
@@ -16,6 +16,25 @@ Template variables are bound by passing a context object:
 ```ts
 parseCrepus('span\n  "hello {name}"', { name: "Ada" });
 ```
+
+## Other syntaxes
+
+`parseTemplate` picks a frontend from the filename, so `.crepus`, `.jsx`/`.tsx`,
+`.svelte` and `.vue` all compile to the same View IR:
+
+```ts
+import { parseTemplate } from "@tschk/crepuscularity-wasm";
+
+parseTemplate('<div class="flex"><span>{t}</span></div>', "Panel.svelte");
+parseTemplate("<template><div class=\"flex\">{{ t }}</div></template>", "Panel.vue");
+```
+
+These are first-party frontends: neither `svelte` nor `vue` is a dependency.
+They compile the **template**. A `<script>` block is extracted and its
+semantics — Svelte runes, Vue's composition API, stores, lifecycle — are not
+executed; expressions are evaluated by crepuscularity's own evaluator. A
+construct the shared AST cannot represent is a parse error rather than a silent
+drop.
 
 ## View IR
 
