@@ -93,33 +93,39 @@ pub fn expand_class_aliases_in_nodes(nodes: &mut [Node], aliases: &HashMap<Strin
     for node in nodes.iter_mut() {
         match node {
             Node::Element(el) => {
-                let mut out = Vec::new();
-                for c in std::mem::take(&mut el.classes) {
-                    out.extend(expand_class_token_owned(c, aliases));
+                let old_classes = std::mem::take(&mut el.classes);
+                el.classes.reserve(old_classes.len());
+                for c in old_classes {
+                    if let Some(exp) = aliases.get(c.as_str()) {
+                        el.classes
+                            .extend(exp.split_whitespace().map(|s| s.to_string()));
+                    } else {
+                        el.classes.push(c);
+                    }
                 }
-                el.classes = out;
-                let mut out_cc: Vec<ConditionalClass> = Vec::new();
-                for cc in std::mem::take(&mut el.conditional_classes) {
-                    let expanded = expand_class_token_owned(cc.class, aliases);
-                    if expanded.is_empty() {
-                        continue;
-                    }
-                    out_cc.reserve(expanded.len());
-                    let mut iter = expanded.into_iter();
-                    let mut prev = iter.next().unwrap();
-                    let condition = cc.condition;
 
-                    for c in iter {
-                        out_cc.push(ConditionalClass {
-                            class: prev,
-                            condition: condition.clone(),
-                        });
-                        prev = c;
+                let old_cc = std::mem::take(&mut el.conditional_classes);
+                let mut out_cc = Vec::with_capacity(old_cc.len());
+                for cc in old_cc {
+                    if let Some(exp) = aliases.get(cc.class.as_str()) {
+                        let mut iter = exp.split_whitespace();
+                        if let Some(first) = iter.next() {
+                            let mut prev = first;
+                            for c in iter {
+                                out_cc.push(ConditionalClass {
+                                    class: prev.to_string(),
+                                    condition: cc.condition.clone(),
+                                });
+                                prev = c;
+                            }
+                            out_cc.push(ConditionalClass {
+                                class: prev.to_string(),
+                                condition: cc.condition,
+                            });
+                        }
+                    } else {
+                        out_cc.push(cc);
                     }
-                    out_cc.push(ConditionalClass {
-                        class: prev,
-                        condition,
-                    });
                 }
                 el.conditional_classes = out_cc;
                 expand_class_aliases_in_nodes(&mut el.children, aliases);
