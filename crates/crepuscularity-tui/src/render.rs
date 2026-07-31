@@ -14,7 +14,7 @@
 //! template, not imperative Rust code.
 
 use ratatui::buffer::Buffer;
-use ratatui::layout::{Alignment, Constraint, Direction, Layout, Rect};
+use ratatui::layout::{Alignment, Constraint, Direction, Rect};
 use ratatui::style::{Color, Style};
 use ratatui::text::{Line, Span, Text};
 use ratatui::widgets::{Block, BorderType, Borders, Padding, Paragraph, Widget, Wrap};
@@ -533,7 +533,10 @@ fn build_children(
     inherited: Style,
     renderer: &mut BufferRenderer,
 ) -> Vec<WidgetChild> {
-    let mut ctx = ctx.clone();
+    // Borrowed until a `let` declaration actually mutates the scope: cloning a
+    // context whose vars hold the loop's item list is O(list length), so an
+    // unconditional clone per node list makes nested loops quadratic.
+    let mut ctx: std::borrow::Cow<'_, TemplateContext> = std::borrow::Cow::Borrowed(ctx);
     let mut out: Vec<WidgetChild> = Vec::new();
     // Consecutive text/expression nodes are buffered and emitted as one Content.
     let mut text_buf: Vec<Line<'static>> = Vec::new();
@@ -545,9 +548,10 @@ fn build_children(
                 let val = eval_value(&decl.expr, &ctx);
                 if decl.is_default {
                     if !ctx.vars.contains_key(&decl.name) {
-                        ctx.vars.insert(decl.name.clone(), val);
+                        ctx.to_mut().vars.insert(decl.name.clone(), val);
                     }
                 } else {
+                    let ctx = ctx.to_mut();
                     if let Some(v) = ctx.vars.get_mut(&decl.name) {
                         *v = val;
                     } else {
@@ -730,7 +734,7 @@ fn build_content_element(
     constraint: Constraint,
     style: Style,
 ) -> WidgetChild {
-    let mut child_ctx = ctx.clone();
+    let mut child_ctx: std::borrow::Cow<'_, TemplateContext> = std::borrow::Cow::Borrowed(ctx);
 
     let lines: Vec<Line<'static>> = el
         .children
@@ -742,9 +746,10 @@ fn build_content_element(
                 let val = eval_value(&decl.expr, &child_ctx);
                 if decl.is_default {
                     if !child_ctx.vars.contains_key(&decl.name) {
-                        child_ctx.vars.insert(decl.name.clone(), val);
+                        child_ctx.to_mut().vars.insert(decl.name.clone(), val);
                     }
                 } else {
+                    let child_ctx = child_ctx.to_mut();
                     if let Some(v) = child_ctx.vars.get_mut(&decl.name) {
                         *v = val;
                     } else {
@@ -1076,6 +1081,10 @@ fn build_for(
     let mut child_ctx = ctx.clone();
     let pattern = block.pattern.trim();
     let has_pattern = !pattern.is_empty();
+    // Keys written by the previous iteration, so the scope can be restored in
+    // time proportional to the item instead of re-cloning the whole context
+    // (which holds the item list itself) on every pass.
+    let mut written: Vec<String> = Vec::new();
     for item_ctx in items {
         let item_str = if has_pattern {
             item_ctx.get_str("value")
@@ -1083,16 +1092,27 @@ fn build_for(
             String::new()
         };
         // Restore child_ctx
-        child_ctx.vars.clone_from(&ctx.vars);
+        for key in written.drain(..) {
+            match ctx.vars.get(&key) {
+                Some(v) => {
+                    child_ctx.vars.insert(key, v.clone());
+                }
+                None => {
+                    child_ctx.vars.remove(&key);
+                }
+            }
+        }
         // Merge all fields from the item context into the child context.
         for (k, v) in &item_ctx.vars {
             child_ctx.vars.insert(k.clone(), v.clone());
+            written.push(k.clone());
         }
         // Bind the loop pattern variable to the item's "value" field if present.
         if has_pattern && !item_str.is_empty() {
             child_ctx
                 .vars
                 .insert(pattern.to_string(), TemplateValue::Str(item_str));
+            written.push(pattern.to_string());
         }
         out.extend(build_children(
             &block.body,
@@ -1252,6 +1272,141 @@ fn paint_node_buf(node: &WidgetNode, buf: &mut Buffer, area: Rect) {
     }
 }
 
+/// Preferred size of a constraint along the layout axis, before growing or
+/// shrinking to fit the available space.
+fn constraint_preferred(c: &Constraint, total: u16) -> u16 {
+    match c {
+        Constraint::Length(v) | Constraint::Min(v) | Constraint::Max(v) => *v,
+        Constraint::Percentage(p) => (u32::from(total) * u32::from(*p) / 100) as u16,
+        Constraint::Ratio(a, b) => {
+            if *b == 0 {
+                0
+            } else {
+                (u64::from(total) * u64::from(*a) / u64::from(*b)) as u16
+            }
+        }
+        Constraint::Fill(_) => 0,
+    }
+}
+
+/// How eagerly a constraint absorbs leftover space. `Fill(w)` grows with
+/// weight `w`; `Min(_)` grows with weight 1; everything else stays put.
+fn constraint_grow_weight(c: &Constraint) -> u32 {
+    match c {
+        Constraint::Fill(w) => u32::from(*w),
+        Constraint::Min(_) => 1,
+        _ => 0,
+    }
+}
+
+/// Smallest size a constraint may be shrunk to before the layout is allowed to
+/// violate it.
+fn constraint_floor(c: &Constraint) -> u16 {
+    match c {
+        Constraint::Min(v) => *v,
+        _ => 0,
+    }
+}
+
+/// Split `area` into one `Rect` per constraint in linear time.
+///
+/// This replaces `ratatui::Layout::split` on the hot path. The cassowary solver
+/// behind `Layout` degrades catastrophically once a single split carries more
+/// than ~30 constraints — which a `for` loop over a list trivially produces —
+/// so the flex distribution is computed directly instead: preferred sizes, then
+/// leftover space to the growable children (or the last child, matching
+/// `Flex::Legacy`), then proportional shrinking from the end when the children
+/// overflow.
+fn split_area(constraints: &[Constraint], area: Rect, direction: Direction, gap: u16) -> Vec<Rect> {
+    let n = constraints.len();
+    if n == 0 {
+        return Vec::new();
+    }
+    let total = match direction {
+        Direction::Horizontal => area.width,
+        Direction::Vertical => area.height,
+    };
+    let spacing = gap.saturating_mul((n as u16).saturating_sub(1));
+    let avail = u32::from(total.saturating_sub(spacing));
+
+    let mut sizes: Vec<u32> = constraints
+        .iter()
+        .map(|c| u32::from(constraint_preferred(c, total)))
+        .collect();
+    let sum: u32 = sizes.iter().sum();
+
+    if sum < avail {
+        let extra = avail - sum;
+        let weights: Vec<u32> = constraints.iter().map(constraint_grow_weight).collect();
+        let wsum: u32 = weights.iter().sum();
+        if let Some(base) = extra.checked_div(wsum) {
+            let mut used = 0;
+            for (i, w) in weights.iter().enumerate() {
+                let add = base * w;
+                sizes[i] += add;
+                used += add;
+            }
+            let mut rem = extra - used;
+            for (i, w) in weights.iter().enumerate() {
+                if rem == 0 {
+                    break;
+                }
+                if *w > 0 {
+                    sizes[i] += 1;
+                    rem -= 1;
+                }
+            }
+        } else if let Some(last) = sizes.last_mut() {
+            *last += extra;
+        }
+    } else if sum > avail {
+        // Shrink from the end, first down to each child's floor, then past it.
+        let mut deficit = sum - avail;
+        for i in (0..n).rev() {
+            if deficit == 0 {
+                break;
+            }
+            let floor = u32::from(constraint_floor(&constraints[i]));
+            let slack = sizes[i].saturating_sub(floor);
+            let cut = slack.min(deficit);
+            sizes[i] -= cut;
+            deficit -= cut;
+        }
+        for i in (0..n).rev() {
+            if deficit == 0 {
+                break;
+            }
+            let cut = sizes[i].min(deficit);
+            sizes[i] -= cut;
+            deficit -= cut;
+        }
+    }
+
+    // Clamp `Max` constraints after distribution so a `Max(v)` never exceeds v.
+    for (i, c) in constraints.iter().enumerate() {
+        if let Constraint::Max(v) = c {
+            sizes[i] = sizes[i].min(u32::from(*v));
+        }
+    }
+
+    let mut out = Vec::with_capacity(n);
+    let mut offset = u32::from(match direction {
+        Direction::Horizontal => area.x,
+        Direction::Vertical => area.y,
+    });
+    let end = offset + u32::from(total);
+    for size in sizes {
+        let start = offset.min(end);
+        let len = size.min(end - start);
+        out.push(match direction {
+            Direction::Horizontal => Rect::new(start as u16, area.y, len as u16, area.height),
+            Direction::Vertical => Rect::new(area.x, start as u16, area.width, len as u16),
+        });
+        offset = start + len + u32::from(gap);
+    }
+    out
+}
+
 fn paint_children_buf(
     children: &[WidgetChild],
     buf: &mut Buffer,
@@ -1263,11 +1418,7 @@ fn paint_children_buf(
         return;
     }
     let constraints: Vec<Constraint> = children.iter().map(|c| c.constraint).collect();
-    let chunks = Layout::default()
-        .direction(direction)
-        .constraints(constraints)
-        .spacing(gap)
-        .split(area);
+    let chunks = split_area(&constraints, area, direction, gap);
 
     for (i, child) in children.iter().enumerate() {
         if let Some(&chunk) = chunks.get(i) {
@@ -1341,11 +1492,7 @@ impl<'a> Scrollable<'a> {
         let virtual_area = Rect::new(0, 0, self.viewport.width, total_height);
         let mut virtual_buf = Buffer::empty(virtual_area);
         let constraints: Vec<Constraint> = self.children.iter().map(|c| c.constraint).collect();
-        let chunks = Layout::default()
-            .direction(self.direction)
-            .constraints(constraints)
-            .spacing(self.gap)
-            .split(virtual_area);
+        let chunks = split_area(&constraints, virtual_area, self.direction, self.gap);
         let vis_start = offset as u16;
         let vis_end = vis_start + self.viewport.height;
         for (i, child) in self.children.iter().enumerate() {

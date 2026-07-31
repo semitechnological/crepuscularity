@@ -2117,3 +2117,130 @@ mod buffer_renderer_api {
         );
     }
 }
+
+mod nested_loop_scaling {
+    use super::*;
+    use std::time::{Duration, Instant};
+
+    fn items(n: usize) -> TemplateValue {
+        TemplateValue::List(
+            (0..n)
+                .map(|i| {
+                    let mut c = TemplateContext::new();
+                    c.set("text", format!("line {i}"));
+                    c.set("shown", true);
+                    c
+                })
+                .collect(),
+        )
+    }
+
+    fn outer(inner: usize, groups: usize) -> TemplateContext {
+        let mut ctx = TemplateContext::new();
+        ctx.set(
+            "groups",
+            TemplateValue::List(
+                (0..groups)
+                    .map(|_| {
+                        let mut g = TemplateContext::new();
+                        g.set("lines", items(inner));
+                        g
+                    })
+                    .collect(),
+            ),
+        );
+        ctx
+    }
+
+    fn timed(template: &str, ctx: &TemplateContext) -> Duration {
+        let start = Instant::now();
+        let rows = render(80, 24, template, ctx);
+        assert!(!all_text(&rows).is_empty());
+        start.elapsed()
+    }
+
+    const NESTED: &str = r#"div w-full h-fit flex-col
+  for group in {groups}
+    div h-fit flex-col
+      for line in {lines}
+        span text-sm
+          "{text}"
+"#;
+
+    const NESTED_IF: &str = r#"div w-full h-fit flex-col
+  for group in {groups}
+    div h-fit flex-col
+      for line in {lines}
+        if {shown}
+          span text-sm
+            "{text}"
+        else
+          span text-xs
+            "hidden"
+"#;
+
+    const NESTED_3: &str = r#"div w-full h-fit flex-col
+  for outer in {groups}
+    div h-fit flex-col
+      for mid in {mids}
+        div h-fit flex-col
+          for line in {lines}
+            span text-sm
+              "{text}"
+"#;
+
+    #[test]
+    fn nested_for_loop_with_many_items_renders_promptly() {
+        let ctx = outer(300, 1);
+        let elapsed = timed(NESTED, &ctx);
+        assert!(
+            elapsed < Duration::from_secs(10),
+            "nested for loop over 300 items took {elapsed:?}"
+        );
+    }
+
+    #[test]
+    fn nested_for_loop_scales_roughly_linearly() {
+        let small = timed(NESTED, &outer(200, 1));
+        let large = timed(NESTED, &outer(800, 1));
+        let ratio = large.as_secs_f64() / small.as_secs_f64().max(1e-6);
+        assert!(
+            ratio < 16.0,
+            "4x the items took {ratio:.1}x the time ({small:?} → {large:?})"
+        );
+    }
+
+    #[test]
+    fn if_inside_nested_for_loop_renders_promptly() {
+        let ctx = outer(300, 1);
+        let elapsed = timed(NESTED_IF, &ctx);
+        assert!(
+            elapsed < Duration::from_secs(10),
+            "if inside a nested for loop over 300 items took {elapsed:?}"
+        );
+    }
+
+    #[test]
+    fn three_level_nested_for_loop_renders_promptly() {
+        let mut ctx = TemplateContext::new();
+        let mut group = TemplateContext::new();
+        group.set(
+            "mids",
+            TemplateValue::List(
+                (0..10)
+                    .map(|_| {
+                        let mut m = TemplateContext::new();
+                        m.set("lines", items(30));
+                        m
+                    })
+                    .collect(),
+            ),
+        );
+        ctx.set("groups", TemplateValue::List(vec![group]));
+        let elapsed = timed(NESTED_3, &ctx);
+        assert!(
+            elapsed < Duration::from_secs(10),
+            "3-level nested for loop over 300 leaves took {elapsed:?}"
+        );
+    }
+}
