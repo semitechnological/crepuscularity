@@ -67,6 +67,7 @@ pub use native::{
 };
 pub use render::{
     render_component_file_to_ir, render_from_files, render_nodes_to_ir, render_template_to_ir,
+    render_template_to_ir_with_path,
 };
 
 /// Serialize IR to JSON (compact).

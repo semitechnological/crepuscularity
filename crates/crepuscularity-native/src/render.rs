@@ -39,6 +39,23 @@ pub fn render_template_to_ir(template: &str, ctx: &TemplateContext) -> Result<Vi
     crepuscularity_core::render_entry::render_template(template, ctx, render_nodes_to_ir)
 }
 
+/// Parse and lower a template to IR, choosing the frontend from `path`.
+///
+/// The dispatcher keys on the file extension, so callers that hold a filename
+/// reach every syntax the parser supports rather than only the default one.
+pub fn render_template_to_ir_with_path(
+    template: &str,
+    ctx: &TemplateContext,
+    path: Option<&std::path::Path>,
+) -> Result<ViewIr, CrepusError> {
+    crepuscularity_core::render_entry::render_template_with(
+        template,
+        ctx,
+        |t| crepuscularity_core::parse_template_with_path(t, path),
+        render_nodes_to_ir,
+    )
+}
+
 /// Lower a named component from a multi-component `.crepus` file.
 pub fn render_component_file_to_ir(
     content: &str,
