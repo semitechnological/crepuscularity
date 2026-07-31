@@ -33,7 +33,7 @@ class CrepuscularityPluginTests(unittest.TestCase):
         fixture = pathlib.Path(__file__).parents[1] / "fixtures" / "hello.crepus"
         allowed_dir = pathlib.Path(__file__).parents[1] / "fixtures"
         ir = render_ir(fixture, {"name": "Ada"}, allowed_dir)
-        self.assertEqual(ir.version, 5)
+        self.assertEqual(ir.version, 6)
         self.assertEqual(ir.root[0]["children"][0]["content"], "Hello Ada")
         self.assertEqual(render_html(fixture, {"name": "Ada"}, allowed_dir), '<div data-crepus-kind="stack" data-axis="column">Hello Ada</div>')
 
