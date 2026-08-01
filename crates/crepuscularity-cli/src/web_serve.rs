@@ -39,7 +39,7 @@ use rayon::iter::ParallelIterator;
 use serde_json::json;
 
 use crepuscularity_core::context::TemplateContext;
-use crepuscularity_web::{render_from_files, render_from_files_with_ssr};
+use crepuscularity_web::{escape_html, render_from_files, render_from_files_with_ssr};
 
 use crate::crepus_toml::WebTargetMeta;
 use crate::web::{
@@ -695,7 +695,7 @@ fn serve_docs_path(stream: &mut TcpStream, url_path: &str, dev_root: &Path) {
             "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>Docs</title></head>\
              <body style=\"font-family:system-ui,sans-serif;padding:2rem;max-width:40rem;line-height:1.5\">\
              <h1>Documentation</h1><p>{}</p></body></html>",
-            html_escape(msg)
+            escape_html(msg)
         );
         let resp = format!(
             "HTTP/1.1 404 Not Found\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\n\r\n{}",
@@ -854,7 +854,7 @@ fn serve_index_document(
         if let Some(pos) = html.find(needle) {
             let ssr_inner = match render_from_files_with_ssr(&files, entry, &ctx, true) {
                 Ok(h) => h,
-                Err(e) => format!("<!-- ssr error: {} -->", html_escape(&e.to_string())),
+                Err(e) => format!("<!-- ssr error: {} -->", escape_html(&e.to_string())),
             };
             // Embed bundle JSON inline to eliminate separate HTTP fetch
             let bundle = serde_json::json!({"entry": entry, "files": &files});
@@ -901,7 +901,7 @@ fn serve_secondary_preview(
         Err(e) => format!(
             "<div style=\"font-family:monospace;padding:2rem\">\
              <h2 style=\"color:#ef4444\">Template error</h2><pre>{}</pre></div>",
-            html_escape(&e.to_string())
+            escape_html(&e.to_string())
         ),
     };
 
@@ -955,7 +955,7 @@ fn error_document(message: &str) -> String {
     format!(
         "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>Error</title></head>\
          <body style=\"font-family:monospace;padding:2rem\"><pre>{}</pre></body></html>",
-        html_escape(message)
+        escape_html(message)
     )
 }
 
@@ -1119,12 +1119,6 @@ fn long_poll_sse(
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
-
-fn html_escape(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-}
 
 fn guess_mime(ext: &str) -> &'static str {
     match ext {

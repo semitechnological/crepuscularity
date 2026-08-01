@@ -19,7 +19,7 @@ use crate::wasm_bundle::{
     cargo_build_wasm32, find_wasm_file, run_wasm_bindgen, run_wasm_opt, wasm_profile_dirs,
     WasmOptStatus,
 };
-use crepuscularity_web::{escape_html_attr, render_bundle_with_ssr};
+use crepuscularity_web::{escape_html, render_bundle_with_ssr};
 
 // ── WASM build ───────────────────────────────────────────────────────────────
 
@@ -649,19 +649,19 @@ pub(crate) fn render_index_html(
     let html_description = head.seo.description.as_deref().unwrap_or(&head.description);
 
     super::WEB_INDEX_HTML
-        .replace("__CREPUS_TITLE__", &escape_html_attr(html_title))
-        .replace("__CREPUS_DESC__", &escape_html_attr(html_description))
+        .replace("__CREPUS_TITLE__", &escape_html(html_title))
+        .replace("__CREPUS_DESC__", &escape_html(html_description))
         .replace("__CREPUS_OG__", &seo)
         .replace("__CREPUS_GOOGLE_FONTS__", &font_markup)
         .replace("__CREPUS_EXTRA_HEAD__", &extra_head)
         .replace("__CREPUS_NOSCRIPT__", &render_llms_noscript(head))
         .replace("__CREPUS_BODY_FONT__", &body_font_css)
-        .replace("__THEME_ACCENT__", &escape_html_attr(&t.accent))
-        .replace("__THEME_ACCENT_SOFT__", &escape_html_attr(&t.accent_soft))
-        .replace("__THEME_SURFACE__", &escape_html_attr(&t.surface))
-        .replace("__THEME_TEXT__", &escape_html_attr(&t.text))
-        .replace("__THEME_MUTED__", &escape_html_attr(&t.muted))
-        .replace("__THEME_BORDER__", &escape_html_attr(&t.border))
+        .replace("__THEME_ACCENT__", &escape_html(&t.accent))
+        .replace("__THEME_ACCENT_SOFT__", &escape_html(&t.accent_soft))
+        .replace("__THEME_SURFACE__", &escape_html(&t.surface))
+        .replace("__THEME_TEXT__", &escape_html(&t.text))
+        .replace("__THEME_MUTED__", &escape_html(&t.muted))
+        .replace("__THEME_BORDER__", &escape_html(&t.border))
 }
 
 /// Escape JSON string for safe embedding in HTML `<script type="application/json">`.
@@ -706,144 +706,144 @@ fn format_seo_tags(head: &SiteHead, resolved: &ResolvedSeoTags<'_>) -> String {
     if let Some(canonical) = &seo.canonical {
         lines.push(format!(
             r#"  <link rel="canonical" href="{}">"#,
-            escape_html_attr(canonical)
+            escape_html(canonical)
         ));
     }
     if !seo.keywords.is_empty() {
         lines.push(format!(
             r#"  <meta name="keywords" content="{}">"#,
-            escape_html_attr(&seo.keywords.join(", "))
+            escape_html(&seo.keywords.join(", "))
         ));
     }
     if let Some(author) = &seo.author {
         lines.push(format!(
             r#"  <meta name="author" content="{}">"#,
-            escape_html_attr(author)
+            escape_html(author)
         ));
     }
     if let Some(robots) = &seo.robots {
         lines.push(format!(
             r#"  <meta name="robots" content="{}">"#,
-            escape_html_attr(robots)
+            escape_html(robots)
         ));
     }
     if let Some(theme_color) = &seo.theme_color {
         lines.push(format!(
             r#"  <meta name="theme-color" content="{}">"#,
-            escape_html_attr(theme_color)
+            escape_html(theme_color)
         ));
     }
     if let Some(application_name) = &seo.application_name {
         lines.push(format!(
             r#"  <meta name="application-name" content="{}">"#,
-            escape_html_attr(application_name)
+            escape_html(application_name)
         ));
     }
     if let Some(generator) = &seo.generator {
         if !generator.trim().is_empty() {
             lines.push(format!(
                 r#"  <meta name="generator" content="{}">"#,
-                escape_html_attr(generator)
+                escape_html(generator)
             ));
         }
     }
 
     lines.push(format!(
         r#"  <meta property="og:title" content="{}">"#,
-        escape_html_attr(resolved.title)
+        escape_html(resolved.title)
     ));
     lines.push(format!(
         r#"  <meta property="og:description" content="{}">"#,
-        escape_html_attr(resolved.description)
+        escape_html(resolved.description)
     ));
     lines.push(format!(
         r#"  <meta property="og:type" content="{}">"#,
-        escape_html_attr(resolved.og_type)
+        escape_html(resolved.og_type)
     ));
     if let Some(canonical) = &seo.canonical {
         lines.push(format!(
             r#"  <meta property="og:url" content="{}">"#,
-            escape_html_attr(canonical)
+            escape_html(canonical)
         ));
     }
     if let Some(site_name) = &seo.site_name {
         lines.push(format!(
             r#"  <meta property="og:site_name" content="{}">"#,
-            escape_html_attr(site_name)
+            escape_html(site_name)
         ));
     }
     if let Some(locale) = &seo.locale {
         lines.push(format!(
             r#"  <meta property="og:locale" content="{}">"#,
-            escape_html_attr(locale)
+            escape_html(locale)
         ));
     }
     if let Some(image) = resolved.image {
         lines.push(format!(
             r#"  <meta property="og:image" content="{}">"#,
-            escape_html_attr(image)
+            escape_html(image)
         ));
     }
     if let Some(image_alt) = &seo.image_alt {
         lines.push(format!(
             r#"  <meta property="og:image:alt" content="{}">"#,
-            escape_html_attr(image_alt)
+            escape_html(image_alt)
         ));
     }
 
     lines.push(format!(
         r#"  <meta name="twitter:card" content="{}">"#,
-        escape_html_attr(resolved.twitter_card)
+        escape_html(resolved.twitter_card)
     ));
     lines.push(format!(
         r#"  <meta name="twitter:title" content="{}">"#,
-        escape_html_attr(resolved.title)
+        escape_html(resolved.title)
     ));
     lines.push(format!(
         r#"  <meta name="twitter:description" content="{}">"#,
-        escape_html_attr(resolved.description)
+        escape_html(resolved.description)
     ));
     if let Some(image) = resolved.image {
         lines.push(format!(
             r#"  <meta name="twitter:image" content="{}">"#,
-            escape_html_attr(image)
+            escape_html(image)
         ));
     }
     if let Some(image_alt) = &seo.image_alt {
         lines.push(format!(
             r#"  <meta name="twitter:image:alt" content="{}">"#,
-            escape_html_attr(image_alt)
+            escape_html(image_alt)
         ));
     }
     if let Some(site) = &seo.twitter_site {
         lines.push(format!(
             r#"  <meta name="twitter:site" content="{}">"#,
-            escape_html_attr(site)
+            escape_html(site)
         ));
     }
     if let Some(creator) = &seo.twitter_creator {
         lines.push(format!(
             r#"  <meta name="twitter:creator" content="{}">"#,
-            escape_html_attr(creator)
+            escape_html(creator)
         ));
     }
 
     for alt in &seo.alternates {
         let mut attrs = vec![
             r#"rel="alternate""#.to_string(),
-            format!(r#"href="{}""#, escape_html_attr(&alt.href)),
+            format!(r#"href="{}""#, escape_html(&alt.href)),
         ];
         if let Some(hreflang) = &alt.hreflang {
-            attrs.push(format!(r#"hreflang="{}""#, escape_html_attr(hreflang)));
+            attrs.push(format!(r#"hreflang="{}""#, escape_html(hreflang)));
         }
         if let Some(media) = &alt.media {
-            attrs.push(format!(r#"media="{}""#, escape_html_attr(media)));
+            attrs.push(format!(r#"media="{}""#, escape_html(media)));
         }
         if let Some(title) = &alt.title {
-            attrs.push(format!(r#"title="{}""#, escape_html_attr(title)));
+            attrs.push(format!(r#"title="{}""#, escape_html(title)));
         }
         if let Some(mime_type) = &alt.mime_type {
-            attrs.push(format!(r#"type="{}""#, escape_html_attr(mime_type)));
+            attrs.push(format!(r#"type="{}""#, escape_html(mime_type)));
         }
         lines.push(format!("  <link {}>", attrs.join(" ")));
     }
@@ -858,7 +858,7 @@ fn format_seo_tags(head: &SiteHead, resolved: &ResolvedSeoTags<'_>) -> String {
     }
 
     if let Some(favicon) = &seo.favicon {
-        let href = escape_html_attr(favicon);
+        let href = escape_html(favicon);
         if favicon.ends_with(".svg") {
             lines.push(format!(
                 r#"  <link rel="icon" type="image/svg+xml" href="{}">"#,
@@ -881,7 +881,7 @@ fn format_seo_tags(head: &SiteHead, resolved: &ResolvedSeoTags<'_>) -> String {
     if let Some(touch) = &seo.apple_touch_icon {
         lines.push(format!(
             r#"  <link rel="apple-touch-icon" href="{}">"#,
-            escape_html_attr(touch)
+            escape_html(touch)
         ));
     }
 
@@ -1046,7 +1046,7 @@ fn render_llms_noscript(head: &SiteHead) -> String {
     };
     format!(
         r#"<noscript><p><a href="{}">Agent-readable text version</a></p></noscript>"#,
-        escape_html_attr(href)
+        escape_html(href)
     )
 }
 

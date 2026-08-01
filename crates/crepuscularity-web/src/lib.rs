@@ -259,15 +259,15 @@ fn render_embed(embed: &EmbedNode, ctx: &TemplateContext) -> Result<String, Crep
     let props_json = serde_json::Value::Object(props).to_string();
     let adapter = embed.adapter.as_deref().unwrap_or("module");
     let scope_attr = if adapter == "rust" {
-        format!(" data-crepus-scope=\"{}\"", escape_html_attr(&embed.src))
+        format!(" data-crepus-scope=\"{}\"", escape_html(&embed.src))
     } else {
         String::new()
     };
     Ok(format!(
         "<div data-crepus-island=\"\" data-crepus-island-src=\"{}\" data-crepus-island-adapter=\"{}\"{scope_attr} data-crepus-island-props=\"{}\"></div>",
-        escape_html_attr(&embed.src),
-        escape_html_attr(adapter),
-        escape_html_attr(&props_json)
+        escape_html(&embed.src),
+        escape_html(adapter),
+        escape_html(&props_json)
     ))
 }
 
@@ -893,10 +893,6 @@ pub fn escape_html(input: &str) -> String {
         }
     }
     out
-}
-
-pub fn escape_html_attr(s: &str) -> String {
-    escape_html(s)
 }
 
 /// Build the `class="..."` attribute value: join classes with spaces, interpolate,

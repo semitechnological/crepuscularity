@@ -208,9 +208,9 @@ pub fn render_bundle_with_ssr(bundle_json: &str, markers: bool) -> Result<String
 pub fn wrap_ssr_document(inner: &str, doc: &SsrDocument<'_>) -> String {
     let body_class = doc
         .body_class
-        .map(|c| format!(r#" class="{}""#, crate::escape_html_attr(c)))
+        .map(|c| format!(r#" class="{}""#, crate::escape_html(c)))
         .unwrap_or_default();
-    let title_esc = crate::escape_html_attr(doc.title);
+    let title_esc = crate::escape_html(doc.title);
     let head_safe = Builder::new()
         .rm_tags(&["base", "meta", "link", "style"])
         .clean(doc.head_extra);

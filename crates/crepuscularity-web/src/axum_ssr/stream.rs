@@ -20,7 +20,7 @@ use tokio_stream::wrappers::ReceiverStream;
 fn render_document_head(doc: &SsrDocument<'_>) -> String {
     let body_class = doc
         .body_class
-        .map(|c| format!(r#" class="{}"#, crate::escape_html_attr(c)))
+        .map(|c| format!(r#" class="{}"#, crate::escape_html(c)))
         .unwrap_or_default();
     let title_esc = doc
         .title
