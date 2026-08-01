@@ -1,3 +1,6 @@
+use crepuscularity_core::tailwind::{
+    parse_arbitrary_length_token, parse_length_token, LengthToken,
+};
 use proc_macro::TokenStream;
 use proc_macro2::{Span, TokenStream as TokenStream2};
 use quote::quote;
@@ -1623,47 +1626,21 @@ fn parse_dynamic_class(class: &str) -> Option<TokenStream2> {
     None
 }
 
+fn length_token_to_tokens(token: LengthToken) -> TokenStream2 {
+    match token {
+        LengthToken::Auto => quote! { ::gpui::Length::Auto },
+        LengthToken::Fraction(f) => quote! { ::gpui::relative(#f) },
+        LengthToken::Px(n) => quote! { ::gpui::px(#n) },
+        LengthToken::Rems(n) => quote! { ::gpui::rems(#n) },
+    }
+}
+
 fn length_value_to_tokens(value: &str) -> Option<TokenStream2> {
-    if value.starts_with('[') && value.ends_with(']') {
-        return arbitrary_length(&value[1..value.len() - 1]);
-    }
-
-    match value {
-        "full" | "screen" => return Some(quote! { ::gpui::relative(1.) }),
-        "auto" => return Some(quote! { ::gpui::Length::Auto }),
-        "px" => return Some(quote! { ::gpui::px(1.) }),
-        _ => {}
-    }
-
-    if let Ok(n) = value.parse::<f32>() {
-        let rems = n * 0.25;
-        return Some(quote! { ::gpui::rems(#rems) });
-    }
-
-    None
+    parse_length_token(value).map(length_token_to_tokens)
 }
 
 fn arbitrary_length(inner: &str) -> Option<TokenStream2> {
-    if let Some(rest) = inner.strip_suffix("px") {
-        if let Ok(n) = rest.parse::<f32>() {
-            return Some(quote! { ::gpui::px(#n) });
-        }
-    }
-    if let Some(rest) = inner.strip_suffix("rem") {
-        if let Ok(n) = rest.parse::<f32>() {
-            return Some(quote! { ::gpui::rems(#n) });
-        }
-    }
-    if let Some(rest) = inner.strip_suffix('%') {
-        if let Ok(n) = rest.parse::<f32>() {
-            let fraction = n / 100.0;
-            return Some(quote! { ::gpui::relative(#fraction) });
-        }
-    }
-    if let Ok(n) = inner.parse::<f32>() {
-        return Some(quote! { ::gpui::px(#n) });
-    }
-    None
+    parse_arbitrary_length_token(inner).map(length_token_to_tokens)
 }
 
 // ============================================================

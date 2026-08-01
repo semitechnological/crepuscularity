@@ -13,6 +13,9 @@ use gpui::{
 };
 
 use crepuscularity_core::context::TemplateContext;
+use crepuscularity_core::tailwind::{
+    parse_arbitrary_length_token, parse_length_token, LengthToken,
+};
 
 /// Apply a class to a div, optionally resolving `{expr}` placeholders against context.
 pub fn apply_class(d: Div, class: &str) -> Div {
@@ -1058,63 +1061,29 @@ fn apply_border_color(d: Div, hex: u32) -> Div {
     d.border_color(rgb(hex))
 }
 
+/// Lower a [`LengthToken`] to an `AbsoluteLength`, rejecting relative units.
+fn token_to_absolute(token: LengthToken) -> Option<AbsoluteLength> {
+    match token {
+        LengthToken::Px(n) => Some(px(n).into()),
+        LengthToken::Rems(n) => Some(rems(n).into()),
+        LengthToken::Auto | LengthToken::Fraction(_) => None,
+    }
+}
+
 /// Parse a Tailwind length token into a `Length` (supports auto, full, %, px, rem, number)
 fn parse_length(value: &str) -> Option<Length> {
-    if value.starts_with('[') && value.ends_with(']') {
-        let inner = &value[1..value.len() - 1];
-        if let Some(abs) = parse_absolute_length(inner) {
-            return Some(abs.into());
-        }
-        if let Some(rest) = inner.strip_suffix('%') {
-            if let Ok(n) = rest.parse::<f32>() {
-                return Some(relative(n / 100.0).into());
-            }
-        }
-        return None;
-    }
-    match value {
-        "full" | "screen" => return Some(relative(1.).into()),
-        "auto" => return Some(Length::Auto),
-        "px" => return Some(px(1.).into()),
-        // Fractions — full Tailwind set
-        "1/2" => return Some(relative(0.5).into()),
-        "1/3" => return Some(relative(1.0 / 3.0).into()),
-        "2/3" => return Some(relative(2.0 / 3.0).into()),
-        "1/4" => return Some(relative(0.25).into()),
-        "2/4" => return Some(relative(0.5).into()),
-        "3/4" => return Some(relative(0.75).into()),
-        "1/5" => return Some(relative(0.2).into()),
-        "2/5" => return Some(relative(0.4).into()),
-        "3/5" => return Some(relative(0.6).into()),
-        "4/5" => return Some(relative(0.8).into()),
-        "1/6" => return Some(relative(1.0 / 6.0).into()),
-        "2/6" => return Some(relative(2.0 / 6.0).into()),
-        "3/6" => return Some(relative(0.5).into()),
-        "4/6" => return Some(relative(4.0 / 6.0).into()),
-        "5/6" => return Some(relative(5.0 / 6.0).into()),
-        "1/12" => return Some(relative(1.0 / 12.0).into()),
-        "2/12" => return Some(relative(2.0 / 12.0).into()),
-        "3/12" => return Some(relative(0.25).into()),
-        "4/12" => return Some(relative(4.0 / 12.0).into()),
-        "5/12" => return Some(relative(5.0 / 12.0).into()),
-        "6/12" => return Some(relative(0.5).into()),
-        "7/12" => return Some(relative(7.0 / 12.0).into()),
-        "8/12" => return Some(relative(8.0 / 12.0).into()),
-        "9/12" => return Some(relative(9.0 / 12.0).into()),
-        "10/12" => return Some(relative(10.0 / 12.0).into()),
-        "11/12" => return Some(relative(11.0 / 12.0).into()),
-        _ => {}
-    }
-    if let Ok(n) = value.parse::<f32>() {
-        return Some(rems(n * 0.25).into());
-    }
-    None
+    Some(match parse_length_token(value)? {
+        LengthToken::Auto => Length::Auto,
+        LengthToken::Fraction(f) => relative(f).into(),
+        LengthToken::Px(n) => px(n).into(),
+        LengthToken::Rems(n) => rems(n).into(),
+    })
 }
 
 /// Parse a Tailwind length token into a `DefiniteLength` (no auto, no %)
 fn parse_definite_length(value: &str) -> Option<DefiniteLength> {
-    if value.starts_with('[') && value.ends_with(']') {
-        return parse_absolute_length(&value[1..value.len() - 1]).map(Into::into);
+    if let Some(inner) = value.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
+        return token_to_absolute(parse_arbitrary_length_token(inner)?).map(Into::into);
     }
     if value == "px" {
         return Some(px(1.).into());
@@ -1127,20 +1096,7 @@ fn parse_definite_length(value: &str) -> Option<DefiniteLength> {
 
 /// Parse a CSS size string to `AbsoluteLength` (px or rem only)
 pub fn parse_absolute_length(inner: &str) -> Option<AbsoluteLength> {
-    if let Some(rest) = inner.strip_suffix("px") {
-        if let Ok(n) = rest.parse::<f32>() {
-            return Some(px(n).into());
-        }
-    }
-    if let Some(rest) = inner.strip_suffix("rem") {
-        if let Ok(n) = rest.parse::<f32>() {
-            return Some(rems(n).into());
-        }
-    }
-    if let Ok(n) = inner.parse::<f32>() {
-        return Some(px(n).into());
-    }
-    None
+    token_to_absolute(parse_arbitrary_length_token(inner)?)
 }
 
 /// Parse a duration string like "300ms", "1s", "0.5s" into milliseconds.
@@ -1190,6 +1146,83 @@ mod parse_duration_ms_tests {
         assert_eq!(parse_duration_ms("1.5ms"), None);
         assert_eq!(parse_duration_ms("-1s"), Some(0));
         assert_eq!(parse_duration_ms("-100ms"), None);
+    }
+}
+
+#[cfg(test)]
+mod parse_length_tests {
+    use super::parse_length;
+    use gpui::{px, relative, rems, Length};
+
+    /// The fraction set that used to be spelled out arm-by-arm, now derived.
+    #[test]
+    fn fractions_match_the_former_hardcoded_table() {
+        let expected: &[(&str, f32)] = &[
+            ("1/2", 0.5),
+            ("1/3", 1.0 / 3.0),
+            ("2/3", 2.0 / 3.0),
+            ("1/4", 0.25),
+            ("2/4", 0.5),
+            ("3/4", 0.75),
+            ("1/5", 0.2),
+            ("2/5", 0.4),
+            ("3/5", 0.6),
+            ("4/5", 0.8),
+            ("1/6", 1.0 / 6.0),
+            ("2/6", 2.0 / 6.0),
+            ("3/6", 0.5),
+            ("4/6", 4.0 / 6.0),
+            ("5/6", 5.0 / 6.0),
+            ("1/12", 1.0 / 12.0),
+            ("2/12", 2.0 / 12.0),
+            ("3/12", 0.25),
+            ("4/12", 4.0 / 12.0),
+            ("5/12", 5.0 / 12.0),
+            ("6/12", 0.5),
+            ("7/12", 7.0 / 12.0),
+            ("8/12", 8.0 / 12.0),
+            ("9/12", 9.0 / 12.0),
+            ("10/12", 10.0 / 12.0),
+            ("11/12", 11.0 / 12.0),
+        ];
+        for (token, fraction) in expected {
+            assert_eq!(
+                parse_length(token),
+                Some(relative(*fraction).into()),
+                "fraction {token} regressed"
+            );
+        }
+    }
+
+    #[test]
+    fn keywords_and_scale() {
+        assert_eq!(parse_length("full"), Some(relative(1.).into()));
+        assert_eq!(parse_length("screen"), Some(relative(1.).into()));
+        assert_eq!(parse_length("auto"), Some(Length::Auto));
+        assert_eq!(parse_length("px"), Some(px(1.).into()));
+        assert_eq!(parse_length("4"), Some(rems(1.).into()));
+        assert_eq!(parse_length("[12px]"), Some(px(12.).into()));
+        assert_eq!(parse_length("[50%]"), Some(relative(0.5).into()));
+        assert_eq!(parse_length("[2rem]"), Some(rems(2.).into()));
+        assert_eq!(parse_length("nope"), None);
+    }
+}
+
+#[cfg(test)]
+mod parse_definite_length_tests {
+    use super::parse_definite_length;
+    use gpui::{px, rems};
+
+    #[test]
+    fn stays_definite() {
+        assert_eq!(parse_definite_length("4"), Some(rems(1.).into()));
+        assert_eq!(parse_definite_length("px"), Some(px(1.).into()));
+        assert_eq!(parse_definite_length("[12px]"), Some(px(12.).into()));
+        // Relative forms are not definite lengths and must stay rejected.
+        assert_eq!(parse_definite_length("full"), None);
+        assert_eq!(parse_definite_length("auto"), None);
+        assert_eq!(parse_definite_length("1/2"), None);
+        assert_eq!(parse_definite_length("[50%]"), None);
     }
 }
 
