@@ -6,7 +6,11 @@
 
 use crepuscularity_core::context::TemplateContext;
 
-use crate::colors::lookup_named_color;
+use crepuscularity_core::tailwind::{
+    parse_font_size_named, parse_size_pt, parse_spacing_pt, resolve_arbitrary_css_color,
+    resolve_css_color, SIZE_FIT,
+};
+
 use crate::ViewStyle;
 
 // ── Public re-exports ────────────────────────────────────────────────────────
@@ -52,117 +56,14 @@ pub(crate) fn is_scroll_container(classes: &[String]) -> bool {
     })
 }
 
-// ── Spacing helpers ──────────────────────────────────────────────────────────
+// ── Scale + colour parsing (canonical implementations live in core) ──────────
 
-/// Tailwind spacing scale: 1 unit = 4 pt.
-/// Also handles fractions: `0.5` → 2.0, `1.5` → 6.0, etc.
-fn parse_spacing(rest: &str) -> Option<f32> {
-    // Arbitrary value: [Npx] or [N]
-    if let Some(inner) = rest.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
-        let stripped = inner.strip_suffix("px").unwrap_or(inner);
-        return stripped.parse::<f32>().ok();
-    }
-    // Named fraction shorthands
-    match rest {
-        "px" => return Some(1.0),
-        "0" => return Some(0.0),
-        _ => {}
-    }
-    // Fractional: "0.5", "1.5", "2.5", "3.5"
-    if let Ok(f) = rest.parse::<f32>() {
-        return Some(f * 4.0);
-    }
-    None
-}
+/// A spacing utility: its class prefix and the [`ViewStyle`] field it sets.
+type SpacingArm = (&'static str, fn(&mut ViewStyle, f32));
 
 /// Parse a spacing prefix: `"p-"` from `"p-4"` → `Some(16.0)`.
 fn parse_prefix_spacing(class: &str, prefix: &str) -> Option<f32> {
-    parse_spacing(class.strip_prefix(prefix)?)
-}
-
-// ── Sizing helpers ───────────────────────────────────────────────────────────
-
-/// Returns the size value or a sentinel:
-/// - `> 0`   = absolute pts
-/// - `-1.0`  = fill parent (w-full, w-screen)
-/// - `-2.0`  = fit content (w-fit, w-auto)
-fn parse_size(rest: &str) -> Option<f32> {
-    match rest {
-        "full" | "screen" => return Some(-1.0),
-        "fit" | "auto" | "min" | "max" => return Some(-2.0),
-        "px" => return Some(1.0),
-        _ => {}
-    }
-    // Arbitrary: [Npx]
-    if let Some(inner) = rest.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
-        let stripped = inner.strip_suffix("px").unwrap_or(inner);
-        return stripped.parse::<f32>().ok().map(|v| v.max(0.0));
-    }
-    // Fractions: "1/2", "1/3", "2/3", "1/4", "3/4", etc. → returned as -3.x (fraction * -100 offset)
-    if let Some((num, den)) = rest.split_once('/') {
-        if let (Ok(n), Ok(d)) = (num.parse::<f32>(), den.parse::<f32>()) {
-            if d != 0.0 {
-                // Encode fraction as -100 - fraction*100 so it's distinguishable from sentinels
-                // This is decoded on the Swift side. Range: -100.01 to -200.0
-                return Some(-(n / d));
-            }
-        }
-    }
-    parse_spacing(rest)
-}
-
-// ── Color helpers ─────────────────────────────────────────────────────────────
-
-/// Try to resolve a color string: named palette, bare hex, or `#hex`.
-/// Also handles opacity suffix: `red-500/50` → color with alpha.
-fn resolve_color(s: &str) -> Option<String> {
-    match s.trim().to_ascii_lowercase().as_str() {
-        "black" => return Some("#000000".to_string()),
-        "white" => return Some("#ffffff".to_string()),
-        "transparent" | "clear" => return Some("#00000000".to_string()),
-        _ => {}
-    }
-    // Named + optional opacity: "red-500/50"
-    if let Some((color_part, opacity_part)) = s.split_once('/') {
-        if let Some(hex) = lookup_named_color(color_part) {
-            if let Ok(pct) = opacity_part.parse::<u8>() {
-                let alpha = (pct as f32 / 100.0 * 255.0).round() as u8;
-                // Append alpha as 2-hex-digit suffix
-                return Some(format!("{}%{:02x}", hex, alpha));
-            }
-        }
-    }
-    // Named palette
-    if let Some(hex) = lookup_named_color(s) {
-        return Some(hex.to_string());
-    }
-    // Bare or prefixed hex
-    parse_hex_color(s)
-}
-
-fn parse_hex_color(s: &str) -> Option<String> {
-    let t = s.trim();
-    let hex = t
-        .strip_prefix('#')
-        .or_else(|| t.strip_prefix("0x"))
-        .unwrap_or(t);
-    if (hex.len() == 6 || hex.len() == 8) && hex.chars().all(|c| c.is_ascii_hexdigit()) {
-        return Some(format!("#{}", hex));
-    }
-    None
-}
-
-/// Try to resolve a color from an arbitrary-value bracket: `bg-[#0f0]` or `bg-[red]`.
-fn resolve_arbitrary_color(rest: &str) -> Option<String> {
-    let inner = rest.strip_prefix('[')?.strip_suffix(']')?;
-    resolve_color(inner).or_else(|| {
-        // CSS named colour passthrough (just return as-is for Swift to handle)
-        if inner.chars().all(|c| c.is_alphabetic() || c == '-') {
-            Some(inner.to_string())
-        } else {
-            None
-        }
-    })
+    parse_spacing_pt(class.strip_prefix(prefix)?)
 }
 
 fn parse_braced_expr(s: &str) -> (bool, &str) {
@@ -182,110 +83,74 @@ fn apply_layout_class(hints: &mut StackLayoutHints, class: &str, ctx: Option<&Te
 
     let s = &mut hints.style;
 
-    // Padding
-    if let Some(v) = parse_prefix_spacing(class, "p-") {
-        s.padding = Some(v);
-        return;
-    }
-    if let Some(v) = parse_prefix_spacing(class, "px-") {
-        s.padding_horizontal = Some(v);
-        return;
-    }
-    if let Some(v) = parse_prefix_spacing(class, "py-") {
-        s.padding_vertical = Some(v);
-        return;
-    }
-    if let Some(v) = parse_prefix_spacing(class, "pt-") {
-        s.padding_top = Some(v);
-        return;
-    }
-    if let Some(v) = parse_prefix_spacing(class, "pb-") {
-        s.padding_bottom = Some(v);
-        return;
-    }
-    if let Some(v) = parse_prefix_spacing(class, "pl-") {
-        s.padding_left = Some(v);
-        return;
-    }
-    if let Some(v) = parse_prefix_spacing(class, "pr-") {
-        s.padding_right = Some(v);
-        return;
-    }
-
-    // Margin
-    if let Some(v) = parse_prefix_spacing(class, "m-") {
-        s.margin = Some(v);
-        return;
-    }
-    if let Some(v) = parse_prefix_spacing(class, "mx-") {
-        s.margin_horizontal = Some(v);
-        return;
-    }
-    if let Some(v) = parse_prefix_spacing(class, "my-") {
-        s.margin_vertical = Some(v);
-        return;
-    }
-    if let Some(v) = parse_prefix_spacing(class, "mt-") {
-        s.margin_top = Some(v);
-        return;
-    }
-    if let Some(v) = parse_prefix_spacing(class, "mb-") {
-        s.margin_bottom = Some(v);
-        return;
-    }
-    if let Some(v) = parse_prefix_spacing(class, "ml-") {
-        s.margin_left = Some(v);
-        return;
-    }
-    if let Some(v) = parse_prefix_spacing(class, "mr-") {
-        s.margin_right = Some(v);
-        return;
+    // Padding and margin: every arm differs only in (prefix, field).
+    const SPACING: &[SpacingArm] = &[
+        ("p-", |s, v| s.padding = Some(v)),
+        ("px-", |s, v| s.padding_horizontal = Some(v)),
+        ("py-", |s, v| s.padding_vertical = Some(v)),
+        ("pt-", |s, v| s.padding_top = Some(v)),
+        ("pb-", |s, v| s.padding_bottom = Some(v)),
+        ("pl-", |s, v| s.padding_left = Some(v)),
+        ("pr-", |s, v| s.padding_right = Some(v)),
+        ("m-", |s, v| s.margin = Some(v)),
+        ("mx-", |s, v| s.margin_horizontal = Some(v)),
+        ("my-", |s, v| s.margin_vertical = Some(v)),
+        ("mt-", |s, v| s.margin_top = Some(v)),
+        ("mb-", |s, v| s.margin_bottom = Some(v)),
+        ("ml-", |s, v| s.margin_left = Some(v)),
+        ("mr-", |s, v| s.margin_right = Some(v)),
+    ];
+    for (prefix, set) in SPACING {
+        if let Some(v) = parse_prefix_spacing(class, prefix) {
+            set(s, v);
+            return;
+        }
     }
 
     // Width / height / size
     if let Some(rest) = class.strip_prefix("w-") {
-        if let Some(v) = parse_size(rest) {
+        if let Some(v) = parse_size_pt(rest) {
             s.width = Some(v);
             return;
         }
     }
     if let Some(rest) = class.strip_prefix("h-") {
-        if let Some(v) = parse_size(rest) {
+        if let Some(v) = parse_size_pt(rest) {
             s.height = Some(v);
             return;
         }
     }
     if let Some(rest) = class.strip_prefix("size-") {
-        if let Some(v) = parse_size(rest) {
+        if let Some(v) = parse_size_pt(rest) {
             s.width = Some(v);
             s.height = Some(v);
             return;
         }
     }
     if let Some(rest) = class.strip_prefix("min-w-") {
-        if let Some(v) = parse_size(rest) {
+        if let Some(v) = parse_size_pt(rest) {
             s.min_width = Some(v.max(0.0));
             return;
         }
     }
     if let Some(rest) = class.strip_prefix("max-w-") {
         if rest == "none" {
-            s.max_width = Some(-2.0);
+            s.max_width = Some(SIZE_FIT);
             return;
         }
-        if let Some(v) = parse_size(rest) {
+        if let Some(v) = parse_size_pt(rest) {
             s.max_width = Some(v);
             return;
         }
     }
     if let Some(rest) = class.strip_prefix("min-h-") {
-        if let Some(v) = parse_size(rest) {
+        if let Some(v) = parse_size_pt(rest) {
             s.min_height = Some(v.max(0.0));
             return;
         }
     }
     if let Some(rest) = class.strip_prefix("max-h-") {
-        if let Some(v) = parse_size(rest) {
+        if let Some(v) = parse_size_pt(rest) {
             s.max_height = Some(v);
             return;
         }
@@ -490,7 +355,7 @@ fn apply_layout_class(hints: &mut StackLayoutHints, class: &str, ctx: Option<&Te
     // border-[N]
     if let Some(rest) = class.strip_prefix("border-") {
         // Try as color
-        if let Some(hex) = resolve_color(rest).or_else(|| resolve_arbitrary_color(rest)) {
+        if let Some(hex) = resolve_css_color(rest).or_else(|| resolve_arbitrary_css_color(rest)) {
             s.border_color = Some(hex);
             return;
         }
@@ -506,7 +371,7 @@ fn apply_layout_class(hints: &mut StackLayoutHints, class: &str, ctx: Option<&Te
                         return;
                     };
                     let color_str = crepuscularity_core::context::value_to_str(&v);
-                    if let Some(hex) = resolve_color(&color_str) {
+                    if let Some(hex) = resolve_css_color(&color_str) {
                         s.background_color = Some(hex);
                         return;
                     }
@@ -519,7 +384,7 @@ fn apply_layout_class(hints: &mut StackLayoutHints, class: &str, ctx: Option<&Te
                         return;
                     };
                     let color_str = crepuscularity_core::context::value_to_str(&v);
-                    if let Some(hex) = resolve_color(&color_str) {
+                    if let Some(hex) = resolve_css_color(&color_str) {
                         s.foreground_color = Some(hex);
                         return;
                     }
@@ -530,7 +395,7 @@ fn apply_layout_class(hints: &mut StackLayoutHints, class: &str, ctx: Option<&Te
 
     // Background color
     if let Some(rest) = class.strip_prefix("bg-") {
-        if let Some(hex) = resolve_color(rest).or_else(|| resolve_arbitrary_color(rest)) {
+        if let Some(hex) = resolve_css_color(rest).or_else(|| resolve_arbitrary_css_color(rest)) {
             s.background_color = Some(hex);
             return;
         }
@@ -562,7 +427,7 @@ fn apply_text_class(s: &mut ViewStyle, class: &str, ctx: Option<&TemplateContext
     // Text color (named + arbitrary + dynamic)
     if let Some(rest) = class.strip_prefix("text-") {
         // Try palette or hex first (before font-size check)
-        if let Some(hex) = resolve_color(rest).or_else(|| resolve_arbitrary_color(rest)) {
+        if let Some(hex) = resolve_css_color(rest).or_else(|| resolve_arbitrary_css_color(rest)) {
             s.foreground_color = Some(hex);
             return;
         }
@@ -574,30 +439,14 @@ fn apply_text_class(s: &mut ViewStyle, class: &str, ctx: Option<&TemplateContext
                     return;
                 };
                 let color_str = crepuscularity_core::context::value_to_str(&v);
-                if let Some(hex) = resolve_color(&color_str) {
+                if let Some(hex) = resolve_css_color(&color_str) {
                     s.foreground_color = Some(hex);
                     return;
                 }
             }
         }
         // Font size
-        let font_size = match rest {
-            "xs" => Some(12.0),
-            "sm" => Some(14.0),
-            "base" => Some(16.0),
-            "lg" => Some(18.0),
-            "xl" => Some(20.0),
-            "2xl" => Some(24.0),
-            "3xl" => Some(30.0),
-            "4xl" => Some(36.0),
-            "5xl" => Some(48.0),
-            "6xl" => Some(60.0),
-            "7xl" => Some(72.0),
-            "8xl" => Some(96.0),
-            "9xl" => Some(128.0),
-            _ => None,
-        };
-        if let Some(size) = font_size {
+        if let Some(size) = parse_font_size_named(rest) {
             s.font_size = Some(size);
             return;
         }
@@ -849,25 +698,25 @@ fn apply_position_class(s: &mut ViewStyle, class: &str) {
         }
     }
     if let Some(rest) = class.strip_prefix("top-") {
-        if let Some(v) = parse_spacing(rest) {
+        if let Some(v) = parse_spacing_pt(rest) {
             s.top = Some(v);
             return;
         }
     }
     if let Some(rest) = class.strip_prefix("right-") {
-        if let Some(v) = parse_spacing(rest) {
+        if let Some(v) = parse_spacing_pt(rest) {
             s.right = Some(v);
             return;
         }
     }
     if let Some(rest) = class.strip_prefix("bottom-") {
-        if let Some(v) = parse_spacing(rest) {
+        if let Some(v) = parse_spacing_pt(rest) {
             s.bottom = Some(v);
             return;
         }
     }
     if let Some(rest) = class.strip_prefix("left-") {
-        if let Some(v) = parse_spacing(rest) {
+        if let Some(v) = parse_spacing_pt(rest) {
             s.left = Some(v);
         }
     }
@@ -876,13 +725,13 @@ fn apply_position_class(s: &mut ViewStyle, class: &str) {
 // Transform
 fn apply_transform_class(s: &mut ViewStyle, class: &str) {
     if let Some(rest) = class.strip_prefix("translate-x-") {
-        if let Some(v) = parse_spacing(rest) {
+        if let Some(v) = parse_spacing_pt(rest) {
             s.translate_x = Some(v);
             return;
         }
     }
     if let Some(rest) = class.strip_prefix("translate-y-") {
-        if let Some(v) = parse_spacing(rest) {
+        if let Some(v) = parse_spacing_pt(rest) {
             s.translate_y = Some(v);
             return;
         }
@@ -955,7 +804,7 @@ fn apply_shadow_class(s: &mut ViewStyle, class: &str) {
     }
     if let Some(rest) = class.strip_prefix("shadow-[") {
         if let Some(inner) = rest.strip_suffix(']') {
-            if let Some(hex) = resolve_arbitrary_color(inner) {
+            if let Some(hex) = resolve_arbitrary_css_color(inner) {
                 s.shadow_color = Some(hex);
             }
         }
@@ -1056,14 +905,14 @@ fn apply_gradient_class(s: &mut ViewStyle, class: &str) {
     }
 
     if let Some(rest) = class.strip_prefix("from-") {
-        if let Some(color) = resolve_color(rest).or_else(|| resolve_arbitrary_color(rest)) {
+        if let Some(color) = resolve_css_color(rest).or_else(|| resolve_arbitrary_css_color(rest)) {
             s.background_gradient_from = Some(color);
             return;
         }
     }
 
     if let Some(rest) = class.strip_prefix("to-") {
-        if let Some(color) = resolve_color(rest).or_else(|| resolve_arbitrary_color(rest)) {
+        if let Some(color) = resolve_css_color(rest).or_else(|| resolve_arbitrary_css_color(rest)) {
             s.background_gradient_to = Some(color);
         }
     }
@@ -1106,5 +955,97 @@ fn apply_object_class(s: &mut ViewStyle, class: &str) {
         "object-right-top" => s.object_position = Some("right-top".into()),
         "object-right-bottom" => s.object_position = Some("right-bottom".into()),
         _ => {}
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crepuscularity_core::tailwind::SIZE_FILL;
+
+    fn layout(class: &str) -> ViewStyle {
+        extract_stack_hints(vec![class.to_string()], None).style
+    }
+
+    #[test]
+    fn spacing_table_covers_every_padding_and_margin_arm() {
+        assert_eq!(layout("p-4").padding, Some(16.0));
+        assert_eq!(layout("px-2").padding_horizontal, Some(8.0));
+        assert_eq!(layout("py-2").padding_vertical, Some(8.0));
+        assert_eq!(layout("pt-1").padding_top, Some(4.0));
+        assert_eq!(layout("pb-1").padding_bottom, Some(4.0));
+        assert_eq!(layout("pl-1").padding_left, Some(4.0));
+        assert_eq!(layout("pr-1").padding_right, Some(4.0));
+        assert_eq!(layout("m-4").margin, Some(16.0));
+        assert_eq!(layout("mx-2").margin_horizontal, Some(8.0));
+        assert_eq!(layout("my-2").margin_vertical, Some(8.0));
+        assert_eq!(layout("mt-1").margin_top, Some(4.0));
+        assert_eq!(layout("mb-1").margin_bottom, Some(4.0));
+        assert_eq!(layout("ml-1").margin_left, Some(4.0));
+        assert_eq!(layout("mr-1").margin_right, Some(4.0));
+    }
+
+    #[test]
+    fn spacing_accepts_half_steps_and_arbitrary_values() {
+        assert_eq!(layout("p-0").padding, Some(0.0));
+        assert_eq!(layout("p-0.5").padding, Some(2.0));
+        assert_eq!(layout("p-1.5").padding, Some(6.0));
+        assert_eq!(layout("p-px").padding, Some(1.0));
+        assert_eq!(layout("p-[20px]").padding, Some(20.0));
+        assert_eq!(layout("p-[20]").padding, Some(20.0));
+    }
+
+    #[test]
+    fn size_sentinels_are_stable() {
+        assert_eq!(layout("w-full").width, Some(SIZE_FILL));
+        assert_eq!(layout("w-screen").width, Some(SIZE_FILL));
+        assert_eq!(layout("h-full").height, Some(SIZE_FILL));
+        for fit in ["w-fit", "w-auto", "w-min", "w-max"] {
+            assert_eq!(layout(fit).width, Some(SIZE_FIT), "{fit}");
+        }
+        assert_eq!(layout("max-w-none").max_width, Some(SIZE_FIT));
+        assert_eq!(layout("w-1/2").width, Some(-0.5));
+        assert_eq!(layout("w-8").width, Some(32.0));
+        assert_eq!(layout("size-8").width, Some(32.0));
+        assert_eq!(layout("size-8").height, Some(32.0));
+    }
+
+    #[test]
+    fn colors_resolve_through_core() {
+        assert_eq!(
+            layout("bg-red-500").background_color.as_deref(),
+            Some("#fb2c36")
+        );
+        assert_eq!(
+            layout("bg-white").background_color.as_deref(),
+            Some("#ffffff")
+        );
+        assert_eq!(
+            layout("bg-transparent").background_color.as_deref(),
+            Some("#00000000")
+        );
+        assert_eq!(
+            layout("bg-red-500/50").background_color.as_deref(),
+            Some("#fb2c36%80")
+        );
+        assert_eq!(
+            layout("bg-[#123456]").background_color.as_deref(),
+            Some("#123456")
+        );
+        assert_eq!(
+            layout("text-slate-900").foreground_color.as_deref(),
+            Some("#0f172b")
+        );
+    }
+
+    #[test]
+    fn font_size_ramp_stays_strict() {
+        assert_eq!(layout("text-xs").font_size, Some(12.0));
+        assert_eq!(layout("text-9xl").font_size, Some(128.0));
+        // Bare numbers and arbitrary values are not font sizes here.
+        assert_eq!(layout("text-4").font_size, None);
+        assert_eq!(layout("text-[22px]").font_size, None);
+        // text-left/center/right must not be swallowed by the size ramp.
+        assert_eq!(layout("text-center").text_align.as_deref(), Some("center"));
     }
 }
