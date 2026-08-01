@@ -2,7 +2,9 @@
 
 **Also:** [Documentation home](README.md) · [Components](components.md) · [CLI](cli.md) · [Extensions](webext.md)
 
-The `.crepus` template language supports **two equivalent input syntaxes** that compile to the same AST and work with every backend (GPUI, web, webext). Auto-detected by whether the first content line starts with `<`.
+This page documents the two `.crepus` syntaxes — indentation and JSX/HTML tags — which compile to the same AST and work with every backend (GPUI, web, webext). Auto-detected by whether the first content line starts with `<`, or by a `.csx` / `.jsx` / `.tsx` extension.
+
+The parser also accepts `.svelte` and `.vue` templates through separate first-party frontends into that same AST. See [Input frontends](frontends.md) for the selection rules and for exactly what those two do and do not support.
 
 ## Indentation Syntax (Native)
 
