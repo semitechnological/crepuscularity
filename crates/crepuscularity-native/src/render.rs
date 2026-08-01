@@ -180,7 +180,7 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<ViewNode, Crepu
             }
         }
         let classes = active_classes(el, ctx)?;
-        let style = style::extract_stack_hints(&classes, Some(ctx)).style;
+        let style = style::extract_stack_hints(classes, Some(ctx)).style;
         return Ok(ViewNode::SlotRotate {
             phrases,
             interval_ms,
@@ -191,7 +191,7 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<ViewNode, Crepu
     let classes = active_classes(el, ctx)?;
 
     if tag == "iframe" {
-        let hints = style::extract_stack_hints(&classes, Some(ctx));
+        let hints = style::extract_stack_hints(classes, Some(ctx));
         return Ok(ViewNode::WebView {
             src: binding_string(el, "src", ctx).unwrap_or_default(),
             style: hints.style.opt(),
@@ -205,7 +205,7 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<ViewNode, Crepu
             .iter()
             .find(|e| e.event == "click")
             .map(|e| e.handler.clone());
-        let hints = style::extract_stack_hints(&classes, Some(ctx));
+        let hints = style::extract_stack_hints(classes, Some(ctx));
         return Ok(ViewNode::Button {
             label,
             on_click,
@@ -216,7 +216,7 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<ViewNode, Crepu
 
     if tag == "toggle" || tag == "switch" {
         let label = component_label(el, ctx)?;
-        let hints = style::extract_stack_hints(&classes, Some(ctx));
+        let hints = style::extract_stack_hints(classes, Some(ctx));
         return Ok(ViewNode::Toggle {
             label,
             bind: binding_raw(el, "bind"),
@@ -229,7 +229,7 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<ViewNode, Crepu
 
     if tag == "checkbox" {
         let label = component_label(el, ctx)?;
-        let hints = style::extract_stack_hints(&classes, Some(ctx));
+        let hints = style::extract_stack_hints(classes, Some(ctx));
         return Ok(ViewNode::Checkbox {
             label,
             bind: binding_raw(el, "bind"),
@@ -240,7 +240,7 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<ViewNode, Crepu
     }
 
     if tag == "slider" {
-        let hints = style::extract_stack_hints(&classes, Some(ctx));
+        let hints = style::extract_stack_hints(classes, Some(ctx));
         return Ok(ViewNode::Slider {
             label: optional_component_label(el, ctx)?,
             bind: binding_raw(el, "bind"),
@@ -254,7 +254,7 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<ViewNode, Crepu
     }
 
     if tag == "progress" {
-        let hints = style::extract_stack_hints(&classes, Some(ctx));
+        let hints = style::extract_stack_hints(classes, Some(ctx));
         return Ok(ViewNode::Progress {
             label: optional_component_label(el, ctx)?,
             value: binding_f32(el, "value", ctx).unwrap_or(0.0),
@@ -264,7 +264,7 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<ViewNode, Crepu
     }
 
     if tag == "meter" {
-        let hints = style::extract_stack_hints(&classes, Some(ctx));
+        let hints = style::extract_stack_hints(classes, Some(ctx));
         return Ok(ViewNode::Meter {
             label: optional_component_label(el, ctx)?,
             value: binding_f32(el, "value", ctx).unwrap_or(0.0),
@@ -275,7 +275,7 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<ViewNode, Crepu
     }
 
     if tag == "badge" {
-        let hints = style::extract_stack_hints(&classes, Some(ctx));
+        let hints = style::extract_stack_hints(classes, Some(ctx));
         return Ok(ViewNode::Badge {
             label: component_label(el, ctx)?,
             tone: binding_string(el, "tone", ctx),
@@ -284,17 +284,19 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<ViewNode, Crepu
     }
 
     if tag == "divider" || tag == "hr" {
-        let hints = style::extract_stack_hints(&classes, Some(ctx));
+        let axis = stack_axis(&classes);
+        let hints = style::extract_stack_hints(classes, Some(ctx));
         return Ok(ViewNode::Divider {
-            axis: stack_axis(&classes),
+            axis,
             style: hints.style.opt(),
         });
     }
 
     if tag == "spacer" {
-        let hints = style::extract_stack_hints(&classes, Some(ctx));
+        let gap = parse_gap_spacing(&classes);
+        let hints = style::extract_stack_hints(classes, Some(ctx));
         return Ok(ViewNode::Spacer {
-            size: binding_f32(el, "size", ctx).or_else(|| parse_gap_spacing(&classes)),
+            size: binding_f32(el, "size", ctx).or(gap),
             style: hints.style.opt(),
         });
     }
@@ -311,7 +313,7 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<ViewNode, Crepu
             .iter()
             .find(|e| e.event == "drop")
             .map(|e| e.handler.clone());
-        let hints = style::extract_stack_hints(&classes, Some(ctx));
+        let hints = style::extract_stack_hints(classes, Some(ctx));
         let children = render_nodes_list(&el.children, ctx)?;
         return Ok(ViewNode::Dropzone {
             label,
@@ -339,7 +341,7 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<ViewNode, Crepu
             .iter()
             .find(|e| e.event == "pick" || e.event == "click")
             .map(|e| e.handler.clone());
-        let hints = style::extract_stack_hints(&classes, Some(ctx));
+        let hints = style::extract_stack_hints(classes, Some(ctx));
         return Ok(ViewNode::FilePicker {
             label,
             accept,
@@ -365,7 +367,7 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<ViewNode, Crepu
             .map(|value| value.eq_ignore_ascii_case("password"))
             .unwrap_or(false)
             || classes.iter().any(|c| c == "secure");
-        let hints = style::extract_stack_hints(&classes, Some(ctx));
+        let hints = style::extract_stack_hints(classes, Some(ctx));
         return Ok(ViewNode::Input {
             placeholder,
             bind,
@@ -398,7 +400,7 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<ViewNode, Crepu
                 }
             }
         }
-        let hints = style::extract_stack_hints(&classes, Some(ctx));
+        let hints = style::extract_stack_hints(classes, Some(ctx));
         return Ok(ViewNode::Picker {
             bind,
             options,
@@ -431,7 +433,7 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<ViewNode, Crepu
                 }
             }
         }
-        let hints = style::extract_stack_hints(&classes, Some(ctx));
+        let hints = style::extract_stack_hints(classes, Some(ctx));
         return Ok(ViewNode::Tabs {
             bind,
             tabs,
@@ -457,7 +459,7 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<ViewNode, Crepu
             .iter()
             .find(|b| b.prop == "placeholder")
             .and_then(|b| eval_expr(&b.value, ctx).ok().map(|v| value_to_str(&v)));
-        let hints = style::extract_stack_hints(&classes, Some(ctx));
+        let hints = style::extract_stack_hints(classes, Some(ctx));
         return Ok(ViewNode::Image {
             src,
             alt,
@@ -468,7 +470,7 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<ViewNode, Crepu
     }
 
     if tag == "a" || tag == "link" {
-        let hints = style::extract_stack_hints(&classes, Some(ctx));
+        let hints = style::extract_stack_hints(classes, Some(ctx));
         return Ok(ViewNode::Link {
             href: binding_string(el, "href", ctx).unwrap_or_default(),
             target: binding_string(el, "target", ctx),
@@ -479,7 +481,7 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<ViewNode, Crepu
     }
 
     if tag == "ul" || tag == "ol" || tag == "list" || tag == "flatlist" {
-        let hints = style::extract_stack_hints(&classes, Some(ctx));
+        let hints = style::extract_stack_hints(classes, Some(ctx));
         return Ok(ViewNode::List {
             ordered: tag == "ol",
             style: hints.style.opt(),
@@ -488,7 +490,7 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<ViewNode, Crepu
     }
 
     if tag == "li" || tag == "list-item" {
-        let hints = style::extract_stack_hints(&classes, Some(ctx));
+        let hints = style::extract_stack_hints(classes, Some(ctx));
         return Ok(ViewNode::ListItem {
             on_long_press: None,
             style: hints.style.opt(),
@@ -499,7 +501,7 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<ViewNode, Crepu
     if is_text_tag(tag) && el.children.len() == 1 {
         if let Node::Text(parts) = &el.children[0] {
             let txt = render_text_inline(parts, ctx)?;
-            let st = style::extract_text_style(&classes, Some(ctx)).opt();
+            let st = style::extract_text_style(classes, Some(ctx)).opt();
             return Ok(ViewNode::Text {
                 content: txt,
                 bind: text_bind(parts),
@@ -510,7 +512,7 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<ViewNode, Crepu
 
     if el.children.is_empty() {
         if let Some(bind) = binding_raw(el, "bind") {
-            let st = style::extract_text_style(&classes, Some(ctx)).opt();
+            let st = style::extract_text_style(classes, Some(ctx)).opt();
             return Ok(ViewNode::Text {
                 content: String::new(),
                 bind: Some(bind),
@@ -526,7 +528,7 @@ fn render_element(el: &Element, ctx: &TemplateContext) -> Result<ViewNode, Crepu
     };
     let spacing = parse_gap_spacing(&classes);
     let scroll = style::is_scroll_container(&classes);
-    let hints = style::extract_stack_hints(&classes, Some(ctx));
+    let hints = style::extract_stack_hints(classes, Some(ctx));
     let children = render_nodes_list(&el.children, ctx)?;
 
     if scroll {
