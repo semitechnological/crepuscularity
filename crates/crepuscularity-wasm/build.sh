@@ -24,4 +24,21 @@ wasm-bindgen \
     --target nodejs
 
 rm -f "$crate_dir/npm/wasm/.gitignore" "$crate_dir/npm/wasm/package.json"
+
+# A binding layer that silently lacks a frontend is worse than one that fails:
+# an extension it does not know falls through to generic markup and returns
+# plausible but wrong IR. The expected set is read from the parser directory
+# rather than listed here, so a new frontend is required without editing this.
+missing=""
+for frontend_dir in "$workspace_root/crates/crepuscularity-core/src/parser"/*/; do
+    frontend="$(basename "$frontend_dir")"
+    if ! grep -aq "parser/$frontend/" "$crate_dir/npm/wasm/crepuscularity_wasm_bg.wasm"; then
+        missing="$missing $frontend"
+    fi
+done
+if [ -n "$missing" ]; then
+    echo "built wasm is missing parser frontends:$missing" >&2
+    exit 1
+fi
+
 echo "built $crate_dir/npm/wasm"
