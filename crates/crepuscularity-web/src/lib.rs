@@ -4,19 +4,18 @@
 //! templates, and [`render_bundle`] for the `crepus web build` JSON bundle format.
 
 use std::path::Path;
-use std::sync::Arc;
 
 use crepuscularity_core::ast::*;
 use crepuscularity_core::context::{value_to_str, TemplateContext, TemplateValue};
 use crepuscularity_core::eval::eval_expr;
 pub use crepuscularity_core::include_paths::resolve_include_path;
 use crepuscularity_core::parser::{parse_component_file, parse_template_with_path};
-use crepuscularity_core::preprocess::{slot_rotate_child_phrases, slot_rotate_words_json_attr};
 use crepuscularity_core::virtual_files::lookup_virtual_file;
 
 mod bundle;
 #[cfg(all(target_arch = "wasm32", feature = "dom"))]
 pub mod dom;
+mod render;
 mod void_html;
 
 /// Reactive DOM bindings re-exported from `crepuscularity-reactive`.
@@ -203,52 +202,7 @@ pub fn render_component_file_to_html(
 /// Use this when a caller owns parsing or analysis separately from rendering. `$: let` declarations
 /// are applied in source order via an optional context overlay, so sibling nodes after a declaration can see it.
 pub fn render_nodes_to_html(nodes: &[Node], ctx: &TemplateContext) -> Result<String, CrepusError> {
-    render_nodes_with_ctx(nodes, None, ctx, 0)
-}
-
-fn render_nodes_with_ctx(
-    nodes: &[Node],
-    mut overlay: Option<TemplateContext>,
-    base: &TemplateContext,
-    depth: usize,
-) -> Result<String, CrepusError> {
-    let _span = tracing::debug_span!("render_html", node_count = nodes.len()).entered();
-    let mut html = String::new();
-
-    for node in nodes {
-        if let Node::LetDecl(decl) = node {
-            let cur = overlay.as_ref().unwrap_or(base);
-            if decl.is_default && cur.vars.contains_key(&decl.name) {
-                continue;
-            }
-            let overlay_ctx = overlay.get_or_insert_with(|| base.clone());
-            let val = eval_expr(&decl.expr, overlay_ctx)?;
-            overlay_ctx.vars.insert(decl.name.clone(), val);
-            continue;
-        }
-        let cur = overlay.as_ref().unwrap_or(base);
-        html.push_str(&render_node(node, cur, depth)?);
-    }
-
-    Ok(html)
-}
-
-fn render_node(node: &Node, ctx: &TemplateContext, depth: usize) -> Result<String, CrepusError> {
-    match node {
-        Node::Element(el) => render_element(el, ctx, depth),
-        Node::Text(parts) => Ok(escape_html(&render_text(parts, ctx)?)),
-        Node::If(block) => render_if(block, ctx, depth),
-        Node::For(block) => render_for(block, ctx, depth),
-        Node::Match(block) => render_match(block, ctx, depth),
-        Node::LetDecl(_) => Ok(String::new()),
-        Node::Include(inc) => render_include(inc, ctx, depth),
-        Node::Embed(embed) => render_embed(embed, ctx),
-        Node::RawText(expr) => Ok(escape_html(&value_to_str(&eval_expr(expr, ctx)?))),
-        Node::RawHtml(expr) => {
-            let inner = value_to_str(&eval_expr(expr, ctx)?);
-            Ok(ammonia::clean(&inner))
-        }
-    }
+    render::Walker::plain(0).nodes(nodes, ctx)
 }
 
 fn render_embed(embed: &EmbedNode, ctx: &TemplateContext) -> Result<String, CrepusError> {
@@ -302,161 +256,6 @@ fn template_value_to_json(value: &TemplateValue) -> serde_json::Value {
     }
 }
 
-fn render_element(
-    el: &Element,
-    ctx: &TemplateContext,
-    depth: usize,
-) -> Result<String, CrepusError> {
-    if el.tag == "slot" {
-        return if let Some((slot_nodes, slot_ctx)) = &ctx.slot {
-            render_nodes_with_ctx(slot_nodes, None, slot_ctx, depth)
-        } else {
-            render_nodes_with_ctx(&el.children, None, ctx, depth)
-        };
-    }
-
-    if el.tag == "slot-rotate" {
-        let phrases = slot_rotate_child_phrases(&el.children).map_err(CrepusError::render)?;
-        if phrases.len() < 2 {
-            return Err(CrepusError::render(
-                "slot-rotate needs at least two plain-text phrase children",
-            ));
-        }
-        let mut interval_ms = 3200u64;
-        for b in &el.bindings {
-            if b.prop == "interval" {
-                let v = value_to_str(&eval_expr(&b.value, ctx)?);
-                let v = v.trim_matches('"').trim();
-                interval_ms = v.parse().unwrap_or(3200);
-            }
-        }
-        let words_json = slot_rotate_words_json_attr(&phrases);
-
-        // Build class list with the "crepus-slot" prefix prepended.
-        let mut class_names: Vec<String> = Vec::with_capacity(el.classes.len() + 1);
-        class_names.push("crepus-slot".to_string());
-        class_names.extend(el.classes.iter().cloned());
-
-        let mut out = String::new();
-        out.push_str("<span");
-        if let Some(id) = &el.id {
-            out.push_str(" id=\"");
-            out.push_str(&escape_html(id));
-            out.push('"');
-        }
-        if let Some(class_attr) = build_class_attr(&class_names, &el.conditional_classes, ctx)? {
-            out.push_str(" class=\"");
-            out.push_str(&class_attr);
-            out.push('"');
-        }
-        out.push_str(" data-slot-words=\"");
-        out.push_str(&escape_html(&words_json));
-        out.push('"');
-        out.push_str(" data-slot-interval=\"");
-        out.push_str(&escape_html(&interval_ms.to_string()));
-        out.push('"');
-        out.push_str(" aria-live=\"polite\"");
-
-        for binding in &el.bindings {
-            if binding.prop == "interval" {
-                continue;
-            }
-            out.push(' ');
-            out.push_str(&binding.prop);
-            out.push_str("=\"");
-            let value = value_to_str(&eval_expr(&binding.value, ctx)?);
-            out.push_str(&escape_html(&value));
-            out.push('"');
-        }
-
-        for handler in &el.event_handlers {
-            out.push(' ');
-            out.push_str("data-on");
-            out.push_str(&handler.event);
-            out.push_str("=\"");
-            out.push_str(&escape_html(&handler.handler));
-            out.push('"');
-        }
-
-        for animation in &el.animations {
-            out.push(' ');
-            out.push_str("data-animate-");
-            out.push_str(&animation.property);
-            out.push_str("=\"");
-            out.push_str(&escape_html(&format!(
-                "{} {}",
-                animation.duration_expr, animation.easing
-            )));
-            out.push('"');
-        }
-
-        out.push_str("></span>");
-        return Ok(out);
-    }
-
-    let mut out = String::new();
-    out.push('<');
-    out.push_str(&el.tag);
-
-    if let Some(id) = &el.id {
-        out.push_str(" id=\"");
-        out.push_str(&escape_html(id));
-        out.push('"');
-    }
-
-    if let Some(class_attr) = build_class_attr(&el.classes, &el.conditional_classes, ctx)? {
-        out.push_str(" class=\"");
-        out.push_str(&class_attr);
-        out.push('"');
-    }
-
-    for binding in &el.bindings {
-        out.push(' ');
-        out.push_str(&binding.prop);
-        out.push_str("=\"");
-        let value = value_to_str(&eval_expr(&binding.value, ctx)?);
-        out.push_str(&escape_html(&value));
-        out.push('"');
-    }
-
-    for handler in &el.event_handlers {
-        out.push(' ');
-        out.push_str("data-on");
-        out.push_str(&handler.event);
-        out.push_str("=\"");
-        out.push_str(&escape_html(&handler.handler));
-        out.push('"');
-    }
-
-    for animation in &el.animations {
-        out.push(' ');
-        out.push_str("data-animate-");
-        out.push_str(&animation.property);
-        out.push_str("=\"");
-        out.push_str(&escape_html(&format!(
-            "{} {}",
-            animation.duration_expr, animation.easing
-        )));
-        out.push('"');
-    }
-
-    if void_html::is_void_html_tag(&el.tag) {
-        out.push_str(" />");
-        return Ok(out);
-    }
-
-    out.push('>');
-
-    for child in &el.children {
-        out.push_str(&render_node(child, ctx, depth)?);
-    }
-
-    out.push_str("</");
-    out.push_str(&el.tag);
-    out.push('>');
-    Ok(out)
-}
-
 pub(crate) fn render_text(
     parts: &[TextPart],
     ctx: &TemplateContext,
@@ -473,82 +272,6 @@ pub(crate) fn render_text(
     Ok(result)
 }
 
-fn render_if(block: &IfBlock, ctx: &TemplateContext, depth: usize) -> Result<String, CrepusError> {
-    if ctx.eval_condition(&block.condition)? {
-        render_nodes_with_ctx(&block.then_children, None, ctx, depth)
-    } else if let Some(else_children) = &block.else_children {
-        render_nodes_with_ctx(else_children, None, ctx, depth)
-    } else {
-        Ok(String::new())
-    }
-}
-
-fn render_for(
-    block: &ForBlock,
-    ctx: &TemplateContext,
-    depth: usize,
-) -> Result<String, CrepusError> {
-    let items = ctx.get_list_ref(&block.iterator);
-    let mut out = String::new();
-    let pattern = block.pattern.trim();
-    let has_pattern = !pattern.is_empty();
-    let mut child_ctx = ctx.clone();
-
-    for item_ctx in items {
-        child_ctx.vars.clone_from(&ctx.vars);
-        for (k, v) in &item_ctx.vars {
-            child_ctx.vars.insert(k.clone(), v.clone());
-        }
-        if has_pattern {
-            let item_str = item_ctx.get_str("value");
-            if !item_str.is_empty() {
-                child_ctx
-                    .vars
-                    .insert(pattern.to_string(), TemplateValue::Str(item_str));
-            } else {
-                child_ctx
-                    .vars
-                    .insert(pattern.to_string(), TemplateValue::Scope(item_ctx.clone()));
-            }
-        }
-        out.push_str(&render_nodes_with_ctx(
-            &block.body,
-            None,
-            &child_ctx,
-            depth,
-        )?);
-    }
-
-    Ok(out)
-}
-
-fn render_match(
-    block: &MatchBlock,
-    ctx: &TemplateContext,
-    depth: usize,
-) -> Result<String, CrepusError> {
-    let val = eval_expr(&block.expr, ctx)?;
-    let value = value_to_str(&val);
-
-    for arm in &block.arms {
-        let pattern = arm.pattern.trim();
-        if pattern == "_" {
-            return render_nodes_with_ctx(&arm.body, None, ctx, depth);
-        }
-        if pattern.starts_with('"') && pattern.ends_with('"') {
-            let lit = &pattern[1..pattern.len() - 1];
-            if value == lit {
-                return render_nodes_with_ctx(&arm.body, None, ctx, depth);
-            }
-        }
-        if value == pattern {
-            return render_nodes_with_ctx(&arm.body, None, ctx, depth);
-        }
-    }
-
-    Ok(String::new())
-}
-
 pub(crate) fn read_file(ctx: &TemplateContext, path: &Path) -> Result<String, CrepusError> {
     if let Some(content) = lookup_virtual_file(ctx, path) {
         return Ok(content);
@@ -562,82 +285,6 @@ pub(crate) fn read_file(ctx: &TemplateContext, path: &Path) -> Result<String, Cr
             path.to_string_lossy()
         )))
     }
-}
-
-fn render_include(
-    inc: &IncludeNode,
-    ctx: &TemplateContext,
-    depth: usize,
-) -> Result<String, CrepusError> {
-    if depth >= MAX_INCLUDE_DEPTH {
-        return Err(CrepusError::render(format!(
-            "maximum include depth ({MAX_INCLUDE_DEPTH}) exceeded; possible circular include involving '{}'",
-            inc.path
-        )));
-    }
-
-    if let Some((file_part, comp_name)) = inc.path.split_once('#') {
-        return render_named_component(inc, ctx, file_part, comp_name, depth);
-    }
-
-    let file_path = resolve_include_path(ctx.base_dir.as_deref(), &inc.path)?;
-    let content = read_file(ctx, &file_path)?;
-    let nodes = crepuscularity_core::parser::parse_template_with_path(&content, Some(&file_path))
-        .map_err(|e| CrepusError::render(format!("include parse error: {e}")))?;
-
-    let mut child_ctx = TemplateContext::new();
-    child_ctx.base_dir = file_path.parent().map(|p| p.to_path_buf());
-    child_ctx.virtual_files = ctx.virtual_files.clone();
-    for (key, expr) in &inc.props {
-        child_ctx.vars.insert(key.clone(), eval_expr(expr, ctx)?);
-    }
-    if !inc.slot.is_empty() {
-        child_ctx.slot = Some((inc.slot.clone(), Arc::new(ctx.clone())));
-    }
-
-    render_nodes_with_ctx(&nodes, None, &child_ctx, depth + 1)
-}
-
-fn render_named_component(
-    inc: &IncludeNode,
-    ctx: &TemplateContext,
-    file_part: &str,
-    comp_name: &str,
-    depth: usize,
-) -> Result<String, CrepusError> {
-    if depth >= MAX_INCLUDE_DEPTH {
-        return Err(CrepusError::render(format!(
-            "maximum include depth ({MAX_INCLUDE_DEPTH}) exceeded; possible circular include involving '{file_part}#{comp_name}'"
-        )));
-    }
-
-    let file_path = resolve_include_path(ctx.base_dir.as_deref(), file_part)?;
-    let content = read_file(ctx, &file_path)?;
-    let comp_file = parse_component_file(&content)
-        .map_err(|e| CrepusError::render(format!("component file parse error: {e}")))?;
-    let comp = comp_file.components.get(comp_name).ok_or_else(|| {
-        CrepusError::render(format!(
-            "component '{}' not found in {}",
-            comp_name, file_part
-        ))
-    })?;
-
-    let mut child_ctx = TemplateContext::new();
-    child_ctx.base_dir = file_path.parent().map(|p| p.to_path_buf());
-    child_ctx.virtual_files = ctx.virtual_files.clone();
-    for (key, expr) in &comp.meta.defaults {
-        child_ctx
-            .vars
-            .insert(key.clone(), eval_expr(expr, &TemplateContext::new())?);
-    }
-    for (key, expr) in &inc.props {
-        child_ctx.vars.insert(key.clone(), eval_expr(expr, ctx)?);
-    }
-    if !inc.slot.is_empty() {
-        child_ctx.slot = Some((inc.slot.clone(), Arc::new(ctx.clone())));
-    }
-
-    render_nodes_with_ctx(&comp.nodes, None, &child_ctx, depth + 1)
 }
 
 // ── Hydration ─────────────────────────────────────────────────────────────────
@@ -753,11 +400,11 @@ fn render_nodes_with_hydration_impl(
                 None
             };
             html.push_str(&render_element_with_hydration(
-                el, &ctx, counter, is_first, dyn_id,
+                el, ctx, counter, is_first, dyn_id,
             )?);
             is_first = false;
         } else {
-            html.push_str(&render_node(node, &ctx, 0)?);
+            html.push_str(&render::Walker::plain(0).node(node, ctx)?);
             is_first = false;
         }
     }
