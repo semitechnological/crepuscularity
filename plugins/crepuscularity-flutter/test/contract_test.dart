@@ -91,8 +91,9 @@ void main() {
         'forEach',
         'list',
         'listItem',
+        'link',
       });
-      expect(kAllowedKinds, hasLength(18));
+      expect(kAllowedKinds, hasLength(19));
     });
 
     test('every executing/disallowed kind decodes to UnsupportedNode', () {

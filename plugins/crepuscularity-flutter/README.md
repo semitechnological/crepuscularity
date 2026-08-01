@@ -39,9 +39,15 @@ Both entry points produce the same widget tree; `fromSource(x)` and
 Constrained, non-executing subset of the View IR `ViewNode` kinds
 (`crates/crepuscularity-native/src/ir.rs`):
 
+Targets View IR version 7 (`IR_VERSION`).
+
 `text`, `stack` (row/column, Tailwind-ish spacing/alignment), `scroll`,
-`button`, `toggle`, `checkbox`, `progress`, `meter`, `badge`, `divider`,
-`spacer`, `image`, `if`, `forEach`, `list`, `listItem`.
+`button`, `toggle`, `checkbox`, `progress`, `timer`, `meter`, `sparkline`,
+`badge`, `divider`, `spacer`, `image`, `link`, `if`, `forEach`, `list`,
+`listItem`.
+
+`ViewStyle` also carries the source `#id` and the raw class tokens alongside the
+resolved layout/theming hints.
 
 Anything outside the allowlist (`webView`, `filePicker`, `dropzone`, free
 `input`/`picker`/`slider`, `tabs`, `slot`, …) renders nothing — it never throws.

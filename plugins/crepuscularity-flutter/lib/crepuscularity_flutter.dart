@@ -49,4 +49,5 @@ export 'src/view_ir.dart'
         ForEachNode,
         ListNode,
         ListItemNode,
+        LinkNode,
         UnsupportedNode;

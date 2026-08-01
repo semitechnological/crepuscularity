@@ -54,6 +54,12 @@ Object _shape(ViewNode node) => switch (node) {
     'listItem': true,
     'children': childrenOf(node).map(_shape).toList(),
   },
+  LinkNode(:final href, :final target, :final rel) => {
+    'link': href,
+    'target': target,
+    'rel': rel,
+    'children': childrenOf(node).map(_shape).toList(),
+  },
   IfNode(:final condition) => {
     'if': condition,
     'children': childrenOf(node).map(_shape).toList(),
@@ -300,6 +306,82 @@ foreach items as row
       },
       visible: const ['alpha', 'beta'],
     );
+  });
+
+  testWidgets('links round trip', (tester) async {
+    await _expectAgreement(
+      tester,
+      '''
+a href=https://example.com/docs target=_blank rel=noopener
+  text "Read the docs"
+''',
+      const [
+        {
+          'kind': 'link',
+          'href': 'https://example.com/docs',
+          'target': '_blank',
+          'rel': 'noopener',
+          'children': [
+            {'kind': 'text', 'content': 'Read the docs'},
+          ],
+        },
+      ],
+      visible: const ['Read the docs'],
+    );
+  });
+
+  testWidgets('a link dispatches its href identically from source and IR', (
+    tester,
+  ) async {
+    for (final build in <CrepusView Function(CrepusActionCallback)>[
+      (onAction) => CrepusView.fromSource(
+        'a "Docs" href=https://example.com/docs',
+        onAction: onAction,
+      ),
+      (onAction) => CrepusView.fromIr({
+        'version': IR_VERSION,
+        'root': const [
+          {
+            'kind': 'link',
+            'href': 'https://example.com/docs',
+            'children': [
+              {'kind': 'text', 'content': 'Docs'},
+            ],
+          },
+        ],
+      }, onAction: onAction),
+    ]) {
+      final actions = <String>[];
+      await tester.pumpWidget(_host(build(actions.add)));
+      await tester.tap(find.text('Docs'));
+      expect(actions, ['https://example.com/docs']);
+    }
+  });
+
+  testWidgets('a source #id survives into the IR and back out again', (
+    tester,
+  ) async {
+    final parsed = viewIrFromSource('text "Titled" #hero text-lg');
+    final style = parsed.root.single.style!;
+    expect(style.id, 'hero');
+    expect(style.classes, ['text-lg']);
+
+    final wire = style.toJson();
+    final decoded = ViewStyle.fromJson(wire)!;
+    expect(decoded.id, 'hero');
+    expect(decoded.classes, ['text-lg']);
+    expect(decoded.fontSize, style.fontSize);
+
+    final fromIr = ViewIr.fromJson({
+      'version': IR_VERSION,
+      'root': [
+        {'kind': 'text', 'content': 'Titled', 'style': wire},
+      ],
+    });
+    final irStyle = fromIr.root.single.style!;
+    expect(irStyle.id, 'hero');
+    expect(irStyle.classes, ['text-lg']);
+    expect(irStyle.toJson(), wire);
   });
 
   testWidgets('a disallowed tag round trips as the same unsupported node', (

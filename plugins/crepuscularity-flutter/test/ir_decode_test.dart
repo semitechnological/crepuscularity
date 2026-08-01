@@ -125,7 +125,7 @@ void main() {
           reason: 'kind=$kind should decode',
         );
       }
-      expect(kAllowedKinds, hasLength(18));
+      expect(kAllowedKinds, hasLength(19));
     });
 
     test('a missing or non-string kind is UnsupportedNode', () {
@@ -526,6 +526,11 @@ void main() {
           'kind': 'listItem',
           'children': [leaf()],
         },
+        'link': {
+          'kind': 'link',
+          'href': 'https://example.com',
+          'children': [leaf()],
+        },
         'forEach': {
           'kind': 'forEach',
           'itemBody': [leaf()],
@@ -572,6 +577,132 @@ void main() {
         expect(childrenOf(ViewNode.fromJson({'kind': kind})), isEmpty);
       }
       expect(childrenOf(const UnsupportedNode('webView')), isEmpty);
+    });
+  });
+
+  group('link', () {
+    test('decodes its href, target, rel and children', () {
+      final node =
+          ViewNode.fromJson(const {
+                'kind': 'link',
+                'href': 'https://example.com/a',
+                'target': '_blank',
+                'rel': 'noopener',
+                'children': [
+                  {'kind': 'text', 'content': 'a'},
+                  {'kind': 'text', 'content': 'b'},
+                ],
+              })
+              as LinkNode;
+      expect(node.href, 'https://example.com/a');
+      expect(node.target, '_blank');
+      expect(node.rel, 'noopener');
+      expect(node.children, hasLength(2));
+    });
+
+    test('missing or non-string fields degrade instead of throwing', () {
+      final cases = <String, Map<String, Object?>>{
+        'no href': {'kind': 'link'},
+        'numeric href': {'kind': 'link', 'href': 7},
+        'children not a list': {
+          'kind': 'link',
+          'href': 'x',
+          'children': 'nope',
+        },
+      };
+      cases.forEach((name, json) {
+        final node = ViewNode.fromJson(json) as LinkNode;
+        expect(node.target, isNull, reason: name);
+        expect(node.rel, isNull, reason: name);
+        expect(node.children, isEmpty, reason: name);
+      });
+      expect((ViewNode.fromJson(const {'kind': 'link'}) as LinkNode).href, '');
+    });
+
+    test('a link nests under the depth cap like any other container', () {
+      final ir = ViewIr.fromJson(const {
+        'version': 7,
+        'root': [
+          {
+            'kind': 'link',
+            'href': 'https://example.com',
+            'children': [
+              {'kind': 'text', 'content': 'deep'},
+            ],
+          },
+        ],
+      });
+      expect(childrenOf(ir.root.single), hasLength(1));
+    });
+  });
+
+  group('style identity fields', () {
+    test('id and classes decode verbatim', () {
+      final style = ViewStyle.fromJson(const {
+        'id': 'hero',
+        'classes': ['p-2', 'text-lg', 'not-a-class'],
+      })!;
+      expect(style.id, 'hero');
+      expect(style.classes, ['p-2', 'text-lg', 'not-a-class']);
+    });
+
+    test('an id alone is enough to keep the style', () {
+      expect(ViewStyle.fromJson(const {'id': 'solo'})!.id, 'solo');
+      expect(
+        ViewStyle.fromJson(const {
+          'classes': ['solo'],
+        })!.classes,
+        ['solo'],
+      );
+      expect(ViewStyle.fromJson(const <String, Object?>{}), isNull);
+    });
+
+    test('non-string id and non-string class entries are dropped', () {
+      final cases = <String, Map<String, Object?>>{
+        'numeric id': {'id': 7, 'classes': <Object?>[]},
+        'list id': {
+          'id': ['a'],
+          'classes': <Object?>[],
+        },
+        'classes not a list': {'classes': 'p-2'},
+      };
+      cases.forEach((name, json) {
+        final style = ViewStyle.fromJson({...json, 'padding': 4})!;
+        expect(style.id, isNull, reason: name);
+        expect(style.classes, isEmpty, reason: name);
+      });
+      final mixed = ViewStyle.fromJson(const {
+        'classes': ['ok', 3, null, 'fine'],
+      })!;
+      expect(mixed.classes, ['ok', 'fine']);
+    });
+
+    test('id and classes survive a toJson/fromJson round trip', () {
+      const original = ViewStyle(
+        id: 'hero',
+        classes: ['p-2', 'text-lg'],
+        padding: 8,
+        fontSize: 17,
+        foregroundColor: '#ef4444',
+      );
+      final json = original.toJson();
+      expect(json['id'], 'hero');
+      expect(json['classes'], ['p-2', 'text-lg']);
+      final decoded = ViewStyle.fromJson(json)!;
+      expect(decoded.id, 'hero');
+      expect(decoded.classes, ['p-2', 'text-lg']);
+      expect(decoded.padding, 8);
+      expect(decoded.fontSize, 17);
+      expect(decoded.foregroundColor, '#ef4444');
+      expect(decoded.toJson(), json);
+    });
+
+    test('absent fields are omitted rather than written as null', () {
+      final json = const ViewStyle(padding: 4).toJson();
+      expect(json.containsKey('id'), isFalse);
+      expect(json.containsKey('classes'), isFalse);
+      expect(json.containsKey('fontSize'), isFalse);
+      expect(json, const {'padding': 4.0});
     });
   });
 }

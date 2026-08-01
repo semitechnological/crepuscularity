@@ -27,6 +27,7 @@ const Set<String> kAllowedKinds = {
   'forEach',
   'list',
   'listItem',
+  'link',
 };
 
 /// Caps applied to any parsed/decoded document. Oversized input is rejected
@@ -81,12 +82,19 @@ List<double> _doubleList(Object? value) {
 
 String? _asString(Object? value) => value is String ? value : null;
 
+List<String> _stringList(Object? value) {
+  if (value is! List) return const [];
+  return value.whereType<String>().toList(growable: false);
+}
+
 bool _asBool(Object? value) => value == true;
 
 /// Portable style hints (a focused subset of `ViewStyle` in `ir.rs`). Fields we
 /// do not render are simply ignored on decode.
 class ViewStyle {
   const ViewStyle({
+    this.id,
+    this.classes = const [],
     this.padding,
     this.paddingHorizontal,
     this.paddingVertical,
@@ -107,6 +115,12 @@ class ViewStyle {
     this.underline,
     this.strikethrough,
   });
+
+  /// The source `#id`, preserved verbatim so hosts can bind to the element.
+  final String? id;
+
+  /// The source class tokens, preserved verbatim alongside the resolved hints.
+  final List<String> classes;
 
   final double? padding;
   final double? paddingHorizontal;
@@ -129,6 +143,8 @@ class ViewStyle {
   final bool? strikethrough;
 
   bool get isEmpty =>
+      id == null &&
+      classes.isEmpty &&
       padding == null &&
       paddingHorizontal == null &&
       paddingVertical == null &&
@@ -152,6 +168,8 @@ class ViewStyle {
   static ViewStyle? fromJson(Object? value) {
     if (value is! Map) return null;
     final style = ViewStyle(
+      id: _asString(value['id']),
+      classes: _stringList(value['classes']),
       padding: _asDouble(value['padding']),
       paddingHorizontal: _asDouble(value['paddingHorizontal']),
       paddingVertical: _asDouble(value['paddingVertical']),
@@ -175,6 +193,38 @@ class ViewStyle {
           : null,
     );
     return style.isEmpty ? null : style;
+  }
+
+  /// Re-encode to the wire shape. Absent fields are omitted rather than written
+  /// as `null`, matching the `skip_serializing_if` behaviour on the Rust side.
+  Map<String, Object?> toJson() {
+    final out = <String, Object?>{};
+    void put(String key, Object? value) {
+      if (value != null) out[key] = value;
+    }
+
+    put('id', id);
+    if (classes.isNotEmpty) out['classes'] = List<String>.of(classes);
+    put('padding', padding);
+    put('paddingHorizontal', paddingHorizontal);
+    put('paddingVertical', paddingVertical);
+    put('paddingTop', paddingTop);
+    put('paddingBottom', paddingBottom);
+    put('paddingLeft', paddingLeft);
+    put('paddingRight', paddingRight);
+    put('fontSize', fontSize);
+    put('fontWeight', fontWeight);
+    put('textAlign', textAlign);
+    put('foregroundColor', foregroundColor);
+    put('backgroundColor', backgroundColor);
+    put('cornerRadius', cornerRadius);
+    put('borderWidth', borderWidth);
+    put('borderColor', borderColor);
+    put('opacity', opacity);
+    put('italic', italic);
+    put('underline', underline);
+    put('strikethrough', strikethrough);
+    return out;
   }
 }
 
@@ -307,6 +357,14 @@ sealed class ViewNode {
       case 'list':
         return ListNode(
           ordered: _asBool(raw['ordered']),
+          children: _childList(raw['children']),
+          style: style,
+        );
+      case 'link':
+        return LinkNode(
+          href: _asString(raw['href']) ?? '',
+          target: _asString(raw['target']),
+          rel: _asString(raw['rel']),
           children: _childList(raw['children']),
           style: style,
         );
@@ -527,6 +585,23 @@ class ListItemNode extends ViewNode {
   final List<ViewNode> children;
 }
 
+/// A container whose subtree is tappable, carrying the destination `href`.
+/// The href is handed to the host through the action callback; this renderer
+/// never opens a URL itself.
+class LinkNode extends ViewNode {
+  const LinkNode({
+    required this.href,
+    this.target,
+    this.rel,
+    required this.children,
+    super.style,
+  });
+  final String href;
+  final String? target;
+  final String? rel;
+  final List<ViewNode> children;
+}
+
 /// A node whose kind is unknown or outside [kAllowedKinds]. Renders nothing.
 class UnsupportedNode extends ViewNode {
   const UnsupportedNode(this.kind);
@@ -582,6 +657,7 @@ List<ViewNode> childrenOf(ViewNode node) => switch (node) {
   ScrollNode(:final children) => children,
   ListNode(:final children) => children,
   ListItemNode(:final children) => children,
+  LinkNode(:final children) => children,
   IfNode(:final thenChildren, :final elseChildren) => [
     ...thenChildren,
     ...?elseChildren,

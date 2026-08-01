@@ -619,8 +619,13 @@ stack col
     ViewStyle? styleOf(String classes) =>
         viewIrFromSource('text "x" $classes').root.single.style;
 
-    test('unknown classes produce no style at all', () {
-      expect(styleOf('not-a-class weird-thing'), isNull);
+    test('unknown classes resolve to no hints but are preserved verbatim', () {
+      final style = styleOf('not-a-class weird-thing')!;
+      expect(style.classes, ['not-a-class', 'weird-thing']);
+      expect(style.fontSize, isNull);
+      expect(style.padding, isNull);
+      expect(style.foregroundColor, isNull);
+      expect(style.cornerRadius, isNull);
     });
 
     test('font size classes map to point sizes', () {
@@ -678,7 +683,7 @@ stack col
     });
 
     test('a non-numeric padding class is ignored', () {
-      expect(styleOf('p-lots'), isNull);
+      expect(styleOf('p-lots')!.padding, isNull);
     });
 
     test('rounded classes map to radii', () {
@@ -704,9 +709,98 @@ stack col
       expect(styleOf('text-white')!.foregroundColor, '#ffffff');
       expect(styleOf('bg-transparent')!.backgroundColor, '#00000000');
       // Arbitrary values are not honoured — no `text-[#deadbe]` escape hatch.
-      expect(styleOf('text-#ff0000'), isNull);
-      expect(styleOf('bg-hotpink'), isNull);
-      expect(styleOf('text-red-501'), isNull);
+      expect(styleOf('text-#ff0000')!.foregroundColor, isNull);
+      expect(styleOf('bg-hotpink')!.backgroundColor, isNull);
+      expect(styleOf('text-red-501')!.foregroundColor, isNull);
+    });
+  });
+
+  group('source identity', () {
+    ViewStyle? styleOf(String source) =>
+        viewIrFromSource(source).root.single.style;
+
+    test('the #id shorthand is preserved on every tag that carries style', () {
+      const cases = {
+        'text "x" #hero': 'hero',
+        'button "Go" #cta onclick=go': 'cta',
+        'stack col #wrap': 'wrap',
+        'badge "New" #chip': 'chip',
+        'img src=a.png #pic': 'pic',
+        'ul #items': 'items',
+        'foreach rows as r #loop': 'loop',
+      };
+      cases.forEach((source, id) {
+        expect(styleOf(source)!.id, id, reason: source);
+      });
+    });
+
+    test('a bare # with no name leaves the id unset', () {
+      expect(styleOf('text "x" # p-2')!.id, isNull);
+    });
+
+    test('raw classes are carried alongside the resolved hints', () {
+      final style = styleOf('text "x" p-2 text-lg mystery')!;
+      expect(style.classes, ['p-2', 'text-lg', 'mystery']);
+      expect(style.padding, 8);
+      expect(style.fontSize, 17);
+    });
+
+    test('classes exclude attributes, events, ids and inline text', () {
+      final style = styleOf('button "Go" #cta p-2 onclick=go label=Other')!;
+      expect(style.classes, ['p-2']);
+      expect(style.id, 'cta');
+    });
+
+    test('a tag with no classes and no id has no style at all', () {
+      expect(styleOf('text "x"'), isNull);
+    });
+  });
+
+  group('link', () {
+    LinkNode linkOf(String source) =>
+        viewIrFromSource(source).root.single as LinkNode;
+
+    test('both the `a` and `link` spellings parse', () {
+      for (final tag in const ['a', 'link']) {
+        final node = linkOf('$tag "Docs" href=https://example.com/docs');
+        expect(node.href, 'https://example.com/docs', reason: tag);
+        expect((node.children.single as TextNode).content, 'Docs', reason: tag);
+      }
+    });
+
+    test('target and rel are carried through', () {
+      final node = linkOf('a "X" href=/x target=_blank rel=noopener');
+      expect(node.target, '_blank');
+      expect(node.rel, 'noopener');
+    });
+
+    test('a link with no href parses with an empty href', () {
+      final node = linkOf('a "Dead"');
+      expect(node.href, '');
+      expect(node.target, isNull);
+      expect(node.rel, isNull);
+    });
+
+    test('indented children win over inline text', () {
+      final node = linkOf('''
+a href=https://example.com "ignored"
+  text "one"
+  text "two"
+''');
+      expect(node.children, hasLength(2));
+      expect((node.children.first as TextNode).content, 'one');
+    });
+
+    test('a link nests containers like any other block', () {
+      final node = linkOf('''
+a href=https://example.com p-2
+  stack row gap-2
+    text "left"
+    badge "right"
+''');
+      expect(node.style!.padding, 8);
+      expect(node.children.single, isA<StackNode>());
+      expect(childrenOf(node), hasLength(1));
     });
   });
 
@@ -888,7 +982,7 @@ if a
     test('a version is always stamped, even on a rejected document', () {
       expect(viewIrFromSource('x' * 9000).version, IR_VERSION);
       expect(viewIrFromSource('').version, IR_VERSION);
-      expect(IR_VERSION, 5);
+      expect(IR_VERSION, 7);
     });
   });
 }

@@ -36,7 +36,7 @@ ViewIr viewIrFromSource(
 
 // The View IR version this parser targets; kept in step with `ir.rs`.
 // ignore: constant_identifier_names
-const int IR_VERSION = 5;
+const int IR_VERSION = 7;
 
 // ── Lexing: one significant line → indent + tokens ──────────────────────────
 
@@ -226,7 +226,7 @@ ViewNode _mapNode(_Raw raw) {
   };
   if (disallowed.contains(tag)) return UnsupportedNode(tag);
 
-  final style = styleFromClasses(el.classes);
+  final style = styleFromClasses(el.classes, id: el.id);
 
   if (_textTags.contains(tag)) {
     final content = el.inlineText ?? _firstTextChild(el);
@@ -318,6 +318,15 @@ ViewNode _mapNode(_Raw raw) {
         children: _mapSiblings(raw.children),
         style: style,
       );
+    case 'a':
+    case 'link':
+      return LinkNode(
+        href: el.attrs['href'] ?? '',
+        target: el.attrs['target'],
+        rel: el.attrs['rel'],
+        children: _listItemChildren(raw, el, style),
+        style: style,
+      );
     case 'li':
     case 'list-item':
     case 'listitem':
@@ -397,7 +406,7 @@ ViewNode _mapFor(_Element el, _Raw raw) {
     bind: bind,
     itemName: itemName,
     itemBody: _mapSiblings(raw.children),
-    style: styleFromClasses(el.classes),
+    style: styleFromClasses(el.classes, id: el.id),
   );
 }
 
@@ -434,6 +443,7 @@ class _Element {
   final Map<String, String> attrs = {};
   final Map<String, String> events = {};
   String? inlineText;
+  String? id;
 
   static _Element parse(_Raw raw) {
     final el = _Element(raw, raw.line.tokens.first);
@@ -442,7 +452,11 @@ class _Element {
         el.inlineText = _unquote(token);
         continue;
       }
-      if (token.startsWith('#')) continue; // id shorthand — ignored
+      if (token.startsWith('#')) {
+        final id = token.substring(1);
+        if (id.isNotEmpty) el.id = id;
+        continue;
+      }
       final eq = token.indexOf('=');
       if (eq > 0) {
         final name = token.substring(0, eq);
@@ -592,7 +606,7 @@ const Map<String, int> _fontWeights = {
 
 /// Build a [ViewStyle] from Tailwind-ish utility classes. Only the classes the
 /// renderer honors are recognized; unknown classes are ignored.
-ViewStyle? styleFromClasses(List<String> classes) {
+ViewStyle? styleFromClasses(List<String> classes, {String? id}) {
   double? padding;
   double? px;
   double? py;
@@ -657,6 +671,8 @@ ViewStyle? styleFromClasses(List<String> classes) {
   }
 
   final style = ViewStyle(
+    id: id,
+    classes: List<String>.of(classes),
     padding: padding,
     paddingHorizontal: px,
     paddingVertical: py,

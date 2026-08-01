@@ -981,6 +981,82 @@ list
     });
   });
 
+  group('link', () {
+    testWidgets('renders its children and taps dispatch the href', (
+      tester,
+    ) async {
+      final actions = <String>[];
+      await tester.pumpWidget(
+        _one(const {
+          'kind': 'link',
+          'href': 'https://example.com/docs',
+          'children': [
+            {'kind': 'text', 'content': 'Read the docs'},
+            {'kind': 'badge', 'label': 'new'},
+          ],
+        }, onAction: actions.add),
+      );
+      expect(find.text('Read the docs'), findsOneWidget);
+      expect(find.text('new'), findsOneWidget);
+      await tester.tap(find.text('Read the docs'));
+      expect(actions, ['https://example.com/docs']);
+    });
+
+    testWidgets('a link with no renderable children renders nothing', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _one(const {
+          'kind': 'link',
+          'href': 'https://example.com',
+          'children': [],
+        }),
+      );
+      expect(find.byType(GestureDetector), findsNothing);
+    });
+
+    testWidgets('a link with an empty href is inert but still renders', (
+      tester,
+    ) async {
+      final actions = <String>[];
+      await tester.pumpWidget(
+        _one(const {
+          'kind': 'link',
+          'children': [
+            {'kind': 'text', 'content': 'Nowhere'},
+          ],
+        }, onAction: actions.add),
+      );
+      expect(find.text('Nowhere'), findsOneWidget);
+      await tester.tap(find.text('Nowhere'));
+      expect(actions, isEmpty);
+    });
+
+    testWidgets('link style is applied like any other container', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _one(const {
+          'kind': 'link',
+          'href': 'https://example.com',
+          'style': {'padding': 6},
+          'children': [
+            {'kind': 'text', 'content': 'Styled link'},
+          ],
+        }),
+      );
+      final padding = tester.widget<Padding>(
+        find
+            .ancestor(
+              of: find.text('Styled link'),
+              matching: find.byType(Padding),
+            )
+            .last,
+      );
+      expect(padding.padding, const EdgeInsets.all(6));
+    });
+  });
+
   group('if', () {
     Future<void> pumpIf(
       WidgetTester tester,

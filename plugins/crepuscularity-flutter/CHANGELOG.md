@@ -8,6 +8,19 @@
 
 ## Unreleased
 
+### View IR 7
+
+- Target View IR version 7; `IR_VERSION` moves from 5 to 7.
+- `ViewStyle.classes` (IR 6) carries the raw class tokens verbatim alongside the
+  resolved hints, so hosts can re-emit them instead of re-deriving CSS.
+- `ViewStyle.id` (IR 7) preserves the source `#id`, which the `.crepus` parser
+  previously discarded.
+- New `link` node kind (IR 6): a container whose subtree is tappable. Its `href`
+  is surfaced verbatim through `onAction` like any other action string — the
+  renderer never opens a URL itself. `target` and `rel` are carried but unused
+  by this renderer. Both `a` and `link` spellings parse in `.crepus` source.
+- `ViewStyle.toJson` re-encodes to the wire shape, omitting absent fields.
+
 ### Behaviour changes
 
 - `if` conditions now resolve a bare operand the same way as an operand on

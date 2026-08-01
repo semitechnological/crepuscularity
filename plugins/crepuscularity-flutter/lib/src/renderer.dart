@@ -153,6 +153,7 @@ class _Renderer {
       ImageNode() => _image(node),
       ListNode() => _list(node, scope),
       ListItemNode() => _listItem(node, scope),
+      LinkNode() => _link(node, scope),
       IfNode() => _ifNode(node, scope),
       ForEachNode() => _forEach(node, scope),
       // Unknown/disallowed kinds render nothing (a faint chip in debug only).
@@ -468,6 +469,17 @@ class _Renderer {
       children: children,
     );
     return _withTap(_withLongPress(widget, node.onLongPress), node.onClick);
+  }
+
+  Widget? _link(LinkNode node, Map<String, Object?> scope) {
+    final children = renderList(node.children, scope);
+    if (children.isEmpty) return null;
+    final widget = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: children,
+    );
+    return _withTap(widget, node.href);
   }
 
   Widget? _ifNode(IfNode node, Map<String, Object?> scope) {
