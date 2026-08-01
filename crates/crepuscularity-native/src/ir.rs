@@ -80,11 +80,6 @@ pub struct ViewStyle {
     pub max_width: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_height: Option<f32>,
-    /// Width as fraction of parent (0.0–1.0). Used for w-1/2, w-1/3, etc.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub width_fraction: Option<f32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub height_fraction: Option<f32>,
     /// aspect-square → 1.0, aspect-video → 16/9
     #[serde(skip_serializing_if = "Option::is_none")]
     pub aspect_ratio: Option<f32>,

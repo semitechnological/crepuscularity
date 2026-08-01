@@ -19,23 +19,23 @@ pub(crate) struct StackLayoutHints {
 }
 
 pub(crate) fn extract_stack_hints(
-    classes: &[String],
+    classes: Vec<String>,
     ctx: Option<&TemplateContext>,
 ) -> StackLayoutHints {
     let mut hints = StackLayoutHints::default();
-    for c in classes {
+    for c in &classes {
         apply_layout_class(&mut hints, c, ctx);
     }
-    hints.style.classes = classes.to_vec();
+    hints.style.classes = classes;
     hints
 }
 
-pub(crate) fn extract_text_style(classes: &[String], ctx: Option<&TemplateContext>) -> ViewStyle {
+pub(crate) fn extract_text_style(classes: Vec<String>, ctx: Option<&TemplateContext>) -> ViewStyle {
     let mut s = ViewStyle::default();
-    for c in classes {
+    for c in &classes {
         apply_presentation_class(&mut s, c, ctx);
     }
-    s.classes = classes.to_vec();
+    s.classes = classes;
     s
 }
 
@@ -244,20 +244,12 @@ fn apply_layout_class(hints: &mut StackLayoutHints, class: &str, ctx: Option<&Te
 
     // Width / height / size
     if let Some(rest) = class.strip_prefix("w-") {
-        if let Some(frac) = parse_fraction(rest) {
-            s.width_fraction = Some(frac);
-            return;
-        }
         if let Some(v) = parse_size(rest) {
             s.width = Some(v);
             return;
         }
     }
     if let Some(rest) = class.strip_prefix("h-") {
-        if let Some(frac) = parse_fraction(rest) {
-            s.height_fraction = Some(frac);
-            return;
-        }
         if let Some(v) = parse_size(rest) {
             s.height = Some(v);
             return;
@@ -825,19 +817,6 @@ fn apply_text_class(s: &mut ViewStyle, class: &str, ctx: Option<&TemplateContext
             s.corner_radius = Some(v);
         }
     }
-}
-
-// ── Fraction parser ──────────────────────────────────────────────────────────
-
-/// Parse `"1/2"` → `Some(0.5)`, `"2/3"` → `Some(0.667)`, etc.
-fn parse_fraction(s: &str) -> Option<f32> {
-    let (num, den) = s.split_once('/')?;
-    let n: f32 = num.parse().ok()?;
-    let d: f32 = den.parse().ok()?;
-    if d == 0.0 {
-        return None;
-    }
-    Some(n / d)
 }
 
 // ── New CSS property parsers ─────────────────────────────────────
