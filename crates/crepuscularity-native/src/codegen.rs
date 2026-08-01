@@ -1861,6 +1861,13 @@ fn bool_literal(value: bool) -> &'static str {
     }
 }
 
-fn indent_str(level: usize) -> String {
-    "    ".repeat(level)
+fn indent_str(level: usize) -> std::borrow::Cow<'static, str> {
+    /// 64 levels of four-space indent, sliced instead of rebuilt per call.
+    const SPACES: &str = "                                                                                                                                                                                                                                                                ";
+    let width = level * 4;
+    if width <= SPACES.len() {
+        std::borrow::Cow::Borrowed(&SPACES[..width])
+    } else {
+        std::borrow::Cow::Owned("    ".repeat(level))
+    }
 }

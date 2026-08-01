@@ -106,22 +106,140 @@ pub fn parse_text_size_px(rest: &str) -> Option<u16> {
         let stripped = inner.strip_suffix("px").unwrap_or(inner);
         return stripped.parse::<u16>().ok();
     }
-    match rest {
-        "xs" => Some(12),
-        "sm" => Some(14),
-        "base" => Some(16),
-        "lg" => Some(18),
-        "xl" => Some(20),
-        "2xl" => Some(24),
-        "3xl" => Some(30),
-        "4xl" => Some(36),
-        "5xl" => Some(48),
-        "6xl" => Some(60),
-        "7xl" => Some(72),
-        "8xl" => Some(96),
-        "9xl" => Some(128),
-        _ => rest.parse::<u16>().ok(),
+    if let Some(v) = parse_font_size_named(rest) {
+        return Some(v as u16);
     }
+    rest.parse::<u16>().ok()
+}
+
+/// The named `text-*` font-size ramp only — no arbitrary values, no bare numbers.
+///
+/// This is the canonical ramp; [`parse_text_size_px`] layers the permissive
+/// fallbacks on top for backends that want them.
+pub fn parse_font_size_named(rest: &str) -> Option<f32> {
+    Some(match rest {
+        "xs" => 12.0,
+        "sm" => 14.0,
+        "base" => 16.0,
+        "lg" => 18.0,
+        "xl" => 20.0,
+        "2xl" => 24.0,
+        "3xl" => 30.0,
+        "4xl" => 36.0,
+        "5xl" => 48.0,
+        "6xl" => 60.0,
+        "7xl" => 72.0,
+        "8xl" => 96.0,
+        "9xl" => 128.0,
+        _ => return None,
+    })
+}
+
+// ── Point-valued scale (View IR canonical) ───────────────────────────────────
+
+/// `width`/`height` sentinel meaning "fill the parent" (`w-full`, `w-screen`).
+pub const SIZE_FILL: f32 = -1.0;
+/// `width`/`height` sentinel meaning "size to content" (`w-fit`, `w-auto`).
+pub const SIZE_FIT: f32 = -2.0;
+
+/// Tailwind spacing scale in points: 1 unit = 4 pt.
+///
+/// Accepts arbitrary `[N]` / `[Npx]` and any decimal step (`0.5` → 2.0).
+pub fn parse_spacing_pt(rest: &str) -> Option<f32> {
+    if let Some(inner) = rest.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
+        let stripped = inner.strip_suffix("px").unwrap_or(inner);
+        return stripped.parse::<f32>().ok();
+    }
+    match rest {
+        "px" => return Some(1.0),
+        "0" => return Some(0.0),
+        _ => {}
+    }
+    rest.parse::<f32>().ok().map(|f| f * 4.0)
+}
+
+/// Parse `"1/2"` → `Some(0.5)`, `"2/3"` → `Some(0.667)`.
+pub fn parse_fraction(s: &str) -> Option<f32> {
+    let (num, den) = s.split_once('/')?;
+    let n: f32 = num.parse().ok()?;
+    let d: f32 = den.parse().ok()?;
+    if d == 0.0 {
+        return None;
+    }
+    Some(n / d)
+}
+
+/// Width/height token in points, or a sentinel.
+///
+/// - `> 0` — absolute points
+/// - [`SIZE_FILL`] — fill parent
+/// - [`SIZE_FIT`] — fit content
+/// - negative fraction (`-0.5` for `w-1/2`) — proportion of the parent
+pub fn parse_size_pt(rest: &str) -> Option<f32> {
+    match rest {
+        "full" | "screen" => return Some(SIZE_FILL),
+        "fit" | "auto" | "min" | "max" => return Some(SIZE_FIT),
+        "px" => return Some(1.0),
+        _ => {}
+    }
+    if let Some(inner) = rest.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
+        let stripped = inner.strip_suffix("px").unwrap_or(inner);
+        return stripped.parse::<f32>().ok().map(|v| v.max(0.0));
+    }
+    if let Some(f) = parse_fraction(rest) {
+        return Some(-f);
+    }
+    parse_spacing_pt(rest)
+}
+
+// ── CSS colour strings ───────────────────────────────────────────────────────
+
+/// Resolve a colour token to a CSS-ish hex string: named palette, bare hex,
+/// `#hex`, or `family-shade/opacity` (encoded as `"{hex}%{alpha:02x}"`).
+pub fn resolve_css_color(s: &str) -> Option<String> {
+    match s.trim().to_ascii_lowercase().as_str() {
+        "black" => return Some("#000000".to_string()),
+        "white" => return Some("#ffffff".to_string()),
+        "transparent" | "clear" => return Some("#00000000".to_string()),
+        _ => {}
+    }
+    if let Some((color_part, opacity_part)) = s.split_once('/') {
+        if let Some(hex) = lookup_named_color(color_part) {
+            if let Ok(pct) = opacity_part.parse::<u8>() {
+                let alpha = (pct as f32 / 100.0 * 255.0).round() as u8;
+                return Some(format!("{}%{:02x}", hex, alpha));
+            }
+        }
+    }
+    if let Some(hex) = lookup_named_color(s) {
+        return Some(hex.to_string());
+    }
+    parse_css_hex_color(s)
+}
+
+/// Accept a 6- or 8-digit hex colour, with or without a `#` / `0x` prefix.
+pub fn parse_css_hex_color(s: &str) -> Option<String> {
+    let t = s.trim();
+    let hex = t
+        .strip_prefix('#')
+        .or_else(|| t.strip_prefix("0x"))
+        .unwrap_or(t);
+    if (hex.len() == 6 || hex.len() == 8) && hex.chars().all(|c| c.is_ascii_hexdigit()) {
+        return Some(format!("#{}", hex));
+    }
+    None
+}
+
+/// Resolve an arbitrary-value bracket colour: `[#0f0f0f]`, `[red-500]`, `[rebeccapurple]`.
+pub fn resolve_arbitrary_css_color(rest: &str) -> Option<String> {
+    let inner = rest.strip_prefix('[')?.strip_suffix(']')?;
+    resolve_css_color(inner).or_else(|| {
+        if inner.chars().all(|c| c.is_alphabetic() || c == '-') {
+            Some(inner.to_string())
+        } else {
+            None
+        }
+    })
 }
 
 /// Resolve `red-500`, `#fff`, `bg-[#0f0]`, or `red-500/50` to RGB bytes.
@@ -225,6 +343,101 @@ mod tests {
         assert_eq!(parse_text_size_px("xl"), Some(20));
         assert_eq!(parse_text_size_px("2xl"), Some(24));
         assert_eq!(parse_text_size_px("[22px]"), Some(22));
+    }
+
+    #[test]
+    fn spacing_pt_scale() {
+        assert_eq!(parse_spacing_pt("4"), Some(16.0));
+        assert_eq!(parse_spacing_pt("0"), Some(0.0));
+        assert_eq!(parse_spacing_pt("px"), Some(1.0));
+        assert_eq!(parse_spacing_pt("0.5"), Some(2.0));
+        assert_eq!(parse_spacing_pt("1.5"), Some(6.0));
+        assert_eq!(parse_spacing_pt("[20px]"), Some(20.0));
+        assert_eq!(parse_spacing_pt("[20]"), Some(20.0));
+        assert_eq!(parse_spacing_pt("full"), None);
+    }
+
+    #[test]
+    fn spacing_pt_agrees_with_spacing_px_on_the_named_scale() {
+        for token in [
+            "0", "0.5", "1", "1.5", "2", "2.5", "3", "3.5", "4", "5", "6", "7", "8", "9", "10",
+            "11", "12", "14", "16", "20", "24", "32", "36", "40", "44", "48", "52", "56", "60",
+            "64", "72", "80", "96", "px",
+        ] {
+            let pt = parse_spacing_pt(token).unwrap();
+            let px = parse_spacing_px(token).unwrap();
+            assert_eq!(pt, px as f32, "spacing scales diverge on {token}");
+        }
+    }
+
+    #[test]
+    fn size_pt_sentinels() {
+        assert_eq!(parse_size_pt("full"), Some(SIZE_FILL));
+        assert_eq!(parse_size_pt("screen"), Some(SIZE_FILL));
+        for fit in ["fit", "auto", "min", "max"] {
+            assert_eq!(parse_size_pt(fit), Some(SIZE_FIT));
+        }
+        assert_eq!(parse_size_pt("px"), Some(1.0));
+        assert_eq!(parse_size_pt("4"), Some(16.0));
+        assert_eq!(parse_size_pt("1/2"), Some(-0.5));
+        assert_eq!(parse_size_pt("[-8px]"), Some(0.0));
+        assert_eq!(parse_size_pt("nope"), None);
+    }
+
+    #[test]
+    fn fraction() {
+        assert_eq!(parse_fraction("1/2"), Some(0.5));
+        assert_eq!(parse_fraction("3/4"), Some(0.75));
+        assert_eq!(parse_fraction("1/0"), None);
+        assert_eq!(parse_fraction("4"), None);
+    }
+
+    #[test]
+    fn font_size_named_is_a_strict_ramp() {
+        assert_eq!(parse_font_size_named("xs"), Some(12.0));
+        assert_eq!(parse_font_size_named("9xl"), Some(128.0));
+        assert_eq!(parse_font_size_named("4"), None);
+        assert_eq!(parse_font_size_named("[22px]"), None);
+    }
+
+    #[test]
+    fn css_color_strings() {
+        assert_eq!(resolve_css_color("black").as_deref(), Some("#000000"));
+        assert_eq!(resolve_css_color("WHITE").as_deref(), Some("#ffffff"));
+        assert_eq!(
+            resolve_css_color("transparent").as_deref(),
+            Some("#00000000")
+        );
+        assert_eq!(resolve_css_color("red-500").as_deref(), Some("#fb2c36"));
+        assert_eq!(
+            resolve_css_color("red-500/50").as_deref(),
+            Some("#fb2c36%80")
+        );
+        assert_eq!(resolve_css_color("#aabbcc").as_deref(), Some("#aabbcc"));
+        assert_eq!(
+            resolve_css_color("0xaabbccdd").as_deref(),
+            Some("#aabbccdd")
+        );
+        assert_eq!(resolve_css_color("#abc"), None);
+        assert_eq!(resolve_css_color("nope"), None);
+    }
+
+    #[test]
+    fn arbitrary_css_colors() {
+        assert_eq!(
+            resolve_arbitrary_css_color("[#ff0000]").as_deref(),
+            Some("#ff0000")
+        );
+        assert_eq!(
+            resolve_arbitrary_css_color("[red-500]").as_deref(),
+            Some("#fb2c36")
+        );
+        assert_eq!(
+            resolve_arbitrary_css_color("[rebeccapurple]").as_deref(),
+            Some("rebeccapurple")
+        );
+        assert_eq!(resolve_arbitrary_css_color("[12345]"), None);
+        assert_eq!(resolve_arbitrary_css_color("#ff0000"), None);
     }
 
     #[test]
