@@ -53,7 +53,9 @@ exports.parse_crepus_json = parse_crepus_json;
  * Parse a template into View IR, choosing the frontend from `filename`.
  *
  * The parser dispatches on the file extension, so `.crepus`, `.jsx`/`.tsx`,
- * `.svelte` and `.vue` all reach the same IR through their own frontend.
+ * `.svelte`, `.vue`, `.astro` and Angular component templates
+ * (`*.component.html`, `*.ng.html`, `*.ng`) all reach the same IR through
+ * their own frontend.
  * @param {string} source
  * @param {string | null} [filename]
  * @param {string | null} [context_json]
