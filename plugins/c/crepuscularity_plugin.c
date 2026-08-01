@@ -66,5 +66,5 @@ int main(int argc, char **argv) {
     if (crepus_render_html(argv[1], html, sizeof(html)) != 0 || strstr(html, "data-crepus-kind=\"stack\"") == NULL) {
         return 1;
     }
-    return strstr(buf, "\"version\":6") || strstr(buf, "\"version\": 6") ? 0 : 1;
+    return strstr(buf, "\"version\":7") || strstr(buf, "\"version\": 7") ? 0 : 1;
 }

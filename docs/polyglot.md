@@ -10,7 +10,7 @@ Equilibrium stays separate. Plugin authors can use Equilibrium, PyO3, JNI, `cgo`
 
 See **[View IR contract](view-ir-contract.md)** for the full spec (versioning, schema export, CLI stderr/stdout, hot reload). See **[Plugin surface](plugin-surface.md)** for what each language package must implement.
 
-- `ViewIr.version` must equal `IR_VERSION` (currently **6**).
+- `ViewIr.version` must equal `IR_VERSION` (currently **7**).
 - Reference plugins: [`plugins/README.md`](../plugins/README.md).
 
 ## CLI Boundary

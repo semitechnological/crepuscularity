@@ -13,6 +13,7 @@ export interface TabItem {
 }
 
 export interface ViewStyle {
+  id?: string;
   classes?: string[];
 
   padding?: number;

@@ -5,8 +5,8 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// Bumped when the JSON schema gains incompatible fields; shells should check `version`.
-/// Bumped for onLongPress field added to ViewNode variants.
-pub const IR_VERSION: u32 = 6;
+/// Bumped for the `id` field added to `ViewStyle`.
+pub const IR_VERSION: u32 = 7;
 
 /// Root document from parsing + lowering (see `crepuscularity_native::render_template_to_ir`).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -27,6 +27,12 @@ pub struct ViewIr {
 #[cfg_attr(feature = "schema", derive(JsonSchema))]
 #[serde(rename_all = "camelCase")]
 pub struct ViewStyle {
+    // ── Source identity ──────────────────────────────────────────────────
+    /// Original `#id` from the template, preserved verbatim so web targets can
+    /// emit `id` and runtimes can bind to the element by selector.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+
     // ── Source classes ───────────────────────────────────────────────────
     /// Original class tokens from the template, preserved verbatim so web
     /// targets can emit `className` instead of re-deriving CSS from hints.
@@ -482,6 +488,44 @@ pub enum ViewNode {
         #[serde(skip_serializing_if = "Option::is_none")]
         style: Option<ViewStyle>,
     },
+}
+
+impl ViewNode {
+    /// Mutable access to the node's style slot, whatever the variant.
+    pub fn style_mut(&mut self) -> &mut Option<ViewStyle> {
+        match self {
+            ViewNode::Text { style, .. }
+            | ViewNode::If { style, .. }
+            | ViewNode::ForEach { style, .. }
+            | ViewNode::Stack { style, .. }
+            | ViewNode::Button { style, .. }
+            | ViewNode::Toggle { style, .. }
+            | ViewNode::Checkbox { style, .. }
+            | ViewNode::Slider { style, .. }
+            | ViewNode::Progress { style, .. }
+            | ViewNode::Meter { style, .. }
+            | ViewNode::Badge { style, .. }
+            | ViewNode::Divider { style, .. }
+            | ViewNode::Spacer { style, .. }
+            | ViewNode::Dropzone { style, .. }
+            | ViewNode::FilePicker { style, .. }
+            | ViewNode::Image { style, .. }
+            | ViewNode::Link { style, .. }
+            | ViewNode::WebView { style, .. }
+            | ViewNode::Scroll { style, .. }
+            | ViewNode::List { style, .. }
+            | ViewNode::ListItem { style, .. }
+            | ViewNode::SlotRotate { style, .. }
+            | ViewNode::Input { style, .. }
+            | ViewNode::Picker { style, .. }
+            | ViewNode::Tabs { style, .. } => style,
+        }
+    }
+
+    /// Attach a source `#id` to the node, creating the style slot if needed.
+    pub fn set_id(&mut self, id: impl Into<String>) {
+        self.style_mut().get_or_insert_with(ViewStyle::default).id = Some(id.into());
+    }
 }
 
 /// One selectable option in a [`ViewNode::Picker`].

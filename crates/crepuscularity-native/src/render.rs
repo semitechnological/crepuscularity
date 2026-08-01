@@ -156,6 +156,14 @@ fn stack_column_raw(children: Vec<ViewNode>) -> ViewNode {
 }
 
 fn render_element(el: &Element, ctx: &TemplateContext) -> Result<ViewNode, CrepusError> {
+    let mut node = render_element_inner(el, ctx)?;
+    if let Some(id) = &el.id {
+        node.set_id(id.clone());
+    }
+    Ok(node)
+}
+
+fn render_element_inner(el: &Element, ctx: &TemplateContext) -> Result<ViewNode, CrepusError> {
     let tag = el.tag.to_ascii_lowercase();
     let tag = tag.as_str();
 

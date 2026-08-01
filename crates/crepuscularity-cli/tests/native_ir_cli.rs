@@ -33,7 +33,7 @@ fn native_ir_renders_file_with_context() {
         String::from_utf8_lossy(&out.stderr)
     );
     let value: serde_json::Value = serde_json::from_slice(&out.stdout).expect("IR JSON");
-    assert_eq!(value["version"], 6);
+    assert_eq!(value["version"], 7);
     assert_eq!(value["root"][0]["children"][0]["content"], "Hello Ada");
 }
 

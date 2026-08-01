@@ -1102,3 +1102,24 @@ fn vue_conditional_classes_lower_to_active_classes() {
     assert_eq!(classes, &json!(["base", "font-bold", "hidden"]));
     round_trip(&ir);
 }
+
+#[test]
+fn element_id_lowers_into_view_style() {
+    let ir = render_template_to_ir(
+        "div #page flex\n h1 #tsc-heading\n  \"hello\"",
+        &TemplateContext::new(),
+    )
+    .unwrap();
+    let v = serde_json::to_value(&ir).unwrap();
+    assert_eq!(v["root"][0]["style"]["id"], "page");
+    assert_eq!(v["root"][0]["children"][0]["style"]["id"], "tsc-heading");
+    round_trip(&ir);
+}
+
+#[test]
+fn element_without_id_omits_the_field() {
+    let ir = render_template_to_ir("div flex", &TemplateContext::new()).unwrap();
+    let v = serde_json::to_value(&ir).unwrap();
+    assert!(v["root"][0]["style"].get("id").is_none());
+    round_trip(&ir);
+}
