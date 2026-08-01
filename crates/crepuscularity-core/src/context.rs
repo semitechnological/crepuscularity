@@ -54,14 +54,7 @@ impl TemplateContext {
         value_to_str(self.vars.get(key).unwrap_or(&TemplateValue::Null))
     }
 
-    pub fn get_list(&self, key: &str) -> Vec<TemplateContext> {
-        match self.vars.get(key) {
-            Some(TemplateValue::List(items)) => items.clone(),
-            _ => Vec::new(),
-        }
-    }
-
-    /// Like `get_list` but returns a reference — avoids cloning the entire list.
+    /// Returns the list stored at `key` as a slice, or empty if absent.
     pub fn get_list_ref(&self, key: &str) -> &[TemplateContext] {
         match self.vars.get(key) {
             Some(TemplateValue::List(items)) => items.as_slice(),
