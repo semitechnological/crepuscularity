@@ -968,6 +968,38 @@ fn exec_tracked(
     Ok((status.success(), err, rss))
 }
 
+/// Whether a step script uses shell syntax that direct exec cannot honour.
+#[cfg(unix)]
+fn needs_shell(script: &str) -> bool {
+    let mut quote: Option<char> = None;
+    let mut chars = script.chars().peekable();
+    while let Some(c) = chars.next() {
+        match quote {
+            Some(q) => {
+                if c == '\\' {
+                    chars.next();
+                } else if c == q {
+                    quote = None;
+                }
+            }
+            None => match c {
+                '\'' | '"' => quote = Some(c),
+                '\\' => {
+                    chars.next();
+                }
+                '&' | '|' | ';' | '<' | '>' | '`' | '\n' => return true,
+                '$' => {
+                    if matches!(chars.peek(), Some('(') | Some('{')) {
+                        return true;
+                    }
+                }
+                _ => {}
+            },
+        }
+    }
+    false
+}
+
 fn run_shell(
     workdir: &Path,
     script: &str,
@@ -977,14 +1009,26 @@ fn run_shell(
 ) -> (bool, String, Option<u64>) {
     #[cfg(unix)]
     {
-        let tokens = match shlex::split(script) {
-            Some(t) if !t.is_empty() => t,
-            _ => return (false, "Failed to parse command script".to_string(), None),
+        // A step containing shell operators has to go through a shell: exec'ing
+        // the split tokens directly hands `&&` to the program as an argument,
+        // which fails the step for a reason that looks like the program's fault.
+        // Simple commands keep the direct path so the tracked process is the
+        // program itself rather than the shell wrapping it.
+        let mut cmd = if needs_shell(script) {
+            let mut c = Command::new("sh");
+            c.arg("-c").arg(script);
+            c
+        } else {
+            let tokens = match shlex::split(script) {
+                Some(t) if !t.is_empty() => t,
+                _ => return (false, "Failed to parse command script".to_string(), None),
+            };
+            let mut c = Command::new(&tokens[0]);
+            if tokens.len() > 1 {
+                c.args(&tokens[1..]);
+            }
+            c
         };
-        let mut cmd = Command::new(&tokens[0]);
-        if tokens.len() > 1 {
-            cmd.args(&tokens[1..]);
-        }
         cmd.current_dir(workdir).envs(envs);
         match exec_tracked(&mut cmd, inherit_io, measure_memory) {
             Ok(x) => x,
@@ -2042,6 +2086,43 @@ mod tests {
     use std::fs;
     #[cfg(unix)]
     use std::os::unix::fs::symlink;
+
+    #[test]
+    #[cfg(unix)]
+    fn needs_shell_detects_operators_outside_quotes() {
+        use super::needs_shell;
+        // Every JS target in benchmark.toml is written this way; running it
+        // without a shell hands `&&` to bun as a package name.
+        assert!(needs_shell("bun install && bun run build"));
+        assert!(needs_shell("cargo build | tee log"));
+        assert!(needs_shell("a; b"));
+        assert!(needs_shell("echo $(date)"));
+        assert!(needs_shell("cargo build > out.txt"));
+        // A plain command keeps the direct-exec path.
+        assert!(!needs_shell("cargo build --release"));
+        assert!(!needs_shell("bun run build"));
+        // Operators inside quotes are data, not syntax.
+        assert!(!needs_shell("echo 'a && b'"));
+        assert!(!needs_shell("echo \"x | y\""));
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn shell_steps_actually_run_both_commands() {
+        use super::run_shell;
+        use std::collections::HashMap;
+        let dir = tempfile::tempdir().expect("tempdir");
+        let (ok, _out, _mem) = run_shell(
+            dir.path(),
+            "echo one > a.txt && echo two > b.txt",
+            false,
+            false,
+            &HashMap::new(),
+        );
+        assert!(ok, "chained step should succeed");
+        assert!(dir.path().join("a.txt").is_file());
+        assert!(dir.path().join("b.txt").is_file());
+    }
 
     #[test]
     #[cfg(unix)]
