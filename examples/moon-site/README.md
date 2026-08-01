@@ -42,12 +42,25 @@ build`, or run the printed commands yourself.
 then leaves it alone, so edits there survive a rebuild; `src/App.tsx` and
 `src/components/` are regenerated from the templates every run.
 
+## Interactivity
+
+The generated component takes two props:
+
+```tsx
+<App scope={{ count, tags: TAGS }} handlers={{ increment: () => setCount(n => n + 1) }} />
+```
+
+`scope` supplies the values template expressions read (`if {count > 0}`,
+`for tag in {tags}`), and `handlers` supplies the functions its events call
+(`button @click=increment`). `if`/`else` become real conditionals and `for`
+becomes `.map()`, so the template decides what renders. State itself lives in
+ordinary React in `src/main.tsx` — the template does not own it.
+
 ## What this example does not do yet
 
-The emitted JSX is structural. Event handlers (`@click`) are not wired to
-Moonshine signals, and `if` / `for` are emitted as `data-crepus-if` /
-`data-crepus-for-each` attributes rather than live control flow, so this path
-suits content-driven pages rather than interactive state today.
+`on_long_press` has no DOM equivalent, so it is emitted as
+`data-crepus-on-long-press` for a host to pick up rather than invented as an
+event.
 
 `bun` is required to produce `dist/`, because Moonshine is a JavaScript
 runtime. Nothing in this project is authored in JavaScript.
