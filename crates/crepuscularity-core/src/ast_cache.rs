@@ -139,5 +139,4 @@ mod tests {
             "Cache should miss after file modification"
         );
     }
-
 }
