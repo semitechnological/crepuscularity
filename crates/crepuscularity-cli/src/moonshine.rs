@@ -727,8 +727,16 @@ mount();
             copy_dir_flat(&ts_dir, &dest).map_err(CrepusCliError::context)?;
         }
 
-        scaffold::write_file(&project.join("src/main.tsx"), MAIN_TSX_BOOTSTRAP)
-            .map_err(CrepusCliError::context)?;
+        // The entry is where generated components, hand-written TSX from `ts/`
+        // and npm libraries get composed, so it is the one generated file worth
+        // editing. Overwriting it every build would silently discard that work;
+        // `src/App.tsx` still tracks the templates on every run.
+        let entry = project.join("src/main.tsx");
+        if entry.exists() {
+            ui::step("kept existing src/main.tsx");
+        } else {
+            scaffold::write_file(&entry, MAIN_TSX_BOOTSTRAP).map_err(CrepusCliError::context)?;
+        }
 
         let (core, crepus, components, local_hint) = match resolve_moonshine_root() {
             Some(root) => {

@@ -8,6 +8,5 @@ index.html
 vite.config.ts
 tsconfig.json
 src/App.tsx
-src/main.tsx
 src/components/
 src/ts/

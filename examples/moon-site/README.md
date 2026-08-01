@@ -29,6 +29,19 @@ build`, or run the printed commands yourself.
 - This is a real bun project after `crepus moon build`: run `bun add
   <package>` in the project directory like any other bun/Vite app.
 
+## Where each piece comes from
+
+| Source | Kind | Becomes |
+| --- | --- | --- |
+| `templates/page.crepus` | indentation syntax | `src/App.tsx` |
+| `templates/badge.csx` | crepusx (JSX-flavoured) | `src/components/Badge.tsx` |
+| inline in `src/main.rs` | raw string literal | `src/components/Footer.tsx` |
+| `ts/Counter.tsx` | hand-written React | `src/ts/Counter.tsx` |
+
+`src/main.tsx` composes all four. `crepus moon build` writes that file once and
+then leaves it alone, so edits there survive a rebuild; `src/App.tsx` and
+`src/components/` are regenerated from the templates every run.
+
 ## What this example does not do yet
 
 The emitted JSX is structural. Event handlers (`@click`) are not wired to
