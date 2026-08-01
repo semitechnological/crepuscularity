@@ -32,7 +32,10 @@ pub mod moonshine;
 pub mod mutations;
 pub mod native;
 mod render;
+pub mod solid;
 pub mod style;
+pub mod svelte;
+pub mod vue;
 
 pub use capabilities::{
     ANDROID_ACCESSIBILITY_INFO, ANDROID_ACTION_SHEET, ANDROID_APP, ANDROID_APPEARANCE,
@@ -71,6 +74,9 @@ pub use render::{
     render_component_file_to_ir, render_from_files, render_nodes_to_ir, render_template_to_ir,
     render_template_to_ir_with_path,
 };
+pub use solid::emit_solid_component;
+pub use svelte::emit_svelte_component;
+pub use vue::emit_vue_component;
 
 /// Serialize IR to JSON (compact).
 pub fn to_json(ir: &ViewIr) -> Result<String, serde_json::Error> {

@@ -249,6 +249,9 @@ pub enum WebEmitTarget {
     #[default]
     Html,
     Moonshine,
+    Svelte,
+    Vue,
+    Solid,
 }
 
 #[derive(Subcommand, Debug)]

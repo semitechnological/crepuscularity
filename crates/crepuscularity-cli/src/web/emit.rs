@@ -59,6 +59,18 @@ pub(crate) fn build_emit_stub(
     let (filename, body) = match emit {
         WebEmitTarget::Html => unreachable!("html uses WASM build path"),
         WebEmitTarget::Moonshine => ("crepus-emit.moonshine.tsx", emit_moonshine(&ir)),
+        WebEmitTarget::Svelte => (
+            "CrepusEmit.svelte",
+            crepuscularity_native::emit_svelte_component(&ir),
+        ),
+        WebEmitTarget::Vue => (
+            "CrepusEmit.vue",
+            crepuscularity_native::emit_vue_component(&ir),
+        ),
+        WebEmitTarget::Solid => (
+            "CrepusEmit.solid.tsx",
+            crepuscularity_native::emit_solid_component(&ir, "CrepusEmit"),
+        ),
     };
 
     let out_file = paths.out_dir.join(filename);
@@ -72,10 +84,22 @@ pub(crate) fn build_emit_stub(
         out_file.display(),
         ir_path.display()
     );
-    eprintln!(
-        "  {} Moonshine emit: App() → JSX with className; install via `crepus moonshine dep`",
-        ui::dim("→")
-    );
+    let hint = match emit {
+        WebEmitTarget::Html => "",
+        WebEmitTarget::Moonshine => {
+            "Moonshine emit: App() → JSX with className; install via `crepus moonshine dep`"
+        }
+        WebEmitTarget::Svelte => {
+            "Svelte 5 emit: a component taking { scope, handlers } via $props()"
+        }
+        WebEmitTarget::Vue => "Vue 3 emit: an SFC taking { scope, handlers } via defineProps()",
+        WebEmitTarget::Solid => {
+            "Solid emit: a component taking { scope, handlers }, Show/For control flow"
+        }
+    };
+    if !hint.is_empty() {
+        eprintln!("  {} {hint}", ui::dim("→"));
+    }
     ui::done_in(t0.elapsed());
 }
 

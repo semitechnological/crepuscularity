@@ -1750,7 +1750,7 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-cli"
-version = "0.15.1"
+version = "0.16.0"
 dependencies = [
  "clap",
  "console",
@@ -1891,7 +1891,7 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-native"
-version = "0.6.3"
+version = "0.6.4"
 dependencies = [
  "crepuscularity-core",
  "schemars",

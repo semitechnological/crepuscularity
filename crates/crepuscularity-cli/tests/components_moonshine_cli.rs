@@ -209,3 +209,53 @@ fn web_build_emit_moonshine_writes_entry() {
     assert!(!entry.contains("renderCrepusIr"));
     assert!(!entry.contains("satisfies ViewIr"));
 }
+
+/// Every non-HTML emit target must write its file and produce source its own
+/// toolchain recognises, so `--emit` stays honest as targets are added.
+#[test]
+fn web_build_emits_svelte_vue_and_solid() {
+    let cases = [
+        ("svelte", "CrepusEmit.svelte", "$props()", "{#if"),
+        ("vue", "CrepusEmit.vue", "defineProps", "v-if"),
+        ("solid", "CrepusEmit.solid.tsx", "solid-js", "<Show"),
+    ];
+
+    for (target, filename, marker, control_flow) in cases {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let site = tmp.path().join("site");
+        std::fs::create_dir_all(&site).expect("mkdir");
+        std::fs::write(
+            site.join("index.crepus"),
+            "stack col gap-2\n if {ready}\n  text \"yes\"\n else\n  text \"no\"\n",
+        )
+        .expect("write crepus");
+        let out = tmp.path().join("dist");
+
+        let status = crepus()
+            .args([
+                "web",
+                "build",
+                "--emit",
+                target,
+                "--site",
+                site.to_str().unwrap(),
+                "--out-dir",
+                out.to_str().unwrap(),
+            ])
+            .status()
+            .expect("run crepus web build");
+        assert!(status.success(), "{target} emit should succeed");
+
+        let body = std::fs::read_to_string(out.join(filename))
+            .unwrap_or_else(|e| panic!("{target}: read {filename}: {e}"));
+        assert!(body.contains(marker), "{target} missing {marker}: {body}");
+        assert!(
+            body.contains(control_flow),
+            "{target} missing {control_flow}: {body}"
+        );
+        assert!(
+            !body.contains("data-crepus-if"),
+            "{target} should emit real control flow: {body}"
+        );
+    }
+}
