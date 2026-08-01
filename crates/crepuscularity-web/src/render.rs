@@ -506,10 +506,13 @@ fn push_bindings(
         if skip_interval && binding.prop == "interval" {
             continue;
         }
+        let value = value_to_str(&eval_expr(&binding.value, ctx)?);
+        if crate::is_url_attr(&binding.prop) && !crate::is_safe_url_value(&binding.prop, &value) {
+            continue;
+        }
         out.push(' ');
         out.push_str(&binding.prop);
         out.push_str("=\"");
-        let value = value_to_str(&eval_expr(&binding.value, ctx)?);
         out.push_str(&crate::escape_html(&value));
         out.push('"');
     }

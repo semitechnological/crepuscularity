@@ -542,6 +542,47 @@ pub fn escape_html(input: &str) -> String {
     out
 }
 
+/// True for attributes whose value a browser resolves as a URL, and which
+/// therefore carry a scheme that `escape_html` cannot neutralise.
+pub(crate) fn is_url_attr(prop: &str) -> bool {
+    matches!(
+        prop,
+        "href" | "src" | "srcset" | "action" | "formaction" | "poster" | "data" | "xlink:href"
+    )
+}
+
+/// Scheme as a browser reads it: leading C0 whitespace is skipped and tab, LF
+/// and CR are dropped from anywhere inside the scheme, because a browser
+/// removes them before parsing. `&#106;avascript:` needs no handling here —
+/// `escape_html` turns the `&` into `&amp;`, so the entity never decodes.
+fn url_scheme(value: &str) -> String {
+    let mut scheme = String::new();
+    for ch in value.trim_start_matches(|c: char| c <= ' ').chars() {
+        match ch {
+            '\t' | '\n' | '\r' => continue,
+            ':' => return scheme,
+            c => scheme.push(c.to_ascii_lowercase()),
+        }
+    }
+    String::new()
+}
+
+/// Whether a URL-bearing attribute is safe to emit.
+///
+/// `javascript:` and `vbscript:` execute wherever they are accepted, so they
+/// are refused on every attribute. `data:` is refused only on navigable
+/// attributes: `data:text/html` in an `href` is a same-origin script vector,
+/// while `data:` in a `src` is the ordinary inline-image case and stays
+/// allowed. A refused attribute is dropped rather than blanked, so the element
+/// is inert instead of pointing at the current page.
+pub(crate) fn is_safe_url_value(prop: &str, value: &str) -> bool {
+    match url_scheme(value).as_str() {
+        "javascript" | "vbscript" => false,
+        "data" => !matches!(prop, "href" | "xlink:href" | "action" | "formaction"),
+        _ => true,
+    }
+}
+
 /// Build the `class="..."` attribute value: join classes with spaces, interpolate,
 /// and escape — in a single pass, avoiding the intermediate Vec + join + escape.
 /// Filters out target-conditional classes for non-web targets (tui:, gpui:, etc.).
