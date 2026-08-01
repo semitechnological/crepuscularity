@@ -245,7 +245,7 @@ fn split_for_parts(src: &str) -> Option<(&str, &str)> {
 }
 
 /// `:class` supports plain expressions, object syntax and array syntax.
-fn apply_dynamic_class(
+pub(crate) fn apply_dynamic_class(
     expr: &str,
     classes: &mut Vec<String>,
     conditional_classes: &mut Vec<ConditionalClass>,
@@ -316,7 +316,7 @@ fn apply_dynamic_class(
 }
 
 /// Split on commas that are not nested inside brackets, braces or quotes.
-fn split_top_level(src: &str) -> Vec<&str> {
+pub(crate) fn split_top_level(src: &str) -> Vec<&str> {
     let mut parts = Vec::new();
     let mut depth = 0i32;
     let mut quote: Option<char> = None;

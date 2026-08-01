@@ -1,5 +1,7 @@
 /// Runtime parser for the crepuscularity template DSL.
 /// Mirrors the compile-time proc-macro parser but operates on strings at runtime.
+mod angular;
+mod astro;
 mod indent;
 mod jsx;
 mod svelte;
@@ -21,6 +23,33 @@ pub use svelte::{parse_svelte_component, SvelteComponent};
 pub(crate) struct RawParseError {
     pub message: String,
     pub byte_offset: Option<usize>,
+}
+
+/// Byte index of the delimiter matching the one at the start of `src`,
+/// ignoring delimiters that appear inside string literals.
+pub(crate) fn match_delimiter(src: &str, open: char, close: char) -> Option<usize> {
+    let mut depth = 0usize;
+    let mut quote: Option<char> = None;
+    for (i, c) in src.char_indices() {
+        if let Some(q) = quote {
+            if c == q {
+                quote = None;
+            }
+            continue;
+        }
+        match c {
+            '"' | '\'' | '`' => quote = Some(c),
+            _ if c == open => depth += 1,
+            _ if c == close => {
+                depth -= 1;
+                if depth == 0 {
+                    return Some(i);
+                }
+            }
+            _ => {}
+        }
+    }
+    None
 }
 
 pub(crate) fn subslice_byte_offset(full: &str, tail: &str) -> usize {
@@ -255,6 +284,10 @@ pub(crate) fn parse_template_raw_with_path(
         vue::parse_vue_file(template)
     } else if is_svelte_mode(path) {
         parse_svelte_template(template)
+    } else if is_astro_mode(path) {
+        astro::parse_astro_template(template)
+    } else if is_angular_mode(path) {
+        angular::parse_angular_template(template)
     } else if is_jsx_mode(template, path) {
         parse_jsx_template(template)
     } else {
@@ -281,6 +314,37 @@ pub(crate) fn is_vue_mode(path: Option<&std::path::Path>) -> bool {
         .and_then(|e| e.to_str())
         .map(|e| e.eq_ignore_ascii_case("vue"))
         .unwrap_or(false)
+}
+
+/// Returns true when the file path has the `.astro` extension, activating the
+/// Astro template frontend.
+pub(crate) fn is_astro_mode(path: Option<&std::path::Path>) -> bool {
+    path.and_then(|p| p.extension())
+        .and_then(|e| e.to_str())
+        .is_some_and(|e| e.eq_ignore_ascii_case("astro"))
+}
+
+/// Returns true when the file path names an Angular component template.
+///
+/// Angular templates are plain `.html`, which the dispatcher cannot claim
+/// wholesale, so the frontend is keyed on the Angular CLI's own naming
+/// convention (`foo.component.html`), on the explicit `.ng.html` opt-in, and on
+/// a bare `.ng` extension.
+pub(crate) fn is_angular_mode(path: Option<&std::path::Path>) -> bool {
+    let Some(path) = path else {
+        return false;
+    };
+    if path
+        .extension()
+        .and_then(|e| e.to_str())
+        .is_some_and(|e| e.eq_ignore_ascii_case("ng"))
+    {
+        return true;
+    }
+    path.file_name()
+        .and_then(|n| n.to_str())
+        .map(|n| n.to_ascii_lowercase())
+        .is_some_and(|n| n.ends_with(".component.html") || n.ends_with(".ng.html"))
 }
 
 /// Returns true when the first non-blank, non-comment, non-`$:` line starts with `<`

@@ -5,9 +5,9 @@
 //! native View IR, LVGL — consumes Vue markup unchanged. `<script>` blocks are
 //! never executed; `<style>` blocks are preserved for a caller to emit.
 
-mod builders;
+pub(crate) mod builders;
 mod sfc;
-mod template;
+pub(crate) mod template;
 
 use super::RawParseError;
 use crate::ast::Node;
