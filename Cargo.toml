@@ -1,6 +1,9 @@
 [workspace]
 resolver = "2"
 exclude = [
+    # Depends on the published crepuscularity-native, not the workspace path, so
+    # it exercises the same resolution a scaffolded project outside this repo gets.
+    "examples/moon-site",
     "tree-sitter-crepus",
     "tree-sitter-crepusx",
     "examples/benchmarks/apps/leptos",
