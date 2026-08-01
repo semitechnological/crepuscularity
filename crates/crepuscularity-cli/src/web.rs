@@ -68,7 +68,6 @@ pub fn execute(cmd: WebCommands) {
             entry,
             target_id,
             manifest,
-            axum,
             emit,
         } => {
             if emit != WebEmitTarget::Html {
@@ -77,7 +76,7 @@ pub fn execute(cmd: WebCommands) {
                     emit
                 ));
             }
-            let opts = resolve_dev_options(site, port, entry, target_id, manifest, axum);
+            let opts = resolve_dev_options(site, port, entry, target_id, manifest);
             crate::web_serve::run(opts);
         }
         WebCommands::BuildFull {
@@ -112,7 +111,6 @@ fn resolve_dev_options(
     entry: String,
     target_id: Option<String>,
     manifest: Option<PathBuf>,
-    axum: bool,
 ) -> crate::web_serve::ServeOptions {
     let explicit_site = site.is_some();
     let mut site_dir =
@@ -147,6 +145,5 @@ fn resolve_dev_options(
         port,
         entry,
         meta,
-        axum,
     }
 }

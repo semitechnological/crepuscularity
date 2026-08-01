@@ -41,8 +41,6 @@ use serde_json::json;
 use crepuscularity_core::context::TemplateContext;
 use crepuscularity_web::{render_from_files, render_from_files_with_ssr};
 
-use axum::extract::State;
-
 use crate::crepus_toml::WebTargetMeta;
 use crate::web::{
     ensure_web_dev_artifacts, load_site_head, merge_site_head_meta, merged_site_google_fonts,
@@ -98,8 +96,6 @@ pub struct ServeOptions {
     /// Entry-point template relative to `site_dir` (default `"index.crepus"`).
     pub entry: String,
     pub meta: Option<WebTargetMeta>,
-    /// Use Axum-based SSR server instead of the raw TCP listener.
-    pub axum: bool,
 }
 
 #[derive(Clone)]
@@ -232,10 +228,6 @@ fn validate_templates(site_dir: &Path) {
 
 /// Run the dev server, blocking until the process is killed.
 pub fn run(opts: ServeOptions) {
-    if opts.axum {
-        serve_with_axum(opts);
-        return;
-    }
     let site_dir = std::fs::canonicalize(&opts.site_dir).unwrap_or_else(|_| opts.site_dir.clone());
 
     // Validate all templates at startup.
@@ -1148,231 +1140,6 @@ fn guess_mime(ext: &str) -> &'static str {
         "woff2" => "font/woff2",
         "woff" => "font/woff",
         _ => "application/octet-stream",
-    }
-}
-
-// ── Axum SSR integration ─────────────────────────────────────────────────────
-
-/// Shared state for Axum SSR handlers.
-struct AxumState {
-    site_dir: PathBuf,
-    entry: String,
-    generation: Arc<AtomicU64>,
-    last_sse_msg: Arc<RwLock<String>>,
-}
-
-/// Axum-based SSR dev server using `crepuscularity_web` SSR rendering.
-///
-/// Starts an Axum HTTP server that renders `.crepus` templates via
-/// [`crepuscularity_web::render_ssr_document`] with hot-reload SSE support.
-pub fn serve_with_axum(opts: ServeOptions) {
-    use axum::{response::IntoResponse, routing::get, Router};
-    use std::net::SocketAddr;
-
-    let site_dir = opts.site_dir.clone();
-    let entry = opts.entry.clone();
-    let vfm = load_vfm(&site_dir);
-    let generation = Arc::new(AtomicU64::new(0));
-    let last_sse_msg = Arc::new(RwLock::new(String::new()));
-
-    // Spawn file watcher
-    let vfm_watcher = Arc::clone(&vfm);
-    let gen_watcher = Arc::clone(&generation);
-    let sse_watcher = Arc::clone(&last_sse_msg);
-    let site_dir_watcher = site_dir.clone();
-    std::thread::spawn(move || {
-        watch_crepus_files(&site_dir_watcher, vfm_watcher, gen_watcher, sse_watcher);
-    });
-
-    let state = Arc::new(AxumState {
-        site_dir: site_dir.clone(),
-        entry: entry.clone(),
-        generation: Arc::clone(&generation),
-        last_sse_msg: Arc::clone(&last_sse_msg),
-    });
-
-    let app = Router::new()
-        .route("/", get(ssr_index_handler))
-        .route("/crepus-bundle.json", get(bundle_handler))
-        .route("/dev-reload", get(sse_handler))
-        .with_state(state)
-        .fallback({
-            let site_dir = site_dir.clone();
-            move |uri: axum::http::Uri| {
-                let site_dir = site_dir.clone();
-                async move {
-                    let path = uri.path().trim_start_matches('/');
-                    if path.is_empty() {
-                        return axum::http::StatusCode::NOT_FOUND.into_response();
-                    }
-                    let full = site_dir.join(path);
-                    match tokio::fs::read(&full).await {
-                        Ok(bytes) => {
-                            let mime =
-                                guess_mime(full.extension().and_then(|e| e.to_str()).unwrap_or(""));
-                            axum::response::Response::builder()
-                                .header(axum::http::header::CONTENT_TYPE, mime)
-                                .body(axum::body::Body::from(bytes))
-                                .unwrap()
-                                .into_response()
-                        }
-                        Err(_) => axum::http::StatusCode::NOT_FOUND.into_response(),
-                    }
-                }
-            }
-        });
-
-    let addr: SocketAddr = ([127, 0, 0, 1], opts.port).into();
-    eprintln!("crepus-dev (axum): listening on http://{addr}");
-    eprintln!("crepus-dev: entry={}", opts.entry);
-
-    let rt = tokio::runtime::Runtime::new().expect("tokio runtime");
-    rt.block_on(async {
-        let listener = tokio::net::TcpListener::bind(addr).await.expect("bind");
-        axum::serve(listener, app.into_make_service())
-            .await
-            .expect("server error");
-    });
-}
-
-/// Render the entry template via SSR and wrap in HTML shell.
-async fn ssr_index_handler(State(state): State<Arc<AxumState>>) -> axum::response::Html<String> {
-    use crepuscularity_web::{render_ssr_document, SsrDocument};
-
-    let files = {
-        let vfm = load_vfm(&state.site_dir);
-        let guard = vfm.read().unwrap_or_else(|e| e.into_inner());
-        guard.clone()
-    };
-    let ctx = TemplateContext::new();
-    let title = state.entry.clone();
-    let entry = state.entry.clone();
-
-    tokio::task::spawn_blocking(move || {
-        let doc = SsrDocument {
-            title: &title,
-            ..Default::default()
-        };
-        match render_ssr_document(
-            files.get(&entry).unwrap_or(&String::new()),
-            &ctx,
-            &doc,
-            true,
-        ) {
-            Ok(html) => axum::response::Html(html),
-            Err(e) => axum::response::Html(format!("<pre style='color:red'>{e}</pre>")),
-        }
-    })
-    .await
-    .unwrap_or_else(|e| axum::response::Html(format!("<pre>spawn_blocking: {e}</pre>")))
-}
-
-/// Return the live virtual `.crepus` map as JSON.
-async fn bundle_handler(State(state): State<Arc<AxumState>>) -> axum::Json<serde_json::Value> {
-    let files = load_vfm(&state.site_dir);
-    let files = files.read().unwrap_or_else(|e| e.into_inner()).clone();
-    axum::Json(serde_json::json!({ "entry": state.entry, "files": files }))
-}
-
-/// SSE endpoint: sends reload event when templates change.
-async fn sse_handler(
-    State(state): State<Arc<AxumState>>,
-) -> axum::response::Sse<
-    impl futures_util::Stream<Item = Result<axum::response::sse::Event, std::convert::Infallible>>,
-> {
-    use axum::response::sse::Event;
-    use axum::response::Sse;
-    use futures_util::stream;
-
-    let start_gen = state.generation.load(Ordering::Acquire);
-    let generation = Arc::clone(&state.generation);
-    let last_sse_msg = Arc::clone(&state.last_sse_msg);
-
-    let stream = stream::unfold((), move |()| {
-        let generation = Arc::clone(&generation);
-        let last_sse_msg = Arc::clone(&last_sse_msg);
-        async move {
-            loop {
-                tokio::time::sleep(Duration::from_millis(100)).await;
-                if generation.load(Ordering::Acquire) != start_gen {
-                    let msg = last_sse_msg
-                        .read()
-                        .map(|g| g.clone())
-                        .unwrap_or_else(|_| "reload".to_string());
-                    let event = Event::default().data(&msg);
-                    return Some((Ok::<_, std::convert::Infallible>(event), ()));
-                }
-            }
-        }
-    });
-    Sse::new(stream).keep_alive(axum::response::sse::KeepAlive::default())
-}
-
-fn load_vfm(site_dir: &Path) -> Arc<RwLock<HashMap<String, String>>> {
-    let mut files = HashMap::new();
-    let mut paths = Vec::new();
-    walk_crepus_files(site_dir, &mut paths);
-    for path in &paths {
-        let rel = path
-            .strip_prefix(site_dir)
-            .unwrap_or(path)
-            .to_string_lossy()
-            .to_string();
-        if let Ok(content) = std::fs::read_to_string(path) {
-            files.insert(rel, content);
-        }
-    }
-    Arc::new(RwLock::new(files))
-}
-
-fn watch_crepus_files(
-    site_dir: &Path,
-    vfm: Arc<RwLock<HashMap<String, String>>>,
-    generation: Arc<AtomicU64>,
-    last_sse_msg: Arc<RwLock<String>>,
-) {
-    let (tx, rx) = mpsc::channel();
-    let mut watcher = notify::recommended_watcher(move |res: Result<Event, _>| {
-        if let Ok(ev) = res {
-            if matches!(
-                ev.kind,
-                EventKind::Create(_) | EventKind::Modify(_) | EventKind::Remove(_)
-            ) {
-                let _ = tx.send(());
-            }
-        }
-    })
-    .expect("failed to create file watcher");
-
-    let _ = watcher.watch(site_dir, RecursiveMode::Recursive);
-
-    loop {
-        if rx.recv().is_err() {
-            break;
-        }
-        // Debounce
-        while rx.try_recv().is_ok() {
-            std::thread::sleep(Duration::from_millis(50));
-        }
-        // Reload VFM
-        {
-            let mut files = vfm.write().unwrap_or_else(|e| e.into_inner());
-            files.clear();
-            let mut paths = Vec::new();
-            walk_crepus_files(site_dir, &mut paths);
-            for path in &paths {
-                let rel = path
-                    .strip_prefix(site_dir)
-                    .unwrap_or(path)
-                    .to_string_lossy()
-                    .to_string();
-                if let Ok(content) = std::fs::read_to_string(path) {
-                    files.insert(rel, content);
-                }
-            }
-        }
-        generation.fetch_add(1, Ordering::Release);
-        *last_sse_msg.write().unwrap_or_else(|e| e.into_inner()) = runtime_rebuild_sse_message();
     }
 }
 

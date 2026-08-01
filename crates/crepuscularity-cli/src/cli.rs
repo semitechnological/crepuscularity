@@ -265,8 +265,6 @@ pub enum WebCommands {
         target_id: Option<String>,
         #[arg(long)]
         manifest: Option<PathBuf>,
-        #[arg(long)]
-        axum: bool,
         /// Accepted for parity with `web build`; only `html` is meaningful for the dev server.
         #[arg(long, value_enum, default_value_t = WebEmitTarget::Html)]
         emit: WebEmitTarget,
