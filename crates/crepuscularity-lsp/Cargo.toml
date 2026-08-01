@@ -1,6 +1,6 @@
 [package]
 name = "crepuscularity-lsp"
-version = "0.2.8"
+version = "0.2.9"
 edition = "2021"
 authors = ["Max Carter <max@undivisible.dev>"]
 license = "ISC"
