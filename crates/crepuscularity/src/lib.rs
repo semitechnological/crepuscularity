@@ -4,7 +4,6 @@
 //! APIs plus the HTML/WASM renderer for applications that want one dependency.
 pub use crepuscularity_core as core;
 pub use crepuscularity_core::build;
-pub use crepuscularity_web as html;
 pub use crepuscularity_web as web;
 pub use crepuscularity_web::crepus_refs;
 
