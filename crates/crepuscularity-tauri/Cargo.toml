@@ -1,6 +1,6 @@
 [package]
 name = "crepuscularity-tauri"
-version = "0.1.13"
+version = "0.1.14"
 edition = "2021"
 license = "ISC"
 description = "Tauri v1/v2 static-bundle adapter for Crepuscularity."
