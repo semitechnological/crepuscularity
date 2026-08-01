@@ -114,9 +114,13 @@ fn package_json_template(core: &str, crepus: &str, components: &str) -> String {
     )
 }
 
-const PLACEHOLDER_CORE: &str = "file:../moonshine/packages/core";
-const PLACEHOLDER_CREPUS: &str = "file:../moonshine/packages/crepus-moonshine";
-const PLACEHOLDER_COMPONENTS: &str = "file:../moonshine/components";
+// Used when no local moonshine checkout is found, which is the normal case
+// outside this developer's machine. A `file:` path here would resolve against a
+// sibling directory the user does not have, so `bun install` would fail on a
+// freshly scaffolded project; the published packages are the working default.
+const PLACEHOLDER_CORE: &str = "^0.3.4";
+const PLACEHOLDER_CREPUS: &str = "^0.3.4";
+const PLACEHOLDER_COMPONENTS: &str = "^0.3.4";
 
 const INDEX_HTML: &str = r#"<!doctype html>
 <html lang="en">
@@ -851,7 +855,10 @@ mod tests {
         assert!(pkg.contains("\"react\""));
         assert!(pkg.contains("\"react-dom\""));
         assert!(pkg.contains("@vitejs/plugin-react"));
-        assert!(pkg.contains("file:../moonshine/packages/core"));
+        assert!(pkg.contains("\"@tschk/moonshine\": \"^0.3.4\""));
+        // Without a local checkout the fallback must be installable anywhere, so
+        // no `file:` path may reach a scaffolded package.json.
+        assert!(!pkg.contains("file:"), "{pkg}");
     }
 
     #[test]

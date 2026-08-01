@@ -142,7 +142,10 @@ fn moonshine_new_scaffolds_app() {
     assert!(pkg.contains("\"react\""));
     assert!(pkg.contains("\"react-dom\""));
     assert!(pkg.contains("@vitejs/plugin-react"));
-    assert!(pkg.contains("file:"));
+    // This test runs with an isolated HOME, so no local checkout is resolvable
+    // and the scaffold must fall back to dependencies that install anywhere.
+    assert!(!pkg.contains("file:"), "{pkg}");
+    assert!(pkg.contains("\"@tschk/moonshine\": \"^0.3.4\""), "{pkg}");
     assert!(!pkg.contains("#path:packages/"));
 
     let main = std::fs::read_to_string(app.join("src/main.tsx")).expect("main.tsx");
