@@ -88,16 +88,6 @@ pub fn parse_content(content: &str) -> Result<Arc<Vec<Node>>, CrepusError> {
     Ok(nodes)
 }
 
-pub fn invalidate_file(path: &Path) {
-    FILE_CACHE.with(|cache| {
-        cache.borrow_mut().remove(path);
-    });
-}
-
-pub fn clear() {
-    FILE_CACHE.with(|cache| cache.borrow_mut().clear());
-    CONTENT_CACHE.with(|cache| cache.borrow_mut().clear());
-}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -106,7 +96,6 @@ mod tests {
 
     #[test]
     fn test_parse_content_cache() {
-        clear();
         let content1 = "div\n  span Hello";
         let content2 = "div\n  span World";
 
@@ -126,7 +115,6 @@ mod tests {
 
     #[test]
     fn test_parse_file_cache() {
-        clear();
         let mut file = NamedTempFile::new().unwrap();
         write!(file, "div\n  span File").unwrap();
         file.flush().unwrap();
@@ -152,35 +140,4 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_invalidate_file() {
-        clear();
-        let mut file = NamedTempFile::new().unwrap();
-        write!(file, "div").unwrap();
-        file.flush().unwrap();
-
-        let path = file.path().to_path_buf();
-
-        let ast1 = parse_file(&path).unwrap();
-
-        invalidate_file(&path);
-
-        let ast2 = parse_file(&path).unwrap();
-        assert!(
-            !Arc::ptr_eq(&ast1, &ast2),
-            "Cache should miss after invalidation"
-        );
-    }
-
-    #[test]
-    fn test_clear() {
-        clear();
-        let content = "span Test";
-        let ast1 = parse_content(content).unwrap();
-
-        clear();
-
-        let ast2 = parse_content(content).unwrap();
-        assert!(!Arc::ptr_eq(&ast1, &ast2), "Cache should miss after clear");
-    }
 }
