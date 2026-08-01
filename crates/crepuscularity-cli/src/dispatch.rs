@@ -3,9 +3,11 @@
 use std::path::PathBuf;
 use std::time::Instant;
 
+#[cfg(feature = "benchmark")]
+use crate::cli::{BenchmarkCheckArgs, BenchmarkCommands, BenchmarkRunArgs};
 use crate::cli::{
-    BenchmarkCheckArgs, BenchmarkCommands, BenchmarkRunArgs, BrowserArg, Cli, Commands,
-    IosCommands, MobileCommands, NativeCommands, TuiCommands, WebCommands, WebextCommands,
+    BrowserArg, Cli, Commands, IosCommands, MobileCommands, NativeCommands, TuiCommands,
+    WebCommands, WebextCommands,
 };
 use crate::error::CrepusCliError;
 use crate::target_build::ManifestBuildArgs;
@@ -102,6 +104,7 @@ pub fn run(cli: Cli) -> Result<(), CrepusCliError> {
             crate::embedded::execute(command);
             Ok(())
         }
+        #[cfg(feature = "benchmark")]
         Commands::Benchmark { command, flat } => {
             run_benchmark(command, flat);
             Ok(())
@@ -127,6 +130,7 @@ fn run_dev(
     crate::dev::run(target, bin, options, emit_events);
 }
 
+#[cfg(feature = "benchmark")]
 fn run_benchmark(command: Option<BenchmarkCommands>, flat: BenchmarkRunArgs) {
     match command {
         Some(BenchmarkCommands::Check { args }) => {
@@ -244,6 +248,7 @@ pub fn browser_target(b: Option<BrowserArg>) -> Option<crepuscularity_webext::Br
     })
 }
 
+#[cfg(feature = "benchmark")]
 pub fn benchmark_run_options(args: BenchmarkRunArgs) -> crate::benchmark::RunOptions {
     let verbose = args.verbose && !args.json && !args.quiet;
     let measure_memory = !args.no_memory;
@@ -268,6 +273,7 @@ pub fn benchmark_run_options(args: BenchmarkRunArgs) -> crate::benchmark::RunOpt
     }
 }
 
+#[cfg(feature = "benchmark")]
 pub fn benchmark_check_options(args: BenchmarkCheckArgs) -> crate::benchmark::CheckOptions {
     crate::benchmark::CheckOptions {
         config_path: args.common.config,

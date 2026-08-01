@@ -2,7 +2,9 @@
 
 use std::path::PathBuf;
 
-use clap::{Args, Parser, Subcommand, ValueEnum};
+#[cfg(feature = "benchmark")]
+use clap::Args;
+use clap::{Parser, Subcommand, ValueEnum};
 
 use crate::build_options::BuildOptionsArgs;
 
@@ -133,6 +135,7 @@ pub enum Commands {
         command: EmbeddedCommands,
     },
     /// Declarative benchmark.toml runs (flags work without `all`/`run` subcommand)
+    #[cfg(feature = "benchmark")]
     Benchmark {
         #[command(subcommand)]
         command: Option<BenchmarkCommands>,
@@ -596,6 +599,7 @@ pub enum EmbeddedCommands {
     },
 }
 
+#[cfg(feature = "benchmark")]
 #[derive(Subcommand, Debug)]
 pub enum BenchmarkCommands {
     All {
@@ -612,6 +616,7 @@ pub enum BenchmarkCommands {
     },
 }
 
+#[cfg(feature = "benchmark")]
 #[derive(Args, Debug, Clone, Default)]
 pub struct BenchmarkCommonArgs {
     #[arg(short = 'c', long = "config")]
@@ -624,6 +629,7 @@ pub struct BenchmarkCommonArgs {
     pub repo: Option<PathBuf>,
 }
 
+#[cfg(feature = "benchmark")]
 #[derive(Args, Debug, Clone, Default)]
 pub struct BenchmarkRunArgs {
     #[command(flatten)]
@@ -649,6 +655,7 @@ pub struct BenchmarkRunArgs {
     pub no_tui: bool,
 }
 
+#[cfg(feature = "benchmark")]
 #[derive(Args, Debug, Clone, Default)]
 pub struct BenchmarkCheckArgs {
     #[command(flatten)]

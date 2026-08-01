@@ -2,7 +2,9 @@
 
 mod apple_project;
 mod aurora;
+#[cfg(feature = "benchmark")]
 mod benchmark;
+#[cfg(feature = "benchmark")]
 mod benchmark_tui;
 mod build_options;
 #[cfg(feature = "desktop")]

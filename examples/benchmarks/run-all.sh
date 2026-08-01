@@ -17,7 +17,7 @@ if [[ $# -gt 0 ]]; then
   args+=("$@")
 fi
 
-if command -v crepus >/dev/null 2>&1; then
+if command -v crepus >/dev/null 2>&1 && crepus benchmark --help >/dev/null 2>&1; then
   exec crepus "${args[@]}"
 fi
 
@@ -35,4 +35,4 @@ if [[ "$(uname -s)" == "Darwin" ]]; then
   fi
 fi
 
-exec cargo run -p crepuscularity-cli -- "${args[@]}"
+exec cargo run -p crepuscularity-cli --features benchmark -- "${args[@]}"

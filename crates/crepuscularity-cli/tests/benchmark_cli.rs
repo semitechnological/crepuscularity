@@ -1,4 +1,5 @@
 //! Integration tests for `crepus benchmark`.
+#![cfg(feature = "benchmark")]
 
 use serde_json::Value;
 use std::path::PathBuf;
