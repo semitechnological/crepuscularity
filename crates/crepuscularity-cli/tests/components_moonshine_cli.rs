@@ -205,7 +205,7 @@ fn web_build_emit_moonshine_writes_entry() {
     assert!(entry.contains("export function App"));
     assert!(entry.contains("export function mount"));
     assert!(entry.contains("data-crepus-root=\"true\""));
-    assert!(entry.contains("className={"));
+    assert!(entry.contains("className=\""));
     assert!(!entry.contains("renderCrepusIr"));
     assert!(!entry.contains("satisfies ViewIr"));
 }

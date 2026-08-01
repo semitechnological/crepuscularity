@@ -85,18 +85,48 @@ fn js_str(s: &str) -> String {
     out
 }
 
-/// `className={"..."}` from the class tokens the parser preserved on the node.
+/// A string-valued JSX attribute, written the way a person writes it:
+/// `name="value"`. The braced form is only used when the value cannot sit
+/// inside a quoted literal, since `name={"value"}` is legal but not idiomatic.
+fn attr(name: &str, value: &str) -> String {
+    let needs_expr = value
+        .chars()
+        .any(|c| c == '"' || c == '\\' || (c as u32) < 0x20);
+    if needs_expr {
+        format!(" {name}={{{}}}", js_str(value))
+    } else {
+        format!(" {name}=\"{value}\"")
+    }
+}
+
+/// A JSX text child, written literally rather than as `{"..."}`. Characters
+/// JSX reads as markup or as an HTML entity force the braced form, because
+/// literal text containing them would not round-trip.
+fn jsx_text(content: &str) -> String {
+    let needs_expr = content.is_empty()
+        || content != content.trim()
+        || content
+            .chars()
+            .any(|c| matches!(c, '{' | '}' | '<' | '>' | '&') || (c as u32) < 0x20);
+    if needs_expr {
+        format!("{{{}}}", js_str(content))
+    } else {
+        content.to_string()
+    }
+}
+
+/// `className="..."` from the class tokens the parser preserved on the node.
 fn class_attr(style: Option<&ViewStyle>) -> String {
     let classes = match style {
         Some(s) if !s.classes.is_empty() => s.classes.join(" "),
         _ => return String::new(),
     };
-    format!(" className={{{}}}", js_str(&classes))
+    attr("className", &classes)
 }
 
 fn opt_attr(name: &str, value: Option<&String>) -> String {
     match value {
-        Some(v) => format!(" {name}={{{}}}", js_str(v)),
+        Some(v) => attr(name, v),
         None => String::new(),
     }
 }
@@ -124,9 +154,9 @@ fn emit_jsx_node(node: &ViewNode, indent: usize) -> String {
     match node {
         ViewNode::Text { content, style, .. } => {
             format!(
-                "{pad}<span{}>{{{}}}</span>",
+                "{pad}<span{}>{}</span>",
                 class_attr(style.as_ref()),
-                js_str(content)
+                jsx_text(content)
             )
         }
         ViewNode::Link {
@@ -138,7 +168,7 @@ fn emit_jsx_node(node: &ViewNode, indent: usize) -> String {
         } => {
             let attrs = format!(
                 "{}{}{}",
-                format_args!(" href={{{}}}", js_str(href)),
+                attr("href", href),
                 opt_attr("target", target.as_ref()),
                 opt_attr("rel", rel.as_ref()),
             );
@@ -167,15 +197,15 @@ fn emit_jsx_node(node: &ViewNode, indent: usize) -> String {
             element("li", &class_attr(style.as_ref()), children, indent)
         }
         ViewNode::Button { label, style, .. } => format!(
-            "{pad}<button type=\"button\"{}>{{{}}}</button>",
+            "{pad}<button type=\"button\"{}>{}</button>",
             class_attr(style.as_ref()),
-            js_str(label)
+            jsx_text(label)
         ),
         ViewNode::Badge { label, tone, style, .. } => format!(
-            "{pad}<span{}{}>{{{}}}</span>",
+            "{pad}<span{}{}>{}</span>",
             class_attr(style.as_ref()),
             opt_attr("data-tone", tone.as_ref()),
-            js_str(label)
+            jsx_text(label)
         ),
         ViewNode::Divider { style, .. } => {
             format!("{pad}<hr{} />", class_attr(style.as_ref()))
@@ -186,14 +216,14 @@ fn emit_jsx_node(node: &ViewNode, indent: usize) -> String {
         ViewNode::Image {
             src, alt, style, ..
         } => format!(
-            "{pad}<img src={{{}}} alt={{{}}}{} />",
-            js_str(src),
-            js_str(alt.as_deref().unwrap_or("")),
+            "{pad}<img{}{}{} />",
+            attr("src", src),
+            attr("alt", alt.as_deref().unwrap_or("")),
             class_attr(style.as_ref())
         ),
         ViewNode::WebView { src, style } => format!(
-            "{pad}<iframe src={{{}}}{} />",
-            js_str(src),
+            "{pad}<iframe{}{} />",
+            attr("src", src),
             class_attr(style.as_ref())
         ),
         ViewNode::Toggle {
@@ -202,10 +232,10 @@ fn emit_jsx_node(node: &ViewNode, indent: usize) -> String {
             style,
             ..
         } => format!(
-            "{pad}<button type=\"button\" role=\"switch\" aria-checked={{{}}}{}>{{{}}}</button>",
+            "{pad}<button type=\"button\" role=\"switch\" aria-checked={{{}}}{}>{}</button>",
             checked,
             class_attr(style.as_ref()),
-            js_str(label)
+            jsx_text(label)
         ),
         ViewNode::Checkbox {
             label,
@@ -213,10 +243,10 @@ fn emit_jsx_node(node: &ViewNode, indent: usize) -> String {
             style,
             ..
         } => format!(
-            "{pad}<label{}>\n{pad}  <input type=\"checkbox\" defaultChecked={{{}}} />\n{pad}  {{{}}}\n{pad}</label>",
+            "{pad}<label{}>\n{pad}  <input type=\"checkbox\" defaultChecked={{{}}} />\n{pad}  {}\n{pad}</label>",
             class_attr(style.as_ref()),
             checked,
-            js_str(label)
+            jsx_text(label)
         ),
         ViewNode::Slider {
             value,
@@ -255,8 +285,8 @@ fn emit_jsx_node(node: &ViewNode, indent: usize) -> String {
             ..
         } => {
             let cls = class_attr(style.as_ref());
-            let ph = format!(" placeholder={{{}}}", js_str(placeholder));
-            let name = format!(" name={{{}}}", js_str(bind));
+            let ph = attr("placeholder", placeholder);
+            let name = attr("name", bind);
             if *multiline {
                 format!("{pad}<textarea{ph}{name}{cls} />")
             } else {
@@ -274,33 +304,33 @@ fn emit_jsx_node(node: &ViewNode, indent: usize) -> String {
                 .iter()
                 .map(|o| {
                     format!(
-                        "{pad}  <option value={{{}}}>{{{}}}</option>",
-                        js_str(&o.value),
-                        js_str(&o.label)
+                        "{pad}  <option{}>{}</option>",
+                        attr("value", &o.value),
+                        jsx_text(&o.label)
                     )
                 })
                 .collect::<Vec<_>>()
                 .join("\n");
             format!(
-                "{pad}<select name={{{}}}{}>\n{opts}\n{pad}</select>",
-                js_str(bind),
+                "{pad}<select{}{}>\n{opts}\n{pad}</select>",
+                attr("name", bind),
                 class_attr(style.as_ref())
             )
         }
         ViewNode::FilePicker { label, style, .. } => format!(
-            "{pad}<label{}>\n{pad}  <input type=\"file\" />\n{pad}  {{{}}}\n{pad}</label>",
+            "{pad}<label{}>\n{pad}  <input type=\"file\" />\n{pad}  {}\n{pad}</label>",
             class_attr(style.as_ref()),
-            js_str(label)
+            jsx_text(label)
         ),
         ViewNode::SlotRotate {
             phrases,
             interval_ms,
             style,
         } => format!(
-            "{pad}<span data-crepus-slot-rotate={{{}}} data-interval-ms={{{interval_ms}}}{}>{{{}}}</span>",
-            js_str(&phrases.join("|")),
+            "{pad}<span{} data-interval-ms={{{interval_ms}}}{}>{}</span>",
+            attr("data-crepus-slot-rotate", &phrases.join("|")),
             class_attr(style.as_ref()),
-            js_str(phrases.first().map(String::as_str).unwrap_or(""))
+            jsx_text(phrases.first().map(String::as_str).unwrap_or(""))
         ),
         ViewNode::Tabs { tabs, style, .. } => {
             let cls = class_attr(style.as_ref());
@@ -308,8 +338,8 @@ fn emit_jsx_node(node: &ViewNode, indent: usize) -> String {
                 .iter()
                 .map(|t| {
                     format!(
-                        "{pad}    <button type=\"button\" role=\"tab\">{{{}}}</button>",
-                        js_str(&t.label)
+                        "{pad}    <button type=\"button\" role=\"tab\">{}</button>",
+                        jsx_text(&t.label)
                     )
                 })
                 .collect::<Vec<_>>()
@@ -337,8 +367,8 @@ fn emit_jsx_node(node: &ViewNode, indent: usize) -> String {
             ..
         } => {
             let attrs = format!(
-                " data-crepus-if={{{}}}{}",
-                js_str(condition),
+                "{}{}",
+                attr("data-crepus-if", condition),
                 class_attr(style.as_ref())
             );
             element("div", &attrs, then_children, indent)
@@ -350,9 +380,9 @@ fn emit_jsx_node(node: &ViewNode, indent: usize) -> String {
             style,
         } => {
             let attrs = format!(
-                " data-crepus-for-each={{{}}} data-crepus-item={{{}}}{}",
-                js_str(bind),
-                js_str(item_name),
+                "{}{}{}",
+                attr("data-crepus-for-each", bind),
+                attr("data-crepus-item", item_name),
                 class_attr(style.as_ref())
             );
             element("div", &attrs, item_body, indent)
@@ -383,9 +413,9 @@ mod tests {
         assert!(body.contains("export function mount"));
         assert!(body.contains("data-crepus-root=\"true\""));
         // Real elements, not an IR blob handed to a runtime renderer.
-        assert!(body.contains("<div className={\"col gap-2\"}>"));
-        assert!(body.contains("<span>{\"hi\"}</span>"));
-        assert!(body.contains("<button type=\"button\">{\"Go\"}</button>"));
+        assert!(body.contains("<div className=\"col gap-2\">"));
+        assert!(body.contains("<span>hi</span>"));
+        assert!(body.contains("<button type=\"button\">Go</button>"));
         assert!(!body.contains("renderCrepusIr"));
         assert!(!body.contains("satisfies ViewIr"));
         assert!(!body.contains("TODO"));
@@ -397,9 +427,27 @@ mod tests {
             "a href=\"https://example.com\" no-underline text-zinc-100\n span \"crepuscularity\"\n";
         let ir = render_template_to_ir(source, &TemplateContext::new()).expect("ir");
         let body = emit_moonshine_app(&ir);
-        assert!(body.contains("<a href={\"https://example.com\"}"));
-        assert!(body.contains("className={\"no-underline text-zinc-100\"}"));
-        assert!(body.contains("{\"crepuscularity\"}"));
+        assert!(body.contains("<a href=\"https://example.com\""));
+        assert!(body.contains("className=\"no-underline text-zinc-100\""));
+        assert!(body.contains(">crepuscularity</span>"));
+    }
+
+    #[test]
+    fn text_containing_jsx_metacharacters_stays_in_an_expression() {
+        // `{`, `}`, `<`, `>` and `&` are markup or entity syntax in a JSX text
+        // child, so this content cannot be written literally.
+        let source = "text \"a < b && c > d\"\n";
+        let ir = render_template_to_ir(source, &TemplateContext::new()).expect("ir");
+        let body = emit_moonshine_app(&ir);
+        assert!(body.contains(r#"{"a < b && c > d"}"#), "{body}");
+    }
+
+    #[test]
+    fn attribute_containing_a_quote_stays_in_an_expression() {
+        let source = "a href=\"/a\\\"b\"\n span \"x\"\n";
+        let ir = render_template_to_ir(source, &TemplateContext::new()).expect("ir");
+        let body = emit_moonshine_app(&ir);
+        assert!(!body.contains(r#"href="/a"b""#), "{body}");
     }
 
     #[test]
@@ -422,11 +470,11 @@ mod tests {
         let ir = sample_ir();
         let app_body = emit_moonshine_app(&ir);
         let component_body = emit_moonshine_component(&ir, "Card");
-        assert!(app_body.contains("<div className={\"col gap-2\"}>"));
-        assert!(component_body.contains("<div className={\"col gap-2\"}>"));
-        assert!(app_body.contains("<span>{\"hi\"}</span>"));
-        assert!(component_body.contains("<span>{\"hi\"}</span>"));
-        assert!(app_body.contains("<button type=\"button\">{\"Go\"}</button>"));
-        assert!(component_body.contains("<button type=\"button\">{\"Go\"}</button>"));
+        assert!(app_body.contains("<div className=\"col gap-2\">"));
+        assert!(component_body.contains("<div className=\"col gap-2\">"));
+        assert!(app_body.contains("<span>hi</span>"));
+        assert!(component_body.contains("<span>hi</span>"));
+        assert!(app_body.contains("<button type=\"button\">Go</button>"));
+        assert!(component_body.contains("<button type=\"button\">Go</button>"));
     }
 }
