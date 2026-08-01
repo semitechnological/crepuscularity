@@ -28,6 +28,7 @@ pub mod host;
 pub mod hot_reload;
 mod include_expand;
 pub mod ir;
+pub mod moonshine;
 pub mod mutations;
 pub mod native;
 mod render;
@@ -60,6 +61,7 @@ pub use colors::resolve_rgba;
 pub use crepuscularity_core::CrepusError;
 pub use hot_reload::{ast_shape_compatible, plan_hot_reload, HotReloadEnvelope, HotReloadMessage};
 pub use ir::{PickerOption, StackAxis, ViewIr, ViewNode, ViewStyle, IR_VERSION};
+pub use moonshine::{emit_moonshine_app, emit_moonshine_component};
 pub use mutations::{apply_mutations, diff_ir, IrMutation};
 pub use native::{
     FilePickerRequest, FilePickerResponse, NativeCapability, NativePluginRequest,

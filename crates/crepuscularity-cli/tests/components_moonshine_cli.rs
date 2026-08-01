@@ -120,7 +120,7 @@ fn moonshine_new_scaffolds_app() {
         .env_remove("MOONSHINE_PATH")
         .env("HOME", tmp.path())
         .env("USERPROFILE", tmp.path())
-        .args(["moonshine", "new", "Demo App"])
+        .args(["moonshine", "new", "Demo App", "--js"])
         .status()
         .expect("spawn crepus moonshine new");
     assert!(status.success());

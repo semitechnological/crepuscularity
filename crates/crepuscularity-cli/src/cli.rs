@@ -158,6 +158,7 @@ pub enum Commands {
         command: ComponentsCommands,
     },
     /// Moonshine + Crepuscularity web runtime helper.
+    #[command(alias = "moon")]
     Moonshine {
         #[command(subcommand)]
         command: MoonshineCommands,
@@ -215,10 +216,31 @@ pub enum ComponentTarget {
 
 #[derive(Subcommand, Debug)]
 pub enum MoonshineCommands {
-    /// Scaffold a minimal Moonshine + Crepus app under cwd.
-    New { name: String },
+    /// Scaffold a Moonshine + Crepus app under cwd.
+    ///
+    /// By default this scaffolds a Rust-only project: crepus templates are
+    /// inlined in `src/main.rs` and built into a real Moonshine site via
+    /// `crepus moon build`. Pass `--js` for the legacy React + Vite scaffold
+    /// with a hardcoded View IR blob in `src/main.tsx`.
+    New {
+        name: String,
+        /// Scaffold the legacy JavaScript/TSX app instead of the Rust-only app.
+        #[arg(long)]
+        js: bool,
+    },
     /// Print package.json dependency snippets for moonshine + crepus packages.
     Dep,
+    /// Build a Rust-only `crepus moon new` project into a real Moonshine site.
+    ///
+    /// Runs `cargo run` in the project to emit the generated app, refreshes
+    /// package.json/index.html/vite.config.ts/tsconfig.json, copies `ts/`
+    /// into the app, then runs `bun install && bun run build` if `bun` is
+    /// on PATH.
+    Build {
+        /// Project directory (default: current directory).
+        #[arg(long)]
+        dir: Option<PathBuf>,
+    },
 }
 
 /// Output target for `crepus web build --emit`.
@@ -731,6 +753,54 @@ mod tests {
             cli.command,
             Some(Commands::Moonshine {
                 command: MoonshineCommands::Dep
+            })
+        ));
+    }
+
+    #[test]
+    fn parses_moon_alias_new_same_as_moonshine_new() {
+        let moon = Cli::try_parse_from(["crepus", "moon", "new", "x"]).expect("parse moon");
+        let moonshine =
+            Cli::try_parse_from(["crepus", "moonshine", "new", "x"]).expect("parse moonshine");
+        match (moon.command, moonshine.command) {
+            (
+                Some(Commands::Moonshine {
+                    command: MoonshineCommands::New { name: n1, js: j1 },
+                }),
+                Some(Commands::Moonshine {
+                    command: MoonshineCommands::New { name: n2, js: j2 },
+                }),
+            ) => {
+                assert_eq!(n1, "x");
+                assert_eq!(n2, "x");
+                assert_eq!(j1, j2);
+                assert!(!j1);
+            }
+            other => panic!("unexpected: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parses_moonshine_new_js_flag() {
+        let cli = Cli::try_parse_from(["crepus", "moonshine", "new", "x", "--js"]).expect("parse");
+        match cli.command {
+            Some(Commands::Moonshine {
+                command: MoonshineCommands::New { name, js },
+            }) => {
+                assert_eq!(name, "x");
+                assert!(js);
+            }
+            other => panic!("unexpected: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parses_moon_build() {
+        let cli = Cli::try_parse_from(["crepus", "moon", "build"]).expect("parse");
+        assert!(matches!(
+            cli.command,
+            Some(Commands::Moonshine {
+                command: MoonshineCommands::Build { dir: None }
             })
         ));
     }
