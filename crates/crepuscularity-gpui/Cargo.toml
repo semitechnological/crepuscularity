@@ -37,7 +37,7 @@ symbols = ["dep:gpui-symbols"]
 [dependencies]
 gpui = { version = "=0.2.2", default-features = false }
 xkbcommon = { version = "0.8", default-features = false, features = ["wayland"], optional = true }
-crepuscularity-core = { path = "../crepuscularity-core", version = "0.4.25" }
+crepuscularity-core = { path = "../crepuscularity-core", version = "0.5.0" }
 crepuscularity_macros = { path = "../crepuscularity_macros", version = "0.5.11" }
 crepuscularity-runtime = { path = "../crepuscularity-runtime", version = "0.4.18" }
 gpui-symbols = { version = "0.6", optional = true }

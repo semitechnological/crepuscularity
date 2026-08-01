@@ -54,14 +54,14 @@ benchmark = []
 
 [dependencies]
 gpui                   = { version = "=0.2.2", default-features = false, features = ["font-kit"], optional = true }
-crepuscularity-core = { path = "../crepuscularity-core", version = "0.4.25" }
+crepuscularity-core = { path = "../crepuscularity-core", version = "0.5.0" }
 crepuscularity-runtime = { path = "../crepuscularity-runtime", version = "0.4.18", optional = true }
 crepuscularity-tui = { path = "../crepuscularity-tui", version = "0.4.17", optional = true }
-crepuscularity-web = { path = "../crepuscularity-web", version = "0.4.20", features = ["parallel", "ssr", "axum"] }
+crepuscularity-web = { path = "../crepuscularity-web", version = "0.5.0", features = ["parallel", "ssr", "axum"] }
 crepuscularity-plugin-bindgen = { path = "../crepuscularity-plugin-bindgen", version = "0.1.5" }
 crepuscularity-webext  = { path = "../crepuscularity-webext", version = "0.3.5" }
 crepuscularity-tauri = { path = "../crepuscularity-tauri", version = "0.1.13", features = ["native"] }
-crepuscularity-native = { path = "../crepuscularity-native", version = "0.5.14" }
+crepuscularity-native = { path = "../crepuscularity-native", version = "0.6.0" }
 crepuscularity-components = { path = "../crepuscularity-components", version = "0.1.0" }
 crepuscularity-embedded = { path = "../crepuscularity-embedded", version = "0.1.22" }
 crepuscularity-lvgl = { path = "../crepuscularity-lvgl", version = "0.1.10" }

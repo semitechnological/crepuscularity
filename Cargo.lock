@@ -1794,7 +1794,7 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-core"
-version = "0.4.25"
+version = "0.5.0"
 dependencies = [
  "notify",
  "serde_json",
@@ -1891,7 +1891,7 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-native"
-version = "0.5.14"
+version = "0.6.0"
 dependencies = [
  "crepuscularity-core",
  "schemars",
@@ -1988,7 +1988,7 @@ dependencies = [
 
 [[package]]
 name = "crepuscularity-web"
-version = "0.4.20"
+version = "0.5.0"
 dependencies = [
  "ammonia",
  "axum",
