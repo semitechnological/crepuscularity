@@ -186,8 +186,14 @@ pub fn parse_size_pt(rest: &str) -> Option<f32> {
         let stripped = inner.strip_suffix("px").unwrap_or(inner);
         return stripped.parse::<f32>().ok().map(|v| v.max(0.0));
     }
-    if let Some(f) = parse_fraction(rest) {
-        return Some(-f);
+    // Fractions are deliberately not encoded here. This value shares a field
+    // with the SIZE_FILL / SIZE_FIT sentinels, and a fraction has no point
+    // value, so `-(n/d)` produced a number no consumer can decode — and
+    // `1/1` collided exactly with SIZE_FILL. Callers that can express a
+    // fraction use `parse_fraction` directly; web targets get it from the
+    // preserved class token.
+    if parse_fraction(rest).is_some() {
+        return None;
     }
     parse_spacing_pt(rest)
 }
@@ -379,9 +385,19 @@ mod tests {
         }
         assert_eq!(parse_size_pt("px"), Some(1.0));
         assert_eq!(parse_size_pt("4"), Some(16.0));
-        assert_eq!(parse_size_pt("1/2"), Some(-0.5));
         assert_eq!(parse_size_pt("[-8px]"), Some(0.0));
         assert_eq!(parse_size_pt("nope"), None);
+    }
+
+    #[test]
+    fn size_pt_rejects_fractions_rather_than_faking_a_sentinel() {
+        // The field these share only decodes points, SIZE_FILL and SIZE_FIT,
+        // so a fraction has no representation. Encoding `-(n/d)` produced
+        // values no consumer could read, and `1/1` aliased SIZE_FILL exactly.
+        for frac in ["1/2", "2/3", "1/1", "3/4"] {
+            assert_eq!(parse_size_pt(frac), None);
+            assert!(parse_fraction(frac).is_some());
+        }
     }
 
     #[test]

@@ -1004,7 +1004,10 @@ mod tests {
             assert_eq!(layout(fit).width, Some(SIZE_FIT), "{fit}");
         }
         assert_eq!(layout("max-w-none").max_width, Some(SIZE_FIT));
-        assert_eq!(layout("w-1/2").width, Some(-0.5));
+        // A fractional width has no point value and must not land in the same
+        // field as the sentinels; web targets read it from the class token.
+        assert_eq!(layout("w-1/2").width, None);
+        assert_eq!(layout("max-w-1/1").max_width, None);
         assert_eq!(layout("w-8").width, Some(32.0));
         assert_eq!(layout("size-8").width, Some(32.0));
         assert_eq!(layout("size-8").height, Some(32.0));
