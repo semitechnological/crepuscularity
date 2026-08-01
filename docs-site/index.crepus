@@ -323,7 +323,7 @@ $ crepus aurora new my-ios && crepus aurora dev
 					span text-xs font-medium
 						"crepuscularity"
 				span text-xs crepus-t-muted
-					"ISC — built with crepuscularity-web"
+					"ISC — built with crepuscularity + moonshine"
 			nav aria-label="Footer" flex flex-wrap gap-x-5 gap-y-2 text-xs items-center justify-start sm:justify-end
 				a href="./docs/index.html" nav-link
 					"Docs"
