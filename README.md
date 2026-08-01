@@ -8,7 +8,7 @@
 
 Think React Native turned into a systems UI toolkit: one compact `.crepus` language can drive GPUI desktop apps, Ratatui terminal UIs, Chromium/Firefox extensions, web output, native mobile shells, embedded panels, and LVGL Pro. Crepuscularity also ships hot reload, runtime rendering, and a GPUI desktop shell with an embedded V8 bridge for native capabilities.
 
-Write UI in a concise, indentation-based template DSL (`.crepus` files). Templates compile at build time via the `view!` macro or render at runtime with full hot-reload support. The same `.crepus` syntax drives native desktop (GPUI), terminal UIs (Ratatui), browser extensions (MV3), HTML output, and React/JSX — and is the foundation for native mobile backends targeting SwiftUI and Jetpack Compose.
+Write UI in a concise, indentation-based template DSL (`.crepus` files). Templates compile at build time via the `view!` macro or render at runtime with full hot-reload support. The same `.crepus` syntax drives native desktop (GPUI), terminal UIs (Ratatui), browser extensions (MV3), and HTML output — and is the foundation for native mobile backends targeting SwiftUI and Jetpack Compose. React output is available through the Moonshine TSX emit (`crepus web build --emit moonshine`); JSX, Svelte, and Vue are supported as **input** syntaxes, not as output targets.
 
 Use [Aurorality](https://github.com/tschk/aurorality) for united SwiftUI macOS + iOS apps.
 
@@ -16,7 +16,7 @@ Use [Aurorality](https://github.com/tschk/aurorality) for united SwiftUI macOS +
 
 - **GPUI component workflow with hot reload** — live template updates without recompiling app code
 - **Rust-owned MV3 extension target** — write popup, background, and content-script surfaces in `.crepus`, then emit Chromium or Firefox bundles without adopting a JavaScript framework or app bundler as the primary authoring model
-- **One syntax, multiple backends** — the same template works across GPUI (native desktop), HTML, React/JSX, and browser extensions today; **`crepuscularity-native`** lowers `.crepus` to JSON **View IR** for SwiftUI / Jetpack Compose shells (see [`examples/native-shells`](examples/native-shells/README.md))
+- **One syntax, multiple backends** — the same template works across GPUI (native desktop), HTML, Ratatui terminals, and browser extensions today; **`crepuscularity-native`** lowers `.crepus` to JSON **View IR** for SwiftUI / Jetpack Compose shells (see [`examples/native-shells`](examples/native-shells/README.md))
 - **Polyglot plugin contract** — host languages consume View IR JSON through `crepus native ir` or the optional `crepuscularity-abi` C session API, then create UI from the typed node tree; drop-in reference packages and native workspace files live under [`plugins/`](plugins/README.md)
 - **Terminal UIs without a second UI language** — **`crepuscularity-tui`** maps `.crepus` elements, includes, slots, control flow, and Tailwind-style terminal classes onto Ratatui frames
 - **Embedded panels (in testing)** — **`crepuscularity-embedded`** renders `.crepus` into an RGB565 buffer you flush over SPI (**ILI9341**, **ST7789**) or into an **LTDC** framebuffer on STM32/ESP32; see [`docs/embedded.md`](docs/embedded.md) and [`examples/embedded-dashboard`](examples/embedded-dashboard/README.md)
@@ -83,7 +83,7 @@ Rust build scripts can use the same manifest for render-output targets:
 let artifacts = crepuscularity::target::write_manifest_file("crepus.toml")?;
 ```
 
-## Template Syntax (or you can write React JSX)
+## Template Syntax (or JSX, Svelte, or Vue templates — see [Input frontends](docs/frontends.md))
 
 ```text
 div w-full h-full bg-zinc-950 text-white flex flex-col p-8
@@ -125,9 +125,25 @@ The `.crepus` DSL is the primary language. Each output target is a renderer that
 | `crepuscularity-web`    | HTML strings — server rendering, WASM, browser extensions      |
 | `crepuscularity-webext` | MV3 browser extensions — manifest, assets, capability scanning |
 | `crepuscularity-embedded` | **UNSTABLE** — RGB565 framebuffer for SPI/LTDC panels (ILI9341, ST7789, ESP-LCD, …); see [`docs/embedded.md`](docs/embedded.md) |
+| `crepuscularity-lvgl`   | LVGL Pro XML for panels and embedded UI workflows; see [`docs/lvgl.md`](docs/lvgl.md) |
+| `crepuscularity-wasm`   | WASM parser behind `@tschk/crepuscularity-wasm`; `parseTemplate` for all four frontends |
 
 
-JSX/HTML tag syntax is supported as an **input format** in the core parser — the same `.crepus` templates can be written in either indentation style or `<tag>` style, and both compile to the same AST.
+## Input Frontends
+
+The core parser has **four frontends**, selected by file extension, all
+compiling to the same AST: indentation (`.crepus`), JSX/HTML tags
+(`.csx`/`.jsx`/`.tsx`), Svelte (`.svelte`), and Vue SFC (`.vue`). The Svelte and
+Vue frontends are hand-written Rust with no `svelte` or `vue` dependency.
+
+They compile the **template only**. `<script>` is extracted and never executed,
+so runes, stores, the Composition API, and lifecycle hooks do not run;
+unsupported markup constructs are hard parse errors rather than silent drops.
+[`docs/frontends.md`](docs/frontends.md) lists exactly what is and is not
+supported.
+
+From JavaScript, `parseTemplate(source, filename)` in
+`@tschk/crepuscularity-wasm` is the single entry point for all four.
 
 ## CLI Commands
 
@@ -227,7 +243,7 @@ These cannot be added without forking GPUI itself:
 ```text
 crates/
   crepuscularity/           Facade re-exporting prelude
-  crepuscularity-core/      AST, parser, evaluator
+  crepuscularity-core/      AST, parser (indent / JSX / Svelte / Vue), evaluator
   crepuscularity_macros/    Compile-time view! proc-macro
   crepuscularity-runtime/   Hot-reload renderer (Tailwind → GPUI styler)
   crepuscularity-web/       HTML backend
@@ -236,7 +252,16 @@ crates/
   crepuscularity-tui/       Ratatui backend + template_refs! handles
   crepuscularity-lite/      GPUI + V8 shell and native plugin bridge
   crepuscularity-native/    View IR JSON for SwiftUI / Compose shells
+  crepuscularity-abi/       C ABI sessions over the View IR
+  crepuscularity-wasm/      WASM parser; @tschk/crepuscularity-wasm npm package
   crepuscularity-reactive/  WASM signals, memos, effects, hydration lifecycle
+  crepuscularity-components/ Rust component catalog registry
+  crepuscularity-embedded/  RGB565 framebuffer for SPI/LTDC panels
+  crepuscularity-lvgl/      LVGL Pro XML generation
+  crepuscularity-lsp/       Language server
+  crepuscularity-tauri/     Tauri host integration
+  crepuscularity-tauri-macros/  Proc macros for the Tauri host
+  crepuscularity-plugin-bindgen/ Plugin binding generation
   crepuscularity-cli/       crepus CLI
 examples/
   examples.toml             Catalog by target (see examples/README.md)
@@ -264,8 +289,6 @@ Install the CLI:
 # default features include desktop/tui/aurora (`crepus dev`)
 cargo install --path crates/crepuscularity-cli
 ```
-
-Pre-built binaries for Linux and Windows are in the repo root (`crepus-linux-x86_64`, `crepus-windows-x86_64.exe`).
 
 On macOS, GPUI requires the Xcode SDK path:
 

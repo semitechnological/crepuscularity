@@ -16,12 +16,12 @@ Root object:
 
 ```json
 {
-  "version": 4,
+  "version": 7, /* always IR_VERSION; see above */
   "root": [ /* ViewNode[] */ ]
 }
 ```
 
-Node kinds include `stack`, `text`, `button`, `textField`, `picker`, `image`, and others defined in [`crates/crepuscularity-native/src/ir.rs`](../crates/crepuscularity-native/src/ir.rs). Style hints use camelCase keys aligned with Swift/Kotlin decoders in `examples/native-shells/` and CLI scaffolds.
+Node kinds include `stack`, `text`, `button`, `input`, `picker`, `image`, `link`, and others defined in [`crates/crepuscularity-native/src/ir.rs`](../crates/crepuscularity-native/src/ir.rs). Style hints use camelCase keys aligned with Swift/Kotlin decoders in `examples/native-shells/` and CLI scaffolds.
 
 ## JSON Schema
 

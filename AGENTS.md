@@ -9,18 +9,25 @@ crepuscularity/
   crates/
     crepuscularity/          — manifest/target build (crepus.toml)
     crepuscularity-cli/      — `crepus` CLI (main entrypoint)
-    crepuscularity-core/     — parser, eval, AST, context, error types
+    crepuscularity-core/     — parser (4 frontends), eval, AST, context, error types
     crepuscularity-components/ — Rust component catalog registry (CLI)
     crepuscularity-web/      — HTML/WASM rendering (web + SSR)
     crepuscularity-webext/   — browser extension builds (MV3)
     crepuscularity-tui/      — Ratatui terminal rendering
     crepuscularity-native/   — View IR for iOS/Android native
-    crepuscularity-embedded/ — LVGL embedded rendering
+    crepuscularity-embedded/ — RGB565 framebuffer for SPI/LTDC panels
     crepuscularity-lvgl/     — LVGL XML generation
     crepuscularity-gpui/     — GPUI desktop rendering
     crepuscularity-runtime/  — hot-reload + shared runtime
-        crepuscularity-lite/     — V8-based JS runtime
-    crepuscularity-macros/   — proc macros
+    crepuscularity-lite/     — V8-based JS runtime
+    crepuscularity_macros/   — proc macros (note the underscore)
+    crepuscularity-reactive/ — WASM signals, memos, effects, hydration
+    crepuscularity-abi/      — C ABI sessions over the View IR
+    crepuscularity-wasm/     — WASM parser + `@tschk/crepuscularity-wasm` npm package
+    crepuscularity-lsp/      — language server
+    crepuscularity-tauri/    — Tauri host integration
+    crepuscularity-tauri-macros/ — proc macros for the Tauri host
+    crepuscularity-plugin-bindgen/ — plugin binding generation
   plugins/
     crepuscularity-flutter/      — Flutter View IR / .crepus renderer
     crepuscularity-components/   — Flutter/Svelte packages + catalog source (omi path deps)
@@ -31,6 +38,24 @@ crepuscularity/
     weather-web/             — SSR weather
     embedded-*/              — LVGL/STM32 examples
 ```
+
+## Parser Frontends
+
+`crepuscularity-core` has four frontends under `src/parser/`, dispatched by file
+extension in `parse_template_with_path`, all producing the same `ast::Node` tree:
+
+| Extension | Frontend | Module |
+|-----------|----------|--------|
+| `.vue` | Vue SFC | `parser/vue/` |
+| `.svelte` | Svelte | `parser/svelte/` |
+| `.csx` `.jsx` `.tsx` (or first line starts with `<`) | JSX | `parser/jsx/` |
+| anything else | indentation | `parser/indent/` |
+
+- Svelte and Vue are **first-party Rust**; no `svelte`/`vue` crate dependency. Do not add one.
+- They compile the **template only**. `<script>` is extracted verbatim and never executed — runes, stores, Composition API, and lifecycle do not run.
+- Unsupported markup constructs must be **hard parse errors**, never silent drops. Keep it that way when extending them.
+- `parseTemplate(source, filename)` in `@tschk/crepuscularity-wasm` is the one JS entry point for all four; the filename selects the frontend.
+- Full support matrix: [`docs/frontends.md`](docs/frontends.md).
 
 ## Targets & Conventions
 
@@ -99,7 +124,7 @@ crepuscularity/
 
 ### `crepus moonshine` — Moonshine + Crepus web apps
 
-**Moonshine is a separate product:** [`github.com/tschk/moonshine`](https://github.com/tschk/moonshine) (`@tschk/moonshine`; local checkout often `~/projects/moonshine`). Prefer the `moonshine` CLI from that repo when available; `crepus moonshine` remains a working Crepuscularity fallback. Crepuscularity compiles `.crepus` → View IR and emits apps that import `@tschk/crepus-moonshine`.
+**Moonshine is a separate product:** [`github.com/tschk/moonshine`](https://github.com/tschk/moonshine) (`@tschk/moonshine`; local checkout often `~/projects/moonshine`). Prefer the `moonshine` CLI from that repo when available; `crepus moonshine` remains a working Crepuscularity fallback. Crepuscularity compiles `.crepus` → View IR and emits a TSX file that imports `@tschk/moonshine/react`.
 
 - Scaffold: `crepus moonshine new <name>` → Vite shell + `index.crepus` + `package.json` (imports `@tschk/moonshine/react`)
 - Dep snippets: `crepus moonshine dep` →
@@ -120,8 +145,9 @@ crepuscularity/
 ### `crepus web build --emit`
 
 - `--emit html` (default) — existing WASM site build (`index.html` + `pkg/`)
-- `--emit moonshine` — real TSX emit (`crepus-emit.moonshine.tsx`) importing `@tschk/crepus-moonshine` + `@tschk/moonshine/react`
-- `--emit svelte|solid|react` — stub/generated file in `dist/` mapping basic View IR kinds to the target framework (not a full runtime)
+- `--emit moonshine` — real TSX emit (`crepus-emit.moonshine.tsx`): literal JSX with `className` from `ViewStyle.classes`, importing only `createApp` from `@tschk/moonshine/react`
+
+`WebEmitTarget` has exactly these two variants (`crates/crepuscularity-cli/src/cli.rs`). The former `--emit svelte|solid|react` stubs were removed as non-functional.
 
 ### `crepus flutter` — Flutter renderer dependency helper
 
@@ -141,7 +167,7 @@ crepuscularity/
 | `crepus components …` | Shared component catalog |
 | `crepus moonshine …` | Moonshine scaffold + deps |
 | `crepus flutter …` | Flutter renderer deps |
-| `crepus web build --emit …` | HTML or framework emit stub |
+| `crepus web build --emit …` | `html` (default) or `moonshine` TSX |
 
 ## Common Error Patterns
 
