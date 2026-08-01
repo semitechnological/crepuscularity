@@ -1,6 +1,6 @@
 [package]
 name = "crepuscularity-cli"
-version = "0.11.0"
+version = "0.12.0"
 edition = "2021"
 license = "ISC"
 description = "crepus CLI — scaffolding and builds for Crepuscularity (UNSTABLE; in active development)."
