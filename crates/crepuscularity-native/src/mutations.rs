@@ -97,9 +97,7 @@ pub fn apply_mutations(ir: &mut ViewIr, ops: &[IrMutation]) -> Result<(), String
                 }
             },
             IrMutation::UpdateStyle { path, style } => {
-                let target_style = node_style_mut(node_mut(ir, path)?)
-                    .ok_or_else(|| format!("node at {:?} does not support style", path))?;
-                *target_style = style.clone();
+                *node_mut(ir, path)?.style_mut() = style.clone();
             }
         }
     }
@@ -426,35 +424,5 @@ fn children_mut<'a>(
             "node at {:?} cannot contain children: {other:?}",
             parent_path
         )),
-    }
-}
-
-fn node_style_mut(node: &mut ViewNode) -> Option<&mut Option<ViewStyle>> {
-    match node {
-        ViewNode::Text { style, .. }
-        | ViewNode::Stack { style, .. }
-        | ViewNode::Button { style, .. }
-        | ViewNode::Toggle { style, .. }
-        | ViewNode::Checkbox { style, .. }
-        | ViewNode::Slider { style, .. }
-        | ViewNode::Progress { style, .. }
-        | ViewNode::Meter { style, .. }
-        | ViewNode::Badge { style, .. }
-        | ViewNode::Divider { style, .. }
-        | ViewNode::Spacer { style, .. }
-        | ViewNode::Dropzone { style, .. }
-        | ViewNode::FilePicker { style, .. }
-        | ViewNode::Image { style, .. }
-        | ViewNode::WebView { style, .. }
-        | ViewNode::Scroll { style, .. }
-        | ViewNode::List { style, .. }
-        | ViewNode::Link { style, .. }
-        | ViewNode::ListItem { style, .. }
-        | ViewNode::SlotRotate { style, .. }
-        | ViewNode::Input { style, .. }
-        | ViewNode::Picker { style, .. }
-        | ViewNode::Tabs { style, .. }
-        | ViewNode::If { style, .. }
-        | ViewNode::ForEach { style, .. } => Some(style),
     }
 }
