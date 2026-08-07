@@ -420,6 +420,49 @@ fn native_add_capability_updates_only_the_scaffold() {
         .expect("scaffold")
         .status
         .success());
+    check_native_add_capability_defaults(&root);
+    check_native_add_capability_share(&root);
+    check_native_add_capability_image_picker(&root);
+    check_native_add_capability_sensors(&root);
+    check_native_add_capability_bluetooth(&root);
+    check_native_add_capability_haptics(&root);
+    check_native_add_capability_clipboard(&root);
+    check_native_add_capability_toast(&root);
+    check_native_add_capability_linking(&root);
+    check_native_add_capability_battery(&root);
+    check_native_add_capability_appearance(&root);
+    check_native_add_capability_documents(&root);
+    check_native_add_capability_photo_library(&root);
+    check_native_add_capability_camera(&root);
+    check_native_add_capability_video(&root);
+    check_native_add_capability_dimensions(&root);
+    check_native_add_capability_dialog(&root);
+    check_native_add_capability_action_sheet(&root);
+    check_native_add_capability_app_state(&root);
+    check_native_add_capability_app(&root);
+    check_native_add_capability_screen_orientation(&root);
+    check_native_add_capability_geolocation(&root);
+    check_native_add_capability_accessibility_info(&root);
+    check_native_add_capability_device(&root);
+    check_native_add_capability_preferences(&root);
+    check_native_add_capability_network(&root);
+    check_native_add_capability_keyboard(&root);
+    check_native_add_capability_settings(&root);
+    check_native_add_capability_local_notifications(&root);
+    check_native_add_capability_secure_storage(&root);
+    check_native_add_capability_biometrics(&root);
+    check_native_add_capability_permissions(&root);
+    check_native_add_capability_microphone(&root);
+    check_native_add_capability_contacts(&root);
+    check_native_add_capability_in_app_browser(&root);
+    check_native_add_capability_system_bars(&root);
+    check_native_add_capability_calendar(&root);
+    check_native_add_capability_deep_links(&root);
+    check_native_add_capability_filesystem(&root);
+}
+
+fn check_native_add_capability_defaults(root: &std::path::Path) {
+    let _ = root;
     let default_android = std::fs::read_to_string(
         root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusRustActions.kt"),
     )
@@ -469,6 +512,10 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(!default_android.contains("deepLinksValue"));
     assert!(!default_ios.contains("deepLinksValue"));
     assert!(!default_cargo.contains("deep-links = []"));
+}
+
+fn check_native_add_capability_share(root: &std::path::Path) {
+    let _ = root;
     assert!(crepus()
         .args(["native", "add", "share", "--dir"])
         .arg(&root)
@@ -485,6 +532,10 @@ fn native_add_capability_updates_only_the_scaffold() {
             .expect("read iOS share bridge");
     assert!(share_android.contains("Intent.createChooser"));
     assert!(share_ios.contains("UIActivityViewController"));
+}
+
+fn check_native_add_capability_image_picker(root: &std::path::Path) {
+    let _ = root;
     assert!(crepus()
         .args(["native", "add", "image-picker", "--dir"])
         .arg(&root)
@@ -503,6 +554,10 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(image_picker_android.contains("\"pick_media\" ->"));
     assert!(image_picker_ios.contains("PHPickerViewController"));
     assert!(image_picker_ios.contains("case \"pick_media\":"));
+}
+
+fn check_native_add_capability_sensors(root: &std::path::Path) {
+    let _ = root;
     assert!(crepus()
         .args(["native", "add", "sensors", "--dir"])
         .arg(&root)
@@ -526,6 +581,10 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(ios_sensors.contains("CMMotionManager"));
     assert!(ios_sensors.contains("9.80665"));
     assert!(ios_sensors.contains("private static let sensors = SensorBridge()"));
+}
+
+fn check_native_add_capability_bluetooth(root: &std::path::Path) {
+    let _ = root;
     assert!(crepus()
         .args(["native", "add", "bluetooth", "--dir"])
         .arg(&root)
@@ -553,6 +612,10 @@ fn native_add_capability_updates_only_the_scaffold() {
             .expect("read manifest")
             .contains("android.permission.BLUETOOTH_SCAN")
     );
+}
+
+fn check_native_add_capability_haptics(root: &std::path::Path) {
+    let _ = root;
     assert!(crepus()
         .args(["native", "add", "haptics", "--dir"])
         .arg(&root)
@@ -569,6 +632,10 @@ fn native_add_capability_updates_only_the_scaffold() {
             .expect("read iOS haptics bridge");
     assert!(haptics_android.contains("VibrationEffect.createOneShot"));
     assert!(haptics_ios.contains("UIImpactFeedbackGenerator"));
+}
+
+fn check_native_add_capability_clipboard(root: &std::path::Path) {
+    let _ = root;
     assert!(crepus()
         .args(["native", "add", "clipboard", "--dir"])
         .arg(&root)
@@ -589,6 +656,10 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(clipboard_ios.contains("UIPasteboard.general"));
     assert!(clipboard_ios.contains("UIPasteboard.changedNotification"));
     assert!(clipboard_ios.contains("clipboard.change"));
+}
+
+fn check_native_add_capability_toast(root: &std::path::Path) {
+    let _ = root;
     assert!(crepus()
         .args(["native", "add", "toast", "--dir"])
         .arg(&root)
@@ -607,6 +678,10 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(toast_android.contains("\"toast\" -> toastValue"));
     assert!(toast_ios.contains("presentToast"));
     assert!(toast_ios.contains("case \"toast\":"));
+}
+
+fn check_native_add_capability_linking(root: &std::path::Path) {
+    let _ = root;
     assert!(crepus()
         .args(["native", "add", "linking", "--dir"])
         .arg(&root)
@@ -623,6 +698,10 @@ fn native_add_capability_updates_only_the_scaffold() {
             .expect("read iOS browser bridge");
     assert!(browser_android.contains("Intent.ACTION_VIEW"));
     assert!(browser_ios.contains("UIApplication.shared.open"));
+}
+
+fn check_native_add_capability_battery(root: &std::path::Path) {
+    let _ = root;
     assert!(crepus()
         .args(["native", "add", "battery", "--dir"])
         .arg(&root)
@@ -641,6 +720,10 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(battery_android.contains("battery.change"));
     assert!(battery_ios.contains("UIDevice.batteryLevelDidChangeNotification"));
     assert!(battery_ios.contains("battery.change"));
+}
+
+fn check_native_add_capability_appearance(root: &std::path::Path) {
+    let _ = root;
     assert!(crepus()
         .args(["native", "add", "appearance", "--dir"])
         .arg(&root)
@@ -659,6 +742,10 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(appearance_android.contains("appearance.change"));
     assert!(appearance_ios.contains("traitCollectionDidChange"));
     assert!(appearance_ios.contains("appearance.change"));
+}
+
+fn check_native_add_capability_documents(root: &std::path::Path) {
+    let _ = root;
     assert!(crepus()
         .args(["native", "add", "documents", "--dir"])
         .arg(&root)
@@ -675,6 +762,10 @@ fn native_add_capability_updates_only_the_scaffold() {
             .expect("read iOS document picker bridge");
     assert!(document_picker_android.contains("\"documentPicker\" -> documentPickerValue(method)"));
     assert!(document_picker_ios.contains("case \"documentPicker\":"));
+}
+
+fn check_native_add_capability_photo_library(root: &std::path::Path) {
+    let _ = root;
     assert!(crepus()
         .args(["native", "add", "photo-library", "--dir"])
         .arg(&root)
@@ -693,6 +784,10 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(photo_library_android.contains("MediaStore.Images.Media.EXTERNAL_CONTENT_URI"));
     assert!(photo_library_ios.contains("PHPhotoLibrary.requestAuthorization"));
     assert!(photo_library_ios.contains("case \"photoLibrary\":"));
+}
+
+fn check_native_add_capability_camera(root: &std::path::Path) {
+    let _ = root;
     assert!(crepus()
         .args(["native", "add", "camera", "--dir"])
         .arg(&root)
@@ -710,6 +805,10 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(camera_android.contains("TakePicturePreview"));
     assert!(camera_ios.contains("UIImagePickerController"));
     assert!(camera_ios.contains("case \"camera\":"));
+}
+
+fn check_native_add_capability_video(root: &std::path::Path) {
+    let _ = root;
     assert!(crepus()
         .args(["native", "add", "video", "--dir"])
         .arg(&root)
@@ -728,6 +827,10 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(video_android.contains("android-video-camera"));
     assert!(video_ios.contains("cameraCaptureMode = .video"));
     assert!(video_ios.contains("ios-video-camera"));
+}
+
+fn check_native_add_capability_dimensions(root: &std::path::Path) {
+    let _ = root;
     assert!(crepus()
         .args(["native", "add", "dimensions", "--dir"])
         .arg(&root)
@@ -744,6 +847,10 @@ fn native_add_capability_updates_only_the_scaffold() {
             .expect("read iOS dimensions bridge");
     assert!(dimensions_android.contains("currentWindowMetrics"));
     assert!(dimensions_ios.contains("UIScreen.main"));
+}
+
+fn check_native_add_capability_dialog(root: &std::path::Path) {
+    let _ = root;
     assert!(crepus()
         .args(["native", "add", "dialog", "--dir"])
         .arg(&root)
@@ -760,6 +867,10 @@ fn native_add_capability_updates_only_the_scaffold() {
             .expect("read iOS dialog bridge");
     assert!(dialog_android.contains("AlertDialog.Builder"));
     assert!(dialog_ios.contains("UIAlertController"));
+}
+
+fn check_native_add_capability_action_sheet(root: &std::path::Path) {
+    let _ = root;
     assert!(crepus()
         .args(["native", "add", "action-sheet", "--dir"])
         .arg(&root)
@@ -776,6 +887,10 @@ fn native_add_capability_updates_only_the_scaffold() {
             .expect("read iOS action sheet bridge");
     assert!(action_sheet_android.contains("setItems(labels)"));
     assert!(action_sheet_ios.contains("preferredStyle: .actionSheet"));
+}
+
+fn check_native_add_capability_app_state(root: &std::path::Path) {
+    let _ = root;
     assert!(crepus()
         .args(["native", "add", "app-state", "--dir"])
         .arg(&root)
@@ -796,6 +911,10 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(app_state_ios.contains("UIApplication.shared.applicationState"));
     assert!(app_state_ios.contains("UIApplication.didBecomeActiveNotification"));
     assert!(app_state_ios.contains("appState.change"));
+}
+
+fn check_native_add_capability_app(root: &std::path::Path) {
+    let _ = root;
     assert!(crepus()
         .args(["native", "add", "app", "--dir"])
         .arg(&root)
@@ -812,6 +931,10 @@ fn native_add_capability_updates_only_the_scaffold() {
             .expect("read iOS app bridge");
     assert!(app_android.contains("getPackageInfo"));
     assert!(app_ios.contains("CFBundleShortVersionString"));
+}
+
+fn check_native_add_capability_screen_orientation(root: &std::path::Path) {
+    let _ = root;
     assert!(crepus()
         .args(["native", "add", "screen-orientation", "--dir"])
         .arg(&root)
@@ -829,6 +952,10 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(orientation_android.contains("SCREEN_ORIENTATION_LANDSCAPE"));
     assert!(orientation_android.contains("SCREEN_ORIENTATION_UNSPECIFIED"));
     assert!(orientation_ios.contains("requestGeometryUpdate"));
+}
+
+fn check_native_add_capability_geolocation(root: &std::path::Path) {
+    let _ = root;
     assert!(crepus()
         .args(["native", "add", "geolocation", "--dir"])
         .arg(&root)
@@ -847,6 +974,10 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(geolocation_android.contains("geolocation.update"));
     assert!(geolocation_ios.contains("startUpdatingLocation"));
     assert!(geolocation_ios.contains("geolocation.update"));
+}
+
+fn check_native_add_capability_accessibility_info(root: &std::path::Path) {
+    let _ = root;
     assert!(crepus()
         .args(["native", "add", "accessibility-info", "--dir"])
         .arg(&root)
@@ -869,6 +1000,10 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(accessibility_ios.contains("accessibilityInfo.change"));
     assert!(accessibility_android.contains("\"accessibilityInfo\", \"screenReader\""));
     assert!(accessibility_ios.contains("case \"accessibilityInfo\", \"screenReader\":"));
+}
+
+fn check_native_add_capability_device(root: &std::path::Path) {
+    let _ = root;
     assert!(crepus()
         .args(["native", "add", "device", "--dir"])
         .arg(&root)
@@ -887,12 +1022,20 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(device_ios.contains("UIDevice.current"));
     assert!(device_android.contains("\"device\", \"platform\""));
     assert!(device_ios.contains("case \"device\", \"platform\":"));
+    assert!(std::fs::read_to_string(
+        root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusRustActions.kt")
+    )
+    .unwrap()
+    .contains("\"browser\", \"linking\", \"appLauncher\", \"phone\", \"sms\""));
     assert!(
-        browser_android.contains("\"browser\", \"linking\", \"appLauncher\", \"phone\", \"sms\"")
+        std::fs::read_to_string(root.join("ios/Sources/NativeShell/CrepusRustActions.swift"))
+            .unwrap()
+            .contains("case \"browser\", \"linking\", \"appLauncher\", \"phone\", \"sms\":")
     );
-    assert!(
-        browser_ios.contains("case \"browser\", \"linking\", \"appLauncher\", \"phone\", \"sms\":")
-    );
+}
+
+fn check_native_add_capability_preferences(root: &std::path::Path) {
+    let _ = root;
     assert!(crepus()
         .args(["native", "add", "preferences", "--dir"])
         .arg(&root)
@@ -909,6 +1052,10 @@ fn native_add_capability_updates_only_the_scaffold() {
             .expect("read iOS preferences bridge");
     assert!(preferences_android.contains("getSharedPreferences"));
     assert!(preferences_ios.contains("UserDefaults.standard"));
+}
+
+fn check_native_add_capability_network(root: &std::path::Path) {
+    let _ = root;
     assert!(crepus()
         .args(["native", "add", "network", "--dir"])
         .arg(&root)
@@ -927,6 +1074,10 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(network_android.contains("registerDefaultNetworkCallback"));
     assert!(network_ios.contains("NWPathMonitor"));
     assert!(network_ios.contains("network.change"));
+}
+
+fn check_native_add_capability_keyboard(root: &std::path::Path) {
+    let _ = root;
     assert!(crepus()
         .args(["native", "add", "keyboard", "--dir"])
         .arg(&root)
@@ -943,6 +1094,10 @@ fn native_add_capability_updates_only_the_scaffold() {
             .expect("read iOS keyboard bridge");
     assert!(keyboard_android.contains("hideSoftInputFromWindow"));
     assert!(keyboard_ios.contains("resignFirstResponder"));
+}
+
+fn check_native_add_capability_settings(root: &std::path::Path) {
+    let _ = root;
     assert!(crepus()
         .args(["native", "add", "settings", "--dir"])
         .arg(&root)
@@ -959,6 +1114,10 @@ fn native_add_capability_updates_only_the_scaffold() {
             .expect("read iOS settings bridge");
     assert!(settings_android.contains("ACTION_APPLICATION_DETAILS_SETTINGS"));
     assert!(settings_ios.contains("openSettingsURLString"));
+}
+
+fn check_native_add_capability_local_notifications(root: &std::path::Path) {
+    let _ = root;
     assert!(crepus()
         .args(["native", "add", "local-notifications", "--dir"])
         .arg(&root)
@@ -986,6 +1145,10 @@ fn native_add_capability_updates_only_the_scaffold() {
             < notifications_manifest.find("</application>")
     );
     assert!(root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusNotificationReceiver.kt").exists());
+}
+
+fn check_native_add_capability_secure_storage(root: &std::path::Path) {
+    let _ = root;
     assert!(crepus()
         .args(["native", "add", "secure-storage", "--dir"])
         .arg(&root)
@@ -1002,6 +1165,10 @@ fn native_add_capability_updates_only_the_scaffold() {
             .expect("read iOS secure storage bridge");
     assert!(secure_storage_android.contains("AndroidKeyStore"));
     assert!(secure_storage_ios.contains("SecItemAdd"));
+}
+
+fn check_native_add_capability_biometrics(root: &std::path::Path) {
+    let _ = root;
     assert!(crepus()
         .args(["native", "add", "biometrics", "--dir"])
         .arg(&root)
@@ -1018,6 +1185,10 @@ fn native_add_capability_updates_only_the_scaffold() {
             .expect("read iOS biometrics bridge");
     assert!(biometrics_android.contains("BiometricPrompt"));
     assert!(biometrics_ios.contains("LAContext"));
+}
+
+fn check_native_add_capability_permissions(root: &std::path::Path) {
+    let _ = root;
     assert!(crepus()
         .args(["native", "add", "permissions", "--dir"])
         .arg(&root)
@@ -1039,6 +1210,10 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(std::fs::read_to_string(root.join("ios/project.yml"))
         .expect("read iOS project")
         .contains("NSBluetoothAlwaysUsageDescription"));
+}
+
+fn check_native_add_capability_microphone(root: &std::path::Path) {
+    let _ = root;
     assert!(crepus()
         .args(["native", "add", "microphone", "--dir"])
         .arg(&root)
@@ -1058,6 +1233,10 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(std::fs::read_to_string(root.join("ios/project.yml"))
         .expect("read iOS project")
         .contains("NSMicrophoneUsageDescription"));
+}
+
+fn check_native_add_capability_contacts(root: &std::path::Path) {
+    let _ = root;
     assert!(crepus()
         .args(["native", "add", "contacts", "--dir"])
         .arg(&root)
@@ -1074,6 +1253,10 @@ fn native_add_capability_updates_only_the_scaffold() {
             .expect("read iOS contacts bridge");
     assert!(contacts_android.contains("ContactsContract.CommonDataKinds.Phone"));
     assert!(contacts_ios.contains("CNContactStore"));
+}
+
+fn check_native_add_capability_in_app_browser(root: &std::path::Path) {
+    let _ = root;
     assert!(crepus()
         .args(["native", "add", "in-app-browser", "--dir"])
         .arg(&root)
@@ -1090,6 +1273,10 @@ fn native_add_capability_updates_only_the_scaffold() {
             .expect("read iOS in-app-browser bridge");
     assert!(in_app_browser_android.contains("CustomTabsIntent"));
     assert!(in_app_browser_ios.contains("SFSafariViewController"));
+}
+
+fn check_native_add_capability_system_bars(root: &std::path::Path) {
+    let _ = root;
     assert!(crepus()
         .args(["native", "add", "system-bars", "--dir"])
         .arg(&root)
@@ -1106,6 +1293,10 @@ fn native_add_capability_updates_only_the_scaffold() {
             .expect("read iOS system-bars bridge");
     assert!(system_bars_android.contains("statusBarColor"));
     assert!(system_bars_ios.contains("overrideUserInterfaceStyle"));
+}
+
+fn check_native_add_capability_calendar(root: &std::path::Path) {
+    let _ = root;
     assert!(crepus()
         .args(["native", "add", "calendar", "--dir"])
         .arg(&root)
@@ -1122,6 +1313,10 @@ fn native_add_capability_updates_only_the_scaffold() {
             .expect("read iOS calendar bridge");
     assert!(calendar_android.contains("CalendarContract.Events.CONTENT_URI"));
     assert!(calendar_ios.contains("EKEventStore"));
+}
+
+fn check_native_add_capability_deep_links(root: &std::path::Path) {
+    let _ = root;
     assert!(crepus()
         .args(["native", "add", "deep-links", "--dir"])
         .arg(&root)
@@ -1156,6 +1351,10 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(info.contains("NSPhotoLibraryUsageDescription"));
     assert!(info.contains("NSContactsUsageDescription"));
     assert!(info.contains("NSCalendarsFullAccessUsageDescription"));
+}
+
+fn check_native_add_capability_filesystem(root: &std::path::Path) {
+    let _ = root;
     assert!(crepus()
         .args(["native", "add", "filesystem", "--dir"])
         .arg(&root)
@@ -1192,8 +1391,16 @@ fn native_add_capability_updates_only_the_scaffold() {
     assert!(cargo.contains("calendar = []"));
     assert!(cargo.contains("contacts = []"));
     assert!(cargo.contains("deep-links = []"));
-    assert!(haptics_android.contains("\"haptics\", \"vibration\""));
-    assert!(haptics_ios.contains("case \"haptics\", \"vibration\":"));
+    assert!(std::fs::read_to_string(
+        root.join("android/app/src/main/java/dev/crepuscularity/nativeshell/CrepusRustActions.kt")
+    )
+    .unwrap()
+    .contains("\"haptics\", \"vibration\""));
+    assert!(
+        std::fs::read_to_string(root.join("ios/Sources/NativeShell/CrepusRustActions.swift"))
+            .unwrap()
+            .contains("case \"haptics\", \"vibration\":")
+    );
     assert!(cargo.contains("filesystem = []"));
     assert!(cargo.contains("default = [\"filesystem\"]"));
     assert!(
