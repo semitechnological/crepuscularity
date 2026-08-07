@@ -443,6 +443,23 @@ mod tests {
     use super::*;
 
     #[test]
+    fn channel_messaging_queue_and_poll() {
+        let host = HostState::default();
+        host.channel_send("chat", json!("hello"));
+        host.channel_send("chat", json!("world"));
+        host.channel_send("system", json!("ping"));
+
+        assert_eq!(host.channel_poll("chat"), Some(json!("hello")));
+        assert_eq!(host.channel_poll("chat"), Some(json!("world")));
+        assert_eq!(host.channel_poll("chat"), None);
+
+        assert_eq!(host.channel_poll("system"), Some(json!("ping")));
+        assert_eq!(host.channel_poll("system"), None);
+
+        assert_eq!(host.channel_poll("non_existent"), None);
+    }
+
+    #[test]
     fn storage_roundtrip_and_snapshot_keys() {
         let host = HostState::default();
         host.storage_set("alpha", json!("one"));
