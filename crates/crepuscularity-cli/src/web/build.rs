@@ -1393,7 +1393,7 @@ fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
     use walkdir::WalkDir;
     let mut files_to_copy = Vec::new();
 
-    for entry in WalkDir::new(src) {
+    for entry in WalkDir::new(src).follow_links(true) {
         let entry = entry.map_err(std::io::Error::other)?;
         let path = entry.path();
 
