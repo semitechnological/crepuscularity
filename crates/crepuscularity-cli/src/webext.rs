@@ -1244,7 +1244,8 @@ fn collect_crepus_pages(
         .into_iter()
         .filter(|e| {
             let path = e.path();
-            path.is_file() && path.extension().and_then(|ext| ext.to_str()) == Some("crepus")
+            let is_file_or_link = e.file_type().is_file() || e.file_type().is_symlink();
+            is_file_or_link && path.extension().and_then(|ext| ext.to_str()) == Some("crepus")
         })
         .map(|e| e.path().to_owned())
         .collect();
