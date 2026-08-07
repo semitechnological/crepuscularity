@@ -1089,7 +1089,7 @@ fn render_crepus_pages(
 
     let mut files = HashMap::new();
     let mut entries = Vec::new();
-    collect_crepus_pages(&pages_dir, &pages_dir, &mut files, &mut entries)?;
+    collect_crepus_pages(&pages_dir, &mut files, &mut entries)?;
     if entries.is_empty() {
         return Ok(());
     }
@@ -1232,27 +1232,42 @@ try {{
 
 fn collect_crepus_pages(
     root: &Path,
-    dir: &Path,
     files: &mut HashMap<String, String>,
     entries: &mut Vec<String>,
 ) -> Result<(), String> {
-    for entry in std::fs::read_dir(dir).map_err(|e| e.to_string())? {
-        let entry = entry.map_err(|e| e.to_string())?;
-        let path = entry.path();
-        if entry.file_type().map_err(|e| e.to_string())?.is_dir() {
-            collect_crepus_pages(root, &path, files, entries)?;
-        } else if path.extension().and_then(|ext| ext.to_str()) == Some("crepus") {
+    use rayon::prelude::*;
+
+    let crepus_files: Vec<_> = walkdir::WalkDir::new(root)
+        .into_iter()
+        .collect::<Result<Vec<_>, walkdir::Error>>()
+        .map_err(|e| e.to_string())?
+        .into_iter()
+        .filter(|e| {
+            let path = e.path();
+            path.is_file() && path.extension().and_then(|ext| ext.to_str()) == Some("crepus")
+        })
+        .map(|e| e.path().to_owned())
+        .collect();
+
+    let results: Result<Vec<(String, String)>, String> = crepus_files
+        .into_par_iter()
+        .map(|path| {
             let rel = path
                 .strip_prefix(root)
                 .map_err(|e| e.to_string())?
                 .to_string_lossy()
                 .replace('\\', "/");
             let source = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
-            files.insert(rel.clone(), source);
-            entries.push(rel);
-        }
+            Ok((rel, source))
+        })
+        .collect();
+
+    for (rel, source) in results? {
+        entries.push(rel.clone());
+        files.insert(rel, source);
     }
     entries.sort();
+
     Ok(())
 }
 
