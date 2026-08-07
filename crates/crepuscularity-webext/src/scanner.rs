@@ -123,8 +123,8 @@ pub fn scan_directory_for_capabilities(dir: &Path) -> Result<CapabilitySet, std:
     let mut set = CapabilitySet::new();
 
     let walker = ignore::WalkBuilder::new(dir)
-        .standard_filters(false)
-        .follow_links(true)
+        .hidden(false)
+        .git_ignore(false)
         .build();
 
     for result in walker {
@@ -132,9 +132,7 @@ pub fn scan_directory_for_capabilities(dir: &Path) -> Result<CapabilitySet, std:
             Ok(entry) => entry,
             Err(e) => {
                 let msg = e.to_string();
-                return Err(e
-                    .into_io_error()
-                    .unwrap_or_else(|| std::io::Error::new(std::io::ErrorKind::Other, msg)));
+                return Err(e.into_io_error().unwrap_or_else(|| std::io::Error::other(msg)));
             }
         };
         let path = entry.path();
