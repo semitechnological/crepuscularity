@@ -512,4 +512,17 @@ mod tests {
         assert_eq!(tree.children[0].style.font_size, Some(20.0));
         assert_eq!(tree.children[0].style.font_weight.as_deref(), Some("bold"));
     }
+
+    #[test]
+    fn record_event_updates_last_event() {
+        let host = HostState::default();
+        let event = HostEventRecord {
+            kind: "click".to_string(),
+            handler_id: "btn-1".to_string(),
+            payload: json!({ "x": 10 }),
+        };
+        host.record_event(event.clone());
+        let snap = host.snapshot();
+        assert_eq!(snap.last_event, Some(event));
+    }
 }
