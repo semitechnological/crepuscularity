@@ -427,7 +427,6 @@ pub fn find_built_ios_app(ios_dir: &Path, cfg: &MobileIosConfig) -> Option<PathB
 pub fn find_app_under(dir: &Path) -> Option<PathBuf> {
     for entry in walkdir::WalkDir::new(dir)
         .min_depth(1)
-        .follow_links(true)
         .into_iter()
         .filter_map(|e| e.ok())
     {
