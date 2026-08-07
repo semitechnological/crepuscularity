@@ -558,3 +558,21 @@ fn main() {
         .detach();
     });
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_hex_color() {
+        assert!(parse_hex_color("#ff0000").is_some());
+        assert!(parse_hex_color("00ff00").is_some());
+        assert!(parse_hex_color(" #0000ff ").is_some());
+
+        assert!(parse_hex_color("#ff0").is_none());
+        assert!(parse_hex_color("ff00000").is_none());
+        assert!(parse_hex_color("#xyz123").is_none());
+        assert!(parse_hex_color("").is_none());
+        assert!(parse_hex_color("   ").is_none());
+    }
+}
