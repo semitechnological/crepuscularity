@@ -132,7 +132,9 @@ pub fn scan_directory_for_capabilities(dir: &Path) -> Result<CapabilitySet, std:
             Ok(entry) => entry,
             Err(e) => {
                 let msg = e.to_string();
-                return Err(e.into_io_error().unwrap_or_else(|| std::io::Error::other(msg)));
+                return Err(e
+                    .into_io_error()
+                    .unwrap_or_else(|| std::io::Error::other(msg)));
             }
         };
         let path = entry.path();
