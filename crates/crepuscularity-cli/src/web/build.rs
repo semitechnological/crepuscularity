@@ -1390,17 +1390,30 @@ pub(crate) fn ensure_web_dev_artifacts(site_dir: &Path) -> Result<(), CrepusCliE
 }
 
 fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
-    std::fs::create_dir_all(dst)?;
-    for entry in std::fs::read_dir(src)? {
-        let entry = entry?;
-        let p = entry.path();
-        let name = entry.file_name();
-        if p.is_dir() {
-            copy_dir_recursive(&p, &dst.join(name))?;
+    use walkdir::WalkDir;
+    let mut files_to_copy = Vec::new();
+
+    for entry in WalkDir::new(src) {
+        let entry = entry.map_err(std::io::Error::other)?;
+        let path = entry.path();
+
+        let relative_path = path.strip_prefix(src).map_err(std::io::Error::other)?;
+        let dst_path = dst.join(relative_path);
+
+        if path.is_dir() {
+            std::fs::create_dir_all(&dst_path)?;
         } else {
-            let _ = std::fs::copy(&p, dst.join(name))?;
+            files_to_copy.push((path.to_path_buf(), dst_path));
         }
     }
+
+    files_to_copy
+        .into_par_iter()
+        .try_for_each(|(s, d)| -> std::io::Result<()> {
+            let _ = std::fs::copy(s, d)?;
+            Ok(())
+        })?;
+
     Ok(())
 }
 
