@@ -8,7 +8,13 @@ module.exports = grammar({
   rules: {
     template: ($) =>
       seq(
-        repeat(choice(seq($.logical_line, $._eol), $._eol)),
+        repeat(
+          choice(
+            seq($.logical_line, $._eol),
+            $._eol,
+            $.raw_style_block,
+          ),
+        ),
         optional($.logical_line),
       ),
 
@@ -21,6 +27,7 @@ module.exports = grammar({
         $.frontmatter_marker,
         $.jsx_fragment,
         $.quoted,
+        $.match_arm,
         $.element_line,
       ),
 
@@ -41,6 +48,12 @@ module.exports = grammar({
         repeat(choice(token(prec(1, /\\./)), /[^"\\]/)),
         '"',
       ),
+
+    // `"key" =>` / `_ =>` match-arm label; the arm body starts on the next line.
+    match_arm: ($) => choice(seq($.quoted, '=>'), seq('_', '=>')),
+
+    // `<style>` … `</style>` is raw text (CSS) spanning lines as a single token.
+    raw_style_block: ($) => token(seq('<style>', /[^<]*/, '</style>')),
 
     element_line: ($) =>
       seq(
