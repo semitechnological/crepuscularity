@@ -1,17 +1,12 @@
 id = "crepuscularity"
 name = "Crepuscularity"
-version = "0.3.1"
+version = "0.3.2"
 schema_version = 1
 authors = ["Max Carter <max@undivisible.dev>"]
 description = "Crepus templates (.crepus) and CrepusX (.csx) for React Native: tree-sitter highlighting, snippets, and crepus-lsp."
 repository = "https://github.com/tschk/crepuscularity"
 
 snippets = ["./snippets/crepus.json", "./snippets/csx.json"]
-
-[[capabilities]]
-kind = "process:exec"
-command = "*"
-args = ["**"]
 
 [grammars.crepus]
 repository = "https://github.com/tschk/crepuscularity"

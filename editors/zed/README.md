@@ -42,9 +42,7 @@ The `[grammars.crepus].rev` field in `extension.toml` pins a **full Git SHA** so
 
 Zed runs **`crepus-lsp --stdio`**. Resolution (see `src/lib.rs`):
 
-1. **`crepus-lsp` on your `PATH`** (e.g. `cargo install --path crates/crepuscularity-lsp`), or  
-2. **`{worktree}/target/debug/crepus-lsp`** (worktree = Zed project folder) — build with  
-   `SDKROOT="$(xcrun --show-sdk-path)" cargo build -p crepuscularity-lsp`  
-   from the **Cargo workspace root** (the folder you added as the Zed project).
+1. **`lsp.crepus-lsp.binary.path`** in your Zed settings, or  
+2. **`crepus-lsp` on your `PATH`** (e.g. `cargo install --path crates/crepuscularity-lsp`).
 
-Open the **repo / workspace root** in Zed (`crepuscularity/`), not only a nested crate, so `target/debug/` matches the path the extension uses.
+Build the LSP with `SDKROOT="$(xcrun --show-sdk-path)" cargo build -p crepuscularity-lsp` from the **Cargo workspace root**, then point `lsp.crepus-lsp.binary.path` at the resulting binary.
