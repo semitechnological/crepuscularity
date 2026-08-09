@@ -457,6 +457,21 @@ mod tests {
         assert_eq!(host.channel_poll("system"), None);
 
         assert_eq!(host.channel_poll("non_existent"), None);
+    fn require_string_field_tests() {
+        let payload = json!({
+            "valid": "hello",
+            "number": 42
+        });
+
+        assert_eq!(require_string_field(&payload, "valid").unwrap(), "hello");
+
+        let err = require_string_field(&payload, "missing").unwrap_err();
+        assert_eq!(err.code, "invalid_payload");
+        assert_eq!(err.message, "expected string field \"missing\"");
+
+        let err = require_string_field(&payload, "number").unwrap_err();
+        assert_eq!(err.code, "invalid_payload");
+        assert_eq!(err.message, "expected string field \"number\"");
     }
 
     #[test]
@@ -528,5 +543,18 @@ mod tests {
         assert_eq!(tree.style.radius, Some(6.0));
         assert_eq!(tree.children[0].style.font_size, Some(20.0));
         assert_eq!(tree.children[0].style.font_weight.as_deref(), Some("bold"));
+    }
+
+    #[test]
+    fn record_event_updates_last_event() {
+        let host = HostState::default();
+        let event = HostEventRecord {
+            kind: "click".to_string(),
+            handler_id: "btn-1".to_string(),
+            payload: json!({ "x": 10 }),
+        };
+        host.record_event(event.clone());
+        let snap = host.snapshot();
+        assert_eq!(snap.last_event, Some(event));
     }
 }

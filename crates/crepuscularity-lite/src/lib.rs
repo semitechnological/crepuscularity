@@ -61,3 +61,30 @@ pub use v8_host::V8Host;
 pub use v8_thread::{V8ThreadHandle, V8ThreadRequest, V8ThreadRuntime};
 #[cfg(feature = "v8")]
 pub use worker::{WorkerHandle, WorkerRuntime};
+
+pub fn parse_hex_color(raw: &str) -> Option<gpui::Hsla> {
+    let hex = raw.trim().trim_start_matches('#');
+    let parsed = match hex.len() {
+        6 => u32::from_str_radix(hex, 16).ok().map(gpui::rgb),
+        _ => None,
+    }?;
+    Some(parsed.into())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_hex_color() {
+        assert!(parse_hex_color("#ff0000").is_some());
+        assert!(parse_hex_color("00ff00").is_some());
+        assert!(parse_hex_color(" #0000ff ").is_some());
+
+        assert!(parse_hex_color("#ff0").is_none());
+        assert!(parse_hex_color("ff00000").is_none());
+        assert!(parse_hex_color("#xyz123").is_none());
+        assert!(parse_hex_color("").is_none());
+        assert!(parse_hex_color("   ").is_none());
+    }
+}

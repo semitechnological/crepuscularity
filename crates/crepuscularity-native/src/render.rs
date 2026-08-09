@@ -198,318 +198,23 @@ fn render_element_inner(el: &Element, ctx: &TemplateContext) -> Result<ViewNode,
 
     let classes = active_classes(el, ctx)?;
 
-    if tag == "iframe" {
-        let hints = style::extract_stack_hints(classes, Some(ctx));
-        return Ok(ViewNode::WebView {
-            src: binding_string(el, "src", ctx).unwrap_or_default(),
-            style: hints.style.opt(),
-        });
+    if let Some(node) = render_form_element(tag, el, ctx, &classes)? {
+        return Ok(node);
     }
-
-    if tag == "button" {
-        let label = collect_primary_text(&el.children, ctx)?;
-        let on_click = el
-            .event_handlers
-            .iter()
-            .find(|e| e.event == "click")
-            .map(|e| e.handler.clone());
-        let hints = style::extract_stack_hints(classes, Some(ctx));
-        return Ok(ViewNode::Button {
-            label,
-            on_click,
-            on_long_press: None,
-            style: hints.style.opt(),
-        });
+    if let Some(node) = render_layout_element(tag, el, ctx, &classes)? {
+        return Ok(node);
     }
-
-    if tag == "toggle" || tag == "switch" {
-        let label = component_label(el, ctx)?;
-        let hints = style::extract_stack_hints(classes, Some(ctx));
-        return Ok(ViewNode::Toggle {
-            label,
-            bind: binding_raw(el, "bind"),
-            checked: binding_bool(el, "checked", ctx).unwrap_or(false),
-            on_change: event_handler(el, "change"),
-            on_long_press: None,
-            style: hints.style.opt(),
-        });
+    if let Some(node) = render_media_element(tag, el, ctx, &classes)? {
+        return Ok(node);
     }
-
-    if tag == "checkbox" {
-        let label = component_label(el, ctx)?;
-        let hints = style::extract_stack_hints(classes, Some(ctx));
-        return Ok(ViewNode::Checkbox {
-            label,
-            bind: binding_raw(el, "bind"),
-            checked: binding_bool(el, "checked", ctx).unwrap_or(false),
-            on_change: event_handler(el, "change"),
-            style: hints.style.opt(),
-        });
-    }
-
-    if tag == "slider" {
-        let hints = style::extract_stack_hints(classes, Some(ctx));
-        return Ok(ViewNode::Slider {
-            label: optional_component_label(el, ctx)?,
-            bind: binding_raw(el, "bind"),
-            value: binding_f32(el, "value", ctx).unwrap_or(0.0),
-            min: binding_f32(el, "min", ctx).unwrap_or(0.0),
-            max: binding_f32(el, "max", ctx).unwrap_or(100.0),
-            step: binding_f32(el, "step", ctx),
-            on_change: event_handler(el, "change"),
-            style: hints.style.opt(),
-        });
-    }
-
-    if tag == "progress" {
-        let hints = style::extract_stack_hints(classes, Some(ctx));
-        return Ok(ViewNode::Progress {
-            label: optional_component_label(el, ctx)?,
-            value: binding_f32(el, "value", ctx).unwrap_or(0.0),
-            max: binding_f32(el, "max", ctx).unwrap_or(100.0),
-            style: hints.style.opt(),
-        });
-    }
-
-    if tag == "meter" {
-        let hints = style::extract_stack_hints(classes, Some(ctx));
-        return Ok(ViewNode::Meter {
-            label: optional_component_label(el, ctx)?,
-            value: binding_f32(el, "value", ctx).unwrap_or(0.0),
-            min: binding_f32(el, "min", ctx).unwrap_or(0.0),
-            max: binding_f32(el, "max", ctx).unwrap_or(100.0),
-            style: hints.style.opt(),
-        });
-    }
-
-    if tag == "badge" {
-        let hints = style::extract_stack_hints(classes, Some(ctx));
-        return Ok(ViewNode::Badge {
-            label: component_label(el, ctx)?,
-            tone: binding_string(el, "tone", ctx),
-            style: hints.style.opt(),
-        });
-    }
-
-    if tag == "divider" || tag == "hr" {
-        let axis = stack_axis(&classes);
-        let hints = style::extract_stack_hints(classes, Some(ctx));
-        return Ok(ViewNode::Divider {
-            axis,
-            style: hints.style.opt(),
-        });
-    }
-
-    if tag == "spacer" {
-        let gap = parse_gap_spacing(&classes);
-        let hints = style::extract_stack_hints(classes, Some(ctx));
-        return Ok(ViewNode::Spacer {
-            size: binding_f32(el, "size", ctx).or(gap),
-            style: hints.style.opt(),
-        });
-    }
-
-    if tag == "dropzone" {
-        let label = collect_primary_text(&el.children, ctx).unwrap_or_default();
-        let accept = el
-            .bindings
-            .iter()
-            .find(|b| b.prop == "accept")
-            .and_then(|b| eval_expr(&b.value, ctx).ok().map(|v| value_to_str(&v)));
-        let on_drop = el
-            .event_handlers
-            .iter()
-            .find(|e| e.event == "drop")
-            .map(|e| e.handler.clone());
-        let hints = style::extract_stack_hints(classes, Some(ctx));
-        let children = render_nodes_list(&el.children, ctx)?;
-        return Ok(ViewNode::Dropzone {
-            label,
-            accept,
-            on_drop,
-            style: hints.style.opt(),
-            children,
-        });
-    }
-
-    if tag == "file-picker" || tag == "filepicker" || tag == "media-picker" {
-        let label =
-            collect_primary_text(&el.children, ctx).unwrap_or_else(|_| "Choose file".to_string());
-        let accept = el
-            .bindings
-            .iter()
-            .find(|b| b.prop == "accept")
-            .and_then(|b| eval_expr(&b.value, ctx).ok().map(|v| value_to_str(&v)))
-            .map(|value| split_accept(&value))
-            .unwrap_or_default();
-        let multiple = el.bindings.iter().any(|b| b.prop == "multiple")
-            || classes.iter().any(|c| c == "multiple");
-        let on_pick = el
-            .event_handlers
-            .iter()
-            .find(|e| e.event == "pick" || e.event == "click")
-            .map(|e| e.handler.clone());
-        let hints = style::extract_stack_hints(classes, Some(ctx));
-        return Ok(ViewNode::FilePicker {
-            label,
-            accept,
-            multiple,
-            on_pick,
-            style: hints.style.opt(),
-        });
-    }
-
-    if tag == "input" || tag == "textfield" || tag == "textinput" || tag == "textarea" {
-        let bind = binding_raw(el, "bind").unwrap_or_default();
-        let placeholder = el
-            .bindings
-            .iter()
-            .find(|b| b.prop == "placeholder")
-            .map(|b| {
-                let v = b.value.trim();
-                v.trim_matches(|c| c == '"' || c == '\'').to_string()
-            })
-            .unwrap_or_default();
-        let multiline = classes.iter().any(|c| c == "multiline") || tag == "textarea";
-        let secure = binding_raw(el, "type")
-            .map(|value| value.eq_ignore_ascii_case("password"))
-            .unwrap_or(false)
-            || classes.iter().any(|c| c == "secure");
-        let hints = style::extract_stack_hints(classes, Some(ctx));
-        return Ok(ViewNode::Input {
-            placeholder,
-            bind,
-            multiline,
-            secure,
-            on_change: event_handler(el, "change"),
-            style: hints.style.opt(),
-        });
-    }
-
-    if tag == "picker" || tag == "select" {
-        let bind = binding_raw(el, "bind").unwrap_or_default();
-        let mut options = Vec::new();
-        for child in &el.children {
-            if let Node::Element(inner) = child {
-                let inner_tag = inner.tag.to_ascii_lowercase();
-                if matches!(inner_tag.as_str(), "span" | "button" | "option") {
-                    let label = collect_primary_text(&inner.children, ctx)?;
-                    let value = inner
-                        .bindings
-                        .iter()
-                        .find(|b| b.prop == "value")
-                        .map(|b| {
-                            let v = b.value.trim();
-                            v.trim_matches(|c| c == '"' || c == '\'').to_string()
-                        })
-                        .filter(|s| !s.is_empty())
-                        .unwrap_or_else(|| slug_option_value(&label));
-                    options.push(PickerOption { value, label });
-                }
-            }
-        }
-        let hints = style::extract_stack_hints(classes, Some(ctx));
-        return Ok(ViewNode::Picker {
-            bind,
-            options,
-            on_change: event_handler(el, "change"),
-            style: hints.style.opt(),
-        });
-    }
-
-    if tag == "tabs" || tag == "tabview" || tag == "page-switcher" {
-        let bind = binding_raw(el, "bind").unwrap_or_default();
-        let mut tabs = Vec::new();
-        for child in &el.children {
-            if let Node::Element(inner) = child {
-                let inner_tag = inner.tag.to_ascii_lowercase();
-                if matches!(inner_tag.as_str(), "tab" | "page") {
-                    let value = binding_raw(inner, "value").unwrap_or_else(|| {
-                        binding_string(inner, "label", ctx)
-                            .map(|label| slug_option_value(&label))
-                            .unwrap_or_default()
-                    });
-                    let label = binding_string(inner, "label", ctx)
-                        .unwrap_or_else(|| value.replace('-', " "));
-                    let icon = binding_string(inner, "icon", ctx);
-                    tabs.push(TabItem {
-                        value,
-                        label,
-                        icon,
-                        children: render_nodes_list(&inner.children, ctx)?,
-                    });
-                }
-            }
-        }
-        let hints = style::extract_stack_hints(classes, Some(ctx));
-        return Ok(ViewNode::Tabs {
-            bind,
-            tabs,
-            on_change: event_handler(el, "change"),
-            style: hints.style.opt(),
-        });
-    }
-
-    if tag == "img" || tag == "image" {
-        let src = el
-            .bindings
-            .iter()
-            .find(|b| b.prop == "src")
-            .and_then(|b| eval_expr(&b.value, ctx).ok().map(|v| value_to_str(&v)))
-            .unwrap_or_default();
-        let alt = el
-            .bindings
-            .iter()
-            .find(|b| b.prop == "alt")
-            .and_then(|b| eval_expr(&b.value, ctx).ok().map(|v| value_to_str(&v)));
-        let placeholder = el
-            .bindings
-            .iter()
-            .find(|b| b.prop == "placeholder")
-            .and_then(|b| eval_expr(&b.value, ctx).ok().map(|v| value_to_str(&v)));
-        let hints = style::extract_stack_hints(classes, Some(ctx));
-        return Ok(ViewNode::Image {
-            src,
-            alt,
-            placeholder,
-            on_long_press: None,
-            style: hints.style.opt(),
-        });
-    }
-
-    if tag == "a" || tag == "link" {
-        let hints = style::extract_stack_hints(classes, Some(ctx));
-        return Ok(ViewNode::Link {
-            href: binding_string(el, "href", ctx).unwrap_or_default(),
-            target: binding_string(el, "target", ctx),
-            rel: binding_string(el, "rel", ctx),
-            style: hints.style.opt(),
-            children: render_nodes_list(&el.children, ctx)?,
-        });
-    }
-
-    if tag == "ul" || tag == "ol" || tag == "list" || tag == "flatlist" {
-        let hints = style::extract_stack_hints(classes, Some(ctx));
-        return Ok(ViewNode::List {
-            ordered: tag == "ol",
-            style: hints.style.opt(),
-            children: render_nodes_list(&el.children, ctx)?,
-        });
-    }
-
-    if tag == "li" || tag == "list-item" {
-        let hints = style::extract_stack_hints(classes, Some(ctx));
-        return Ok(ViewNode::ListItem {
-            on_long_press: None,
-            style: hints.style.opt(),
-            children: render_nodes_list(&el.children, ctx)?,
-        });
+    if let Some(node) = render_list_element(tag, el, ctx, &classes)? {
+        return Ok(node);
     }
 
     if is_text_tag(tag) && el.children.len() == 1 {
         if let Node::Text(parts) = &el.children[0] {
             let txt = render_text_inline(parts, ctx)?;
-            let st = style::extract_text_style(classes, Some(ctx)).opt();
+            let st = style::extract_text_style(classes.clone(), Some(ctx)).opt();
             return Ok(ViewNode::Text {
                 content: txt,
                 bind: text_bind(parts),
@@ -520,7 +225,7 @@ fn render_element_inner(el: &Element, ctx: &TemplateContext) -> Result<ViewNode,
 
     if el.children.is_empty() {
         if let Some(bind) = binding_raw(el, "bind") {
-            let st = style::extract_text_style(classes, Some(ctx)).opt();
+            let st = style::extract_text_style(classes.clone(), Some(ctx)).opt();
             return Ok(ViewNode::Text {
                 content: String::new(),
                 bind: Some(bind),
@@ -564,6 +269,350 @@ fn render_element_inner(el: &Element, ctx: &TemplateContext) -> Result<ViewNode,
         style: hints.style.opt(),
         children,
     })
+}
+
+fn render_form_element(
+    tag: &str,
+    el: &Element,
+    ctx: &TemplateContext,
+    classes: &[String],
+) -> Result<Option<ViewNode>, CrepusError> {
+    if tag == "button" {
+        let label = collect_primary_text(&el.children, ctx)?;
+        let on_click = el
+            .event_handlers
+            .iter()
+            .find(|e| e.event == "click")
+            .map(|e| e.handler.clone());
+        let hints = style::extract_stack_hints(classes.to_vec(), Some(ctx));
+        return Ok(Some(ViewNode::Button {
+            label,
+            on_click,
+            on_long_press: None,
+            style: hints.style.opt(),
+        }));
+    }
+
+    if tag == "toggle" || tag == "switch" {
+        let label = component_label(el, ctx)?;
+        let hints = style::extract_stack_hints(classes.to_vec(), Some(ctx));
+        return Ok(Some(ViewNode::Toggle {
+            label,
+            bind: binding_raw(el, "bind"),
+            checked: binding_bool(el, "checked", ctx).unwrap_or(false),
+            on_change: event_handler(el, "change"),
+            on_long_press: None,
+            style: hints.style.opt(),
+        }));
+    }
+
+    if tag == "checkbox" {
+        let label = component_label(el, ctx)?;
+        let hints = style::extract_stack_hints(classes.to_vec(), Some(ctx));
+        return Ok(Some(ViewNode::Checkbox {
+            label,
+            bind: binding_raw(el, "bind"),
+            checked: binding_bool(el, "checked", ctx).unwrap_or(false),
+            on_change: event_handler(el, "change"),
+            style: hints.style.opt(),
+        }));
+    }
+
+    if tag == "slider" {
+        let hints = style::extract_stack_hints(classes.to_vec(), Some(ctx));
+        return Ok(Some(ViewNode::Slider {
+            label: optional_component_label(el, ctx)?,
+            bind: binding_raw(el, "bind"),
+            value: binding_f32(el, "value", ctx).unwrap_or(0.0),
+            min: binding_f32(el, "min", ctx).unwrap_or(0.0),
+            max: binding_f32(el, "max", ctx).unwrap_or(100.0),
+            step: binding_f32(el, "step", ctx),
+            on_change: event_handler(el, "change"),
+            style: hints.style.opt(),
+        }));
+    }
+
+    if tag == "progress" {
+        let hints = style::extract_stack_hints(classes.to_vec(), Some(ctx));
+        return Ok(Some(ViewNode::Progress {
+            label: optional_component_label(el, ctx)?,
+            value: binding_f32(el, "value", ctx).unwrap_or(0.0),
+            max: binding_f32(el, "max", ctx).unwrap_or(100.0),
+            style: hints.style.opt(),
+        }));
+    }
+
+    if tag == "meter" {
+        let hints = style::extract_stack_hints(classes.to_vec(), Some(ctx));
+        return Ok(Some(ViewNode::Meter {
+            label: optional_component_label(el, ctx)?,
+            value: binding_f32(el, "value", ctx).unwrap_or(0.0),
+            min: binding_f32(el, "min", ctx).unwrap_or(0.0),
+            max: binding_f32(el, "max", ctx).unwrap_or(100.0),
+            style: hints.style.opt(),
+        }));
+    }
+
+    if tag == "dropzone" {
+        let label = collect_primary_text(&el.children, ctx).unwrap_or_default();
+        let accept = el
+            .bindings
+            .iter()
+            .find(|b| b.prop == "accept")
+            .and_then(|b| eval_expr(&b.value, ctx).ok().map(|v| value_to_str(&v)));
+        let on_drop = el
+            .event_handlers
+            .iter()
+            .find(|e| e.event == "drop")
+            .map(|e| e.handler.clone());
+        let hints = style::extract_stack_hints(classes.to_vec(), Some(ctx));
+        let children = render_nodes_list(&el.children, ctx)?;
+        return Ok(Some(ViewNode::Dropzone {
+            label,
+            accept,
+            on_drop,
+            style: hints.style.opt(),
+            children,
+        }));
+    }
+
+    if tag == "file-picker" || tag == "filepicker" || tag == "media-picker" {
+        let label =
+            collect_primary_text(&el.children, ctx).unwrap_or_else(|_| "Choose file".to_string());
+        let accept = el
+            .bindings
+            .iter()
+            .find(|b| b.prop == "accept")
+            .and_then(|b| eval_expr(&b.value, ctx).ok().map(|v| value_to_str(&v)))
+            .map(|value| split_accept(&value))
+            .unwrap_or_default();
+        let multiple = el.bindings.iter().any(|b| b.prop == "multiple")
+            || classes.iter().any(|c| c == "multiple");
+        let on_pick = el
+            .event_handlers
+            .iter()
+            .find(|e| e.event == "pick" || e.event == "click")
+            .map(|e| e.handler.clone());
+        let hints = style::extract_stack_hints(classes.to_vec(), Some(ctx));
+        return Ok(Some(ViewNode::FilePicker {
+            label,
+            accept,
+            multiple,
+            on_pick,
+            style: hints.style.opt(),
+        }));
+    }
+
+    if tag == "input" || tag == "textfield" || tag == "textinput" || tag == "textarea" {
+        let bind = binding_raw(el, "bind").unwrap_or_default();
+        let placeholder = el
+            .bindings
+            .iter()
+            .find(|b| b.prop == "placeholder")
+            .map(|b| {
+                let v = b.value.trim();
+                v.trim_matches(|c| c == '"' || c == '\'').to_string()
+            })
+            .unwrap_or_default();
+        let multiline = classes.iter().any(|c| c == "multiline") || tag == "textarea";
+        let secure = binding_raw(el, "type")
+            .map(|value| value.eq_ignore_ascii_case("password"))
+            .unwrap_or(false)
+            || classes.iter().any(|c| c == "secure");
+        let hints = style::extract_stack_hints(classes.to_vec(), Some(ctx));
+        return Ok(Some(ViewNode::Input {
+            placeholder,
+            bind,
+            multiline,
+            secure,
+            on_change: event_handler(el, "change"),
+            style: hints.style.opt(),
+        }));
+    }
+
+    if tag == "picker" || tag == "select" {
+        let bind = binding_raw(el, "bind").unwrap_or_default();
+        let mut options = Vec::new();
+        for child in &el.children {
+            if let Node::Element(inner) = child {
+                let inner_tag = inner.tag.to_ascii_lowercase();
+                if matches!(inner_tag.as_str(), "span" | "button" | "option") {
+                    let label = collect_primary_text(&inner.children, ctx)?;
+                    let value = inner
+                        .bindings
+                        .iter()
+                        .find(|b| b.prop == "value")
+                        .map(|b| {
+                            let v = b.value.trim();
+                            v.trim_matches(|c| c == '"' || c == '\'').to_string()
+                        })
+                        .filter(|s| !s.is_empty())
+                        .unwrap_or_else(|| slug_option_value(&label));
+                    options.push(PickerOption { value, label });
+                }
+            }
+        }
+        let hints = style::extract_stack_hints(classes.to_vec(), Some(ctx));
+        return Ok(Some(ViewNode::Picker {
+            bind,
+            options,
+            on_change: event_handler(el, "change"),
+            style: hints.style.opt(),
+        }));
+    }
+
+    Ok(None)
+}
+
+fn render_layout_element(
+    tag: &str,
+    el: &Element,
+    ctx: &TemplateContext,
+    classes: &[String],
+) -> Result<Option<ViewNode>, CrepusError> {
+    if tag == "badge" {
+        let hints = style::extract_stack_hints(classes.to_vec(), Some(ctx));
+        return Ok(Some(ViewNode::Badge {
+            label: component_label(el, ctx)?,
+            tone: binding_string(el, "tone", ctx),
+            style: hints.style.opt(),
+        }));
+    }
+
+    if tag == "divider" || tag == "hr" {
+        let axis = stack_axis(classes);
+        let hints = style::extract_stack_hints(classes.to_vec(), Some(ctx));
+        return Ok(Some(ViewNode::Divider {
+            axis,
+            style: hints.style.opt(),
+        }));
+    }
+
+    if tag == "spacer" {
+        let gap = parse_gap_spacing(classes);
+        let hints = style::extract_stack_hints(classes.to_vec(), Some(ctx));
+        return Ok(Some(ViewNode::Spacer {
+            size: binding_f32(el, "size", ctx).or(gap),
+            style: hints.style.opt(),
+        }));
+    }
+
+    if tag == "tabs" || tag == "tabview" || tag == "page-switcher" {
+        let bind = binding_raw(el, "bind").unwrap_or_default();
+        let mut tabs = Vec::new();
+        for child in &el.children {
+            if let Node::Element(inner) = child {
+                let inner_tag = inner.tag.to_ascii_lowercase();
+                if matches!(inner_tag.as_str(), "tab" | "page") {
+                    let value = binding_raw(inner, "value").unwrap_or_else(|| {
+                        binding_string(inner, "label", ctx)
+                            .map(|label| slug_option_value(&label))
+                            .unwrap_or_default()
+                    });
+                    let label = binding_string(inner, "label", ctx)
+                        .unwrap_or_else(|| value.replace('-', " "));
+                    let icon = binding_string(inner, "icon", ctx);
+                    tabs.push(TabItem {
+                        value,
+                        label,
+                        icon,
+                        children: render_nodes_list(&inner.children, ctx)?,
+                    });
+                }
+            }
+        }
+        let hints = style::extract_stack_hints(classes.to_vec(), Some(ctx));
+        return Ok(Some(ViewNode::Tabs {
+            bind,
+            tabs,
+            on_change: event_handler(el, "change"),
+            style: hints.style.opt(),
+        }));
+    }
+
+    Ok(None)
+}
+
+fn render_media_element(
+    tag: &str,
+    el: &Element,
+    ctx: &TemplateContext,
+    classes: &[String],
+) -> Result<Option<ViewNode>, CrepusError> {
+    if tag == "iframe" {
+        let hints = style::extract_stack_hints(classes.to_vec(), Some(ctx));
+        return Ok(Some(ViewNode::WebView {
+            src: binding_string(el, "src", ctx).unwrap_or_default(),
+            style: hints.style.opt(),
+        }));
+    }
+
+    if tag == "img" || tag == "image" {
+        let src = el
+            .bindings
+            .iter()
+            .find(|b| b.prop == "src")
+            .and_then(|b| eval_expr(&b.value, ctx).ok().map(|v| value_to_str(&v)))
+            .unwrap_or_default();
+        let alt = el
+            .bindings
+            .iter()
+            .find(|b| b.prop == "alt")
+            .and_then(|b| eval_expr(&b.value, ctx).ok().map(|v| value_to_str(&v)));
+        let placeholder = el
+            .bindings
+            .iter()
+            .find(|b| b.prop == "placeholder")
+            .and_then(|b| eval_expr(&b.value, ctx).ok().map(|v| value_to_str(&v)));
+        let hints = style::extract_stack_hints(classes.to_vec(), Some(ctx));
+        return Ok(Some(ViewNode::Image {
+            src,
+            alt,
+            placeholder,
+            on_long_press: None,
+            style: hints.style.opt(),
+        }));
+    }
+
+    if tag == "a" || tag == "link" {
+        let hints = style::extract_stack_hints(classes.to_vec(), Some(ctx));
+        return Ok(Some(ViewNode::Link {
+            href: binding_string(el, "href", ctx).unwrap_or_default(),
+            target: binding_string(el, "target", ctx),
+            rel: binding_string(el, "rel", ctx),
+            style: hints.style.opt(),
+            children: render_nodes_list(&el.children, ctx)?,
+        }));
+    }
+
+    Ok(None)
+}
+
+fn render_list_element(
+    tag: &str,
+    el: &Element,
+    ctx: &TemplateContext,
+    classes: &[String],
+) -> Result<Option<ViewNode>, CrepusError> {
+    if tag == "ul" || tag == "ol" || tag == "list" || tag == "flatlist" {
+        let hints = style::extract_stack_hints(classes.to_vec(), Some(ctx));
+        return Ok(Some(ViewNode::List {
+            ordered: tag == "ol",
+            style: hints.style.opt(),
+            children: render_nodes_list(&el.children, ctx)?,
+        }));
+    }
+
+    if tag == "li" || tag == "list-item" {
+        let hints = style::extract_stack_hints(classes.to_vec(), Some(ctx));
+        return Ok(Some(ViewNode::ListItem {
+            on_long_press: None,
+            style: hints.style.opt(),
+            children: render_nodes_list(&el.children, ctx)?,
+        }));
+    }
+
+    Ok(None)
 }
 
 fn slug_option_value(label: &str) -> String {

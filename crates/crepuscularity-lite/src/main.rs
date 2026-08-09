@@ -9,7 +9,7 @@ use std::{
 use crepuscularity_lite::config::CrepusLiteConfig;
 use crepuscularity_lite::host::{HostNode, HostSnapshot, HostStyle};
 use crepuscularity_lite::integration::{apply_window_deferred, take_app_exit_request};
-use crepuscularity_lite::{prepare_guest_source, Bridge, V8ThreadRuntime};
+use crepuscularity_lite::{parse_hex_color, prepare_guest_source, Bridge, V8ThreadRuntime};
 use gpui::AnyElement;
 use gpui::ClickEvent;
 use gpui::{
@@ -22,15 +22,6 @@ fn bench_log_result_enabled() -> bool {
     std::env::var("CREPUS_BENCH_LOG_RESULT")
         .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
         .unwrap_or(false)
-}
-
-fn parse_hex_color(raw: &str) -> Option<gpui::Hsla> {
-    let hex = raw.trim().trim_start_matches('#');
-    let parsed = match hex.len() {
-        6 => u32::from_str_radix(hex, 16).ok().map(rgb),
-        _ => None,
-    }?;
-    Some(parsed.into())
 }
 
 fn apply_host_style(mut element: gpui::Div, style: &HostStyle) -> gpui::Div {

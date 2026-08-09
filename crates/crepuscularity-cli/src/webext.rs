@@ -258,32 +258,31 @@ fn auto_detect_icons(app_path: &Path, manifest: &mut crepuscularity_webext::Exte
         return;
     }
 
-    if manifest.options.icons.is_empty() {
-        if let Ok(entries) = std::fs::read_dir(&icons_dir) {
-            for entry in entries.flatten() {
-                let name = entry.file_name().to_string_lossy().to_string();
-                // Only match icon{size}.png (not action_* icons)
-                if name.starts_with("icon") && !name.contains("action") {
-                    if let Some(size) = detect_icon_size(&name) {
-                        manifest.options.icons.insert(size, format!("icons/{name}"));
-                    }
-                }
-            }
-        }
+    let needs_icons = manifest.options.icons.is_empty();
+    let needs_action_icons = manifest.options.action_icons.is_empty();
+
+    if !needs_icons && !needs_action_icons {
+        return;
     }
 
-    if manifest.options.action_icons.is_empty() {
-        if let Ok(entries) = std::fs::read_dir(&icons_dir) {
-            for entry in entries.flatten() {
-                let name = entry.file_name().to_string_lossy().to_string();
-                // Match action_disabled_* files
-                if name.contains("action_disabled") {
-                    if let Some(size) = detect_icon_size(&name) {
-                        manifest
-                            .options
-                            .action_icons
-                            .insert(size, format!("icons/{name}"));
-                    }
+    if let Ok(entries) = std::fs::read_dir(&icons_dir) {
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().to_string();
+
+            // Match icon{size}.png (not action_* icons)
+            if needs_icons && name.starts_with("icon") && !name.contains("action") {
+                if let Some(size) = detect_icon_size(&name) {
+                    manifest.options.icons.insert(size, format!("icons/{name}"));
+                }
+            }
+
+            // Match action_disabled_* files
+            if needs_action_icons && name.contains("action_disabled") {
+                if let Some(size) = detect_icon_size(&name) {
+                    manifest
+                        .options
+                        .action_icons
+                        .insert(size, format!("icons/{name}"));
                 }
             }
         }
@@ -1089,7 +1088,7 @@ fn render_crepus_pages(
 
     let mut files = HashMap::new();
     let mut entries = Vec::new();
-    collect_crepus_pages(&pages_dir, &pages_dir, &mut files, &mut entries)?;
+    collect_crepus_pages(&pages_dir, &mut files, &mut entries)?;
     if entries.is_empty() {
         return Ok(());
     }
@@ -1232,27 +1231,43 @@ try {{
 
 fn collect_crepus_pages(
     root: &Path,
-    dir: &Path,
     files: &mut HashMap<String, String>,
     entries: &mut Vec<String>,
 ) -> Result<(), String> {
-    for entry in std::fs::read_dir(dir).map_err(|e| e.to_string())? {
-        let entry = entry.map_err(|e| e.to_string())?;
-        let path = entry.path();
-        if entry.file_type().map_err(|e| e.to_string())?.is_dir() {
-            collect_crepus_pages(root, &path, files, entries)?;
-        } else if path.extension().and_then(|ext| ext.to_str()) == Some("crepus") {
+    use rayon::prelude::*;
+
+    let crepus_files: Vec<_> = walkdir::WalkDir::new(root)
+        .into_iter()
+        .collect::<Result<Vec<_>, walkdir::Error>>()
+        .map_err(|e| e.to_string())?
+        .into_iter()
+        .filter(|e| {
+            let path = e.path();
+            let is_file_or_link = e.file_type().is_file() || e.file_type().is_symlink();
+            is_file_or_link && path.extension().and_then(|ext| ext.to_str()) == Some("crepus")
+        })
+        .map(|e| e.path().to_owned())
+        .collect();
+
+    let results: Result<Vec<(String, String)>, String> = crepus_files
+        .into_par_iter()
+        .map(|path| {
             let rel = path
                 .strip_prefix(root)
                 .map_err(|e| e.to_string())?
                 .to_string_lossy()
                 .replace('\\', "/");
             let source = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
-            files.insert(rel.clone(), source);
-            entries.push(rel);
-        }
+            Ok((rel, source))
+        })
+        .collect();
+
+    for (rel, source) in results? {
+        entries.push(rel.clone());
+        files.insert(rel, source);
     }
     entries.sort();
+
     Ok(())
 }
 
