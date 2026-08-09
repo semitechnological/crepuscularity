@@ -457,6 +457,9 @@ mod tests {
         assert_eq!(host.channel_poll("system"), None);
 
         assert_eq!(host.channel_poll("non_existent"), None);
+    }
+
+    #[test]
     fn require_string_field_tests() {
         let payload = json!({
             "valid": "hello",
