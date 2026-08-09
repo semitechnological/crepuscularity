@@ -26,7 +26,8 @@ module.exports = grammar({
         $.jsx_close_tag,
       ),
 
-    identifier: ($) => token.immediate(/[A-Z][a-zA-Z0-9_:.]*/),
+    // JSX tag name: components (CamelCase), intrinsic tags (div, span) and dotted names.
+    identifier: ($) => token.immediate(/[a-zA-Z_][a-zA-Z0-9_:.]*/),
 
     jsx_self_closing: ($) =>
       seq(
