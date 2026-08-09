@@ -3,7 +3,7 @@ name = "zed-crepuscularity"
 version = "0.1.0"
 edition = "2021"
 authors = ["Max Carter <max@undivisible.dev>"]
-license = "ISC"
+license = "Zlib"
 description = "Zed extension for Crepuscularity .crepus (WASM stub + LSP wiring)."
 publish = false
 
