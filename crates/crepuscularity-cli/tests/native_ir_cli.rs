@@ -518,7 +518,7 @@ fn check_native_add_capability_share(root: &std::path::Path) {
     let _ = root;
     assert!(crepus()
         .args(["native", "add", "share", "--dir"])
-        .arg(&root)
+        .arg(root)
         .output()
         .expect("add share")
         .status
@@ -538,7 +538,7 @@ fn check_native_add_capability_image_picker(root: &std::path::Path) {
     let _ = root;
     assert!(crepus()
         .args(["native", "add", "image-picker", "--dir"])
-        .arg(&root)
+        .arg(root)
         .output()
         .expect("add image picker")
         .status
@@ -560,7 +560,7 @@ fn check_native_add_capability_sensors(root: &std::path::Path) {
     let _ = root;
     assert!(crepus()
         .args(["native", "add", "sensors", "--dir"])
-        .arg(&root)
+        .arg(root)
         .output()
         .expect("add sensors")
         .status
@@ -587,7 +587,7 @@ fn check_native_add_capability_bluetooth(root: &std::path::Path) {
     let _ = root;
     assert!(crepus()
         .args(["native", "add", "bluetooth", "--dir"])
-        .arg(&root)
+        .arg(root)
         .output()
         .expect("add bluetooth")
         .status
@@ -618,7 +618,7 @@ fn check_native_add_capability_haptics(root: &std::path::Path) {
     let _ = root;
     assert!(crepus()
         .args(["native", "add", "haptics", "--dir"])
-        .arg(&root)
+        .arg(root)
         .output()
         .expect("add haptics")
         .status
@@ -638,7 +638,7 @@ fn check_native_add_capability_clipboard(root: &std::path::Path) {
     let _ = root;
     assert!(crepus()
         .args(["native", "add", "clipboard", "--dir"])
-        .arg(&root)
+        .arg(root)
         .output()
         .expect("add clipboard")
         .status
@@ -662,7 +662,7 @@ fn check_native_add_capability_toast(root: &std::path::Path) {
     let _ = root;
     assert!(crepus()
         .args(["native", "add", "toast", "--dir"])
-        .arg(&root)
+        .arg(root)
         .output()
         .expect("add toast")
         .status
@@ -684,7 +684,7 @@ fn check_native_add_capability_linking(root: &std::path::Path) {
     let _ = root;
     assert!(crepus()
         .args(["native", "add", "linking", "--dir"])
-        .arg(&root)
+        .arg(root)
         .output()
         .expect("add browser")
         .status
@@ -704,7 +704,7 @@ fn check_native_add_capability_battery(root: &std::path::Path) {
     let _ = root;
     assert!(crepus()
         .args(["native", "add", "battery", "--dir"])
-        .arg(&root)
+        .arg(root)
         .output()
         .expect("add battery")
         .status
@@ -726,7 +726,7 @@ fn check_native_add_capability_appearance(root: &std::path::Path) {
     let _ = root;
     assert!(crepus()
         .args(["native", "add", "appearance", "--dir"])
-        .arg(&root)
+        .arg(root)
         .output()
         .expect("add appearance")
         .status
@@ -748,7 +748,7 @@ fn check_native_add_capability_documents(root: &std::path::Path) {
     let _ = root;
     assert!(crepus()
         .args(["native", "add", "documents", "--dir"])
-        .arg(&root)
+        .arg(root)
         .output()
         .expect("add document picker")
         .status
@@ -768,7 +768,7 @@ fn check_native_add_capability_photo_library(root: &std::path::Path) {
     let _ = root;
     assert!(crepus()
         .args(["native", "add", "photo-library", "--dir"])
-        .arg(&root)
+        .arg(root)
         .output()
         .expect("add photo library")
         .status
@@ -790,7 +790,7 @@ fn check_native_add_capability_camera(root: &std::path::Path) {
     let _ = root;
     assert!(crepus()
         .args(["native", "add", "camera", "--dir"])
-        .arg(&root)
+        .arg(root)
         .output()
         .expect("add camera")
         .status
@@ -811,7 +811,7 @@ fn check_native_add_capability_video(root: &std::path::Path) {
     let _ = root;
     assert!(crepus()
         .args(["native", "add", "video", "--dir"])
-        .arg(&root)
+        .arg(root)
         .output()
         .expect("add video")
         .status
@@ -833,7 +833,7 @@ fn check_native_add_capability_dimensions(root: &std::path::Path) {
     let _ = root;
     assert!(crepus()
         .args(["native", "add", "dimensions", "--dir"])
-        .arg(&root)
+        .arg(root)
         .output()
         .expect("add dimensions")
         .status
@@ -853,7 +853,7 @@ fn check_native_add_capability_dialog(root: &std::path::Path) {
     let _ = root;
     assert!(crepus()
         .args(["native", "add", "dialog", "--dir"])
-        .arg(&root)
+        .arg(root)
         .output()
         .expect("add dialog")
         .status
@@ -873,7 +873,7 @@ fn check_native_add_capability_action_sheet(root: &std::path::Path) {
     let _ = root;
     assert!(crepus()
         .args(["native", "add", "action-sheet", "--dir"])
-        .arg(&root)
+        .arg(root)
         .output()
         .expect("add action sheet")
         .status
@@ -893,7 +893,7 @@ fn check_native_add_capability_app_state(root: &std::path::Path) {
     let _ = root;
     assert!(crepus()
         .args(["native", "add", "app-state", "--dir"])
-        .arg(&root)
+        .arg(root)
         .output()
         .expect("add app state")
         .status
@@ -917,7 +917,7 @@ fn check_native_add_capability_app(root: &std::path::Path) {
     let _ = root;
     assert!(crepus()
         .args(["native", "add", "app", "--dir"])
-        .arg(&root)
+        .arg(root)
         .output()
         .expect("add app")
         .status
@@ -937,7 +937,7 @@ fn check_native_add_capability_screen_orientation(root: &std::path::Path) {
     let _ = root;
     assert!(crepus()
         .args(["native", "add", "screen-orientation", "--dir"])
-        .arg(&root)
+        .arg(root)
         .output()
         .expect("add screen orientation")
         .status
@@ -958,7 +958,7 @@ fn check_native_add_capability_geolocation(root: &std::path::Path) {
     let _ = root;
     assert!(crepus()
         .args(["native", "add", "geolocation", "--dir"])
-        .arg(&root)
+        .arg(root)
         .output()
         .expect("add geolocation")
         .status
@@ -980,7 +980,7 @@ fn check_native_add_capability_accessibility_info(root: &std::path::Path) {
     let _ = root;
     assert!(crepus()
         .args(["native", "add", "accessibility-info", "--dir"])
-        .arg(&root)
+        .arg(root)
         .output()
         .expect("add accessibility info")
         .status
@@ -1006,7 +1006,7 @@ fn check_native_add_capability_device(root: &std::path::Path) {
     let _ = root;
     assert!(crepus()
         .args(["native", "add", "device", "--dir"])
-        .arg(&root)
+        .arg(root)
         .output()
         .expect("add device")
         .status
@@ -1038,7 +1038,7 @@ fn check_native_add_capability_preferences(root: &std::path::Path) {
     let _ = root;
     assert!(crepus()
         .args(["native", "add", "preferences", "--dir"])
-        .arg(&root)
+        .arg(root)
         .output()
         .expect("add preferences")
         .status
@@ -1058,7 +1058,7 @@ fn check_native_add_capability_network(root: &std::path::Path) {
     let _ = root;
     assert!(crepus()
         .args(["native", "add", "network", "--dir"])
-        .arg(&root)
+        .arg(root)
         .output()
         .expect("add network")
         .status
@@ -1080,7 +1080,7 @@ fn check_native_add_capability_keyboard(root: &std::path::Path) {
     let _ = root;
     assert!(crepus()
         .args(["native", "add", "keyboard", "--dir"])
-        .arg(&root)
+        .arg(root)
         .output()
         .expect("add keyboard")
         .status
@@ -1100,7 +1100,7 @@ fn check_native_add_capability_settings(root: &std::path::Path) {
     let _ = root;
     assert!(crepus()
         .args(["native", "add", "settings", "--dir"])
-        .arg(&root)
+        .arg(root)
         .output()
         .expect("add settings")
         .status
@@ -1120,7 +1120,7 @@ fn check_native_add_capability_local_notifications(root: &std::path::Path) {
     let _ = root;
     assert!(crepus()
         .args(["native", "add", "local-notifications", "--dir"])
-        .arg(&root)
+        .arg(root)
         .output()
         .expect("add local notifications")
         .status
@@ -1151,7 +1151,7 @@ fn check_native_add_capability_secure_storage(root: &std::path::Path) {
     let _ = root;
     assert!(crepus()
         .args(["native", "add", "secure-storage", "--dir"])
-        .arg(&root)
+        .arg(root)
         .output()
         .expect("add secure storage")
         .status
@@ -1171,7 +1171,7 @@ fn check_native_add_capability_biometrics(root: &std::path::Path) {
     let _ = root;
     assert!(crepus()
         .args(["native", "add", "biometrics", "--dir"])
-        .arg(&root)
+        .arg(root)
         .output()
         .expect("add biometrics")
         .status
@@ -1191,7 +1191,7 @@ fn check_native_add_capability_permissions(root: &std::path::Path) {
     let _ = root;
     assert!(crepus()
         .args(["native", "add", "permissions", "--dir"])
-        .arg(&root)
+        .arg(root)
         .output()
         .expect("add permissions")
         .status
@@ -1216,7 +1216,7 @@ fn check_native_add_capability_microphone(root: &std::path::Path) {
     let _ = root;
     assert!(crepus()
         .args(["native", "add", "microphone", "--dir"])
-        .arg(&root)
+        .arg(root)
         .output()
         .expect("add microphone")
         .status
@@ -1239,7 +1239,7 @@ fn check_native_add_capability_contacts(root: &std::path::Path) {
     let _ = root;
     assert!(crepus()
         .args(["native", "add", "contacts", "--dir"])
-        .arg(&root)
+        .arg(root)
         .output()
         .expect("add contacts")
         .status
@@ -1259,7 +1259,7 @@ fn check_native_add_capability_in_app_browser(root: &std::path::Path) {
     let _ = root;
     assert!(crepus()
         .args(["native", "add", "in-app-browser", "--dir"])
-        .arg(&root)
+        .arg(root)
         .output()
         .expect("add in-app-browser")
         .status
@@ -1279,7 +1279,7 @@ fn check_native_add_capability_system_bars(root: &std::path::Path) {
     let _ = root;
     assert!(crepus()
         .args(["native", "add", "system-bars", "--dir"])
-        .arg(&root)
+        .arg(root)
         .output()
         .expect("add system-bars")
         .status
@@ -1299,7 +1299,7 @@ fn check_native_add_capability_calendar(root: &std::path::Path) {
     let _ = root;
     assert!(crepus()
         .args(["native", "add", "calendar", "--dir"])
-        .arg(&root)
+        .arg(root)
         .output()
         .expect("add calendar")
         .status
@@ -1319,7 +1319,7 @@ fn check_native_add_capability_deep_links(root: &std::path::Path) {
     let _ = root;
     assert!(crepus()
         .args(["native", "add", "deep-links", "--dir"])
-        .arg(&root)
+        .arg(root)
         .output()
         .expect("add deep links")
         .status
@@ -1357,7 +1357,7 @@ fn check_native_add_capability_filesystem(root: &std::path::Path) {
     let _ = root;
     assert!(crepus()
         .args(["native", "add", "filesystem", "--dir"])
-        .arg(&root)
+        .arg(root)
         .output()
         .expect("add filesystem")
         .status

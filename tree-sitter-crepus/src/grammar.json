@@ -26,10 +26,6 @@
               {
                 "type": "SYMBOL",
                 "name": "_eol"
-              },
-              {
-                "type": "SYMBOL",
-                "name": "raw_style_block"
               }
             ]
           }
@@ -74,10 +70,6 @@
         {
           "type": "SYMBOL",
           "name": "quoted"
-        },
-        {
-          "type": "SYMBOL",
-          "name": "match_arm"
         },
         {
           "type": "SYMBOL",
@@ -212,57 +204,6 @@
           "value": "\""
         }
       ]
-    },
-    "match_arm": {
-      "type": "CHOICE",
-      "members": [
-        {
-          "type": "SEQ",
-          "members": [
-            {
-              "type": "SYMBOL",
-              "name": "quoted"
-            },
-            {
-              "type": "STRING",
-              "value": "=>"
-            }
-          ]
-        },
-        {
-          "type": "SEQ",
-          "members": [
-            {
-              "type": "STRING",
-              "value": "_"
-            },
-            {
-              "type": "STRING",
-              "value": "=>"
-            }
-          ]
-        }
-      ]
-    },
-    "raw_style_block": {
-      "type": "TOKEN",
-      "content": {
-        "type": "SEQ",
-        "members": [
-          {
-            "type": "STRING",
-            "value": "<style>"
-          },
-          {
-            "type": "PATTERN",
-            "value": "[^<]*"
-          },
-          {
-            "type": "STRING",
-            "value": "</style>"
-          }
-        ]
-      }
     },
     "element_line": {
       "type": "SEQ",
