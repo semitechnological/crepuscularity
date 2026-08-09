@@ -122,25 +122,31 @@ pub fn scan_content_for_capabilities(content: &str, file_name: &str) -> Vec<Capa
 pub fn scan_directory_for_capabilities(dir: &Path) -> Result<CapabilitySet, std::io::Error> {
     let mut set = CapabilitySet::new();
 
-    fn visit_dir(dir: &Path, set: &mut CapabilitySet) -> Result<(), std::io::Error> {
-        if dir.is_dir() {
-            for entry in std::fs::read_dir(dir)? {
-                let entry = entry?;
-                let path = entry.path();
-                if path.is_dir() {
-                    visit_dir(&path, set)?;
-                } else if path.extension().is_some_and(|ext| ext == "crepus") {
-                    let usages = scan_crepus_for_capabilities(&path)?;
-                    for usage in usages {
-                        set.add(usage.capability);
-                    }
-                }
+    let walker = ignore::WalkBuilder::new(dir)
+        .hidden(false)
+        .git_ignore(false)
+        .build();
+
+    for result in walker {
+        let entry = match result {
+            Ok(entry) => entry,
+            Err(e) => {
+                let msg = e.to_string();
+                return Err(e
+                    .into_io_error()
+                    .unwrap_or_else(|| std::io::Error::other(msg)));
+            }
+        };
+        let path = entry.path();
+
+        if path.is_file() && path.extension().is_some_and(|ext| ext == "crepus") {
+            let usages = scan_crepus_for_capabilities(path)?;
+            for usage in usages {
+                set.add(usage.capability);
             }
         }
-        Ok(())
     }
 
-    visit_dir(dir, &mut set)?;
     Ok(set)
 }
 
