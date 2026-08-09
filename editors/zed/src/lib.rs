@@ -7,14 +7,18 @@ impl CrepuscularityExtension {
         zed::settings::LspSettings::for_worktree("crepus-lsp", worktree).ok()
     }
 
-    fn lsp_path(settings: &Option<zed::settings::LspSettings>, worktree: &zed::Worktree) -> zed::Result<String> {
+    fn lsp_path(settings: &Option<zed::settings::LspSettings>, worktree: &zed::Worktree) -> String {
         if let Some(path) = settings.as_ref().and_then(|s| s.binary.as_ref()).and_then(|b| b.path.clone()) {
-            return Ok(path);
+            return path;
         }
         if let Some(path) = worktree.which("crepus-lsp") {
-            return Ok(path);
+            return path;
         }
-        Err("crepus-lsp not found: set `lsp.crepus-lsp.binary.path` in your Zed settings or add `crepus-lsp` to your PATH".to_string().into())
+        let root = worktree
+            .root_path()
+            .trim_end_matches(|c| c == '/' || c == '\\')
+            .to_string();
+        format!("{root}/target/debug/crepus-lsp")
     }
 
     fn lsp_args(settings: &Option<zed::settings::LspSettings>) -> Vec<String> {
@@ -50,7 +54,7 @@ impl zed::Extension for CrepuscularityExtension {
     ) -> zed::Result<zed::Command> {
         let settings = Self::lsp_settings(worktree);
         Ok(zed::Command {
-            command: Self::lsp_path(&settings, worktree)?,
+            command: Self::lsp_path(&settings, worktree),
             args: Self::lsp_args(&settings),
             env: Self::lsp_env(&settings),
         })
