@@ -258,32 +258,31 @@ fn auto_detect_icons(app_path: &Path, manifest: &mut crepuscularity_webext::Exte
         return;
     }
 
-    if manifest.options.icons.is_empty() {
-        if let Ok(entries) = std::fs::read_dir(&icons_dir) {
-            for entry in entries.flatten() {
-                let name = entry.file_name().to_string_lossy().to_string();
-                // Only match icon{size}.png (not action_* icons)
-                if name.starts_with("icon") && !name.contains("action") {
-                    if let Some(size) = detect_icon_size(&name) {
-                        manifest.options.icons.insert(size, format!("icons/{name}"));
-                    }
-                }
-            }
-        }
+    let needs_icons = manifest.options.icons.is_empty();
+    let needs_action_icons = manifest.options.action_icons.is_empty();
+
+    if !needs_icons && !needs_action_icons {
+        return;
     }
 
-    if manifest.options.action_icons.is_empty() {
-        if let Ok(entries) = std::fs::read_dir(&icons_dir) {
-            for entry in entries.flatten() {
-                let name = entry.file_name().to_string_lossy().to_string();
-                // Match action_disabled_* files
-                if name.contains("action_disabled") {
-                    if let Some(size) = detect_icon_size(&name) {
-                        manifest
-                            .options
-                            .action_icons
-                            .insert(size, format!("icons/{name}"));
-                    }
+    if let Ok(entries) = std::fs::read_dir(&icons_dir) {
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().to_string();
+
+            // Match icon{size}.png (not action_* icons)
+            if needs_icons && name.starts_with("icon") && !name.contains("action") {
+                if let Some(size) = detect_icon_size(&name) {
+                    manifest.options.icons.insert(size, format!("icons/{name}"));
+                }
+            }
+
+            // Match action_disabled_* files
+            if needs_action_icons && name.contains("action_disabled") {
+                if let Some(size) = detect_icon_size(&name) {
+                    manifest
+                        .options
+                        .action_icons
+                        .insert(size, format!("icons/{name}"));
                 }
             }
         }
