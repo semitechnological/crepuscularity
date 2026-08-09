@@ -443,6 +443,24 @@ mod tests {
     use super::*;
 
     #[test]
+    fn require_string_field_tests() {
+        let payload = json!({
+            "valid": "hello",
+            "number": 42
+        });
+
+        assert_eq!(require_string_field(&payload, "valid").unwrap(), "hello");
+
+        let err = require_string_field(&payload, "missing").unwrap_err();
+        assert_eq!(err.code, "invalid_payload");
+        assert_eq!(err.message, "expected string field \"missing\"");
+
+        let err = require_string_field(&payload, "number").unwrap_err();
+        assert_eq!(err.code, "invalid_payload");
+        assert_eq!(err.message, "expected string field \"number\"");
+    }
+
+    #[test]
     fn storage_roundtrip_and_snapshot_keys() {
         let host = HostState::default();
         host.storage_set("alpha", json!("one"));
