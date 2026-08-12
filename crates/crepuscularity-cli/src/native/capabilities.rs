@@ -524,11 +524,8 @@ pub fn add_feature(path: &Path, feature: &str) -> Result<(), CrepusCliError> {
     {
         return Ok(());
     }
-    if let Some(features) = source.find("[features]\n") {
-        let start = features + "[features]\n".len();
-        let end = source[start..]
-            .find("\n[")
-            .map_or(source.len(), |offset| start + offset);
+    if let Some((before, after)) = source.split_once("[features]\n") {
+        let end = before.len() + "[features]\n".len() + after.find("\n[").unwrap_or(after.len());
         source.insert_str(end, &format!("{feature} = []\n"));
     } else {
         source.push_str(&format!("\n[features]\n{feature} = []\n"));
