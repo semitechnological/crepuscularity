@@ -383,4 +383,33 @@ mod tests {
         let raw_html = Node::RawHtml("<div></div>".to_string());
         assert_eq!(classify_node(&raw_html), Region::Dynamic);
     }
+
+    #[test]
+    fn test_analyze_template() {
+        let nodes = vec![
+            // Index 0: Static text
+            Node::Text(vec![TextPart::Literal("static text".to_string())]),
+            // Index 1: Dynamic text (1 expr)
+            Node::Text(vec![
+                TextPart::Literal("hello ".to_string()),
+                TextPart::Expr("name".to_string()),
+            ]),
+            // Index 2: Static element
+            Node::Element(dummy_element()),
+            // Index 3: Dynamic element (1 binding)
+            Node::Element({
+                let mut el = dummy_element();
+                el.bindings.push(Binding {
+                    prop: "src".to_string(),
+                    value: "url".to_string(),
+                });
+                el
+            }),
+        ];
+
+        let map = analyze_template(&nodes);
+        assert_eq!(map.static_indices, vec![0, 2]);
+        assert_eq!(map.dynamic_indices, vec![1, 3]);
+        assert_eq!(map.expr_count, 2);
+    }
 }
