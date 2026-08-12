@@ -701,4 +701,40 @@ div
         assert_eq!(rest, "\nbody");
         assert_eq!(offset, 7);
     }
+
+    #[test]
+    fn split_frontmatter_parts_only_open() {
+        let content = "+++";
+        let (toml, rest, offset) = split_frontmatter_parts(content);
+        assert_eq!(toml, None);
+        assert_eq!(rest, "+++");
+        assert_eq!(offset, 0);
+    }
+
+    #[test]
+    fn split_frontmatter_parts_crlf() {
+        let content = "+++\r\nfoo = 'bar'\r\n+++\r\nbody content";
+        let (toml, rest, offset) = split_frontmatter_parts(content);
+        assert_eq!(toml, Some("\r\nfoo = 'bar'\r"));
+        assert_eq!(rest, "\r\nbody content");
+        assert_eq!(offset, 21);
+    }
+
+    #[test]
+    fn split_frontmatter_parts_multiple_blocks() {
+        let content = "+++\nfoo = 'bar'\n+++\n+++\nbaz = 'qux'\n+++";
+        let (toml, rest, offset) = split_frontmatter_parts(content);
+        assert_eq!(toml, Some("\nfoo = 'bar'"));
+        assert_eq!(rest, "\n+++\nbaz = 'qux'\n+++");
+        assert_eq!(offset, 19);
+    }
+
+    #[test]
+    fn split_frontmatter_parts_no_newline_before_close() {
+        let content = "+++foo+++";
+        let (toml, rest, offset) = split_frontmatter_parts(content);
+        assert_eq!(toml, None);
+        assert_eq!(rest, "+++foo+++");
+        assert_eq!(offset, 0);
+    }
 }
