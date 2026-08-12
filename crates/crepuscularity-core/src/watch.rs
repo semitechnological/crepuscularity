@@ -54,11 +54,10 @@ pub fn create_watcher(
     let target = canonical_target.clone();
     let root = watch_dir.clone();
 
-    let mut watcher =
-        notify::recommended_watcher(move |res: notify::Result<notify::Event>| {
-            handle_watcher_event(res, &changed, &target, &root, label)
-        })
-        .map_err(|e| format!("could not create file watcher: {e}"))?;
+    let mut watcher = notify::recommended_watcher(move |res: notify::Result<notify::Event>| {
+        handle_watcher_event(res, &changed, &target, &root, label)
+    })
+    .map_err(|e| format!("could not create file watcher: {e}"))?;
 
     watcher
         .watch(&watch_dir, notify::RecursiveMode::Recursive)
