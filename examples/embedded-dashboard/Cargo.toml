@@ -2,14 +2,14 @@
 name = "embedded-dashboard"
 version = "0.1.0"
 edition = "2021"
-license.workspace = true
+license = "ISC"
 publish = false
 
 [dependencies]
-crepuscularity-embedded = { path = "../../crates/crepuscularity-embedded", version = "0.1.15", features = ["std"] }
+crepuscularity-embedded = { path = "../../crates/crepuscularity-embedded", version = "0.1.23", features = ["std"] }
 
 [build-dependencies]
-crepuscularity-core = { path = "../../crates/crepuscularity-core", version = "0.4.16" }
+crepuscularity-core = { path = "../../crates/crepuscularity-core", version = "0.5.0" }
 
 [[test]]
 name = "smoke"
