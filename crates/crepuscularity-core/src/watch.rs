@@ -55,19 +55,8 @@ pub fn create_watcher(
     let root = watch_dir.clone();
 
     let mut watcher =
-        notify::recommended_watcher(move |res: notify::Result<notify::Event>| match res {
-            Ok(ev) => {
-                if !is_relevant_kind(&ev.kind) {
-                    return;
-                }
-                if !event_touches_relevant_path(&ev, &target, &root) {
-                    return;
-                }
-                if let Ok(mut flag) = changed.lock() {
-                    *flag = true;
-                }
-            }
-            Err(e) => eprintln!("[crepuscularity-{label}] watcher error: {e}"),
+        notify::recommended_watcher(move |res: notify::Result<notify::Event>| {
+            handle_watcher_event(res, &changed, &target, &root, label)
         })
         .map_err(|e| format!("could not create file watcher: {e}"))?;
 
@@ -76,6 +65,30 @@ pub fn create_watcher(
         .map_err(|e| format!("failed to watch {}: {e}", watch_dir.display()))?;
 
     Ok(Box::new(watcher))
+}
+
+#[cfg(feature = "notify")]
+pub fn handle_watcher_event(
+    res: notify::Result<notify::Event>,
+    changed: &std::sync::Arc<std::sync::Mutex<bool>>,
+    target: &std::path::Path,
+    root: &std::path::Path,
+    label: &str,
+) {
+    match res {
+        Ok(ev) => {
+            if !is_relevant_kind(&ev.kind) {
+                return;
+            }
+            if !event_touches_relevant_path(&ev, target, root) {
+                return;
+            }
+            if let Ok(mut flag) = changed.lock() {
+                *flag = true;
+            }
+        }
+        Err(e) => eprintln!("[crepuscularity-{label}] watcher error: {e}"),
+    }
 }
 
 /// Returns true for Modify, Create, or Remove event kinds.
