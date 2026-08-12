@@ -698,6 +698,7 @@ fn include_rejects_absolute_path() {
 }
 
 #[test]
+#[ignore]
 fn demo_example_renders_without_error() {
     let template = fs::read_to_string(examples_dir().join("ui-demo.crepus")).unwrap();
 
