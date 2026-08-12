@@ -852,9 +852,9 @@ fn apply_dynamic(d: Div, class: &str) -> Div {
     // ── aspect-[N/M] or aspect-[N] — arbitrary aspect ratio ──
     if let Some(rest) = class.strip_prefix("aspect-[") {
         if let Some(inner) = rest.strip_suffix(']') {
-            let ratio = if let Some(slash) = inner.find('/') {
-                let w = inner[..slash].parse::<f32>().ok();
-                let h = inner[slash + 1..].parse::<f32>().ok();
+            let ratio = if let Some((num, den)) = inner.split_once('/') {
+                let w = num.parse::<f32>().ok();
+                let h = den.parse::<f32>().ok();
                 w.zip(h)
                     .and_then(|(w, h)| if h != 0.0 { Some(w / h) } else { None })
             } else {
