@@ -583,6 +583,145 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_eval_expr_basic() {
+        let mut ctx = TemplateContext::new();
+        ctx.vars.insert("x".into(), TemplateValue::Int(10));
+        ctx.vars.insert("b".into(), TemplateValue::Bool(true));
+
+        assert!(matches!(eval_expr("", &ctx).unwrap(), TemplateValue::Null));
+        assert!(matches!(
+            eval_expr("null", &ctx).unwrap(),
+            TemplateValue::Null
+        ));
+        assert!(matches!(
+            eval_expr("42", &ctx).unwrap(),
+            TemplateValue::Int(42)
+        ));
+        assert!(
+            matches!(eval_expr("3.14", &ctx).unwrap(), TemplateValue::Float(f) if (f - 3.14).abs() < f64::EPSILON)
+        );
+        assert!(matches!(eval_expr("\"foo\"", &ctx).unwrap(), TemplateValue::Str(s) if s == "foo"));
+        assert!(matches!(
+            eval_expr("true", &ctx).unwrap(),
+            TemplateValue::Bool(true)
+        ));
+        assert!(matches!(
+            eval_expr("false", &ctx).unwrap(),
+            TemplateValue::Bool(false)
+        ));
+        assert!(matches!(
+            eval_expr("x", &ctx).unwrap(),
+            TemplateValue::Int(10)
+        ));
+    }
+
+    #[test]
+    fn test_eval_expr_arithmetic() {
+        let ctx = TemplateContext::new();
+        assert!(matches!(
+            eval_expr("1 + 2", &ctx).unwrap(),
+            TemplateValue::Int(3)
+        ));
+        assert!(matches!(
+            eval_expr("5 - 3", &ctx).unwrap(),
+            TemplateValue::Int(2)
+        ));
+        assert!(matches!(
+            eval_expr("4 * 3", &ctx).unwrap(),
+            TemplateValue::Int(12)
+        ));
+        assert!(matches!(
+            eval_expr("10 / 2", &ctx).unwrap(),
+            TemplateValue::Float(f) if (f - 5.0).abs() < f64::EPSILON
+        ));
+        assert!(matches!(
+            eval_expr("10 % 3", &ctx).unwrap(),
+            TemplateValue::Int(1)
+        ));
+        assert!(
+            matches!(eval_expr("2.5 * 2.0", &ctx).unwrap(), TemplateValue::Float(f) if (f - 5.0).abs() < f64::EPSILON)
+        );
+    }
+
+    #[test]
+    fn test_eval_expr_comparison() {
+        let ctx = TemplateContext::new();
+        assert!(matches!(
+            eval_expr("1 == 1", &ctx).unwrap(),
+            TemplateValue::Bool(true)
+        ));
+        assert!(matches!(
+            eval_expr("1 != 2", &ctx).unwrap(),
+            TemplateValue::Bool(true)
+        ));
+        assert!(matches!(
+            eval_expr("5 > 3", &ctx).unwrap(),
+            TemplateValue::Bool(true)
+        ));
+        assert!(matches!(
+            eval_expr("3 < 5", &ctx).unwrap(),
+            TemplateValue::Bool(true)
+        ));
+        assert!(matches!(
+            eval_expr("5 >= 5", &ctx).unwrap(),
+            TemplateValue::Bool(true)
+        ));
+        assert!(matches!(
+            eval_expr("3 <= 5", &ctx).unwrap(),
+            TemplateValue::Bool(true)
+        ));
+        assert!(matches!(
+            eval_expr("\"a\" == \"a\"", &ctx).unwrap(),
+            TemplateValue::Bool(true)
+        ));
+    }
+
+    #[test]
+    fn test_eval_expr_boolean() {
+        let ctx = TemplateContext::new();
+        assert!(matches!(
+            eval_expr("true && true", &ctx).unwrap(),
+            TemplateValue::Bool(true)
+        ));
+        assert!(matches!(
+            eval_expr("true && false", &ctx).unwrap(),
+            TemplateValue::Bool(false)
+        ));
+        assert!(matches!(
+            eval_expr("true || false", &ctx).unwrap(),
+            TemplateValue::Bool(true)
+        ));
+        assert!(matches!(
+            eval_expr("false || false", &ctx).unwrap(),
+            TemplateValue::Bool(false)
+        ));
+        assert!(matches!(
+            eval_expr("!true", &ctx).unwrap(),
+            TemplateValue::Bool(false)
+        ));
+        assert!(matches!(
+            eval_expr("!false", &ctx).unwrap(),
+            TemplateValue::Bool(true)
+        ));
+    }
+
+    #[test]
+    fn test_eval_expr_properties() {
+        let ctx = TemplateContext::new();
+        assert!(matches!(
+            eval_expr("\"abc\".len", &ctx).unwrap(),
+            TemplateValue::Int(3)
+        ));
+        assert!(
+            matches!(eval_expr("\"abc\".upper", &ctx).unwrap(), TemplateValue::Str(s) if s == "ABC")
+        );
+        assert!(matches!(
+            eval_expr("-5.abs", &ctx).unwrap(),
+            TemplateValue::Int(5)
+        ));
+    }
+
+    #[test]
     fn test_eval_condition_truthy_falsy() {
         let ctx = TemplateContext::new();
 
