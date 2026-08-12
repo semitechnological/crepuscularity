@@ -117,3 +117,63 @@ pub fn event_touches_relevant_path(
     }
     false
 }
+
+#[cfg(all(test, feature = "notify"))]
+mod tests {
+    use super::*;
+    use std::sync::{Arc, Mutex};
+    use std::time::Duration;
+    use tempfile::tempdir;
+
+    #[test]
+    fn test_create_watcher_triggers_on_file_modification() {
+        let dir = tempdir().unwrap();
+        let target_file = dir.path().join("target.crepus");
+        std::fs::write(&target_file, "content").unwrap();
+
+        let changed = Arc::new(Mutex::new(false));
+        let _watcher = create_watcher(&target_file, changed.clone(), "test").unwrap();
+
+        std::thread::sleep(Duration::from_millis(100));
+
+        std::fs::write(&target_file, "new content").unwrap();
+
+        let mut triggered = false;
+        for _ in 0..10 {
+            std::thread::sleep(Duration::from_millis(100));
+            if *changed.lock().unwrap() {
+                triggered = true;
+                break;
+            }
+        }
+
+        assert!(triggered, "Watcher did not trigger on modification");
+    }
+
+    #[test]
+    fn test_create_watcher_triggers_on_sibling_crepus_file() {
+        let dir = tempdir().unwrap();
+        let target_file = dir.path().join("target.crepus");
+        let sibling_file = dir.path().join("sibling.crepus");
+        std::fs::write(&target_file, "content").unwrap();
+        std::fs::write(&sibling_file, "content").unwrap();
+
+        let changed = Arc::new(Mutex::new(false));
+        let _watcher = create_watcher(&target_file, changed.clone(), "test").unwrap();
+
+        std::thread::sleep(Duration::from_millis(100));
+
+        std::fs::write(&sibling_file, "new content").unwrap();
+
+        let mut triggered = false;
+        for _ in 0..10 {
+            std::thread::sleep(Duration::from_millis(100));
+            if *changed.lock().unwrap() {
+                triggered = true;
+                break;
+            }
+        }
+
+        assert!(triggered, "Watcher did not trigger on sibling modification");
+    }
+}
