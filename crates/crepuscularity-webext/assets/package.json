@@ -1,0 +1,11 @@
+{
+  "name": "assets",
+  "private": true,
+  "devDependencies": {
+    "@happy-dom/global-registrator": "^20.11.2",
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  }
+}
