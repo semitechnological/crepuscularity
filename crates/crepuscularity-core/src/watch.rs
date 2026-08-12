@@ -117,3 +117,51 @@ pub fn event_touches_relevant_path(
     }
     false
 }
+
+#[cfg(all(test, feature = "notify"))]
+mod tests {
+    use super::*;
+    use std::path::{Path, PathBuf};
+    use notify::{Event, EventKind};
+
+    fn make_event(paths: Vec<PathBuf>) -> Event {
+        Event {
+            kind: EventKind::Any,
+            paths,
+            attrs: notify::event::EventAttributes::new(),
+        }
+    }
+
+    #[test]
+    fn test_event_touches_relevant_path() {
+        let target = Path::new("/my/project/target.crepus");
+        let root = Path::new("/my/project");
+
+        let ev = make_event(vec![PathBuf::from("/my/project/target.crepus")]);
+        assert!(event_touches_relevant_path(&ev, target, root));
+
+        let ev = make_event(vec![PathBuf::from("/other/path/file.crepus")]);
+        assert!(!event_touches_relevant_path(&ev, target, root));
+
+        let ev = make_event(vec![PathBuf::from("/my/project/other.crepus")]);
+        assert!(event_touches_relevant_path(&ev, target, root));
+
+        let ev = make_event(vec![PathBuf::from("/my/project/context.toml")]);
+        assert!(event_touches_relevant_path(&ev, target, root));
+
+        let ev = make_event(vec![PathBuf::from("/my/project/other.toml")]);
+        assert!(!event_touches_relevant_path(&ev, target, root));
+
+        let ev = make_event(vec![PathBuf::from("/my/project/other.txt")]);
+        assert!(!event_touches_relevant_path(&ev, target, root));
+
+        let ev = make_event(vec![PathBuf::from("/my/project/no_extension")]);
+        assert!(!event_touches_relevant_path(&ev, target, root));
+
+        let ev = make_event(vec![
+            PathBuf::from("/my/project/other.toml"),
+            PathBuf::from("/my/project/other.crepus"),
+        ]);
+        assert!(event_touches_relevant_path(&ev, target, root));
+    }
+}
