@@ -54,7 +54,7 @@ fn buffer_rows(terminal: &Terminal<TestBackend>) -> Vec<String> {
 }
 
 fn examples_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../examples/showcase")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../examples")
 }
 
 fn temp_case(name: &str) -> PathBuf {
@@ -699,7 +699,7 @@ fn include_rejects_absolute_path() {
 
 #[test]
 fn demo_example_renders_without_error() {
-    let template = fs::read_to_string(examples_dir().join("ui-demo.crepus")).unwrap();
+    let template = fs::read_to_string(examples_dir().join("demo.crepus")).unwrap();
 
     let mut ctx = TemplateContext::new();
     ctx.set("title", "Demo");
