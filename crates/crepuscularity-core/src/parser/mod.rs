@@ -115,6 +115,7 @@ pub struct ComponentDef {
 /// ```
 ///
 /// Components are then included with `include components.crepus#Card title="Hello"`.
+#[derive(Debug)]
 pub struct ComponentFile {
     pub components: HashMap<String, ComponentDef>,
 }
@@ -586,6 +587,63 @@ div
             panel.meta.defaults.get("warning").map(|e| e.to_string()),
             Some("\"sandboxed\"".to_string())
         );
+    }
+
+    #[test]
+    fn parse_component_file_no_frontmatter() {
+        let source = r#"--- Comp1
+div
+  "Hello"
+--- Comp2
+span
+  "World""#;
+        let file = parse_component_file(source).expect("should parse");
+        assert_eq!(file.components.len(), 2);
+        assert!(file.components.contains_key("Comp1"));
+        assert!(file.components.contains_key("Comp2"));
+        let comp1 = &file.components["Comp1"];
+        assert_eq!(comp1.nodes.len(), 1);
+        assert!(comp1.meta.description.is_none());
+        assert!(comp1.meta.defaults.is_empty());
+    }
+
+    #[test]
+    fn parse_component_file_with_description() {
+        let source = r#"+++
+[Button]
+description = "A simple button component"
++++
+
+--- Button
+button
+  "Click me""#;
+        let file = parse_component_file(source).expect("should parse");
+        let btn = file.components.get("Button").expect("Button component");
+        assert_eq!(
+            btn.meta.description.as_deref(),
+            Some("A simple button component")
+        );
+    }
+
+    #[test]
+    fn parse_component_file_invalid_toml() {
+        let source = r#"+++
+[Button]
+invalid toml
++++
+
+--- Button
+button"#;
+        let err = parse_component_file(source).expect_err("should fail");
+        assert!(err.to_string().contains("TOML parse error in frontmatter"));
+    }
+
+    #[test]
+    fn parse_component_file_invalid_component_syntax() {
+        let source = r#"--- Button
+<unclosed>"#;
+        let err = parse_component_file(source).expect_err("should fail");
+        assert!(err.to_string().contains("component \"Button\":"));
     }
 
     #[test]
