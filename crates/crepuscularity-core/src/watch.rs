@@ -117,3 +117,22 @@ pub fn event_touches_relevant_path(
     }
     false
 }
+
+#[cfg(all(test, feature = "notify"))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_relevant_kind() {
+        use notify::event::{AccessKind, CreateKind, ModifyKind, RemoveKind};
+        use notify::EventKind;
+
+        assert!(is_relevant_kind(&EventKind::Modify(ModifyKind::Any)));
+        assert!(is_relevant_kind(&EventKind::Create(CreateKind::Any)));
+        assert!(is_relevant_kind(&EventKind::Remove(RemoveKind::Any)));
+
+        assert!(!is_relevant_kind(&EventKind::Access(AccessKind::Any)));
+        assert!(!is_relevant_kind(&EventKind::Other));
+        assert!(!is_relevant_kind(&EventKind::Any));
+    }
+}
