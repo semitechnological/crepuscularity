@@ -1,0 +1,15 @@
+[package]
+name = "crepus_bench_desktop"
+version = "0.1.0"
+edition = "2021"
+license = "ISC"
+
+[[bin]]
+name = "crepus_bench_desktop"
+path = "src/main.rs"
+
+[dependencies]
+gpui = { version = "0.2.2", default-features = false, features = ["font-kit"] }
+crepuscularity-gpui = { path = "../../../../crates/crepuscularity-gpui" }
+
+[workspace]

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-EXT="$ROOT/examples/extensions"
+EXT="$ROOT/examples/advanced/extensions"
 
 mkdir -p "$EXT"
 

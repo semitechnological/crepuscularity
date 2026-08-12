@@ -79,7 +79,7 @@ fn strip_windows_verbatim_prefix(path: PathBuf) -> PathBuf {
     ignore = "crepus benchmark subprocess exits with Windows loader status in CI"
 )]
 fn benchmark_all_alias_runs() {
-    let config = repo_root().join("examples/benchmarks/benchmark.toml");
+    let config = repo_root().join("examples/advanced/benchmarks/benchmark.toml");
     let out = crepus()
         .current_dir(repo_root())
         .args([
@@ -109,7 +109,7 @@ fn benchmark_all_alias_runs() {
     ignore = "crepus benchmark subprocess exits with Windows loader status in CI"
 )]
 fn benchmark_dry_run_parses_config() {
-    let config = repo_root().join("examples/benchmarks/benchmark.toml");
+    let config = repo_root().join("examples/advanced/benchmarks/benchmark.toml");
     assert!(config.is_file(), "{}", config.display());
 
     let out = crepus()
@@ -143,14 +143,14 @@ fn benchmark_dry_run_parses_config() {
 #[test]
 fn benchmark_desktop_fixture_cargo_check() {
     let root = repo_root();
-    let manifest = root.join("examples/benchmarks/crepus-desktop/Cargo.toml");
+    let manifest = root.join("examples/advanced/benchmarks/crepus-desktop/Cargo.toml");
     assert!(manifest.is_file(), "missing {}", manifest.display());
 
     let mut cmd = Command::new("cargo");
     cmd.current_dir(&root).args([
         "check",
         "--manifest-path",
-        "examples/benchmarks/crepus-desktop/Cargo.toml",
+        "examples/advanced/benchmarks/crepus-desktop/Cargo.toml",
     ]);
     #[cfg(target_os = "macos")]
     {
@@ -171,7 +171,7 @@ fn benchmark_desktop_fixture_cargo_check() {
         .expect("spawn cargo check for bench desktop fixture");
     assert!(
         st.success(),
-        "examples/benchmarks/crepus-desktop must compile for `crepus benchmark` (set SDKROOT on macOS if needed)"
+        "examples/advanced/benchmarks/crepus-desktop must compile for `crepus benchmark` (set SDKROOT on macOS if needed)"
     );
 }
 
@@ -181,7 +181,7 @@ fn benchmark_desktop_fixture_cargo_check() {
     ignore = "crepus benchmark subprocess exits with Windows loader status in CI"
 )]
 fn benchmark_json_includes_summary() {
-    let config = repo_root().join("examples/benchmarks/benchmark.toml");
+    let config = repo_root().join("examples/advanced/benchmarks/benchmark.toml");
     let out = crepus()
         .current_dir(repo_root())
         .args([
@@ -215,7 +215,7 @@ fn benchmark_json_includes_summary() {
     ignore = "crepus benchmark subprocess exits with Windows loader status in CI"
 )]
 fn benchmark_check_json_for_crepus_web() {
-    let config = repo_root().join("examples/benchmarks/benchmark.toml");
+    let config = repo_root().join("examples/advanced/benchmarks/benchmark.toml");
     let out = crepus()
         .current_dir(repo_root())
         .args([
@@ -257,7 +257,7 @@ fn benchmark_check_json_for_crepus_web() {
     ignore = "crepus benchmark subprocess exits with Windows loader status in CI"
 )]
 fn benchmark_check_no_matching_targets_json() {
-    let config = repo_root().join("examples/benchmarks/benchmark.toml");
+    let config = repo_root().join("examples/advanced/benchmarks/benchmark.toml");
     let out = crepus()
         .current_dir(repo_root())
         .args([

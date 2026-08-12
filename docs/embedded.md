@@ -70,7 +70,7 @@ ui.flush(panel)?;
 
 [`PanelPreset`](https://docs.rs/crepuscularity-embedded/latest/crepuscularity_embedded/enum.PanelPreset.html) — `Ili9341_240x320`, `St7789_240x320`, etc. — sets byte order and `Ui` size (always available, no extra feature).
 
-Board walkthroughs: [`examples/embedded-stm32/`](../examples/embedded-stm32/) · [`examples/embedded-esp32/`](../examples/embedded-esp32/).
+Board walkthroughs: [`examples/advanced/embedded-stm32/`](../examples/advanced/embedded-stm32/) · [`examples/advanced/embedded-esp32/`](../examples/advanced/embedded-esp32/).
 
 ## Real hardware (STM32, ESP32, RP2040, …)
 
@@ -89,9 +89,9 @@ Board walkthroughs: [`examples/embedded-stm32/`](../examples/embedded-stm32/) ·
 | Pico Display Pack | **RP2040** | ST7789 | SPI | 240×135 |
 | Discovery / HMI | STM32F746, H743 | RGB parallel | **LTDC** (+ SDRAM FB) | board resolution (e.g. 480×272) |
 
-**STM32 + ILI9341** — feature `embassy-stm32` or blit a host-built `frame.bin` ([`examples/embedded-stm32`](../examples/embedded-stm32/)).
+**STM32 + ILI9341** — feature `embassy-stm32` or blit a host-built `frame.bin` ([`examples/advanced/embedded-stm32`](../examples/advanced/embedded-stm32/)).
 
-**ESP32-S3 + ST7789** — feature `esp-idf` + [`examples/embedded-esp32`](../examples/embedded-esp32/).
+**ESP32-S3 + ST7789** — feature `esp-idf` + [`examples/advanced/embedded-esp32`](../examples/advanced/embedded-esp32/).
 
 **LTDC (framebuffer in RAM)** — avoid a copy; render into scan-out memory:
 

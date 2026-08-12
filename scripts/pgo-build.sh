@@ -22,7 +22,7 @@ CREPUS_BIN="$CARGO_MANIFEST/target/pgo/crepus"
 BENCHMARK_SCRIPT="${BENCHMARK_SCRIPT:-}"
 # Default benchmark: render the example ui.crepus template repeatedly to exercise
 # parsing, evaluation, and HTML rendering — the hot code paths.
-BENCHMARK_TEMPLATE="${BENCHMARK_TEMPLATE:-$CARGO_MANIFEST/examples/ui.crepus}"
+BENCHMARK_TEMPLATE="${BENCHMARK_TEMPLATE:-$CARGO_MANIFEST/examples/showcase/full-range.crepus}"
 
 pgo_gen() {
   echo "==> Step 1: instrumented build (profile=pgo, PGO_DIR=$PGO_DIR)"

@@ -108,9 +108,9 @@ if {is_lvgl}
 
 ## Examples
 
-[`examples/lvgl-pro-mode/`](../examples/lvgl-pro-mode/) renders a dashboard component XML artifact from a host program.
+[`examples/advanced/lvgl-pro-mode/`](../examples/advanced/lvgl-pro-mode/) renders a dashboard component XML artifact from a host program.
 
-[`examples/lvgl-stm32/`](../examples/lvgl-stm32/) uses `build.rs` to generate STM32-oriented LVGL XML at compile time.
+[`examples/advanced/lvgl-stm32/`](../examples/advanced/lvgl-stm32/) uses `build.rs` to generate STM32-oriented LVGL XML at compile time.
 
 ## Relationship to embedded framebuffer
 

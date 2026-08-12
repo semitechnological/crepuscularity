@@ -165,7 +165,11 @@ fn converts_shipped_examples() {
                 "tauri",
                 "convert",
                 "--dir",
-                root.join("examples").join(name).to_str().unwrap(),
+                root.join("examples")
+                    .join("advanced")
+                    .join(name)
+                    .to_str()
+                    .unwrap(),
                 "--out",
                 destination.to_str().unwrap(),
             ])

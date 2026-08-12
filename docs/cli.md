@@ -99,7 +99,7 @@ entry = "index.crepus"
 [[targets]]
 type = "webext"
 id = "extension"
-app = "examples/extensions/rs_vimium"
+app = "examples/advanced/extensions/rs_vimium"
 
 [[targets]]
 type = "native"
@@ -342,7 +342,7 @@ To refresh bundled fixtures after template changes, regenerate IR with **`crepus
 
 ## Examples
 
-The example catalog lives in [`examples/examples.toml`](../examples/examples.toml), grouped by output target. External browser extensions ([undivisible/anywhere](https://github.com/undivisible/anywhere), [undivisible/rs_vimium](https://github.com/undivisible/rs_vimium)) are symlinked under `examples/extensions/` — see [`examples/README.md`](../examples/README.md) and `./scripts/examples-link.sh`.
+The example catalog lives in [`examples/examples.toml`](../examples/examples.toml), grouped by output target. External browser extensions ([undivisible/anywhere](https://github.com/undivisible/anywhere), [undivisible/rs_vimium](https://github.com/undivisible/rs_vimium)) are symlinked under `examples/advanced/extensions/` — see [`examples/README.md`](../examples/README.md) and `./scripts/examples-link.sh`.
 
 ## Mobile Apps (`crepus mobile`)
 

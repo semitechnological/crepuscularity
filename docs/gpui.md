@@ -307,4 +307,4 @@ GPUI is designed for high-performance applications:
 
 ## Examples
 
-See the `examples/text-features/` directory for a complete GPUI application demonstrating advanced text styling features.
+See the `examples/advanced/text-features/` directory for a complete GPUI application demonstrating advanced text styling features.

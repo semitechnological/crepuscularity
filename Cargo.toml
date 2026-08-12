@@ -1,13 +1,10 @@
 [workspace]
 resolver = "2"
 exclude = [
-    # Depends on the published crepuscularity-native, not the workspace path, so
-    # it exercises the same resolution a scaffolded project outside this repo gets.
-    "examples/moon-site",
+    "examples/advanced",
     "examples/embedded-dashboard",
     "tree-sitter-crepus",
     "tree-sitter-crepusx",
-    "examples/benchmarks/apps/leptos",
     "plugins/crepuscularity-components/packages/gpui",
 ]
 members = [
@@ -36,7 +33,7 @@ members = [
     #   cargo check --workspace --exclude crepuscularity-lite
     "crates/crepuscularity-lite",
     "examples/weather",
-] # other examples built explicitly: text-features, todo, embedded-dashboard, host-sim, lvgl-*
+] # other examples are kept under examples/advanced and built explicitly
 
 [profile.release]
 lto = "fat"

@@ -1,7 +1,7 @@
 # Example catalog — grouped by output target (see examples/README.md).
 #
 # In-repo examples use `path` relative to this file.
-# External repos use `git` + a symlink under `extensions/` (./scripts/examples-link.sh).
+# External repos use `git` + a symlink under `advanced/extensions/` (./scripts/examples-link.sh).
 
 version = 1
 
@@ -15,14 +15,14 @@ path = "quicknote"
 target = "webext"
 id = "anywhere"
 label = "AI Anywhere"
-path = "extensions/anywhere"
+path = "advanced/extensions/anywhere"
 git = "https://github.com/undivisible/anywhere"
 
 [[examples]]
 target = "webext"
 id = "rs-vimium"
 label = "Vimium (Rust + .crepus)"
-path = "extensions/rs_vimium"
+path = "advanced/extensions/rs_vimium"
 git = "https://github.com/undivisible/rs_vimium"
 
 [[examples]]
@@ -35,25 +35,25 @@ path = "web-site"
 target = "web"
 id = "weather-web"
 label = "Weather app (web)"
-path = "weather-web"
+path = "advanced/weather-web"
 
 [[examples]]
 target = "web"
 id = "todo-web"
 label = "Todo app (web)"
-path = "todo-web"
+path = "advanced/todo-web"
 
 [[examples]]
 target = "web"
 id = "counter"
 label = "Counter with SSR server"
-path = "counter"
+path = "advanced/counter"
 
 [[examples]]
 target = "web"
 id = "ssr-demo"
 label = "SSR router demo"
-path = "ssr-demo"
+path = "advanced/ssr-demo"
 
 [[examples]]
 target = "gpui"
@@ -65,13 +65,13 @@ path = "weather"
 target = "gpui"
 id = "todo"
 label = "Todo app (GPUI)"
-path = "todo"
+path = "advanced/todo"
 
 [[examples]]
 target = "gpui"
 id = "text-features"
 label = "Letter-spacing and text-transform"
-path = "text-features"
+path = "advanced/text-features"
 
 [[examples]]
 target = "native"
@@ -89,67 +89,67 @@ path = "embedded-dashboard"
 target = "embedded"
 id = "embedded-stm32"
 label = "STM32 ILI9341 walkthrough"
-path = "embedded-stm32"
+path = "advanced/embedded-stm32"
 
 [[examples]]
 target = "embedded"
 id = "embedded-esp32"
 label = "ESP32-S3 ST7789 walkthrough"
-path = "embedded-esp32"
+path = "advanced/embedded-esp32"
 
 [[examples]]
 target = "lvgl"
 id = "lvgl-pro-mode"
 label = "LVGL Pro XML generator"
-path = "lvgl-pro-mode"
+path = "advanced/lvgl-pro-mode"
 
 [[examples]]
 target = "lvgl"
 id = "lvgl-stm32"
 label = "STM32 LVGL XML build-time asset"
-path = "lvgl-stm32"
+path = "advanced/lvgl-stm32"
 
 [[examples]]
 target = "render"
 id = "render"
 label = "CLI render demos"
-path = "render"
+path = "advanced/render"
 
 [[examples]]
 target = "render"
 id = "ui-demo"
 label = "UI primitives demo"
-path = "ui-demo.crepus"
+path = "showcase/ui-demo.crepus"
 
 [[examples]]
 target = "render"
-id = "demo"
-label = "Language showcase"
-path = "demo.crepus"
+id = "full-range"
+label = "Full-range DSL showcase"
+path = "showcase/full-range.crepus"
 
 [[examples]]
 target = "render"
 id = "layout"
 label = "Layout patterns"
-path = "layout.crepus"
+path = "showcase/layout.crepus"
 
 [[examples]]
 target = "render"
 id = "typography"
 label = "Typography"
-path = "typography.crepus"
+path = "showcase/typography.crepus"
 
 [[examples]]
 target = "render"
 id = "components-demo"
 label = "Shared components"
-path = "components-demo.crepus"
+path = "showcase/components-demo.crepus"
 
 [[examples]]
 target = "render"
 id = "jsx-demo"
 label = "JSX interop demo"
-path = "jsx-demo.crepus"
+path = "showcase/jsx-demo.crepus"
 
 [[examples]]
 target = "render"
@@ -158,7 +158,19 @@ label = "Reusable UI library components"
 path = "ui-library"
 
 [[examples]]
+target = "render"
+id = "product-dashboard"
+label = "Polished data dashboard"
+path = "showcase/product-dashboard.crepus"
+
+[[examples]]
+target = "render"
+id = "controls"
+label = "Control gallery"
+path = "showcase/controls.crepus"
+
+[[examples]]
 target = "benchmark"
 id = "benchmarks"
 label = "Build-time compare harness"
-path = "benchmarks"
+path = "advanced/benchmarks"

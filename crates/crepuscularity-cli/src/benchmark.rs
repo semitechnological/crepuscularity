@@ -1,4 +1,4 @@
-//! `crepus benchmark` — declarative build-time comparisons (see `examples/benchmarks/benchmark.toml`).
+//! `crepus benchmark` — declarative build-time comparisons (see `examples/advanced/benchmarks/benchmark.toml`).
 
 use console::style;
 use serde::{Deserialize, Serialize};
@@ -258,7 +258,7 @@ pub fn execute_run(opts: RunOptions) {
             .settings
             .work_root
             .as_deref()
-            .unwrap_or("examples/benchmarks/.work");
+            .unwrap_or("examples/advanced/benchmarks/.work");
         resolve_path(&repo, rel)
     });
 
@@ -784,7 +784,7 @@ fn resolve_config_path(explicit: Option<PathBuf>) -> PathBuf {
     let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
     for candidate in [
         cwd.join("benchmark.toml"),
-        cwd.join("examples/benchmarks/benchmark.toml"),
+        cwd.join("examples/advanced/benchmarks/benchmark.toml"),
     ] {
         if candidate.exists() {
             return candidate;
@@ -1228,7 +1228,7 @@ fn run_builtin(
             let site = target
                 .site
                 .as_deref()
-                .unwrap_or("examples/benchmarks/crepus-web");
+                .unwrap_or("examples/advanced/benchmarks/crepus-web");
             let site_path = resolve_path(repo, site);
             let out_dir = work_dir.join("out");
             if dry_run {
@@ -1317,7 +1317,7 @@ fn run_builtin(
             }
         }
         "crepus-webext" => {
-            let fixture = repo.join("examples/benchmarks/crepus-webext");
+            let fixture = repo.join("examples/advanced/benchmarks/crepus-webext");
             let app_dir = work_dir.join("app");
             if dry_run {
                 print_step_line(
@@ -1454,7 +1454,7 @@ fn run_builtin(
             }
         }
         "crepus-desktop" => {
-            let crate_dir = repo.join("examples/benchmarks/crepus-desktop");
+            let crate_dir = repo.join("examples/advanced/benchmarks/crepus-desktop");
             if !crate_dir.join("Cargo.toml").exists() {
                 return (
                     false,
@@ -1621,7 +1621,7 @@ fn copy_rec(src: &Path, dst: &Path) -> std::io::Result<()> {
 
 /// After copying the benchmark fixture into `.work/.../app`, rewrite `runtime/Cargo.toml` so
 /// `crepuscularity-webext` points at the real workspace crate (relative `../../../../crates/...`
-/// only works from `examples/benchmarks/crepus-webext/runtime`).
+/// only works from `examples/advanced/benchmarks/crepus-webext/runtime`).
 fn patch_webext_runtime_crepuscularity_path(repo: &Path, app_dir: &Path) -> std::io::Result<()> {
     let toml_path = app_dir.join("runtime/Cargo.toml");
     let crate_dir = repo.join("crates/crepuscularity-webext");

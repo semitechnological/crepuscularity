@@ -168,7 +168,7 @@ fn print_usage() {
     );
     eprintln!(
         "  {}  {}",
-        style("crepus aurora run examples/counter --macos").green(),
+        style("crepus aurora run examples/advanced/counter --macos").green(),
         style("build & run the counter example").dim()
     );
     eprintln!();
