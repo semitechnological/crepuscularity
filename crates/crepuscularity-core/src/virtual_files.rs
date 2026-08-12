@@ -101,4 +101,26 @@ mod tests {
         Arc::make_mut(&mut ctx.virtual_files).insert("other.crepus".into(), "other".into());
         assert!(lookup_virtual_file(&ctx, Path::new("child.crepus")).is_none());
     }
+
+    #[test]
+    fn lookup_exact_key_takes_precedence_over_basename() {
+        let mut ctx = TemplateContext::new();
+        Arc::make_mut(&mut ctx.virtual_files).insert("/some/path/child.crepus".into(), "exact".into());
+        Arc::make_mut(&mut ctx.virtual_files).insert("child.crepus".into(), "base".into());
+        assert_eq!(
+            lookup_virtual_file(&ctx, Path::new("/some/path/child.crepus")).as_deref(),
+            Some("exact")
+        );
+    }
+
+    #[test]
+    fn lookup_basename_takes_precedence_over_suffix() {
+        let mut ctx = TemplateContext::new();
+        Arc::make_mut(&mut ctx.virtual_files).insert("child.crepus".into(), "base".into());
+        Arc::make_mut(&mut ctx.virtual_files).insert("a/child.crepus".into(), "suffix".into());
+        assert_eq!(
+            lookup_virtual_file(&ctx, Path::new("/other/path/child.crepus")).as_deref(),
+            Some("base")
+        );
+    }
 }
