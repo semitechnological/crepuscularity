@@ -402,10 +402,29 @@ mod tests {
 
     #[test]
     fn fraction() {
+        // Valid cases
         assert_eq!(parse_fraction("1/2"), Some(0.5));
         assert_eq!(parse_fraction("3/4"), Some(0.75));
+        assert_eq!(parse_fraction("-1/2"), Some(-0.5));
+        assert_eq!(parse_fraction("1/-2"), Some(-0.5));
+        assert_eq!(parse_fraction("1.5/3"), Some(0.5));
+
+        // Division by zero
         assert_eq!(parse_fraction("1/0"), None);
+        assert_eq!(parse_fraction("-1/0"), None);
+        assert_eq!(parse_fraction("0/0"), None);
+        assert_eq!(parse_fraction("1/0.0"), None);
+
+        // Invalid formats
         assert_eq!(parse_fraction("4"), None);
+        assert_eq!(parse_fraction("1/2/3"), None);
+        assert_eq!(parse_fraction("a/b"), None);
+        assert_eq!(parse_fraction("1/b"), None);
+        assert_eq!(parse_fraction("a/2"), None);
+        assert_eq!(parse_fraction(""), None);
+        assert_eq!(parse_fraction("/"), None);
+        assert_eq!(parse_fraction("1/"), None);
+        assert_eq!(parse_fraction("/2"), None);
     }
 
     #[test]
