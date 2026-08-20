@@ -148,7 +148,9 @@ mod tests {
         let dir = tempfile::tempdir().expect("tempdir");
         let base = dir.path();
         let res = resolve_include_path(Some(base), "missing.crepus").unwrap();
-        let expected = std::fs::canonicalize(base).expect("canonicalize").join("missing.crepus");
+        let expected = std::fs::canonicalize(base)
+            .expect("canonicalize")
+            .join("missing.crepus");
         assert_eq!(res, expected);
     }
 
