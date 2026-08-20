@@ -614,4 +614,60 @@ div
         expand_class_list_in_place(&mut no_match, &aliases);
         assert_eq!(no_match, vec!["flex".to_string(), "gap-4".to_string()]);
     }
+
+    #[test]
+    fn test_strip_indent_decorators_empty() {
+        let s = "";
+        let d = strip_indent_decorators(s);
+        assert_eq!(d.body, "");
+        assert!(d.google_fonts.is_empty());
+        assert!(d.class_aliases.is_empty());
+        assert!(d.inline_css.is_empty());
+    }
+
+    #[test]
+    fn test_strip_indent_decorators_whitespace_only() {
+        let s = "   \n\t  \n";
+        let d = strip_indent_decorators(s);
+        assert_eq!(d.body, "");
+        assert!(d.google_fonts.is_empty());
+        assert!(d.class_aliases.is_empty());
+        assert!(d.inline_css.is_empty());
+    }
+
+    #[test]
+    fn test_strip_indent_decorators_no_trailing_newline() {
+        let s = "div\n  span";
+        let d = strip_indent_decorators(s);
+        assert_eq!(d.body, "div\n  span");
+        assert!(d.google_fonts.is_empty());
+        assert!(d.class_aliases.is_empty());
+        assert!(d.inline_css.is_empty());
+    }
+
+    #[test]
+    fn test_strip_indent_decorators_only_decorators() {
+        let s = "google-font Inter\n\n.btn px-4 py-2\n";
+        let d = strip_indent_decorators(s);
+        assert_eq!(d.body, "");
+        assert_eq!(d.google_fonts, vec!["Inter"]);
+        assert_eq!(
+            d.class_aliases.get("btn").map(|s| s.as_str()),
+            Some("px-4 py-2")
+        );
+        assert!(d.inline_css.is_empty());
+    }
+
+    #[test]
+    fn test_strip_indent_decorators_multiple_empty_lines() {
+        let s = "google-font Inter\n\n\n\n\n\n.btn px-4 py-2\n\n";
+        let d = strip_indent_decorators(s);
+        assert_eq!(d.body, "");
+        assert_eq!(d.google_fonts, vec!["Inter"]);
+        assert_eq!(
+            d.class_aliases.get("btn").map(|s| s.as_str()),
+            Some("px-4 py-2")
+        );
+        assert!(d.inline_css.is_empty());
+    }
 }
