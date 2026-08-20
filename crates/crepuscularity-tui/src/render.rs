@@ -699,7 +699,16 @@ fn build_element(
         build_empty_box(&hints, constraint, style)
     } else {
         build_container_element(
-            el, &hints, ctx, parent_dir, constraint, style, &classes, renderer,
+            el,
+            &hints,
+            ctx,
+            parent_dir,
+            ContainerProps {
+                constraint,
+                style,
+                classes: &classes,
+            },
+            renderer,
         )
     }
 }
@@ -799,32 +808,36 @@ fn build_empty_box(hints: &StyleHints, constraint: Constraint, style: Style) -> 
     }
 }
 
+pub struct ContainerProps<'a> {
+    pub constraint: Constraint,
+    pub style: Style,
+    pub classes: &'a [String],
+}
+
 /// Element with structural children → split its area for each child.
-#[allow(clippy::too_many_arguments)]
 fn build_container_element(
     el: &Element,
     hints: &StyleHints,
     ctx: &TemplateContext,
     _parent_dir: Direction,
-    constraint: Constraint,
-    style: Style,
-    classes: &[String],
+    props: ContainerProps<'_>,
     renderer: &mut BufferRenderer,
 ) -> WidgetChild {
     let child_dir = hints.direction;
-    let children = build_children(&el.children, ctx, child_dir, style, renderer);
-    let scroll_cfg = scroll_config(el, ctx, classes);
+    let children = build_children(&el.children, ctx, child_dir, props.style, renderer);
+    let scroll_cfg = scroll_config(el, ctx, props.classes);
 
     // Resolve Fit constraints: measure the natural content size and
     // convert to a Fixed constraint so the element doesn't fill.
-    let constraint = resolve_fit_constraint(constraint, &children, child_dir, hints.gap, hints);
+    let constraint =
+        resolve_fit_constraint(props.constraint, &children, child_dir, hints.gap, hints);
 
     WidgetChild {
         node: WidgetNode::Container {
             direction: child_dir,
             gap: hints.gap,
             children,
-            style,
+            style: props.style,
             block: hints_to_block(hints),
             scroll_offset: scroll_cfg.offset,
             scroll_bottom: scroll_cfg.scroll_to_bottom,
