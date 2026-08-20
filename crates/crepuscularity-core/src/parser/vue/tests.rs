@@ -20,13 +20,20 @@ fn element(node: &Node) -> &Element {
 
 fn text_of(node: &Node) -> String {
     match node {
-        Node::Text(parts) => parts
-            .iter()
-            .map(|p| match p {
-                TextPart::Literal(s) => s.clone(),
-                TextPart::Expr(e) => format!("{{{e}}}"),
-            })
-            .collect(),
+        Node::Text(parts) => {
+            let mut out = String::new();
+            for p in parts {
+                match p {
+                    TextPart::Literal(s) => out.push_str(s),
+                    TextPart::Expr(e) => {
+                        out.push('{');
+                        out.push_str(e);
+                        out.push('}');
+                    }
+                }
+            }
+            out
+        }
         other => panic!("expected text, got {other:?}"),
     }
 }
