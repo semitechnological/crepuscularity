@@ -192,4 +192,45 @@ mod tests {
             assert_eq!(merge_unique_font_families(input_strings), expected_strings);
         }
     }
+
+    #[test]
+    fn test_google_fonts_head_markup_empty() {
+        assert_eq!(google_fonts_head_markup(&[]), "");
+    }
+
+    #[test]
+    fn test_google_fonts_head_markup_single() {
+        let families = vec!["Inter".to_string()];
+        let expected = r#"  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">"#;
+        assert_eq!(google_fonts_head_markup(&families), expected);
+    }
+
+    #[test]
+    fn test_google_fonts_head_markup_multiple() {
+        let families = vec!["Inter".to_string(), "Fira Code".to_string()];
+        let expected = r#"  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fira+Code:wght@400;500;600;700&display=swap" rel="stylesheet">"#;
+        assert_eq!(google_fonts_head_markup(&families), expected);
+    }
+
+    #[test]
+    fn test_google_fonts_head_markup_with_weights() {
+        let families = vec!["Inter:wght@400;700".to_string()];
+        let expected = r#"  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400%3B700&display=swap" rel="stylesheet">"#;
+        assert_eq!(google_fonts_head_markup(&families), expected);
+    }
+
+    #[test]
+    fn test_google_fonts_head_markup_material_symbols() {
+        let families = vec!["Material Symbols Outlined".to_string()];
+        let expected = r#"  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=swap" rel="stylesheet">"#;
+        assert_eq!(google_fonts_head_markup(&families), expected);
+    }
 }
