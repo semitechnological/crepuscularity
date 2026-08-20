@@ -215,6 +215,9 @@ fn detect_completion_context(prefix: &str) -> CompletionCtx {
         return CompletionCtx::Expression;
     }
     if in_string.is_some() {
+        if jsx_class_attribute_string(prefix) {
+            return CompletionCtx::Classes;
+        }
         return CompletionCtx::QuotedString;
     }
 
@@ -239,6 +242,42 @@ fn detect_completion_context(prefix: &str) -> CompletionCtx {
         return CompletionCtx::Classes;
     }
     CompletionCtx::IndentTag
+}
+
+fn jsx_class_attribute_string(prefix: &str) -> bool {
+    let trimmed = prefix.trim_start();
+    if !trimmed.starts_with('<') || trimmed.contains('>') {
+        return false;
+    }
+
+    let mut in_string: Option<char> = None;
+    let mut quote_at: Option<usize> = None;
+    for (i, ch) in prefix.char_indices() {
+        match (in_string, ch) {
+            (Some(q), c) if c == q => {
+                in_string = None;
+                quote_at = None;
+            }
+            (Some(_), _) => {}
+            (None, '"' | '\'') => {
+                in_string = Some(ch);
+                quote_at = Some(i);
+            }
+            _ => {}
+        }
+    }
+    let Some(qpos) = quote_at else {
+        return false;
+    };
+    let before = prefix[..qpos].trim_end();
+    let Some(name) = before.strip_suffix('=') else {
+        return false;
+    };
+    let name = name
+        .rsplit(|c: char| c.is_whitespace() || c == '<' || c == '/')
+        .next()
+        .unwrap_or("");
+    name.eq_ignore_ascii_case("class") || name.eq_ignore_ascii_case("classname")
 }
 
 fn tag_completions() -> Vec<CompletionItem> {
@@ -563,6 +602,29 @@ mod tests {
         let labels: Vec<&str> = items.iter().map(|i| i.label.as_str()).collect();
         assert!(labels.contains(&"flex"));
         assert!(!labels.contains(&"if"));
+    }
+
+    #[test]
+    fn jsx_class_attribute_offers_class_completions() {
+        let source = r#"<div class=""#;
+        let items = completion_items(source, position(0, 12));
+        let labels: Vec<&str> = items.iter().map(|i| i.label.as_str()).collect();
+        assert!(labels.contains(&"flex"), "got {labels:?}");
+        assert!(labels.contains(&"text-white"));
+    }
+
+    #[test]
+    fn jsx_classname_attribute_offers_class_completions() {
+        let source = r#"<div className="tex"#;
+        let items = completion_items(source, position(0, 19));
+        let labels: Vec<&str> = items.iter().map(|i| i.label.as_str()).collect();
+        assert!(labels.contains(&"text-white"), "got {labels:?}");
+    }
+
+    #[test]
+    fn jsx_id_attribute_string_returns_nothing() {
+        let items = completion_items(r#"<div id="fl"#, position(0, 11));
+        assert!(items.is_empty());
     }
 
     #[test]
