@@ -63,12 +63,13 @@ pub use v8_thread::{V8ThreadHandle, V8ThreadRequest, V8ThreadRuntime};
 pub use worker::{WorkerHandle, WorkerRuntime};
 
 pub fn parse_hex_color(raw: &str) -> Option<gpui::Hsla> {
+    use palette::IntoColor;
     let hex = raw.trim().trim_start_matches('#');
     let parsed = match hex.len() {
         6 => u32::from_str_radix(hex, 16).ok().map(gpui::rgb),
         _ => None,
     }?;
-    Some(parsed.into())
+    Some(parsed.into_color())
 }
 
 #[cfg(test)]

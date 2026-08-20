@@ -51,7 +51,6 @@ pub const GPUI_MANIFEST_DIR: &str = env!("CARGO_MANIFEST_DIR");
 /// Style must fill the parent slot — default style lays out as empty block.
 pub fn cached_view(view: impl Into<AnyView>) -> AnyView {
     view.into()
-        .cached(StyleRefinement::default().flex_1().size_full())
 }
 
 pub fn gpui_window_options(
@@ -105,13 +104,12 @@ pub enum Anchor {
 }
 
 pub const MAX_BUTTONS_PER_SIDE: usize = 3;
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum WindowButton {
     Minimize,
     Maximize,
     Close,
 }
-
-pub const MAX_BUTTONS_PER_SIDE: usize = 3;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct WindowButtonLayout {

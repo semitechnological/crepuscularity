@@ -2,7 +2,7 @@
 pub(crate) fn run_preview(path: std::path::PathBuf) {
     use console::style;
     use crepuscularity_runtime::{HotReloadState, HotReloadView, TemplateContext};
-    use gpui::{bounds, point, prelude::*, px, size, Application, WindowOptions};
+    use gpui::{bounds, point, prelude::*, px, size, WindowOptions};
 
     let display_name = path
         .file_name()

@@ -151,7 +151,7 @@ fn launch_viewer(
     vars: Vec<(String, TemplateValue)>,
 ) {
     use crepuscularity_runtime::{HotReloadState, HotReloadView};
-    use gpui::{bounds, point, prelude::*, size, Application, WindowOptions};
+    use gpui::{bounds, point, prelude::*, size, WindowOptions};
 
     let mut ctx = TemplateContext::new();
     for (k, v) in vars {
