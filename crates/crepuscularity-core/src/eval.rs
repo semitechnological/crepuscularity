@@ -733,6 +733,9 @@ mod tests {
         assert!(eval_condition("-0.1", &ctx).unwrap());
         assert!(eval_condition("\"hello\"", &ctx).unwrap());
         assert!(eval_condition("1 + 2", &ctx).unwrap());
+        // String coercion: non-empty strings are truthy, even if they contain falsy text
+        assert!(eval_condition("\"false\"", &ctx).unwrap());
+        assert!(eval_condition("\"0\"", &ctx).unwrap());
 
         // Falsy values
         assert!(!eval_condition("false", &ctx).unwrap());
@@ -740,6 +743,60 @@ mod tests {
         assert!(!eval_condition("0.0", &ctx).unwrap());
         assert!(!eval_condition("\"\"", &ctx).unwrap());
         assert!(!eval_condition("null", &ctx).unwrap());
+    }
+
+    #[test]
+    fn test_eval_condition_complex_types_coercion() {
+        let mut ctx = TemplateContext::new();
+
+        // List coercion
+        ctx.vars
+            .insert("empty_list".into(), TemplateValue::List(vec![]));
+        ctx.vars.insert(
+            "full_list".into(),
+            TemplateValue::List(vec![TemplateContext::new()]),
+        );
+
+        // Scope coercion
+        let empty_scope = TemplateContext::new();
+        let mut full_scope = TemplateContext::new();
+        full_scope
+            .vars
+            .insert("key".into(), TemplateValue::Bool(true));
+
+        ctx.vars
+            .insert("empty_scope".into(), TemplateValue::Scope(empty_scope));
+        ctx.vars
+            .insert("full_scope".into(), TemplateValue::Scope(full_scope));
+
+        // Lists
+        assert!(!eval_condition("empty_list", &ctx).unwrap());
+        assert!(eval_condition("full_list", &ctx).unwrap());
+
+        // Scopes
+        assert!(!eval_condition("empty_scope", &ctx).unwrap());
+        assert!(eval_condition("full_scope", &ctx).unwrap());
+    }
+
+    #[test]
+    fn test_is_truthy_direct() {
+        assert!(is_truthy(&TemplateValue::Bool(true)));
+        assert!(!is_truthy(&TemplateValue::Bool(false)));
+        assert!(is_truthy(&TemplateValue::Int(42)));
+        assert!(!is_truthy(&TemplateValue::Int(0)));
+        assert!(is_truthy(&TemplateValue::Float(3.14)));
+        assert!(!is_truthy(&TemplateValue::Float(0.0)));
+        assert!(is_truthy(&TemplateValue::Str("foo".into())));
+        assert!(!is_truthy(&TemplateValue::Str("".into())));
+        assert!(is_truthy(&TemplateValue::List(
+            vec![TemplateContext::new()]
+        )));
+        assert!(!is_truthy(&TemplateValue::List(vec![])));
+        let mut scope = TemplateContext::new();
+        scope.vars.insert("a".into(), TemplateValue::Int(1));
+        assert!(is_truthy(&TemplateValue::Scope(scope)));
+        assert!(!is_truthy(&TemplateValue::Scope(TemplateContext::new())));
+        assert!(!is_truthy(&TemplateValue::Null));
     }
 
     #[test]
