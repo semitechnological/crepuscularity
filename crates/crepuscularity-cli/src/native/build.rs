@@ -463,10 +463,8 @@ pub fn booted_or_available_ios_device() -> Option<String> {
 }
 
 pub fn simulator_id_from_line(line: &str) -> Option<String> {
-    let start = line.find('(')? + 1;
-    let rest = &line[start..];
-    let end = rest.find(')')?;
-    let candidate = &rest[..end];
+    let (_, rest) = line.split_once('(')?;
+    let (candidate, _) = rest.split_once(')')?;
     if candidate.chars().filter(|c| *c == '-').count() == 4 {
         Some(candidate.to_string())
     } else {
