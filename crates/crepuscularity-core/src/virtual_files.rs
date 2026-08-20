@@ -105,7 +105,8 @@ mod tests {
     #[test]
     fn lookup_exact_key_takes_precedence_over_basename() {
         let mut ctx = TemplateContext::new();
-        Arc::make_mut(&mut ctx.virtual_files).insert("/some/path/child.crepus".into(), "exact".into());
+        Arc::make_mut(&mut ctx.virtual_files)
+            .insert("/some/path/child.crepus".into(), "exact".into());
         Arc::make_mut(&mut ctx.virtual_files).insert("child.crepus".into(), "base".into());
         assert_eq!(
             lookup_virtual_file(&ctx, Path::new("/some/path/child.crepus")).as_deref(),
