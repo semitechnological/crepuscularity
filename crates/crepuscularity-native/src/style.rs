@@ -424,246 +424,220 @@ fn apply_text_class(s: &mut ViewStyle, class: &str, ctx: Option<&TemplateContext
         return;
     }
 
-    // Text color (named + arbitrary + dynamic)
     if let Some(rest) = class.strip_prefix("text-") {
-        // Try palette or hex first (before font-size check)
-        if let Some(hex) = resolve_css_color(rest).or_else(|| resolve_arbitrary_css_color(rest)) {
-            s.foreground_color = Some(hex);
+        if apply_text_color(s, rest, ctx) {
             return;
         }
-        // Dynamic expression
-        if let Some(ctx) = ctx {
-            let (ok, expr) = parse_braced_expr(rest);
-            if ok {
-                let Ok(v) = crepuscularity_core::eval::eval_expr(expr, ctx) else {
-                    return;
-                };
-                let color_str = crepuscularity_core::context::value_to_str(&v);
-                if let Some(hex) = resolve_css_color(&color_str) {
-                    s.foreground_color = Some(hex);
-                    return;
-                }
-            }
-        }
-        // Font size
         if let Some(size) = parse_font_size_named(rest) {
             s.font_size = Some(size);
             return;
         }
-        // text-align
-        match rest {
-            "left" => {
-                s.text_align = Some("leading".into());
-                return;
-            }
-            "center" => {
-                s.text_align = Some("center".into());
-                return;
-            }
-            "right" => {
-                s.text_align = Some("trailing".into());
-                return;
-            }
-            _ => {}
+        if let Some(align) = parse_text_align(rest) {
+            s.text_align = Some(align);
+            return;
         }
     }
 
-    // Font weight
-    match class {
-        "font-thin" => {
-            s.font_weight = Some(100);
-            return;
-        }
-        "font-extralight" => {
-            s.font_weight = Some(200);
-            return;
-        }
-        "font-light" => {
-            s.font_weight = Some(300);
-            return;
-        }
-        "font-normal" => {
-            s.font_weight = Some(400);
-            return;
-        }
-        "font-medium" => {
-            s.font_weight = Some(500);
-            return;
-        }
-        "font-semibold" => {
-            s.font_weight = Some(600);
-            return;
-        }
-        "font-bold" => {
-            s.font_weight = Some(700);
-            return;
-        }
-        "font-extrabold" => {
-            s.font_weight = Some(800);
-            return;
-        }
-        "font-black" => {
-            s.font_weight = Some(900);
-            return;
-        }
-        // Font family
-        "font-sans" => {
-            s.font_family = Some("sans".into());
-            return;
-        }
-        "font-serif" => {
-            s.font_family = Some("serif".into());
-            return;
-        }
-        "font-mono" => {
-            s.font_family = Some("mono".into());
-            return;
-        }
-        _ => {}
+    if let Some(w) = parse_font_weight(class) {
+        s.font_weight = Some(w);
+        return;
     }
 
-    // Line height (leading-)
+    if let Some(f) = parse_font_family(class) {
+        s.font_family = Some(f);
+        return;
+    }
+
     if let Some(rest) = class.strip_prefix("leading-") {
-        let lh = match rest {
-            "none" => Some(1.0),
-            "tight" => Some(1.25),
-            "snug" => Some(1.375),
-            "normal" => Some(1.5),
-            "relaxed" => Some(1.625),
-            "loose" => Some(2.0),
-            _ => {
-                // Arbitrary: leading-[N] or leading-N (absolute pts)
-                if let Some(inner) = rest.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
-                    let stripped = inner.strip_suffix("px").unwrap_or(inner);
-                    stripped.parse::<f32>().ok()
-                } else {
-                    rest.parse::<f32>().ok().map(|n| n * 4.0)
-                }
-            }
-        };
-        if let Some(v) = lh {
-            s.line_height = Some(v);
+        if let Some(lh) = parse_line_height(rest) {
+            s.line_height = Some(lh);
             return;
         }
     }
 
-    // Letter spacing (tracking-)
     if let Some(rest) = class.strip_prefix("tracking-") {
-        let ls = match rest {
-            "tighter" => Some(-0.8),
-            "tight" => Some(-0.4),
-            "normal" => Some(0.0),
-            "wide" => Some(0.4),
-            "wider" => Some(0.8),
-            "widest" => Some(1.6),
-            _ => {
-                if let Some(inner) = rest.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
-                    let stripped = inner.strip_suffix("px").unwrap_or(inner);
-                    stripped.parse::<f32>().ok()
-                } else {
-                    None
-                }
+        if let Some(ls) = parse_letter_spacing(rest) {
+            s.letter_spacing = Some(ls);
+            return;
+        }
+    }
+
+    if let Some(tt) = parse_text_transform(class) {
+        s.text_transform = Some(tt);
+        return;
+    }
+
+    if apply_text_decoration(s, class) {
+        return;
+    }
+
+    if let Some(r) = parse_border_radius(class) {
+        s.corner_radius = Some(r);
+        return;
+    }
+}
+
+#[inline]
+fn apply_text_color(s: &mut ViewStyle, rest: &str, ctx: Option<&TemplateContext>) -> bool {
+    if let Some(hex) = resolve_css_color(rest).or_else(|| resolve_arbitrary_css_color(rest)) {
+        s.foreground_color = Some(hex);
+        return true;
+    }
+    if let Some(ctx) = ctx {
+        let (ok, expr) = parse_braced_expr(rest);
+        if ok {
+            let Ok(v) = crepuscularity_core::eval::eval_expr(expr, ctx) else {
+                return true;
+            };
+            let color_str = crepuscularity_core::context::value_to_str(&v);
+            if let Some(hex) = resolve_css_color(&color_str) {
+                s.foreground_color = Some(hex);
+                return true;
             }
-        };
-        if let Some(v) = ls {
-            s.letter_spacing = Some(v);
-            return;
         }
     }
+    false
+}
 
-    // Text transform
+#[inline]
+fn parse_text_align(rest: &str) -> Option<String> {
+    match rest {
+        "left" => Some("leading".into()),
+        "center" => Some("center".into()),
+        "right" => Some("trailing".into()),
+        _ => None,
+    }
+}
+
+#[inline]
+fn parse_font_weight(class: &str) -> Option<u16> {
     match class {
-        "uppercase" => {
-            s.text_transform = Some("uppercase".into());
-            return;
-        }
-        "lowercase" => {
-            s.text_transform = Some("lowercase".into());
-            return;
-        }
-        "capitalize" => {
-            s.text_transform = Some("capitalize".into());
-            return;
-        }
-        "normal-case" => {
-            s.text_transform = Some("normal".into());
-            return;
-        }
-        _ => {}
+        "font-thin" => Some(100),
+        "font-extralight" => Some(200),
+        "font-light" => Some(300),
+        "font-normal" => Some(400),
+        "font-medium" => Some(500),
+        "font-semibold" => Some(600),
+        "font-bold" => Some(700),
+        "font-extrabold" => Some(800),
+        "font-black" => Some(900),
+        _ => None,
     }
+}
 
-    // Text decorations
+#[inline]
+fn parse_font_family(class: &str) -> Option<String> {
+    match class {
+        "font-sans" => Some("sans".into()),
+        "font-serif" => Some("serif".into()),
+        "font-mono" => Some("mono".into()),
+        _ => None,
+    }
+}
+
+#[inline]
+fn parse_line_height(rest: &str) -> Option<f32> {
+    match rest {
+        "none" => Some(1.0),
+        "tight" => Some(1.25),
+        "snug" => Some(1.375),
+        "normal" => Some(1.5),
+        "relaxed" => Some(1.625),
+        "loose" => Some(2.0),
+        _ => {
+            if let Some(inner) = rest.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
+                let stripped = inner.strip_suffix("px").unwrap_or(inner);
+                stripped.parse::<f32>().ok()
+            } else {
+                rest.parse::<f32>().ok().map(|n| n * 4.0)
+            }
+        }
+    }
+}
+
+#[inline]
+fn parse_letter_spacing(rest: &str) -> Option<f32> {
+    match rest {
+        "tighter" => Some(-0.8),
+        "tight" => Some(-0.4),
+        "normal" => Some(0.0),
+        "wide" => Some(0.4),
+        "wider" => Some(0.8),
+        "widest" => Some(1.6),
+        _ => {
+            if let Some(inner) = rest.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
+                let stripped = inner.strip_suffix("px").unwrap_or(inner);
+                stripped.parse::<f32>().ok()
+            } else {
+                None
+            }
+        }
+    }
+}
+
+#[inline]
+fn parse_text_transform(class: &str) -> Option<String> {
+    match class {
+        "uppercase" => Some("uppercase".into()),
+        "lowercase" => Some("lowercase".into()),
+        "capitalize" => Some("capitalize".into()),
+        "normal-case" => Some("normal".into()),
+        _ => None,
+    }
+}
+
+#[inline]
+fn apply_text_decoration(s: &mut ViewStyle, class: &str) -> bool {
     match class {
         "italic" | "font-italic" => {
             s.italic = Some(true);
-            return;
+            true
         }
         "not-italic" => {
             s.italic = Some(false);
-            return;
+            true
         }
         "underline" => {
             s.underline = Some(true);
-            return;
+            true
         }
         "no-underline" => {
             s.underline = Some(false);
-            return;
+            true
         }
         "line-through" => {
             s.strikethrough = Some(true);
-            return;
+            true
         }
         "no-line-through" => {
             s.strikethrough = Some(false);
-            return;
+            true
         }
-        _ => {}
+        _ => false,
     }
+}
 
-    // Border radius
+#[inline]
+fn parse_border_radius(class: &str) -> Option<f32> {
     match class {
-        "rounded-none" => {
-            s.corner_radius = Some(0.0);
-            return;
-        }
-        "rounded-sm" => {
-            s.corner_radius = Some(2.0);
-            return;
-        }
-        "rounded" | "rounded-md" => {
-            s.corner_radius = Some(6.0);
-            return;
-        }
-        "rounded-lg" => {
-            s.corner_radius = Some(8.0);
-            return;
-        }
-        "rounded-xl" => {
-            s.corner_radius = Some(12.0);
-            return;
-        }
-        "rounded-2xl" => {
-            s.corner_radius = Some(16.0);
-            return;
-        }
-        "rounded-3xl" => {
-            s.corner_radius = Some(24.0);
-            return;
-        }
-        "rounded-full" => {
-            s.corner_radius = Some(9999.0);
-            return;
-        }
-        _ => {}
-    }
-    if let Some(inner) = class
-        .strip_prefix("rounded-[")
-        .and_then(|s| s.strip_suffix(']'))
-    {
-        let stripped = inner.strip_suffix("px").unwrap_or(inner);
-        if let Ok(v) = stripped.parse::<f32>() {
-            s.corner_radius = Some(v);
+        "rounded-none" => Some(0.0),
+        "rounded-sm" => Some(2.0),
+        "rounded" | "rounded-md" => Some(6.0),
+        "rounded-lg" => Some(8.0),
+        "rounded-xl" => Some(12.0),
+        "rounded-2xl" => Some(16.0),
+        "rounded-3xl" => Some(24.0),
+        "rounded-full" => Some(9999.0),
+        _ => {
+            if let Some(inner) = class
+                .strip_prefix("rounded-[")
+                .and_then(|s| s.strip_suffix(']'))
+            {
+                let stripped = inner.strip_suffix("px").unwrap_or(inner);
+                stripped.parse::<f32>().ok()
+            } else {
+                None
+            }
         }
     }
 }
