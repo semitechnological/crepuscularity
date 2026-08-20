@@ -165,3 +165,31 @@ fn normalize_google_font_family(family: &str) -> String {
         _ => family.trim().to_string(),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_merge_unique_font_families() {
+        let cases: Vec<(Vec<&str>, Vec<&str>)> = vec![
+            (vec!["Inter", "Roboto", "Inter"], vec!["Inter", "Roboto"]),
+            (
+                vec!["INTER", "roboto", "inter", "ROBOTO"],
+                vec!["INTER", "roboto"],
+            ),
+            (
+                vec!["  Inter  ", " Roboto ", "Inter"],
+                vec!["Inter", "Roboto"],
+            ),
+            (vec!["", "   ", "Inter"], vec!["Inter"]),
+            (vec![], vec![]),
+        ];
+
+        for (input, expected) in cases {
+            let input_strings: Vec<String> = input.into_iter().map(String::from).collect();
+            let expected_strings: Vec<String> = expected.into_iter().map(String::from).collect();
+            assert_eq!(merge_unique_font_families(input_strings), expected_strings);
+        }
+    }
+}
