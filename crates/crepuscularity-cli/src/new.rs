@@ -58,7 +58,7 @@ fn main_rs(name: &str) -> String {
     let pascal = to_pascal_case(name);
     format!(
         r##"use crepuscularity_gpui::prelude::*;
-use gpui::{{App, Application, WindowOptions}};
+use gpui::{{App, WindowOptions}};
 
 struct {pascal}View {{
     count: i32,
@@ -89,7 +89,7 @@ impl Render for {pascal}View {{
 }}
 
 fn main() {{
-    Application::new().run(|cx: &mut App| {{
+    crepuscularity_gpui::application().run(|cx: &mut App| {{
         use gpui::prelude::*;
         match cx.open_window(WindowOptions::default(), |_win, cx| {{
             cx.new({pascal}View::new)

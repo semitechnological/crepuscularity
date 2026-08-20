@@ -6,9 +6,41 @@ pub use crepuscularity_core::build;
 pub use crepuscularity_macros::{view, view_file};
 pub use crepuscularity_runtime;
 pub use gpui::*;
+pub use gpui_platform;
 pub use pollster::block_on;
 
+/// Create a new GPUI [`Application`] for the current platform.
+///
+/// gpui-ce's platform split removed `Application::new()`; the equivalent is
+/// `gpui_platform::application()`. Re-exported here so consumers call
+/// `crepuscularity_gpui::application()`.
+pub fn application() -> gpui::Application {
+    gpui_platform::application()
+}
+
 pub mod animation;
+
+/// Corner of an element/panel. gpui-ce's core no longer ships a `Corner` enum (it was a
+/// macOS traffic-light/CSD helper in zed 0.2.x), so crepuscularity defines its own for the
+/// `Anchor` ↔ titlebar-corner mapping below.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Corner {
+    TopLeft,
+    TopRight,
+    BottomLeft,
+    BottomRight,
+}
+
+impl From<Anchor> for Corner {
+    fn from(anchor: Anchor) -> Self {
+        match anchor {
+            Anchor::TopLeft | Anchor::TopCenter | Anchor::LeftCenter => Corner::TopLeft,
+            Anchor::TopRight | Anchor::RightCenter => Corner::TopRight,
+            Anchor::BottomLeft => Corner::BottomLeft,
+            Anchor::BottomCenter | Anchor::BottomRight => Corner::BottomRight,
+        }
+    }
+}
 
 pub const GPUI_MANIFEST_DIR: &str = env!("CARGO_MANIFEST_DIR");
 
@@ -45,6 +77,7 @@ pub use gpui_symbols::{Icon, SymbolWeight};
 
 pub mod prelude {
     pub use crate::animation;
+    pub use crate::application;
     pub use crate::gpui_window_options;
     pub use crepuscularity_macros::{view, view_file};
     pub use crepuscularity_runtime;
@@ -71,18 +104,7 @@ pub enum Anchor {
     RightCenter,
 }
 
-impl From<Anchor> for Corner {
-    fn from(anchor: Anchor) -> Self {
-        match anchor {
-            Anchor::TopLeft | Anchor::TopCenter | Anchor::LeftCenter => Corner::TopLeft,
-            Anchor::TopRight | Anchor::RightCenter => Corner::TopRight,
-            Anchor::BottomLeft => Corner::BottomLeft,
-            Anchor::BottomCenter | Anchor::BottomRight => Corner::BottomRight,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub const MAX_BUTTONS_PER_SIDE: usize = 3;
 pub enum WindowButton {
     Minimize,
     Maximize,

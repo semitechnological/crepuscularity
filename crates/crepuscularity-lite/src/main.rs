@@ -515,7 +515,7 @@ fn main() {
         std::env::set_var("CREPUS_LITE_BASE", example_dir.to_str().unwrap_or("."));
     }
 
-    Application::new().run(move |cx: &mut App| {
+    gpui_platform::application().run(move |cx: &mut App| {
         let opts = WindowOptions {
             window_bounds: Some(WindowBounds::Windowed(bounds(
                 point(px(100.), px(100.)),

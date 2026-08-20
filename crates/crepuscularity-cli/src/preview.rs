@@ -24,7 +24,7 @@ pub(crate) fn run_preview(path: std::path::PathBuf) {
         style(path.display().to_string()).cyan().bold()
     );
 
-    Application::new().run(move |cx: &mut gpui::App| {
+    gpui_platform::application().run(move |cx: &mut gpui::App| {
         let opts = WindowOptions {
             app_id: Some(format!("crepuscularity.preview.{display_name}")),
             titlebar: Some(gpui::TitlebarOptions {

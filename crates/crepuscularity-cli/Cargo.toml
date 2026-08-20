@@ -43,7 +43,7 @@ path = "tests/tauri_cli.rs"
 default = ["full"]
 
 # Desktop (GPUI) commands: `crepus new`, `crepus dev`, `crepus preview`.
-desktop = ["dep:gpui", "dep:crepuscularity-runtime"]
+desktop = ["dep:gpui", "dep:gpui_platform", "dep:crepuscularity-runtime"]
 
 # TUI commands: `crepus tui preview`, `crepus benchmark` live dashboard.
 tui = ["dep:ratatui", "dep:crepuscularity-tui"]
@@ -53,7 +53,8 @@ full = ["desktop", "tui"]
 benchmark = []
 
 [dependencies]
-gpui                   = { version = "=0.2.2", default-features = false, features = ["font-kit"], optional = true }
+gpui                   = { git = "https://github.com/gpui-ce/gpui-ce", package = "gpui", default-features = false, features = ["font-kit"], optional = true }
+gpui_platform          = { git = "https://github.com/gpui-ce/gpui-ce", package = "gpui_platform", optional = true }
 crepuscularity-core = { path = "../crepuscularity-core", version = "0.5.0" }
 crepuscularity-runtime = { path = "../crepuscularity-runtime", version = "0.4.19", optional = true }
 crepuscularity-tui = { path = "../crepuscularity-tui", version = "0.4.24", optional = true }

@@ -264,7 +264,7 @@ fn run_hud(cwd: PathBuf, bin_name: String, options: BuildOptions, emit_events: b
     {
         let shared = shared.clone();
         let shutdown = shutdown.clone();
-        gpui::Application::new().run(move |cx: &mut gpui::App| {
+        gpui_platform::application().run(move |cx: &mut gpui::App| {
             open_hud_window(shared, shutdown, cx);
         });
     }

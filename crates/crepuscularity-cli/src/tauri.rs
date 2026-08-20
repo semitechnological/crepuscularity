@@ -194,7 +194,7 @@ fn write_desktop_project(
     fs::write(
         root.join("src/main.rs"),
         format!(
-            "use crepuscularity_gpui::prelude::*;\nuse crepuscularity_gpui::{{bounds, point, size, view_file, WindowBounds}};\n\nstruct CrepusView;\n\nimpl Render for CrepusView {{\n    fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {{\n        view_file!(\"views/main.crepus\")\n    }}\n}}\n\nfn main() {{\n    Application::new().run(|cx: &mut App| {{\n        {opens}\n    }});\n}}\n"
+            "use crepuscularity_gpui::prelude::*;\nuse crepuscularity_gpui::{{bounds, point, size, view_file, WindowBounds}};\n\nstruct CrepusView;\n\nimpl Render for CrepusView {{\n    fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {{\n        view_file!(\"views/main.crepus\")\n    }}\n}}\n\nfn main() {{\n    crepuscularity_gpui::application().run(|cx: &mut App| {{\n        {opens}\n    }});\n}}\n"
         ),
     )
     .map_err(|e| e.to_string())
