@@ -383,16 +383,7 @@ pub fn execute_run(opts: RunOptions) {
                 step_total,
             };
             let (ok, err, step_results) = if let Some(ref b) = t.builtin {
-                run_builtin(
-                    b,
-                    t,
-                    &repo,
-                    &target_dir,
-                    dry_run,
-                    json_out,
-                    verbose,
-                    measure_memory,
-                )
+                run_builtin(b, t, &repo, &ctx)
             } else {
                 run_steps(&t.steps, ctx)
             };
@@ -1208,20 +1199,15 @@ fn run_steps(
     (true, None, results)
 }
 
-#[allow(clippy::too_many_arguments)]
 fn run_builtin(
     builtin: &str,
     target: &BenchTarget,
     repo: &Path,
-    work_dir: &Path,
-    dry_run: bool,
-    json_out: bool,
-    verbose: bool,
-    measure_memory: bool,
+    ctx: &StepRunCtx<'_>,
 ) -> (bool, Option<String>, Vec<JsonStepResult>) {
     let exe = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("crepus"));
     let mut results = Vec::new();
-    let inherit_io = verbose && !json_out && !dry_run;
+    let inherit_io = ctx.verbose && !ctx.json_out && !ctx.dry_run;
 
     match builtin {
         "crepus-web" => {
@@ -1230,17 +1216,17 @@ fn run_builtin(
                 .as_deref()
                 .unwrap_or("examples/advanced/benchmarks/crepus-web");
             let site_path = resolve_path(repo, site);
-            let out_dir = work_dir.join("out");
-            if dry_run {
+            let out_dir = ctx.target_dir.join("out");
+            if ctx.dry_run {
                 print_step_line(
-                    json_out,
-                    verbose,
+                    ctx.json_out,
+                    ctx.verbose,
                     1,
                     1,
                     "crepus web build (--site → --out-dir)",
                     None,
                 );
-                if verbose && !json_out {
+                if ctx.verbose && !ctx.json_out {
                     eprintln!(
                         "            {}",
                         style(format!(
@@ -1263,7 +1249,7 @@ fn run_builtin(
                     }],
                 );
             }
-            if verbose && !json_out {
+            if ctx.verbose && !ctx.json_out {
                 eprintln!(
                     "      {} {}",
                     style("···").dim(),
@@ -1280,7 +1266,7 @@ fn run_builtin(
                 .arg(&site_path)
                 .arg("--out-dir")
                 .arg(&out_dir);
-            let built = exec_tracked(&mut cmd, inherit_io, measure_memory);
+            let built = exec_tracked(&mut cmd, inherit_io, ctx.measure_memory);
             let ms = t0.elapsed().as_millis();
             let (ok, combined, rss) = match built {
                 Ok(x) => x,
@@ -1301,8 +1287,8 @@ fn run_builtin(
                 stderr_tail: err.as_ref().map(|s| tail_str(s)),
             });
             print_step_line(
-                json_out,
-                verbose,
+                ctx.json_out,
+                ctx.verbose,
                 1,
                 1,
                 "crepus web build (--site → --out-dir)",
@@ -1318,17 +1304,17 @@ fn run_builtin(
         }
         "crepus-webext" => {
             let fixture = repo.join("examples/advanced/benchmarks/crepus-webext");
-            let app_dir = work_dir.join("app");
-            if dry_run {
+            let app_dir = ctx.target_dir.join("app");
+            if ctx.dry_run {
                 print_step_line(
-                    json_out,
-                    verbose,
+                    ctx.json_out,
+                    ctx.verbose,
                     1,
                     2,
                     "sync fixture (copy to work dir)",
                     None,
                 );
-                print_step_line(json_out, verbose, 2, 2, "crepus webext build", None);
+                print_step_line(ctx.json_out, ctx.verbose, 2, 2, "crepus webext build", None);
                 return (
                     true,
                     None,
@@ -1350,7 +1336,7 @@ fn run_builtin(
                     ],
                 );
             }
-            if verbose && !json_out {
+            if ctx.verbose && !ctx.json_out {
                 eprintln!(
                     "      {} {}",
                     style("···").dim(),
@@ -1370,8 +1356,8 @@ fn run_builtin(
                     stderr_tail: Some(e.to_string()),
                 });
                 print_step_line(
-                    json_out,
-                    verbose,
+                    ctx.json_out,
+                    ctx.verbose,
                     1,
                     2,
                     "sync fixture (copy to work dir)",
@@ -1388,8 +1374,8 @@ fn run_builtin(
                 stderr_tail: None,
             });
             print_step_line(
-                json_out,
-                verbose,
+                ctx.json_out,
+                ctx.verbose,
                 1,
                 2,
                 "sync fixture (copy to work dir)",
@@ -1404,7 +1390,7 @@ fn run_builtin(
                 );
             }
 
-            if verbose && !json_out {
+            if ctx.verbose && !ctx.json_out {
                 eprintln!(
                     "      {} {}",
                     style("···").dim(),
@@ -1417,7 +1403,7 @@ fn run_builtin(
             let t_build = Instant::now();
             let mut wcmd = Command::new(&exe);
             wcmd.args(["webext", "build", "--app"]).arg(&app_dir);
-            let built = exec_tracked(&mut wcmd, inherit_io, measure_memory);
+            let built = exec_tracked(&mut wcmd, inherit_io, ctx.measure_memory);
             let ms = t_build.elapsed().as_millis();
             let (ok, combined, rss) = match built {
                 Ok(x) => x,
@@ -1438,8 +1424,8 @@ fn run_builtin(
                 stderr_tail: err.as_ref().map(|s| tail_str(s)),
             });
             print_step_line(
-                json_out,
-                verbose,
+                ctx.json_out,
+                ctx.verbose,
                 2,
                 2,
                 "crepus webext build",
@@ -1462,11 +1448,11 @@ fn run_builtin(
                     results,
                 );
             }
-            let target_sub = work_dir.join("cargo-target");
-            if dry_run {
+            let target_sub = ctx.target_dir.join("cargo-target");
+            if ctx.dry_run {
                 print_step_line(
-                    json_out,
-                    verbose,
+                    ctx.json_out,
+                    ctx.verbose,
                     1,
                     1,
                     "cargo build --release (GPUI fixture, CARGO_TARGET_DIR in work)",
@@ -1484,7 +1470,7 @@ fn run_builtin(
                     }],
                 );
             }
-            if verbose && !json_out {
+            if ctx.verbose && !ctx.json_out {
                 eprintln!(
                     "      {} {}",
                     style("···").dim(),
@@ -1500,7 +1486,7 @@ fn run_builtin(
                 .current_dir(&crate_dir)
                 .env("CARGO_TARGET_DIR", &target_sub);
             inject_sdkroot_env(&mut cmd);
-            let built = exec_tracked(&mut cmd, inherit_io, measure_memory);
+            let built = exec_tracked(&mut cmd, inherit_io, ctx.measure_memory);
             let ms = t0.elapsed().as_millis();
             let (ok, combined, rss) = match built {
                 Ok(x) => x,
@@ -1521,8 +1507,8 @@ fn run_builtin(
                 stderr_tail: err.as_ref().map(|s| tail_str(s)),
             });
             print_step_line(
-                json_out,
-                verbose,
+                ctx.json_out,
+                ctx.verbose,
                 1,
                 1,
                 "cargo build --release (GPUI fixture, CARGO_TARGET_DIR in work)",
