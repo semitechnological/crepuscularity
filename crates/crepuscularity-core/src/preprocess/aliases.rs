@@ -167,3 +167,63 @@ pub fn expand_class_list_in_place(classes: &mut Vec<String>, aliases: &HashMap<S
     }
     *classes = out;
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_expand_class_token() {
+        let mut aliases = HashMap::new();
+        aliases.insert("btn".to_string(), "px-4 py-2 bg-blue-500".to_string());
+        aliases.insert("empty".to_string(), "".to_string());
+        aliases.insert("whitespace".to_string(), "   ".to_string());
+
+        assert_eq!(
+            expand_class_token("btn", &aliases),
+            vec![
+                "px-4".to_string(),
+                "py-2".to_string(),
+                "bg-blue-500".to_string()
+            ]
+        );
+
+        assert_eq!(expand_class_token("empty", &aliases), Vec::<String>::new());
+
+        assert_eq!(
+            expand_class_token("whitespace", &aliases),
+            Vec::<String>::new()
+        );
+
+        assert_eq!(
+            expand_class_token("unknown", &aliases),
+            vec!["unknown".to_string()]
+        );
+    }
+
+    #[test]
+    fn test_expand_class_token_owned() {
+        let mut aliases = HashMap::new();
+        aliases.insert("btn".to_string(), "px-4 py-2 bg-blue-500".to_string());
+        aliases.insert("empty".to_string(), "".to_string());
+
+        assert_eq!(
+            expand_class_token_owned("btn".to_string(), &aliases),
+            vec![
+                "px-4".to_string(),
+                "py-2".to_string(),
+                "bg-blue-500".to_string()
+            ]
+        );
+
+        assert_eq!(
+            expand_class_token_owned("empty".to_string(), &aliases),
+            Vec::<String>::new()
+        );
+
+        assert_eq!(
+            expand_class_token_owned("unknown".to_string(), &aliases),
+            vec!["unknown".to_string()]
+        );
+    }
+}
