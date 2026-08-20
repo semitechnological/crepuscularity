@@ -482,4 +482,24 @@ mod tests {
         assert_eq!(parse_color_rgb("#123"), None); // Short hex is not supported
         assert_eq!(parse_color_rgb("[invalid]"), None);
     }
+
+    #[test]
+    fn test_parse_color_rgb_bad_hex_formats() {
+        // Not enough characters
+        assert_eq!(parse_color_rgb("#"), None);
+        assert_eq!(parse_color_rgb("#1"), None);
+        assert_eq!(parse_color_rgb("#12"), None);
+        assert_eq!(parse_color_rgb("#1234"), None);
+        assert_eq!(parse_color_rgb("#12345"), None);
+
+        // Invalid hex characters
+        assert_eq!(parse_color_rgb("#zzzzzz"), None);
+        assert_eq!(parse_color_rgb("#12345g"), None);
+        assert_eq!(parse_color_rgb("#-12345"), None);
+        assert_eq!(parse_color_rgb("#      "), None);
+
+        // 0x prefix
+        assert_eq!(parse_color_rgb("0xzzzzzz"), None);
+        assert_eq!(parse_color_rgb("0x123"), None);
+    }
 }
