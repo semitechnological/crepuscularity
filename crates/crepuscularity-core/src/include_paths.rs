@@ -142,4 +142,27 @@ mod tests {
         let err = resolve_include_path(Some(site.path()), "escape/secret.crepus").unwrap_err();
         assert!(err.to_string().contains("include path outside base dir"));
     }
+
+    #[test]
+    fn include_path_resolves_missing_file_with_base_dir() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let base = dir.path();
+        let res = resolve_include_path(Some(base), "missing.crepus").unwrap();
+        let expected = std::fs::canonicalize(base).expect("canonicalize").join("missing.crepus");
+        assert_eq!(res, expected);
+    }
+
+    #[test]
+    fn include_path_resolves_with_synthetic_base_dir() {
+        let dir = std::env::temp_dir().join("crepus-synthetic-dir-doesnotexist-12345");
+        let res = resolve_include_path(Some(&dir), "virtual.crepus").unwrap();
+        assert_eq!(res, dir.join("virtual.crepus"));
+    }
+
+    #[test]
+    fn include_path_resolves_without_base_dir_but_file_exists() {
+        let res = resolve_include_path(None, "src/lib.rs").unwrap();
+        let expected = std::fs::canonicalize("src/lib.rs").expect("canonicalize");
+        assert_eq!(res, expected);
+    }
 }
