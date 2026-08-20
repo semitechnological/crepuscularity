@@ -190,3 +190,26 @@ impl EventDispatcher {
         DispatchResult::NotHandled
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_focused() {
+        let mut focus_manager = FocusManager::new();
+        focus_manager.set_focusable_ids(vec!["button1".to_string(), "button2".to_string()]);
+
+        assert!(focus_manager.is_focused("button1"));
+        assert!(!focus_manager.is_focused("button2"));
+        assert!(!focus_manager.is_focused("button3"));
+
+        assert!(focus_manager.focus("button2"));
+        assert!(!focus_manager.is_focused("button1"));
+        assert!(focus_manager.is_focused("button2"));
+
+        focus_manager.set_focusable_ids(vec![]);
+        assert!(!focus_manager.is_focused("button1"));
+        assert!(!focus_manager.is_focused("button2"));
+    }
+}
