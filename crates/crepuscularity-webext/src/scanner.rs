@@ -5,6 +5,7 @@
 
 use std::collections::HashMap;
 use std::path::Path;
+use std::sync::OnceLock;
 
 use crate::capabilities::{Capability, CapabilitySet};
 
@@ -18,75 +19,78 @@ pub struct CapabilityUsage {
 }
 
 /// Map of browser API patterns to required capabilities.
-fn api_capability_map() -> HashMap<&'static str, Capability> {
-    let mut map = HashMap::new();
+fn api_capability_map() -> &'static HashMap<&'static str, Capability> {
+    static MAP: OnceLock<HashMap<&'static str, Capability>> = OnceLock::new();
+    MAP.get_or_init(|| {
+        let mut map = HashMap::new();
 
-    // Storage API
-    map.insert("browser.storage", Capability::Storage);
-    map.insert("chrome.storage", Capability::Storage);
-    map.insert("storage.local", Capability::Storage);
-    map.insert("storage.sync", Capability::Storage);
+        // Storage API
+        map.insert("browser.storage", Capability::Storage);
+        map.insert("chrome.storage", Capability::Storage);
+        map.insert("storage.local", Capability::Storage);
+        map.insert("storage.sync", Capability::Storage);
 
-    // Messaging API
-    map.insert("browser.runtime.sendMessage", Capability::Messaging);
-    map.insert("chrome.runtime.sendMessage", Capability::Messaging);
-    map.insert("browser.runtime.connect", Capability::Messaging);
-    map.insert("chrome.runtime.connect", Capability::Messaging);
-    map.insert("runtime.onMessage", Capability::Messaging);
+        // Messaging API
+        map.insert("browser.runtime.sendMessage", Capability::Messaging);
+        map.insert("chrome.runtime.sendMessage", Capability::Messaging);
+        map.insert("browser.runtime.connect", Capability::Messaging);
+        map.insert("chrome.runtime.connect", Capability::Messaging);
+        map.insert("runtime.onMessage", Capability::Messaging);
 
-    // Tabs API
-    map.insert("browser.tabs", Capability::Tabs);
-    map.insert("chrome.tabs", Capability::Tabs);
+        // Tabs API
+        map.insert("browser.tabs", Capability::Tabs);
+        map.insert("chrome.tabs", Capability::Tabs);
 
-    // Notifications
-    map.insert("browser.notifications", Capability::Notifications);
-    map.insert("chrome.notifications", Capability::Notifications);
+        // Notifications
+        map.insert("browser.notifications", Capability::Notifications);
+        map.insert("chrome.notifications", Capability::Notifications);
 
-    // Clipboard
-    map.insert("navigator.clipboard", Capability::Clipboard);
-    map.insert("browser.clipboard", Capability::Clipboard);
+        // Clipboard
+        map.insert("navigator.clipboard", Capability::Clipboard);
+        map.insert("browser.clipboard", Capability::Clipboard);
 
-    // History
-    map.insert("browser.history", Capability::History);
-    map.insert("chrome.history", Capability::History);
+        // History
+        map.insert("browser.history", Capability::History);
+        map.insert("chrome.history", Capability::History);
 
-    // Bookmarks
-    map.insert("browser.bookmarks", Capability::Bookmarks);
-    map.insert("chrome.bookmarks", Capability::Bookmarks);
+        // Bookmarks
+        map.insert("browser.bookmarks", Capability::Bookmarks);
+        map.insert("chrome.bookmarks", Capability::Bookmarks);
 
-    // Downloads
-    map.insert("browser.downloads", Capability::Downloads);
-    map.insert("chrome.downloads", Capability::Downloads);
+        // Downloads
+        map.insert("browser.downloads", Capability::Downloads);
+        map.insert("chrome.downloads", Capability::Downloads);
 
-    // WebRequest
-    map.insert("browser.webRequest", Capability::WebRequest);
-    map.insert("chrome.webRequest", Capability::WebRequest);
+        // WebRequest
+        map.insert("browser.webRequest", Capability::WebRequest);
+        map.insert("chrome.webRequest", Capability::WebRequest);
 
-    // Cookies
-    map.insert("browser.cookies", Capability::Cookies);
-    map.insert("chrome.cookies", Capability::Cookies);
+        // Cookies
+        map.insert("browser.cookies", Capability::Cookies);
+        map.insert("chrome.cookies", Capability::Cookies);
 
-    // Identity
-    map.insert("browser.identity", Capability::Identity);
-    map.insert("chrome.identity", Capability::Identity);
+        // Identity
+        map.insert("browser.identity", Capability::Identity);
+        map.insert("chrome.identity", Capability::Identity);
 
-    // Scripting
-    map.insert("browser.scripting", Capability::Scripting);
-    map.insert("chrome.scripting", Capability::Scripting);
+        // Scripting
+        map.insert("browser.scripting", Capability::Scripting);
+        map.insert("chrome.scripting", Capability::Scripting);
 
-    // Alarms
-    map.insert("browser.alarms", Capability::Alarms);
-    map.insert("chrome.alarms", Capability::Alarms);
+        // Alarms
+        map.insert("browser.alarms", Capability::Alarms);
+        map.insert("chrome.alarms", Capability::Alarms);
 
-    // Context menus
-    map.insert("browser.contextMenus", Capability::ContextMenus);
-    map.insert("chrome.contextMenus", Capability::ContextMenus);
-    map.insert("browser.menus", Capability::ContextMenus);
+        // Context menus
+        map.insert("browser.contextMenus", Capability::ContextMenus);
+        map.insert("chrome.contextMenus", Capability::ContextMenus);
+        map.insert("browser.menus", Capability::ContextMenus);
 
-    // Geolocation
-    map.insert("navigator.geolocation", Capability::Geolocation);
+        // Geolocation
+        map.insert("navigator.geolocation", Capability::Geolocation);
 
-    map
+        map
+    })
 }
 
 /// Scan a .crepus file for browser API usage in expression slots and return detected capabilities.
@@ -103,7 +107,7 @@ pub fn scan_content_for_capabilities(content: &str, file_name: &str) -> Vec<Capa
     let mut usages = Vec::new();
 
     for (line_num, line) in content.lines().enumerate() {
-        for (api_pattern, capability) in &api_map {
+        for (api_pattern, capability) in api_map {
             if line.contains(api_pattern) {
                 usages.push(CapabilityUsage {
                     capability: capability.clone(),
