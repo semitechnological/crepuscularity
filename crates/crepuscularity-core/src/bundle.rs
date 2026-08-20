@@ -35,3 +35,84 @@ pub fn parse_bundle(bundle_json: &str) -> Result<Bundle, CrepusError> {
     }
     Ok(Bundle { entry, files })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_valid_bundle() {
+        let json = r#"{
+            "entry": "main.crepus",
+            "files": {
+                "main.crepus": "hello",
+                "other.crepus": "world"
+            }
+        }"#;
+        let bundle = parse_bundle(json).unwrap();
+        assert_eq!(bundle.entry, "main.crepus");
+        assert_eq!(bundle.files.len(), 2);
+        assert_eq!(bundle.files["main.crepus"], "hello");
+        assert_eq!(bundle.files["other.crepus"], "world");
+    }
+
+    #[test]
+    fn test_parse_invalid_json() {
+        let err = parse_bundle("{ invalid json }").unwrap_err();
+        assert!(err.to_string().contains("bundle JSON:"));
+    }
+
+    #[test]
+    fn test_missing_entry_errors() {
+        let json = r#"{
+            "files": {
+                "main.crepus": "hello"
+            }
+        }"#;
+        let err = parse_bundle(json).unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "render error: bundle missing string field \"entry\""
+        );
+    }
+
+    #[test]
+    fn test_missing_files() {
+        let json = r#"{
+            "entry": "main.crepus"
+        }"#;
+        let err = parse_bundle(json).unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "render error: bundle missing \"files\" object"
+        );
+    }
+
+    #[test]
+    fn test_files_not_object() {
+        let json = r#"{
+            "entry": "main.crepus",
+            "files": []
+        }"#;
+        let err = parse_bundle(json).unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "render error: \"files\" must be a JSON object"
+        );
+    }
+
+    #[test]
+    fn test_files_non_string_value() {
+        let json = r#"{
+            "entry": "main.crepus",
+            "files": {
+                "main.crepus": 42
+            }
+        }"#;
+        let err = parse_bundle(json).unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "render error: files[\"main.crepus\"] must be a string"
+        );
+    }
+}
