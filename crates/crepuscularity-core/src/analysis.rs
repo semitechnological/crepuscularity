@@ -377,6 +377,21 @@ mod tests {
         });
         assert_eq!(classify_node(&embed_node), Region::Dynamic);
 
+        let match_node_with_arms = Node::Match(MatchBlock {
+            expr: "val".to_string(),
+            arms: vec![
+                MatchArm {
+                    pattern: "1".to_string(),
+                    body: vec![Node::Text(vec![TextPart::Literal("One".to_string())])],
+                },
+                MatchArm {
+                    pattern: "_".to_string(),
+                    body: vec![Node::Text(vec![TextPart::Expr("other".to_string())])],
+                },
+            ],
+        });
+        assert_eq!(classify_node_inner(&match_node_with_arms), (Region::Dynamic, 2));
+
         let raw_text = Node::RawText("text".to_string());
         assert_eq!(classify_node(&raw_text), Region::Dynamic);
 
