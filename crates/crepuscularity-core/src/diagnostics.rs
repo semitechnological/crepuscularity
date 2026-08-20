@@ -125,5 +125,10 @@ mod tests {
         assert!(!is_multi_component_file(""));
         assert!(!is_multi_component_file("   "));
         assert!(!is_multi_component_file("abc\n+++"));
+
+        // `---` lines are body-section headers, not multi-component frontmatter
+        assert!(!is_multi_component_file("---component"));
+        assert!(!is_multi_component_file("--- component"));
+        assert!(!is_multi_component_file("   ---component"));
     }
 }
