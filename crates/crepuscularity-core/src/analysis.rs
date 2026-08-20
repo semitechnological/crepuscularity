@@ -390,7 +390,10 @@ mod tests {
                 },
             ],
         });
-        assert_eq!(classify_node_inner(&match_node_with_arms), (Region::Dynamic, 2));
+        assert_eq!(
+            classify_node_inner(&match_node_with_arms),
+            (Region::Dynamic, 2)
+        );
 
         let raw_text = Node::RawText("text".to_string());
         assert_eq!(classify_node(&raw_text), Region::Dynamic);
