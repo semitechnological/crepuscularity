@@ -749,7 +749,8 @@ fn jsx_demo_example_renders_include() {
 
 #[test]
 fn components_demo_renders_slot_content() {
-    let template = fs::read_to_string(examples_dir().join("showcase/components-demo.crepus")).unwrap();
+    let template =
+        fs::read_to_string(examples_dir().join("showcase/components-demo.crepus")).unwrap();
 
     let mut ctx = TemplateContext::new();
     ctx.base_dir = Some(examples_dir().join("showcase"));
