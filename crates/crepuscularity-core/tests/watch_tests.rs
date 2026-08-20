@@ -111,7 +111,7 @@ fn test_handle_watcher_event() {
         attrs: Default::default(),
     };
     watch::handle_watcher_event(Ok(event), &changed, &target, &watch_root, "test");
-    assert_eq!(*changed.lock().unwrap(), true);
+    assert!(*changed.lock().unwrap());
 
     *changed.lock().unwrap() = false;
 
@@ -122,7 +122,7 @@ fn test_handle_watcher_event() {
         attrs: Default::default(),
     };
     watch::handle_watcher_event(Ok(event), &changed, &target, &watch_root, "test");
-    assert_eq!(*changed.lock().unwrap(), false);
+    assert!(!*changed.lock().unwrap());
 
     // Err event shouldn't panic
     watch::handle_watcher_event(
@@ -132,5 +132,5 @@ fn test_handle_watcher_event() {
         &watch_root,
         "test",
     );
-    assert_eq!(*changed.lock().unwrap(), false);
+    assert!(!*changed.lock().unwrap());
 }
