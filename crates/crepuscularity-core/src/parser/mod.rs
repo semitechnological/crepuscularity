@@ -115,6 +115,7 @@ pub struct ComponentDef {
 /// ```
 ///
 /// Components are then included with `include components.crepus#Card title="Hello"`.
+#[derive(Debug)]
 pub struct ComponentFile {
     pub components: HashMap<String, ComponentDef>,
 }

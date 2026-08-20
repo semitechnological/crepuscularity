@@ -226,10 +226,8 @@ fn detect_completion_context(prefix: &str) -> CompletionCtx {
         // Inside a JSX tag if no `>` has closed it on this line yet.
         if !trimmed_start.contains('>') {
             // Inside an attribute area only after the first space.
-            if let Some(pos) = trimmed_start.find(char::is_whitespace) {
-                if prefix.len() > prefix.trim_start().len() + pos + 1 {
-                    return CompletionCtx::Classes;
-                }
+            if trimmed_start.contains(char::is_whitespace) {
+                return CompletionCtx::Classes;
             }
             return CompletionCtx::JsxTag;
         }
@@ -536,6 +534,35 @@ mod tests {
         let labels: Vec<&str> = items.iter().map(|i| i.label.as_str()).collect();
         assert!(labels.contains(&"div"));
         assert!(labels.contains(&"if"));
+    }
+
+    #[test]
+    fn jsx_partial_tag_still_offers_tags() {
+        let items = completion_items("<div", position(0, 4));
+        let labels: Vec<&str> = items.iter().map(|i| i.label.as_str()).collect();
+        assert!(labels.contains(&"div"));
+        assert!(labels.contains(&"if"));
+    }
+
+    #[test]
+    fn jsx_attribute_area_offers_classes() {
+        let items = completion_items("<div ", position(0, 5));
+        let labels: Vec<&str> = items.iter().map(|i| i.label.as_str()).collect();
+        assert!(labels.contains(&"flex"));
+        assert!(labels.contains(&"text-white"));
+        assert!(
+            !labels.contains(&"if"),
+            "attribute slot should not offer tag completions"
+        );
+    }
+
+    #[test]
+    fn indented_jsx_attribute_area_offers_classes() {
+        let source = "  <button ";
+        let items = completion_items(source, position(0, 10));
+        let labels: Vec<&str> = items.iter().map(|i| i.label.as_str()).collect();
+        assert!(labels.contains(&"flex"));
+        assert!(!labels.contains(&"if"));
     }
 
     #[test]
