@@ -1133,9 +1133,9 @@ fn quoted_crepus_text(trimmed: &str) -> Option<String> {
 
 fn attr_value(line: &str, name: &str) -> Option<String> {
     let needle = format!("{name}=\"");
-    let start = line.find(&needle)? + needle.len();
-    let end = line[start..].find('"')? + start;
-    Some(line[start..end].to_string())
+    let (_, remainder) = line.split_once(&needle)?;
+    let (value, _) = remainder.split_once('"')?;
+    Some(value.to_string())
 }
 
 fn llms_base_url(llms: &crate::crepus_toml::LlmsConfig, head: &SiteHead) -> String {
