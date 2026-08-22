@@ -23,9 +23,11 @@ oxc = ["dep:oxc_allocator", "dep:oxc_codegen", "dep:oxc_parser", "dep:oxc_semant
 crepuscularity-core = { path = "../crepuscularity-core", version = "0.5.0" }
 arboard = "3.6"
 dirs = "6"
-gpui = { workspace = true, features = ["runtime_shaders"] }
+gpui = { workspace = true }
+gpui_platform = { workspace = true, features = ["runtime_shaders"] }
 open = "5.3"
 notify-debouncer-mini = "0.7"
+palette = { version = "0.7", features = ["serializing"] }
 reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls"] }
 serde = { workspace = true }
 serde_json.workspace = true

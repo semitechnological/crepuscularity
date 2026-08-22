@@ -1291,7 +1291,6 @@ fn map_class(class: &str) -> Option<TokenStream2> {
     map_class_to_style(class)
 }
 
-#[cfg(feature = "gpui_text_run_styles")]
 fn gpui_text_run_class(class: &str) -> Option<TokenStream2> {
     match class {
         "uppercase" => Some(quote! { .text_transform(::gpui::TextTransform::Uppercase) }),
@@ -1306,11 +1305,6 @@ fn gpui_text_run_class(class: &str) -> Option<TokenStream2> {
         "tracking-widest" => Some(quote! { .letter_spacing(::gpui::px(5.0)) }),
         _ => None,
     }
-}
-
-#[cfg(not(feature = "gpui_text_run_styles"))]
-fn gpui_text_run_class(_class: &str) -> Option<TokenStream2> {
-    None
 }
 
 fn map_class_to_style(class: &str) -> Option<TokenStream2> {
@@ -1552,7 +1546,6 @@ fn parse_dynamic_class(class: &str) -> Option<TokenStream2> {
     }
 
     // tracking-[Npx] / tracking-[Nrem]
-    #[cfg(feature = "gpui_text_run_styles")]
     if let Some(rest) = class.strip_prefix("tracking-[") {
         if let Some(inner) = rest.strip_suffix(']') {
             if let Some(tokens) = arbitrary_length(inner) {

@@ -1,4 +1,3 @@
-#[cfg(feature = "gpui_text_run_styles")]
 use gpui::TextTransform;
 /// Runtime Tailwind class → GPUI style applicator.
 ///
@@ -168,9 +167,9 @@ fn apply_layout(d: Div, class: &str) -> Result<Div, Div> {
         "flex-auto" => d.flex_auto(),
         "flex-initial" => d.flex_initial(),
         "flex-none" => d.flex_none(),
-        "grow" => d.flex_grow(),
+        "grow" => d.flex_grow(1.0),
         "grow-0" => d.flex_none(),
-        "shrink" => d.flex_shrink(),
+        "shrink" => d.flex_shrink(1.0),
         "shrink-0" => d.flex_shrink_0(),
 
         // ── Justify content ──
@@ -385,17 +384,11 @@ fn apply_typography(d: Div, class: &str) -> Result<Div, Div> {
         "whitespace-nowrap" => d.whitespace_nowrap(),
         "whitespace-normal" => d.whitespace_normal(),
 
-        // ── Text transform (GPUI APIs newer than crates.io 0.2.2; vendored gpui in this repo) ──
-        #[cfg(feature = "gpui_text_run_styles")]
+        // ── Text transform (gpui-ce provides TextTransform natively) ──
         "uppercase" => d.text_transform(TextTransform::Uppercase),
-        #[cfg(feature = "gpui_text_run_styles")]
         "lowercase" => d.text_transform(TextTransform::Lowercase),
-        #[cfg(feature = "gpui_text_run_styles")]
         "capitalize" => d.text_transform(TextTransform::Capitalize),
-        #[cfg(feature = "gpui_text_run_styles")]
         "normal-case" => d.text_transform(TextTransform::None),
-        #[cfg(not(feature = "gpui_text_run_styles"))]
-        "uppercase" | "lowercase" | "capitalize" | "normal-case" => d,
         _ => return Err(d),
     })
 }
@@ -533,6 +526,7 @@ fn apply_shadows(d: Div, class: &str) -> Result<Div, Div> {
             offset: point(px(0.), px(0.)),
             blur_radius: px(0.),
             spread_radius: px(3.),
+            inset: false,
         }]),
         "ring-0" => d.shadow_none(),
         "ring-1" => d.shadow(vec![BoxShadow {
@@ -540,24 +534,28 @@ fn apply_shadows(d: Div, class: &str) -> Result<Div, Div> {
             offset: point(px(0.), px(0.)),
             blur_radius: px(0.),
             spread_radius: px(1.),
+            inset: false,
         }]),
         "ring-2" => d.shadow(vec![BoxShadow {
             color: hsla(0.603, 0.912, 0.602, 0.5),
             offset: point(px(0.), px(0.)),
             blur_radius: px(0.),
             spread_radius: px(2.),
+            inset: false,
         }]),
         "ring-4" => d.shadow(vec![BoxShadow {
             color: hsla(0.603, 0.912, 0.602, 0.5),
             offset: point(px(0.), px(0.)),
             blur_radius: px(0.),
             spread_radius: px(4.),
+            inset: false,
         }]),
         "ring-8" => d.shadow(vec![BoxShadow {
             color: hsla(0.603, 0.912, 0.602, 0.5),
             offset: point(px(0.), px(0.)),
             blur_radius: px(0.),
             spread_radius: px(8.),
+            inset: false,
         }]),
         "ring-inset" => d, // GPUI has no inset shadow; accepted silently
         _ => return Err(d),
@@ -824,8 +822,7 @@ fn apply_dynamic(d: Div, class: &str) -> Div {
         }
     }
 
-    // ── tracking-* (letter-spacing) — same gpui_text_run_styles gating as macros/view! ──
-    #[cfg(feature = "gpui_text_run_styles")]
+    // ── tracking-* (letter-spacing) — gpui-ce provides letter_spacing natively ──
     {
         match class {
             "tracking-tighter" => return d.letter_spacing(px(-2.0)),
@@ -881,6 +878,7 @@ fn apply_dynamic(d: Div, class: &str) -> Div {
                     offset: point(px(0.), px(0.)),
                     blur_radius: px(0.),
                     spread_radius: spread,
+                    inset: false,
                 }]);
             }
         }

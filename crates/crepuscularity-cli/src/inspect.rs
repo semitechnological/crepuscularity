@@ -151,7 +151,7 @@ fn launch_viewer(
     vars: Vec<(String, TemplateValue)>,
 ) {
     use crepuscularity_runtime::{HotReloadState, HotReloadView};
-    use gpui::{bounds, point, prelude::*, size, Application, WindowOptions};
+    use gpui::{bounds, point, prelude::*, size, WindowOptions};
 
     let mut ctx = TemplateContext::new();
     for (k, v) in vars {
@@ -168,7 +168,7 @@ fn launch_viewer(
     eprintln!("crepus inspect: window {}x{}", width as u32, height as u32);
     eprintln!("crepus inspect: edit and save to hot-reload");
 
-    Application::new().run(move |cx: &mut gpui::App| {
+    gpui_platform::application().run(move |cx: &mut gpui::App| {
         let window_options = WindowOptions {
             app_id: Some(format!("crepuscularity.inspect.{}", display_name)),
             titlebar: Some(gpui::TitlebarOptions {
