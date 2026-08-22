@@ -1,7 +1,7 @@
 use std::ffi::c_void;
 
 use crepuscularity_gpui::prelude::*;
-use gpui::{bounds, point, size, Application, ClickEvent};
+use gpui::{bounds, point, size, App, ClickEvent};
 
 type CurrentTrackCallback = unsafe extern "C" fn(*mut c_void, i32, *mut u8, usize) -> i32;
 type TrackActionCallback = unsafe extern "C" fn(
@@ -270,7 +270,7 @@ impl Render for ScrobblerApp {
 
 #[no_mangle]
 pub extern "C" fn crepus_local_scrobbler_run(callbacks: CrepusScrobblerCallbacks) -> i32 {
-    Application::new().run(move |cx: &mut App| {
+    gpui_platform::application().run(move |cx: &mut App| {
         let options = gpui_window_options(
             "crepuscularity.local-scrobbler.zig",
             "Local Scrobbler",

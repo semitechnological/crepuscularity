@@ -49,6 +49,7 @@ pub const GPUI_MANIFEST_DIR: &str = env!("CARGO_MANIFEST_DIR");
 /// Mirrors Zed's `AnyView::cached` pattern: previous layout/paint is reused unless
 /// the child entity called `cx.notify()` (or the window is force-refreshed).
 /// Style must fill the parent slot — default style lays out as empty block.
+#[deprecated(note = "gpui-ce no longer exposes a public `.cached()` API on AnyView; this is now an identity conversion and should be removed from callers")]
 pub fn cached_view(view: impl Into<AnyView>) -> AnyView {
     view.into()
 }
@@ -71,9 +72,6 @@ pub fn gpui_window_options(
     }
 }
 
-#[cfg(feature = "symbols")]
-pub use gpui_symbols::{Icon, SymbolWeight};
-
 pub mod prelude {
     pub use crate::animation;
     pub use crate::application;
@@ -86,8 +84,6 @@ pub mod prelude {
         Application, Context, Entity, FontWeight, IntoElement, Render, SharedString, Window,
         WindowOptions,
     };
-    #[cfg(feature = "symbols")]
-    pub use gpui_symbols::{Icon, SymbolWeight};
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]

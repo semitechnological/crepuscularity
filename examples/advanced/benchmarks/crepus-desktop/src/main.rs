@@ -1,5 +1,5 @@
 use crepuscularity_gpui::prelude::*;
-use gpui::{App, Application, WindowOptions};
+use gpui::{App, WindowOptions};
 
 struct BenchView {
     count: i32,
@@ -30,7 +30,7 @@ impl Render for BenchView {
 }
 
 fn main() {
-    Application::new().run(|cx: &mut App| {
+    gpui_platform::application().run(|cx: &mut App| {
         use gpui::prelude::*;
         cx.open_window(WindowOptions::default(), |_win, cx| cx.new(BenchView::new))
             .unwrap();
