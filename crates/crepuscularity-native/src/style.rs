@@ -473,7 +473,6 @@ fn apply_text_class(s: &mut ViewStyle, class: &str, ctx: Option<&TemplateContext
 
     if let Some(r) = parse_border_radius(class) {
         s.corner_radius = Some(r);
-        return;
     }
 }
 
