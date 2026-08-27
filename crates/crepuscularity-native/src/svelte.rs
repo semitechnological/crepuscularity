@@ -2,6 +2,7 @@
 //! JSX emitter but targeting Svelte 5 runes/markup instead of React/JSX.
 
 use crate::ir::{ViewIr, ViewNode, ViewStyle};
+use crate::utils::html_text;
 
 /// Emit a complete Svelte 5 `.svelte` single-file component from `ir`.
 ///
@@ -27,20 +28,6 @@ pub fn emit_svelte_component(ir: &ViewIr) -> String {
 {markup}
 "#
     )
-}
-
-/// HTML-escape text content: `&`, `<`, `>`.
-fn html_text(s: &str) -> String {
-    let mut out = String::with_capacity(s.len());
-    for c in s.chars() {
-        match c {
-            '&' => out.push_str("&amp;"),
-            '<' => out.push_str("&lt;"),
-            '>' => out.push_str("&gt;"),
-            c => out.push(c),
-        }
-    }
-    out
 }
 
 /// HTML-escape an attribute value: `&`, `<`, `>`, `"`.

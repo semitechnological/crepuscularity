@@ -3,6 +3,7 @@
 //! of React/JSX.
 
 use crate::ir::{ViewIr, ViewNode, ViewStyle};
+use crate::utils::html_text;
 
 /// Emit a complete Vue 3 `.vue` single-file component from `ir`.
 ///
@@ -30,20 +31,6 @@ function toArray(v: unknown): any[] {{
 </template>
 "#
     )
-}
-
-/// HTML-escape text content: `&`, `<`, `>`.
-fn html_text(s: &str) -> String {
-    let mut out = String::with_capacity(s.len());
-    for c in s.chars() {
-        match c {
-            '&' => out.push_str("&amp;"),
-            '<' => out.push_str("&lt;"),
-            '>' => out.push_str("&gt;"),
-            c => out.push(c),
-        }
-    }
-    out
 }
 
 /// HTML-escape an attribute value: `&`, `<`, `>`, `"`.
